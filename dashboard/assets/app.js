@@ -49,7 +49,7 @@ try { localStorage.removeItem("gex.page"); } catch(e) {}
 let impactF = store.get("gex.impact", "med");       // high | med | all
 let curF = store.get("gex.cur", "USD");             // USD | all
 let news = null;
-const VIEW_IDS = ["levels", "gamma", "vol", "timeline", "bias", "track", "strategies", "briefings", "news", "indicator", "library"];
+const VIEW_IDS = ["levels", "gamma", "vol", "timeline", "bias", "track", "briefings", "news", "indicator", "library"];
 function setPage(p){
   if(!VIEW_IDS.includes(p)) p = "levels";
   page = p;
@@ -64,7 +64,7 @@ function setPage(p){
   if(p === "indicator") loadIndicator();
   if(p === "timeline") loadTimeline();
   if(p === "library") renderLibrary();
-  if(p === "track" || p === "strategies") loadTrack();
+  if(p === "track") loadTrack();
   if(!NO_MARKET_PAGES.includes(p) && data) render();
   $("explainTab").title = "Explain this page (X)";
 }
@@ -543,9 +543,9 @@ function renderMaxPain(X){
 // =====================================================================================================
 const PAGES = [
   ["levels", "Levels", "LVL"], ["gamma", "Gamma lab", "GEX"], ["vol", "Volatility", "VOL"], ["timeline", "Timeline", "TL"],
-  ["bias", "Bias", "BIAS"], ["track", "Track record", "TRK"], ["strategies", "Strategies", "STR"], ["briefings", "Briefings", "BRF"], ["news", "News", "NEWS"], ["indicator", "Indicator", "IND"],
+  ["bias", "Bias", "BIAS"], ["track", "Track record", "TRK"], ["briefings", "Briefings", "BRF"], ["news", "News", "NEWS"], ["indicator", "Indicator", "IND"],
   ["library", "Library", "LIB"]];
-const NO_MARKET_PAGES = ["news", "indicator", "briefings", "library", "track", "strategies"];
+const NO_MARKET_PAGES = ["news", "indicator", "briefings", "library", "track"];
 const pickP = v => v && typeof v === "object" ? v.price : v;
 const curW = () => data && (data.workers.find(x => x.market === market && x.result) || data.workers.find(x => x.market === market));
 
@@ -835,19 +835,10 @@ const HELP = {
     body: `<p>Bars count sessions by how many expected moves (σ) the close moved. The grey curve is a normal distribution, the shape the band assumes.</p><p>Real markets have a taller middle (most days are quieter than implied) and fatter tails (the big days are bigger than a normal curve allows). That's why a band can hold most days and still be blown through on a few.</p>`},
   backtest_vol: {title: "By volatility level", tldr: "Does the band hold better in calm or stressed markets?",
     body: `<p>Sessions split into five equal groups by the vol index the evening before. Compare the close-inside rate and the breaks across the groups to see when the band is most and least reliable.</p>`},
-  strategies: {title: "Futures strategy lab", tldr: "Futures rules built on options data, listed only when they pass every test.",
-    body: `<p>Each rule turns an options signal into a futures trade on ES or NQ: the expected move, the VIX term structure, intraday VIX, or GEX PRO's gamma levels. Every rule is fixed before it is tested.</p><p>It must make money after costs over the last 3 years on both ES and NQ, in both halves of that period. Swing rules must also hold up on 2010-2023 data that was never used to choose them. Only rules that pass everything are listed as strategies.</p><p><b>R</b> is profit per trade in expected moves, and the $ figure is per full-size contract ($50 per ES point, $20 per NQ point).</p>`,
-    watch: ["Zero passed so far: there is no proven futures strategy here yet", "The forward test grows with every graded session"]},
-  strat_proven: {title: "Proven strategies", tldr: "Rules that passed every test. Empty until one does.",
-    body: `<p>A strategy appears here automatically once it passes: as the 3-year window rolls forward, or when a GEX-level rule collects 30+ trades with a significant profit. Nothing unproven is shown as a strategy.</p>`},
-  strat_log: {title: "Research log", tldr: "Every rule tested, with its numbers and the reason it failed.",
-    body: `<p>Each cell shows trades, the average profit per trade in expected moves (R), and the average in dollars per contract after costs. <b>Out of sample</b> is 2010 up to the 3-year window: data the rule never saw. A rule can be profitable and still fail when its profit is too small to rule out luck (t below the bar), or when one half of the period lost money.</p>`},
-  strat_gex: {title: "Forward test on GEX levels", tldr: "Rules on GEX PRO's real walls, zero gamma and regime, tested as sessions are graded.",
-    body: `<p>History has no free gamma data, so these rules can only be tested on the sessions the track record has frozen since it started. Each is run on that day's hourly bars with the plan made before the open. Results are shown once a rule has 30 trades.</p>`},
   paste: {title: "The hourly paste", tldr: "One text block that carries all levels to TradingView.",
     body: `<p>Published every hour on the hour (ET). One paste holds NQ and ES; each chart draws only its own market. The indicator marks levels stale after 90 minutes.</p>`},
 };
-const PAGE_HELP = {levels: "regime", gamma: "gamma_curve", vol: "term", timeline: "timeline", bias: "bias", briefings: "briefings", news: "calendar", indicator: "indicator", library: "library", track: "track", strategies: "strategies"};
+const PAGE_HELP = {levels: "regime", gamma: "gamma_curve", vol: "term", timeline: "timeline", bias: "bias", briefings: "briefings", news: "calendar", indicator: "indicator", library: "library", track: "track"};
 let exKey = null;
 function openExplain(key){
   const h = HELP[key]; if(!h) return;
@@ -930,7 +921,7 @@ $("cmd").addEventListener("keydown", e => {
 });
 
 // ---------- keyboard
-const KEYS = [["/  or  Ctrl+K", "Command line"], ["1 - 9, 0", "Pages (Levels, Gamma lab, Volatility, Timeline, Bias, Track record, Strategies, Briefings, News, Indicator); type LIB for the Library"],
+const KEYS = [["/  or  Ctrl+K", "Command line"], ["1 - 9, 0", "Pages (Levels, Gamma lab, Volatility, Timeline, Bias, Track record, Briefings, News, Indicator, Library)"],
   ["N  /  E", "Switch to NQ / ES"], ["X", "Explain this page"], ["T", "Light / dark mode"], ["C", "Copy the TradingView paste"], ["?", "This list"], ["Esc", "Close panels"]];
 function showKeys(on){ $("keys").hidden = !on; if(on) $("keysGrid").innerHTML = KEYS.map(([k, d]) => `<kbd>${esc(k)}</kbd><span>${esc(d)}</span>`).join(""); }
 $("keysBtn").onclick = () => showKeys(true);
@@ -1018,7 +1009,7 @@ let trk = null, trkM = store.get("gex.trkm", "ALL"), btM = store.get("gex.btm", 
 async function loadTrack(){
   try { trk = await (await fetch(API.track, {cache: "no-store"})).json(); }
   catch(e){ trk = trk || {error: OFFLINE}; }
-  if(page === "strategies") renderStrategies(); else renderTrack();
+  renderTrack();
 }
 const pct = r => r == null ? "-" : num(100 * r, 0) + "%";
 const ciTxt = s => s && s.ci ? `${num(100 * s.ci[0], 0)}-${num(100 * s.ci[1], 0)}%` : "-";
@@ -1147,94 +1138,6 @@ function renderBacktest(){
     ${B.by_vol.length > 1 && B.by_vol[0].close_in.rate > B.by_vol.at(-1).close_in.rate ? `<div class="expl">When implied vol is low the band is generous; in high-vol regimes realized moves catch up with it and breaks become more common.</div>` : ""}`;
 }
 
-// what to do, exactly, for each rule that has passed (shown only once it passes)
-const PROVEN_INFO = {
-  backwardation_bounce: {
-    rules: ["Watch the VIX curve at the close: VIX against VIX3M (the 3-month VIX). The Strategies page shows the ratio after every close",
-      "If VIX closes ABOVE VIX3M (ratio over 1.00, an inverted curve), buy 1 ES or NQ at the close",
-      "Hold 3 sessions. At the 3rd close, if VIX is still above VIX3M, hold 3 more sessions; otherwise sell at that close",
-      "No stop: as tested, the trade is only closed by the rule. One position at a time"],
-    use: ["Not tested, judgment only: an entry with price at or below the put wall in negative gamma buys where dealer hedging is most stretched",
-      "Size small: entries come during selloffs, often several in a row. Micro contracts (MES $5/pt, MNQ $2/pt) cut the dollar figures by 10x",
-      "Check the News page: a curve inversion ahead of FOMC or CPI can stay inverted longer"],
-    risk: "It buys during market stress with no stop. In a crash it can stay in a losing trade for weeks; the worst drops in the table are real. It made less in total than buy and hold, because it is in the market only about one day in ten."},
-  contango_hold: {
-    rules: ["At every close, check VIX against VIX3M (the 3-month VIX)",
-      "If the ratio is below 0.95 (steep contango, a calm market), be long 1 ES or NQ into the next close",
-      "Stay long while the ratio stays below 0.95; sell at the first close where it is 0.95 or higher",
-      "One position, no stop: the curve is the exit"],
-    use: ["Not tested, judgment only: positive gamma on the Levels page usually lines up with steep contango, and two calm signals agreeing is a stronger reason to hold",
-      "When zero gamma is close above price, a regime flip often comes before the curve does: consider being early to exit",
-      "It is mostly market exposure: compare it with simply holding before using it"],
-    risk: "It made less than holding ES/NQ the whole time, and its out-of-sample worst drop was similar to or worse than buy and hold's. Its value is stepping aside when the curve flattens, not extra profit."},
-};
-// ---------- Strategy lab: futures rules on options data; only rules that pass every test are listed
-const FUT = {SPX: "ES", NDX: "NQ"};
-function renderStrategies(){
-  const L = ((trk || {}).backtest || {}).strategy_lab;
-  if(!L || !L.rules){ $("stTitle").textContent = trk && trk.error ? trk.error : "The strategy lab is not built yet"; return; }
-  const rules = L.rules, passed = rules.filter(r => r.passed), pv = L.point_value || {SPX: 50, NDX: 20};
-  const ym = s => s.slice(0, 7);
-  $("stTitle").textContent = `${rules.length} futures strategies tested, ${passed.length} passed`;
-  $("stKpis").innerHTML = kpi("Tested", String(rules.length), "rules fixed before testing")
-    + kpi("Passed", String(passed.length), passed.length ? "listed below" : "none is shown as a strategy", passed.length ? "var(--good)" : "var(--ink2)")
-    + kpi("3-year test", `${ym(L.window[0])} to ${ym(L.window[1])}`, "hourly bars, ES and NQ")
-    + kpi("Out of sample", `${L.oos[0].slice(0, 4)} to ${ym(L.oos[1])}`, "swing rules, never used to choose them");
-  $("stNote").innerHTML = passed.length
-    ? `Only strategies that passed every test are listed. Each one shows today's signal, its exact rules, and an honest comparison with simply holding ES/NQ. The research log shows the ${rules.length - passed.length} that failed, and why.`
-    : `<b>No strategy has passed every test, so none is listed.</b> Rules built on the expected move and the VIX term structure didn't show an edge after costs that was large and consistent enough on both ES and NQ. A strategy is listed here automatically if it passes, either as the 3-year window rolls forward or once the forward test on GEX PRO's own levels has enough trades. Until then, use the levels as context: the Track record page shows how they've behaved.`;
-  // proven strategies
-  const r2 = v => v == null ? "-" : signed(v, 3);
-  const usd = (s, und) => (s.avg_pts >= 0 ? "+$" : "-$") + num(Math.abs(s.avg_pts * pv[und]), 0);
-  const cell = (s, und) => s && s.n ? `<b style="color:${s.avg_pts > 0 ? "var(--good)" : "var(--bad)"}">${usd(s, und)}</b> <span class="dim">/ trade</span><div class="st-kind">${s.n.toLocaleString("en-US")} trades · ${r2(s.avg_r)} R · t ${s.t == null ? "-" : num(s.t, 1)}</div>` : "-";
-  $("stProvenSub").textContent = passed.length ? `${passed.length} of ${rules.length} · per full-size contract after costs` : "";
-  const money$ = x => (x >= 0 ? "+$" : "-$") + Math.round(Math.abs(x)).toLocaleString("en-US");
-  const minOosT = r => Math.min(...["SPX", "NDX"].map(u => (r.results[u].oos || r.results[u].window).stats.t || 0));
-  const N = L.now || {};
-  $("stProven").innerHTML = passed.length ? passed.slice().sort((x, y) => minOosT(y) - minOosT(x)).map(r => {
-    const I = PROVEN_INFO[r.id] || {rules: [r.idea], use: [], risk: ""};
-    const row = (u, k, label) => {
-      const x = r.results[u][k]; if(!x) return "";
-      const s = x.stats, b = x.buy_hold || {}, held = s.sessions_held || 0;
-      return `<tr><td>${FUT[u]} · ${label}</td><td class="m">${s.n}</td><td class="m">${pct(s.win)}</td><td class="m"><b style="color:${s.total_pts > 0 ? "var(--good)" : "var(--bad)"}">${money$(s.total_pts * pv[u])}</b></td>
-        <td class="m">${money$(-(s.daily_dd_pts || 0) * pv[u])}</td><td class="m">${b.sessions ? pct(held / b.sessions) : "-"}</td>
-        <td class="m">${b.pts != null ? money$(b.pts * pv[u]) : "-"}</td><td class="m">${b.max_dd_pts != null ? money$(-b.max_dd_pts * pv[u]) : "-"}</td>
-        <td class="m">${b.pts && held ? num((s.total_pts / held) / (b.pts / b.sessions), 1) + "×" : "-"}</td></tr>`;
-    };
-    const now = ["SPX", "NDX"].map(u => { const z = r.results[u].now || {}; return z.in
-      ? `<b>${FUT[u]}: in a trade</b> since the ${esc(z.since)} close at ${num(z.entry, 2)} (${signed(z.pts, 2)} pts by the last close). Exit: ${esc(z.exit_due)}.`
-      : `<b>${FUT[u]}: flat.</b> ${z.signal_today ? "The signal is on at the last close: enter at the close." : "No entry signal at the last close."}`; }).join("<br>");
-    const es = r.results.SPX.oos, beats = es && es.stats.total_pts > es.buy_hold.pts;
-    return `<div class="st-card"><div class="head"><h2>${esc(r.name)}</h2><span class="trk-tag good">passed</span><span class="sub">${esc(r.kind === "swing" ? `swing · holds ${r.hold} session${r.hold === 1 ? "" : "s"} at a time` : "intraday")} · uses ${esc(r.uses)}</span></div>
-      <div class="st-now"><div class="eyebrow">Today · as of the ${esc(N.date || "-")} close · VIX/VIX3M ${N.vix_vix3m == null ? "-" : num(N.vix_vix3m, 3)}</div>${now}</div>
-      <div class="st-grid"><div>
-        <p class="st-idea">${esc(r.idea)}</p>
-        <div class="eyebrow">Rules (mechanical, as tested)</div><ol class="st-list">${I.rules.map(x => `<li>${esc(x)}</li>`).join("")}</ol>
-      </div><div>
-        <div class="eyebrow">Using it with GEX PRO</div><ul class="st-list">${I.use.map(x => `<li>${esc(x)}</li>`).join("")}</ul>
-        <div class="st-risk"><b>Risk.</b> ${esc(I.risk)}</div>
-      </div></div>
-      <div class="trk-log" style="margin-top:12px"><table class="trk-table"><tr><th>Market · period</th><th>Trades</th><th>Win</th><th>Net profit</th><th>Worst drop</th><th>Time in market</th><th>Buy &amp; hold</th><th>B&amp;H worst drop</th><th>Profit per day in market vs B&amp;H</th></tr>
-        ${row("SPX", "window", "last 3 years")}${row("NDX", "window", "last 3 years")}${row("SPX", "oos", `${L.oos[0].slice(0, 4)}-${L.oos[1].slice(0, 4)}`)}${row("NDX", "oos", `${L.oos[0].slice(0, 4)}-${L.oos[1].slice(0, 4)}`)}</table></div>
-      <div class="expl"><b>Compared with simply holding:</b> ${beats ? "it made more than buy and hold out of sample on ES." : "it made less in total than holding ES/NQ the whole time. The edge is in the last column: profit for each day you actually have money in the market."} The worst drop is the account marked to market at every close. Profit factor ${num((r.results.SPX.oos || r.results.SPX.window).stats.pf, 2)} on ES out of sample; t ${num(r.results.SPX.oos.stats.t, 1)} (ES) and ${num(r.results.NDX.oos.stats.t, 1)} (NQ).</div></div>`;
-  }).join("") : `<div class="st-empty"><b>None yet.</b> Every rule tested so far failed at least one test. The research log below shows each one and why.</div>`;
-  // research log
-  $("stLogSub").textContent = `every rule tested · average profit per trade after costs, per full-size contract · R = the same in expected moves`;
-  $("stLog").innerHTML = `<table class="trk-table"><tr><th>Strategy</th><th>Type</th><th>Options data</th><th>ES · 3 yrs</th><th>NQ · 3 yrs</th><th>ES · out of sample</th><th>NQ · out of sample</th><th>Result</th></tr>${rules.map(r => {
-    const a = r.results.SPX, b = r.results.NDX;
-    return `<tr><td><b>${esc(r.name)}</b><div class="st-kind">${esc(r.idea)}</div></td><td>${r.kind === "swing" ? `swing · ${r.hold}d` : "intraday"}</td><td>${esc(r.uses)}</td>
-      <td class="m">${cell(a.window.stats, "SPX")}</td><td class="m">${cell(b.window.stats, "NDX")}</td>
-      <td class="m">${a.oos ? cell(a.oos.stats, "SPX") : `<span class="dim">n/a</span>`}</td><td class="m">${b.oos ? cell(b.oos.stats, "NDX") : `<span class="dim">n/a</span>`}</td>
-      <td><span class="trk-tag ${r.passed ? "good" : "bad"}">${r.passed ? "passed" : "failed"}</span><div class="st-kind">${esc(r.why)}</div></td></tr>`; }).join("")}</table>
-    <div class="expl">Out-of-sample tests apply to swing rules only, because free hourly history doesn't reach back before ${ym(L.window[0])}.</div>`;
-  // forward test on GEX PRO's own levels
-  const G = L.gex || {rules: [], sessions: 0};
-  $("stGexSub").textContent = `${G.sessions} graded session${G.sessions === 1 ? "" : "s"} with hourly bars so far`;
-  $("stGex").innerHTML = `<table class="trk-table"><tr><th>Rule</th><th>GEX PRO levels used</th><th>Trades so far</th><th>Status</th></tr>${G.rules.map(r =>
-    `<tr><td><b>${esc(r.name)}</b><div class="st-kind">${esc(r.doc)}</div></td><td>${esc(r.uses)}</td><td class="m">${r.stats.n || 0}</td>
-     <td><span class="trk-tag ${r.passed ? "good" : ""}">${r.passed ? "passed" : "not proven"}</span><div class="st-kind">${esc(r.why)}</div></td></tr>`).join("")}</table>
-    <div class="expl">These rules need the real gamma levels, which exist only from the first saved session on, so they can only be tested going forward. Results are hidden until a rule has 30 trades: with fewer, a profit or a loss says nothing. A rule that then passes the same bar moves up to Proven strategies.</div>`;
-}
 
 setPage(page);
 load();
@@ -1246,6 +1149,6 @@ setInterval(loadNews, 10 * 60 * 1000);                      // the service itsel
 setInterval(() => { if(page === "news") renderNews(); }, 60000);   // keep countdowns current
 setInterval(() => { if(page === "briefings") loadBriefings(); }, STATIC ? 5 * 60 * 1000 : 60000);
 setInterval(() => { if(page === "indicator") loadIndicator(); }, STATIC ? 5 * 60 * 1000 : 15000);   // pick up code edits
-window.addEventListener("resize", () => { if(data) render(); if(page === "timeline") renderTimeline(); if(page === "track") renderTrack(); if(page === "strategies") renderStrategies(); });
-setInterval(() => { if(page === "track" || page === "strategies") loadTrack(); }, 5 * 60 * 1000);
+window.addEventListener("resize", () => { if(data) render(); if(page === "timeline") renderTimeline(); if(page === "track") renderTrack(); });
+setInterval(() => { if(page === "track") loadTrack(); }, 5 * 60 * 1000);
 setInterval(() => { if(page === "timeline") loadTimeline(); }, STATIC ? 5 * 60 * 1000 : 60000);

@@ -42,7 +42,6 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
     <div class="side-label">Insight</div>
     <button role="tab" data-p="bias" aria-selected="false"><svg viewBox="0 0 20 20"><path d="M10 3v14M5 8l5-5 5 5"/></svg><span>Bias</span><kbd>BIAS</kbd></button>
     <button role="tab" data-p="track" aria-selected="false"><svg viewBox="0 0 20 20"><path d="M3 16h14M5 16V9M9 16V5M13 16v-5M17 16V7"/></svg><span>Track record</span><kbd>TRK</kbd></button>
-    <button role="tab" data-p="strategies" aria-selected="false"><svg viewBox="0 0 20 20"><path d="M3 15l4-5 3 3 6-8"/><path d="M13 5h3v3"/></svg><span>Strategies</span><kbd>STR</kbd></button>
     <button role="tab" data-p="briefings" aria-selected="false"><svg viewBox="0 0 20 20"><path d="M5 3h10v14H5zM8 7h4M8 10h4M8 13h2"/></svg><span>Briefings</span><kbd>BRF</kbd></button>
     <button role="tab" data-p="news" aria-selected="false"><svg viewBox="0 0 20 20"><path d="M3 5h11v11H3zM14 8h3v8h-3M6 8h5M6 11h5"/></svg><span>News</span><kbd>NEWS</kbd></button>
     <div class="side-label">Resources</div>
@@ -186,39 +185,6 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
       </div>
       <section class="card" data-help="backtest_vol" style="margin-top:14px"><div class="head"><h2>By volatility level</h2><span class="sub" id="btVolSub"></span></div><div id="btVol"></div></section>
       <div class="expl trk-disclaimer">Hypothetical, rule-based results, not trading results. No orders, fills, costs or slippage are modeled. Past behaviour of a level or a band does not guarantee future behaviour. Not investment advice.</div>
-    </div>
-
-    <!-- STRATEGIES -->
-    <div id="strategiesView" hidden>
-      <section class="card trk-hero" data-help="strategies">
-        <div class="eyebrow">Futures strategy lab · ES and NQ · built on options data</div>
-        <h2 class="trk-title" id="stTitle">Loading...</h2>
-        <div class="trk-kpis" id="stKpis"></div>
-        <div class="expl" id="stNote"></div>
-      </section>
-      <section class="card" data-help="strat_proven" style="margin-top:14px">
-        <div class="head"><h2>Proven strategies</h2><span class="sub" id="stProvenSub"></span></div>
-        <div id="stProven"></div>
-      </section>
-      <section class="card" data-help="strat_log" style="margin-top:14px">
-        <div class="head"><h2>Research log</h2><span class="sub" id="stLogSub"></span></div>
-        <div class="trk-log" id="stLog"></div>
-      </section>
-      <section class="card" data-help="strat_gex" style="margin-top:14px">
-        <div class="head"><h2>Forward test on GEX PRO's own levels</h2><span class="sub" id="stGexSub"></span></div>
-        <div class="trk-log" id="stGex"></div>
-      </section>
-      <section class="card" style="margin-top:14px"><div class="head"><h2>How strategies are tested</h2></div>
-        <div class="st-method">
-          <p><b>Futures only, built on options data.</b> Every rule trades ES or NQ. Its signals come from the options market: the expected move (VIX / VXN), the VIX term structure (VIX9D, VIX, VIX3M), intraday VIX, and GEX PRO's own gamma levels.</p>
-          <p><b>Rules first, results second.</b> Each rule's entry, stop, exit and filter were written down before it was run, and none was tuned afterwards. The research log shows every rule tested, not just the winners.</p>
-          <p><b>The 3-year test.</b> Intraday rules are walked hour by hour over the last 3 years. They need 30+ trades, a profit after costs, a t-statistic of 2 or more, and both halves profitable, on ES and on NQ.</p>
-          <p><b>The out-of-sample test.</b> Swing rules must also be profitable in both halves of the 3 years on both markets. They then have to hold on 2010 to the start of that window, data never used to choose them: both halves profitable and t ≥ 1.65, on ES and on NQ.</p>
-          <p><b>Worst case and costs.</b> One position at a time. When an hour touches both the stop and the target, the stop counts. A round trip costs 0.5 ES points or 2 NQ points ($25 / $40 per contract).</p>
-          <p><b>Proxies.</b> History uses the cash indexes (SPX, NDX) during regular hours as stand-ins for ES and NQ. Futures-only overnight moves are not traded or counted.</p>
-        </div>
-      </section>
-      <div class="expl trk-disclaimer">Hypothetical, rule-based research, not trading results and not investment advice. Backtests leave out real fills, slippage beyond the assumed cost, margin and limit days. Futures are leveraged and can lose more than the margin posted.</div>
     </div>
 
     <!-- BRIEFINGS -->

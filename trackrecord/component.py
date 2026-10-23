@@ -28,7 +28,7 @@ from pathlib import Path
 from typing import Callable, Optional
 from zoneinfo import ZoneInfo
 
-from . import backtest, prices, strategies
+from . import backtest, prices
 from .score import grade, make_plan, summarize
 
 log = logging.getLogger("trackrecord")
@@ -156,37 +156,23 @@ class TrackRecordComponent:
         path = (self.cache_dir or self.dir) / "backtest.json"
         cached = self._read(path)
         now = self.clock()
-        lab_ok = cached and (cached.get("strategy_lab") or {}).get("version") == strategies.VERSION
-        if lab_ok and now - datetime.fromisoformat(cached["built"]) < BACKTEST_MAX_AGE:
-            return cached                                       # (a cache from older rules or simulator is rebuilt)
+        if cached and "strategy_lab" not in cached and now - datetime.fromisoformat(cached["built"]) < BACKTEST_MAX_AGE:
+            return cached                                       # (an old cache that still holds the removed strategy lab is rebuilt)
         today = now.astimezone(NY).date()
         final = today.isoformat() if now >= self.session_close(today) + timedelta(minutes=20) else (today - timedelta(days=1)).isoformat()
         out = {"built": now.isoformat(), "markets": {}}
-        lab = {}
         for market, und in (("ES", "SPX"), ("NQ", "NDX")):
             try:
                 bars = self.src.daily(und, since=date(1990, 1, 1))
                 vol = self.src.vol_index(und)
                 r = backtest.run(und, prices.VOL_INDEX[und], bars, vol, until=final) if bars and vol else None
-                lab[und] = {"bars": bars, "vol": vol, "hourly": {d: v for d, v in self.src.hourly(und).items() if d <= final}}
             except Exception:
                 log.exception("backtest %s failed", und)
                 r = None
             if r:
                 out["markets"][market] = r
-        try:                                                    # the futures strategy lab (see strategies.py)
-            if len(lab) == 2:
-                lab["term"] = {"VIX": self.src.vol_index("SPX"), "VIX3M": self.src.cboe_index("VIX3M"), "VIX9D": self.src.cboe_index("VIX9D")}
-                lab["vixh"] = self.src.vix_hourly()
-                if lab["term"]["VIX3M"]:
-                    out["strategy_lab"] = dict(strategies.study(lab, final), built=now.isoformat(),
-                                               gex=strategies.gex_forward(self.sessions(), {u: lab[u]["hourly"] for u in ("SPX", "NDX")}))
-        except Exception:
-            log.exception("strategy lab failed")
         if not out["markets"] and cached:
             return cached                                       # keep the last good backtest when sources fail
-        if "strategy_lab" not in out and lab_ok:
-            out["strategy_lab"] = cached["strategy_lab"]        # and the last good strategy lab
         if out["markets"]:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(json.dumps(out, separators=(",", ":")), encoding="utf-8")

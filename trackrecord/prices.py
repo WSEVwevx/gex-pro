@@ -21,7 +21,6 @@ log = logging.getLogger("trackrecord.prices")
 UA = {"User-Agent": "Mozilla/5.0 (GEX PRO track record)", "Accept": "*/*"}
 CBOE = "https://cdn.cboe.com/api/global"
 YAHOO = "https://query1.finance.yahoo.com/v8/finance/chart/{sym}?interval=1d&period1={p1}&period2={p2}"
-HOURLY = {"SPX": "^GSPC", "NDX": "^NDX"}
 DAILY = {"SPX": [("cboe", "_SPX"), ("yahoo", "^GSPC")], "NDX": [("yahoo", "^NDX")]}
 VOL_INDEX = {"SPX": "VIX", "NDX": "VXN"}
 
@@ -80,72 +79,6 @@ def daily(underlying: str, since: date = date(1990, 1, 1)) -> dict[str, dict]:
         except Exception as e:                                   # try the next source
             log.warning("daily %s from %s failed: %s", underlying, kind, e)
     return {}
-
-
-def parse_yahoo_hourly(raw: bytes) -> dict[str, list]:
-    """date -> [(open, high, low, close), ...] for the regular session's hourly bars, in time order."""
-    from zoneinfo import ZoneInfo
-    res = json.loads(raw)["chart"]["result"][0]
-    tz = ZoneInfo(res["meta"].get("exchangeTimezoneName", "America/New_York"))
-    q = res["indicators"]["quote"][0]
-    out: dict[str, list] = {}
-    for i, t in enumerate(res.get("timestamp") or []):
-        b = _bar("", q["open"][i], q["high"][i], q["low"][i], q["close"][i], "")
-        if not b:
-            continue
-        dt = datetime.fromtimestamp(t, tz)
-        day = out.setdefault(dt.date().isoformat(), [])
-        bar = (b["open"], b["high"], b["low"], b["close"])
-        if (dt.hour, dt.minute) >= (16, 0) and day:          # Yahoo's closing print: fold it into the last real bar
-            o, h, l, _ = day[-1]
-            day[-1] = (o, max(h, bar[1]), min(l, bar[2]), bar[3])
-        else:
-            day.append(bar)
-    return out
-
-
-def hourly(underlying: str) -> dict[str, list]:
-    """About the last 730 days of hourly bars from Yahoo (its limit for this bar size); {} on failure."""
-    sym = HOURLY.get(underlying)
-    if not sym:
-        return {}
-    try:
-        return parse_yahoo_hourly(_get(f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(sym)}?interval=1h&range=730d"))
-    except Exception as e:
-        log.warning("hourly %s failed: %s", underlying, e)
-        return {}
-
-
-def cboe_index(name: str) -> dict[str, float]:
-    """date -> close of a Cboe volatility index (VIX3M, VIX9D, VVIX, SKEW, ...); {} on failure."""
-    try:
-        return parse_cboe_vol_csv(_get(f"{CBOE}/us_indices/daily_prices/{name}_History.csv"))
-    except Exception as e:
-        log.warning("%s history failed: %s", name, e)
-        return {}
-
-
-def parse_yahoo_hourly_closes(raw: bytes) -> dict[str, dict]:
-    """date -> {"HH:MM" (bar start, ET): close} for every hourly bar, extended hours included."""
-    from zoneinfo import ZoneInfo
-    res = json.loads(raw)["chart"]["result"][0]
-    tz = ZoneInfo(res["meta"].get("exchangeTimezoneName", "America/New_York"))
-    out: dict[str, dict] = {}
-    for i, t in enumerate(res.get("timestamp") or []):
-        c = res["indicators"]["quote"][0]["close"][i]
-        if c:
-            dt = datetime.fromtimestamp(t, tz)
-            out.setdefault(dt.date().isoformat(), {})[dt.strftime("%H:%M")] = float(c)
-    return out
-
-
-def vix_hourly() -> dict[str, dict]:
-    """About two years of hourly VIX closes from Yahoo; {} on failure."""
-    try:
-        return parse_yahoo_hourly_closes(_get("https://query1.finance.yahoo.com/v8/finance/chart/%5EVIX?interval=1h&range=730d"))
-    except Exception as e:
-        log.warning("hourly VIX failed: %s", e)
-        return {}
 
 
 def parse_cboe_intraday(raw: bytes) -> Optional[dict]:

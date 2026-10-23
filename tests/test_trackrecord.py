@@ -128,15 +128,6 @@ class FakeSource:
     def vol_index(self, underlying):
         return {}
 
-    def hourly(self, underlying):
-        return {}
-
-    def cboe_index(self, name):
-        return {}
-
-    def vix_hourly(self):
-        return {}
-
 
 class TestSchedule(unittest.TestCase):
     def make(self, tmp, now, levels):
