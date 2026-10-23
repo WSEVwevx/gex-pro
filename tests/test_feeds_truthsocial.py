@@ -70,6 +70,8 @@ class TestParsing(unittest.TestCase):
         self.assertEqual(market_tone("The Fed must cut rates"), "bullish")
         self.assertIsNone(market_tone("Sanctions were avoided because of a great deal"))  # mixed -> no label
         self.assertIsNone(market_tone("A ceasefire at the family dinner"))               # no market topic
+        self.assertIsNone(market_tone("Big Rally happening in Iowa. Inflation is coming down"))  # political rally
+        self.assertEqual(market_tone("The stock market will rally on this trade news"), "bullish")
         self.assertEqual(from_api(API)[1]["tone"], "bearish")
 
 

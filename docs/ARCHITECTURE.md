@@ -1,12 +1,13 @@
 # Architecture
 
-GEX PRO is three independent Python packages plus one web page.
+GEX PRO is independent feature packages, one app shell that joins them, and one web page.
 
 | Package | Owns | May import |
 |---|---|---|
 | `gexsys/` | GEX only: options data, the math, levels, the hourly TradingView paste, the indicator script | nothing else in the project |
 | `feeds/` | Market news: ForexFactory calendar, Truth Social posts | nothing else in the project |
-| `gexpro/` | The app shell: the local website server, the hosted-site build, the START.bat command | `gexsys`, `feeds` |
+| `briefings/` | NY AM and Asia session briefings | nothing else in the project |
+| `gexpro/` | The app shell: the local website server, the hosted-site build, the START.bat command | `gexsys`, `feeds`, `briefings` |
 
 `tests/test_architecture.py` fails the build if a feature package imports another one or the shell.
 
@@ -37,6 +38,14 @@ Today's components:
 |---|---|---|
 | `gexsys.component.GexComponent` | `/health`, `/api/markets`, `/api/all`, `/api/levels`, `/api/pine`, `/api/pine/all`, `/api/indicator` | `all.json`, `pine-*.txt`, `indicator.json` |
 | `feeds.component.FeedsComponent` | `/api/news`, `/api/posts` | `news.json`, `posts.json` |
+| `briefings.component.BriefingsComponent` | `/api/briefings` | `briefings.json` |
+
+## Features that need other features' data
+
+Briefings use GEX levels, the calendar and posts, but may not import those packages. Instead the shell
+builds a plain snapshot (`gexpro/context.py`) and passes it in as `context()`, together with anything
+else it needs (`is_trading_day`, `notify`). The feature defines the snapshot's shape in its own docs
+(`briefings/compose.py`), so it can be tested with hand-made data. Do the same for future features.
 
 ## Adding a feature
 

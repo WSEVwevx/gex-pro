@@ -6,4 +6,5 @@
 The shell owns no market logic. Each feature package provides a component (see components.py):
   gexsys  -> GexComponent    options GEX levels, the hourly TradingView paste, the indicator script
   feeds   -> FeedsComponent  ForexFactory calendar, Truth Social posts
+  briefings -> BriefingsComponent  NY AM and Asia session briefings (reads a snapshot from gexpro/context.py)
 """

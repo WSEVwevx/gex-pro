@@ -81,7 +81,8 @@ _BULL = [(re.compile(p, re.I), w) for p, w in (
     (r"\bceasefire\b|\bpeace\b|\btruce\b", 1),
     (r"\brate cuts?\b|\bcut(ting)? (interest )?rates\b|\blower (interest )?rates\b", 1),
     (r"\btax cuts?\b|\bstimulus\b|\brebate", 1),
-    (r"\b(record|all[- ]time) highs?\b|\bboom\w*|\bsoar\w*|\bsurg\w*|\brally\w*", 1),
+    # "rally" only next to markets: "Big Rally in Iowa" is a political rally, "stocks rally" is not
+    (r"\b(record|all[- ]time) highs?\b|\bboom\w*|\bsoar\w*|\bsurg\w*|\b(stock|market|equit|dow|nasdaq|s&p)\w*\s+(\w+\s+){0,2}rall\w*", 1),
     (r"\b(paus\w*|lift\w*|remov\w*|suspend\w*|reduc\w*|lower\w*|delay\w*|exempt\w*)\s+(\w+\s+){0,2}tariffs?\b"
      r"|\btariffs?\s+(pause|relief|exemptions?|reduction)", 2),
 )]

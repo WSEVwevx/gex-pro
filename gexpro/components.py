@@ -17,8 +17,12 @@ from __future__ import annotations
 
 from typing import Protocol
 
+from briefings.component import BriefingsComponent
 from feeds.component import FeedsComponent
+from gexsys import marketcal, publish
 from gexsys.component import GexComponent
+
+from .context import snapshot
 
 
 class Component(Protocol):
@@ -31,4 +35,8 @@ class Component(Protocol):
 
 
 def default_components(gex_configs) -> list:
-    return [GexComponent(gex_configs), FeedsComponent()]
+    """Order matters for the hosted build: briefings read what gex and feeds just built."""
+    gex, feeds = GexComponent(gex_configs), FeedsComponent()
+    briefings = BriefingsComponent(context=lambda: snapshot(gex, feeds), is_trading_day=marketcal.is_trading_day,
+                                   notify=publish.notify_desktop)
+    return [gex, feeds, briefings]

@@ -50,8 +50,8 @@ class FeedsComponent:
         pass
 
     def build_static(self, data: Path, state: Path) -> dict:
-        cal = self._calendar or Calendar(cache_path=state / "ff_calendar.json")
-        posts = self._posts or Posts(cache_path=state / "truth_posts.json")
+        cal = self._calendar = self._calendar or Calendar(cache_path=state / "ff_calendar.json")
+        posts = self._posts = self._posts or Posts(cache_path=state / "truth_posts.json")
         _write(data / "news.json", cal.get())
         _write(data / "posts.json", posts.get())
         return {}

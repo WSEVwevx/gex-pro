@@ -98,6 +98,10 @@ Full details: [METHODOLOGY](docs/METHODOLOGY.md). Caveats: [LIMITATIONS](docs/LI
   - a level ladder with explanations;
   - a GEX-by-price chart;
   - max pain and gamma by expiration.
+* **Briefings:** a NY AM briefing at 9:00 AM ET on trading days and an Asia session briefing at 7:00 PM ET
+  the evening before each trading day: both markets' regime, levels, expected range, bias and game plan, the
+  relevant calendar (overnight Asia/Europe events for the Asia one) and market-moving posts. A Windows
+  notification when each is written; a missed one is written late when the app starts.
 * **Indicator:** the GEX PRO TradingView script, always the current version, with Copy / Download
   buttons, install steps, version and last-updated time, and the script's recent changes.
 * **Bias:** a transparent, rule-based reading of today's positioning:
@@ -144,12 +148,14 @@ Three independent packages; only the app shell joins them (a test enforces it). 
 feature: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ```
-gexpro/            app shell: website server, hosted-site build, `python -m gexpro serve` (START.bat)
+gexpro/            app shell: website server, hosted-site build, `python -m gexpro serve` (START.bat),
+                   context (the data snapshot briefings read from gex + feeds)
 gexsys/            GEX only: providers/{base,cboe,csvfile,synthetic}, pricing, engine, levels, extras,
                    mapping, marketcal, pipeline, storage, alerts, publish (hourly paste), export (Pine
                    payload), bias, indicator (script info), service (market workers), component
                    (its website endpoints), audit, replay, config, __main__ (GEX tools CLI)
 feeds/             market news: forexfactory (calendar), truthsocial (posts), component
+briefings/         NY AM and Asia session briefings: schedule, compose (the text), component
 dashboard/         the website (one page; reads each component's endpoints)
 pine/              TradingView Pine v6 indicator (GEX PRO)
 configs/           NQ / ES configurations

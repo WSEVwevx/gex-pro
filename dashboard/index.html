@@ -183,6 +183,25 @@ td.m{font-family:var(--mono)}
 .change code{font:12px var(--mono);color:var(--ink3)}
 .change .when{font:12px var(--mono);color:var(--ink3);white-space:nowrap}
 
+/* briefings page */
+.bhead{margin-top:22px}
+.bhead .lead{font-size:16px;line-height:1.6;color:var(--ink);margin-top:12px;max-width:110ch}
+.bgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:16px;align-items:start}
+@media(max-width:980px){.bgrid{grid-template-columns:1fr}}
+.bm h2{font-size:15px}
+.bm .hl{font-size:14px;line-height:1.55;margin-top:8px}
+.blv{display:grid;margin-top:12px}
+.blv div{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px solid var(--line);font-size:13px;color:var(--ink2)}
+.blv b{font:600 13px var(--mono);color:var(--ink)}
+.bsec{margin-top:14px}
+.bsec .eyebrow{margin-bottom:4px}
+.bsec p{margin:4px 0 0;font-size:13px;line-height:1.55;color:var(--ink2)}
+.bev{display:grid;grid-template-columns:86px 44px 1fr auto;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line);font-size:13px}
+.bev .tm{font:12px var(--mono);color:var(--ink2)} .bev .fp{font:12px var(--mono);color:var(--ink3);white-space:nowrap}
+.bpost{padding:9px 0;border-top:1px solid var(--line);font-size:13px;line-height:1.5}
+.bpost .meta{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--ink3);margin-bottom:3px}
+.bsel{background:var(--page);color:var(--ink2);border:1px solid var(--line);border-radius:9px;padding:5px 8px;font:inherit;font-size:12px}
+
 /* phones */
 @media(max-width:700px){
   .wrap{padding:0 16px 40px}
@@ -206,7 +225,7 @@ td.m{font-family:var(--mono)}
   <div class="bar">
     <div class="brand"><svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><rect width="22" height="22" rx="6" fill="#151a23" stroke="rgba(255,255,255,.14)"/><rect x="5" y="6" width="12" height="2" rx="1" fill="#3987e5"/><rect x="5" y="10" width="8" height="2" rx="1" fill="#b9bec7"/><rect x="5" y="14" width="10" height="2" rx="1" fill="#d95926"/></svg>GEX <b class="pro">PRO</b></div>
     <div class="seg" role="tablist" id="pages" aria-label="Page">
-      <button role="tab" data-p="levels" aria-selected="true">Levels</button><button role="tab" data-p="bias" aria-selected="false">Bias</button><button role="tab" data-p="news" aria-selected="false">News</button><button role="tab" data-p="indicator" aria-selected="false">Indicator</button></div>
+      <button role="tab" data-p="levels" aria-selected="true">Levels</button><button role="tab" data-p="bias" aria-selected="false">Bias</button><button role="tab" data-p="briefings" aria-selected="false">Briefings</button><button role="tab" data-p="news" aria-selected="false">News</button><button role="tab" data-p="indicator" aria-selected="false">Indicator</button></div>
     <div class="seg" role="tablist" id="tabs" aria-label="Market"></div>
     <span class="spacer"></span>
     <button class="btn ghost" id="copyMarket">Copy NQ only</button>
@@ -254,6 +273,24 @@ td.m{font-family:var(--mono)}
       <div class="expl" id="postsFoot"></div>
     </section>
    </div>
+  </div>
+
+  <div id="briefingsView" hidden>
+    <section class="card accent bhead" id="briefHead" style="--accent:var(--pos)">
+      <div class="head" style="margin-bottom:0"><div class="eyebrow" id="briefKicker">Session briefing</div><span class="spacer"></span>
+        <div class="filters" id="briefKind" role="tablist" aria-label="Briefing"></div>
+        <select class="bsel" id="briefPick" aria-label="Earlier briefings"></select></div>
+      <div class="iname" id="briefTitle">Loading...</div>
+      <div class="meta-row" id="briefMeta"></div>
+      <div class="lead" id="briefLead"></div>
+    </section>
+    <div class="bgrid" id="briefMarkets"></div>
+    <div class="bgrid">
+      <section class="card"><div id="briefCal"></div></section>
+      <section class="card"><div class="head"><h2 id="briefPostsTitle">Market-moving posts</h2></div><div id="briefPosts"></div></section>
+    </div>
+    <p class="foot" id="briefFoot">NY AM briefing at 9:00 AM ET on trading days; Asia session briefing at 7:00 PM ET on the evening before each trading day.
+      Written automatically from the GEX levels, the economic calendar and the posts feed. Model estimates, not trading advice.</p>
   </div>
 
   <div id="indicatorView" hidden>
@@ -348,8 +385,8 @@ const store = { get(k, d){ try { return localStorage.getItem(k) ?? d; } catch(e)
 // Static mode: the hosted copy (python -m gexsys build-site) reads files that a scheduled job rewrites,
 // instead of the local service's /api endpoints.
 const STATIC = !!window.GEX_STATIC;
-const API = STATIC ? {all: "data/all.json", news: "data/news.json", posts: "data/posts.json", indicator: "data/indicator.json"}
-                   : {all: "/api/all", news: "/api/news", posts: "/api/posts", indicator: "/api/indicator"};
+const API = STATIC ? {all: "data/all.json", news: "data/news.json", posts: "data/posts.json", indicator: "data/indicator.json", briefings: "data/briefings.json"}
+                   : {all: "/api/all", news: "/api/news", posts: "/api/posts", indicator: "/api/indicator", briefings: "/api/briefings"};
 const pineUrl = m => STATIC ? `data/pine-published${m ? "-" + m : ""}.txt`
                             : `/api/pine/all?which=published${m ? "&market=" + encodeURIComponent(m) : ""}`;
 const OFFLINE = STATIC ? "Can't load the latest data file. Check your connection; retrying."
@@ -393,11 +430,12 @@ function setPage(p){
   page = p;
   [...$("pages").children].forEach(b => b.setAttribute("aria-selected", String(b.dataset.p === p)));
   $("levelsView").hidden = p !== "levels"; $("newsView").hidden = p !== "news"; $("biasView").hidden = p !== "bias";
-  $("indicatorView").hidden = p !== "indicator";
-  $("tabs").style.display = p === "news" || p === "indicator" ? "none" : "";
+  $("indicatorView").hidden = p !== "indicator"; $("briefingsView").hidden = p !== "briefings";
+  $("tabs").style.display = p === "news" || p === "indicator" || p === "briefings" ? "none" : "";
+  if(p === "briefings") loadBriefings();
   if(p === "news") renderNews();
   if(p === "indicator") loadIndicator();
-  if(p !== "news" && p !== "indicator" && data) render();
+  if(!["news", "indicator", "briefings"].includes(p) && data) render();
 }
 [...$("pages").children].forEach(b => b.onclick = () => setPage(b.dataset.p));
 async function loadNews(){
@@ -439,6 +477,55 @@ function renderPosts(){
       ${hot ? `<div class="tags">${p.tone ? `<span class="tone ${p.tone}" title="Keyword guess at what this post means for stocks, not a forecast">${p.tone}</span>` : ""}${p.market_words.map(w => `<span class="mw">${esc(w)}</span>`).join("")}</div>` : ""}
     </div>`; }).join("") || `<div class="expl">${postF === "market" ? "No recent posts mention market topics." : "No posts available."}</div>`;
   $("postsFoot").innerHTML = `Source: ${esc(posts.source || "-")}${posts.fetched_at ? `, updated ${ago(posts.fetched_at)}` : ""}; checked every 5 min. Yellow tags flag market topics (tariffs, the Fed, China, oil...); Bullish / Bearish is a keyword guess at the post's lean for stocks, shown only when it is clear. Posts can move futures quickly, and nothing here predicts how.${posts.error ? ` <span style="color:var(--warn)">${esc(posts.error)}</span>` : ""}`;
+}
+
+// ---------- Briefings page: NY AM and Asia session write-ups
+let brief = null, briefPick = "";                          // "" = the newest briefing
+async function loadBriefings(){
+  try { brief = await (await fetch(API.briefings, {cache:"no-store"})).json(); }
+  catch(e){ $("briefTitle").textContent = "Briefings unavailable"; $("briefLead").textContent = OFFLINE; return; }
+  renderBriefings();
+}
+const BKIND = {nyam: "NY AM", asia: "Asia"};
+function renderBriefings(){
+  if(!brief) return;
+  const latest = Object.values(brief.latest || {}).filter(Boolean).sort((a, b) => b.slot.localeCompare(a.slot));
+  const b = briefPick ? (brief.by_id[briefPick] || brief.latest[briefPick]) : latest[0];
+  const kindNow = b ? b.kind : null;
+  $("briefKind").innerHTML = ["nyam", "asia"].map(k => `<button role="tab" aria-selected="${kindNow === k && !String(briefPick).includes("-")}" data-k="${k}"${brief.latest[k] ? "" : " disabled"}>${BKIND[k]}</button>`).join("");
+  [...$("briefKind").children].forEach(x => x.onclick = () => { briefPick = x.dataset.k; renderBriefings(); });
+  $("briefPick").innerHTML = `<option value="">Earlier briefings</option>` + (brief.history || []).filter(h => brief.by_id[h.id]).map(h =>
+    `<option value="${esc(h.id)}"${briefPick === h.id ? " selected" : ""}>${esc(BKIND[h.kind])} · ${new Date(h.session + "T12:00:00Z").toLocaleDateString("en-US", {weekday:"short", month:"short", day:"numeric", timeZone:"UTC"})}</option>`).join("");
+  $("briefPick").onchange = e => { briefPick = e.target.value; renderBriefings(); };
+  const nxt = Object.entries(brief.next || {}).filter(([, v]) => v).map(([k, v]) => `<span class="chip">Next ${BKIND[k]} <b>${new Date(v).toLocaleString("en-US", {...ET, weekday:"short", hour:"numeric", minute:"2-digit"})} ET</b></span>`).join("");
+  if(!b){
+    $("briefTitle").textContent = "No briefing yet";
+    $("briefMeta").innerHTML = nxt; $("briefLead").textContent = "The first one is written at the next briefing time (or as soon as the app starts during a briefing window).";
+    $("briefMarkets").innerHTML = ""; $("briefCal").innerHTML = ""; $("briefPosts").innerHTML = ""; return;
+  }
+  $("briefHead").style.setProperty("--accent", b.kind === "asia" ? "var(--oi)" : "var(--pos)");
+  $("briefKicker").textContent = b.kind === "asia" ? "Night session · Asia open" : "Before the US open";
+  $("briefTitle").textContent = `${b.title} · ${new Date(b.session + "T12:00:00Z").toLocaleDateString("en-US", {weekday:"long", month:"short", day:"numeric", timeZone:"UTC"})} session`;
+  $("briefMeta").innerHTML = `<span class="chip">Written <b>${new Date(b.generated_at).toLocaleString("en-US", {...ET, weekday:"short", hour:"numeric", minute:"2-digit"})} ET</b></span>`
+    + (b.late ? `<span class="chip" title="The app wasn't running at the scheduled time, so this was written when it started"><i class="dot warn"></i>Written late</span>` : "") + nxt;
+  $("briefLead").textContent = b.headline;
+  const col = r => r === "POSITIVE" ? "var(--pos)" : r === "NEGATIVE" ? "var(--neg)" : "var(--zg)";
+  $("briefMarkets").innerHTML = (b.markets || []).map(m => `<section class="card bm accent" style="--accent:${col(m.regime)}">
+    <div class="head" style="margin-bottom:0"><h2>${esc(m.market)}</h2><span class="chip" style="color:${col(m.regime)}">${esc((m.regime || "").toLowerCase())} gamma</span></div>
+    <div class="hl">${esc(m.headline)}</div>
+    <div class="blv">${(m.levels || []).map(l => `<div><span>${esc(l.name)}</span><b>${num(l.price)} <span style="color:var(--ink3);font-weight:500">${signed(l.price - m.price, 1)}</span></b></div>`).join("")}</div>
+    ${m.range ? `<div class="bsec"><div class="eyebrow">Expected range</div><p>${esc(m.range.text)}</p></div>` : ""}
+    ${m.odte ? `<div class="bsec"><div class="eyebrow">0DTE levels</div><p>${esc(m.odte)}</p></div>` : ""}
+    ${m.bias ? `<div class="bsec"><div class="eyebrow">Bias</div><p>${esc(m.bias)}</p></div>` : ""}
+    <div class="bsec"><div class="eyebrow">Game plan</div><p>${esc(m.plan)}</p></div>
+    ${(m.changes || []).length ? `<div class="bsec"><div class="eyebrow">What changed</div>${m.changes.map(c => `<p>${esc(c)}</p>`).join("")}</div>` : ""}
+    ${m.data ? `<div class="expl">${esc(m.data)}</div>` : ""}</section>`).join("");
+  $("briefCal").innerHTML = (b.calendar || []).map(c => `<div class="head" style="margin:${c === b.calendar[0] ? 0 : 18}px 0 6px"><h2>${esc(c.title)}</h2></div>`
+    + ((c.items || []).map(e => `<div class="bev"><span class="tm">${esc(e.day)} ${esc(e.clock)}</span><span class="imp ${esc(e.impact)}">${esc(e.impact === "Medium" ? "Med" : e.impact)}</span><span>${esc(e.title)} <span style="color:var(--ink3);font:12px var(--mono)">${esc(e.country)}</span></span><span class="fp">${esc(e.detail || "")}</span></div>`).join("")
+       || `<div class="expl" style="margin-top:0">No high- or medium-impact events.</div>`)).join("");
+  $("briefPostsTitle").textContent = (b.posts || {}).title || "Market-moving posts";
+  $("briefPosts").innerHTML = ((b.posts || {}).items || []).map(x => `<div class="bpost"><div class="meta"><b style="color:var(--ink2)">${esc(x.clock)} ET</b>${x.tone ? `<span class="tone ${esc(x.tone)}">${esc(x.tone)}</span>` : ""}${(x.words || []).map(w => `<span class="mw">${esc(w)}</span>`).join("")}${x.url ? `<a href="${esc(x.url)}" target="_blank" rel="noopener">open</a>` : ""}</div>${esc(x.text)}</div>`).join("")
+    || `<div class="expl" style="margin-top:0">No market-related posts in this window.</div>`;
 }
 
 // ---------- Indicator page: the TradingView script, always the current file
@@ -824,6 +911,7 @@ setInterval(load, STATIC ? 60000 : 20000);
 setInterval(loadPosts, 2 * 60 * 1000);                     // the service itself re-fetches at most every 5 min
 setInterval(loadNews, 10 * 60 * 1000);                      // the service itself re-fetches at most every 30 min
 setInterval(() => { if(page === "news") renderNews(); }, 60000);   // keep countdowns current
+setInterval(() => { if(page === "briefings") loadBriefings(); }, STATIC ? 5 * 60 * 1000 : 60000);
 setInterval(() => { if(page === "indicator") loadIndicator(); }, STATIC ? 5 * 60 * 1000 : 15000);   // pick up code edits
 window.addEventListener("resize", () => data && render());
 </script>

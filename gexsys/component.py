@@ -139,6 +139,7 @@ class GexComponent:
             w.step()
             workers.append(w)
         _prune(snaps, keep_days)
+        self.workers = {w.key: w for w in workers}          # so the app can read this build's results
         _write(data / "all.json", json.dumps(_all(workers, static=True)))
         _write(data / "indicator.json", json.dumps(indicator_info()))
         for which, pick in (("latest", lambda w: w.result and w.result.get("pine")),
