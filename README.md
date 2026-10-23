@@ -1,4 +1,4 @@
-# gexsys: NQ / ES options gamma-exposure levels for TradingView
+# GEX PRO: NQ / ES options gamma-exposure levels for TradingView
 
 An analytical system that turns options chains (SPX/SPY, NDX/QQQ, or CME ES/NQ futures options)
 into **modeled** gamma-exposure (GEX) levels for NQ/MNQ and ES/MES traders. It does not trade and
@@ -55,7 +55,9 @@ Other commands: `replay --market NQ` (level-stability statistics over stored sna
 
 ## TradingView
 
-1. Add `pine/nq_es_gex_levels.pine` as a new indicator.
+1. Add the **GEX PRO** indicator: the website's **Indicator** page always has the current code (Copy
+   code, or Download .pine), with install steps. It reads `pine/nq_es_gex_levels.pine` directly, so every
+   edit to the script shows up there.
 2. Paste the `GEX1;…` payload from `snapshot` or from `/api/pine?market=NQ`.
 
 Details, the repainting notes and the **manual validation checklist** (the script has not been
@@ -96,6 +98,8 @@ Full details: [METHODOLOGY](docs/METHODOLOGY.md). Caveats: [LIMITATIONS](docs/LI
   - a level ladder with explanations;
   - a GEX-by-price chart;
   - max pain and gamma by expiration.
+* **Indicator:** the GEX PRO TradingView script, always the current version, with Copy / Download
+  buttons, install steps, version and last-updated time, and the script's recent changes.
 * **Bias:** a transparent, rule-based reading of today's positioning:
   - bias and confidence, day type (range / trend / pivot), base case and expected range;
   - a session chart with an illustrative path, ±1σ cone and key levels;
@@ -112,7 +116,7 @@ in market hours with Cboe delayed data, so you can open it on any device without
 (`python -m gexsys build-site`, `.github/workflows/website.yml`). Setup: [docs/HOSTING.md](docs/HOSTING.md).
 
 Only one copy of the service can run at a time. If START.bat is already open, a second copy
-prints "GEX is ALREADY RUNNING" and exits. To pick up updates, close the old window first.
+prints "GEX PRO is ALREADY RUNNING" and exits. To pick up updates, close the old window first.
 
 ## Scheduled updates (every hour)
 

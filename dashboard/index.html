@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>GEX Levels</title>
+<title>GEX PRO</title>
 <style>
 :root{
   --page:#080b10; --panel:#0f131a; --panel2:#151a23; --raise:#1a202a;
@@ -156,12 +156,40 @@ td.m{font-family:var(--mono)}
 .tone.bullish{color:var(--good);border:1px solid rgba(34,179,94,.4);background:rgba(34,179,94,.08)}
 .tone.bearish{color:var(--bad);border:1px solid rgba(224,90,90,.4);background:rgba(224,90,90,.08)}
 
+/* brand */
+.brand .pro{font-weight:800;letter-spacing:.06em;color:var(--pos)}
+
+/* indicator page */
+.ihero{display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:16px;margin-top:22px}
+@media(max-width:1080px){.ihero{grid-template-columns:1fr}}
+.iname{font-size:22px;font-weight:650;letter-spacing:-.01em;margin-top:8px}
+.meta-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.steps{margin:10px 0 0;padding:0;list-style:none;counter-reset:s}
+.steps li{counter-increment:s;display:grid;grid-template-columns:22px 1fr;gap:10px;font-size:13px;color:var(--ink2);padding:7px 0;line-height:1.5}
+.steps li:before{content:counter(s);display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--raise);border:1px solid var(--line2);color:var(--ink);font:600 11px var(--mono)}
+.steps b{color:var(--ink);font-weight:600}
+.codehead{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.codehead .fname{font:600 13px var(--mono)}
+.code{font:12.5px/1.65 var(--mono);background:#070a0e;border:1px solid var(--line);border-radius:12px;max-height:640px;overflow:auto;padding:10px 0;tab-size:4;scrollbar-width:thin;scrollbar-color:var(--line2) transparent}
+.cl{display:grid;grid-template-columns:52px 1fr;white-space:pre;min-width:max-content}
+.cl:hover{background:rgba(255,255,255,.025)}
+.cl .ln{color:#3d4654;text-align:right;padding-right:16px;user-select:none}
+.cl .lc{padding-right:20px;color:#cfd6e0}
+.tk-c{color:#5f6b7c;font-style:italic}.tk-s{color:#8fd1b0}.tk-n{color:#e0a85c}.tk-k{color:#b59cf5}.tk-f{color:#7fb2f0}.tk-ns{color:#8ab4c8}
+.changes{display:grid}
+.change{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:baseline;padding:10px 0;border-bottom:1px solid var(--line);font-size:13px}
+.change:last-child{border-bottom:0}
+.change code{font:12px var(--mono);color:var(--ink3)}
+.change .when{font:12px var(--mono);color:var(--ink3);white-space:nowrap}
+
 /* phones */
 @media(max-width:700px){
   .wrap{padding:0 16px 40px}
   .bar{padding:10px 16px;gap:8px}
   .statusline .chips{padding:6px 16px}
   header{position:static}
+  .toast{left:16px;right:16px;bottom:16px;max-width:none}
   .brand{width:100%;margin:0}
   .seg button{padding:6px 12px}
   #copyMarket,#copyAll{flex:1;white-space:nowrap;padding:8px 10px;font-size:12px}
@@ -176,9 +204,9 @@ td.m{font-family:var(--mono)}
 <body>
 <header>
   <div class="bar">
-    <div class="brand"><svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><rect width="22" height="22" rx="6" fill="#151a23" stroke="rgba(255,255,255,.14)"/><rect x="5" y="6" width="12" height="2" rx="1" fill="#3987e5"/><rect x="5" y="10" width="8" height="2" rx="1" fill="#b9bec7"/><rect x="5" y="14" width="10" height="2" rx="1" fill="#d95926"/></svg>GEX Levels</div>
+    <div class="brand"><svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><rect width="22" height="22" rx="6" fill="#151a23" stroke="rgba(255,255,255,.14)"/><rect x="5" y="6" width="12" height="2" rx="1" fill="#3987e5"/><rect x="5" y="10" width="8" height="2" rx="1" fill="#b9bec7"/><rect x="5" y="14" width="10" height="2" rx="1" fill="#d95926"/></svg>GEX <b class="pro">PRO</b></div>
     <div class="seg" role="tablist" id="pages" aria-label="Page">
-      <button role="tab" data-p="levels" aria-selected="true">Levels</button><button role="tab" data-p="bias" aria-selected="false">Bias</button><button role="tab" data-p="news" aria-selected="false">News</button></div>
+      <button role="tab" data-p="levels" aria-selected="true">Levels</button><button role="tab" data-p="bias" aria-selected="false">Bias</button><button role="tab" data-p="news" aria-selected="false">News</button><button role="tab" data-p="indicator" aria-selected="false">Indicator</button></div>
     <div class="seg" role="tablist" id="tabs" aria-label="Market"></div>
     <span class="spacer"></span>
     <button class="btn ghost" id="copyMarket">Copy NQ only</button>
@@ -226,6 +254,45 @@ td.m{font-family:var(--mono)}
       <div class="expl" id="postsFoot"></div>
     </section>
    </div>
+  </div>
+
+  <div id="indicatorView" hidden>
+    <section class="ihero">
+      <div class="card accent" style="--accent:var(--pos)">
+        <div class="eyebrow">TradingView indicator</div>
+        <div class="iname" id="indName">GEX PRO</div>
+        <div class="meta-row" id="indMeta"><span class="chip">Loading...</span></div>
+        <div class="actions">
+          <button class="btn" id="indCopy">Copy code</button>
+          <button class="btn ghost" id="indDownload">Download .pine</button>
+        </div>
+        <div class="expl" id="indNote">Always the latest version: this page reads the script every time it changes.</div>
+      </div>
+      <div class="card">
+        <div class="eyebrow">Install or update (about 1 minute)</div>
+        <ol class="steps">
+          <li><span>Click <b>Copy code</b>.</span></li>
+          <li><span>In TradingView open the <b>Pine Editor</b> (bottom panel). First time: <b>Open &gt; New indicator</b>. Updating: open <b>GEX PRO</b>.</span></li>
+          <li><span>Select everything (<b>Ctrl+A</b>), paste (<b>Ctrl+V</b>), then <b>Save</b>.</span></li>
+          <li><span>First time only: <b>Add to chart</b> on your NQ and ES charts.</span></li>
+        </ol>
+      </div>
+      <div class="card">
+        <div class="eyebrow">Then paste the levels</div>
+        <div class="big sm" id="indPasteTime" style="margin-top:8px">-</div>
+        <div class="expl" style="margin-top:6px">A new paste is published every hour on the hour (ET). Click below, then in TradingView: indicator settings &gt; <b>Levels payload</b> &gt; Ctrl+A, Ctrl+V &gt; OK.</div>
+        <div class="actions"><button class="btn" id="indPaste">Copy levels for TradingView</button></div>
+      </div>
+    </section>
+    <section class="card" style="margin-top:16px">
+      <div class="codehead"><h2>Source code</h2><span class="fname" id="indFile">GEX_PRO.pine</span><span class="spacer"></span>
+        <button class="linkbtn" id="indCopy2">Copy</button></div>
+      <div class="code" id="indCode" role="region" aria-label="Indicator source code" tabindex="0"><div class="skeleton" style="padding:0 16px">Loading code...</div></div>
+    </section>
+    <section class="card" style="margin-top:16px">
+      <div class="head"><h2>Recent changes</h2></div>
+      <div class="changes" id="indChanges"></div>
+    </section>
   </div>
 
   <div id="levelsView">
@@ -281,16 +348,16 @@ const store = { get(k, d){ try { return localStorage.getItem(k) ?? d; } catch(e)
 // Static mode: the hosted copy (python -m gexsys build-site) reads files that a scheduled job rewrites,
 // instead of the local service's /api endpoints.
 const STATIC = !!window.GEX_STATIC;
-const API = STATIC ? {all: "data/all.json", news: "data/news.json", posts: "data/posts.json"}
-                   : {all: "/api/all", news: "/api/news", posts: "/api/posts"};
+const API = STATIC ? {all: "data/all.json", news: "data/news.json", posts: "data/posts.json", indicator: "data/indicator.json"}
+                   : {all: "/api/all", news: "/api/news", posts: "/api/posts", indicator: "/api/indicator"};
 const pineUrl = m => STATIC ? `data/pine-published${m ? "-" + m : ""}.txt`
                             : `/api/pine/all?which=published${m ? "&market=" + encodeURIComponent(m) : ""}`;
 const OFFLINE = STATIC ? "Can't load the latest data file. Check your connection; retrying."
-                       : "Can't reach the GEX service. Is START.bat still running? Retrying every 20 seconds.";
+                       : "Can't reach the GEX PRO service. Is START.bat still running? Retrying every 20 seconds.";
 
 if (location.protocol === "file:" && !STATIC) {
   document.body.innerHTML = `<div class="wrap"><div class="banner bad" style="margin-top:40px;font-size:15px;line-height:1.7">
-  This page only works while the GEX service is running.<br>1. Double-click <b>START.bat</b> in your Options Indicator folder.<br>
+  This page only works while the GEX PRO service is running.<br>1. Double-click <b>START.bat</b> in your Options Indicator folder.<br>
   2. Your browser opens <b>http://127.0.0.1:8765</b> automatically.</div></div>`;
   throw new Error("opened as file");
 }
@@ -326,9 +393,11 @@ function setPage(p){
   page = p;
   [...$("pages").children].forEach(b => b.setAttribute("aria-selected", String(b.dataset.p === p)));
   $("levelsView").hidden = p !== "levels"; $("newsView").hidden = p !== "news"; $("biasView").hidden = p !== "bias";
-  $("tabs").style.display = p === "news" ? "none" : "";
+  $("indicatorView").hidden = p !== "indicator";
+  $("tabs").style.display = p === "news" || p === "indicator" ? "none" : "";
   if(p === "news") renderNews();
-  if(p !== "news" && data) render();
+  if(p === "indicator") loadIndicator();
+  if(p !== "news" && p !== "indicator" && data) render();
 }
 [...$("pages").children].forEach(b => b.onclick = () => setPage(b.dataset.p));
 async function loadNews(){
@@ -372,6 +441,64 @@ function renderPosts(){
   $("postsFoot").innerHTML = `Source: ${esc(posts.source || "-")}${posts.fetched_at ? `, updated ${ago(posts.fetched_at)}` : ""}; checked every 5 min. Yellow tags flag market topics (tariffs, the Fed, China, oil...); Bullish / Bearish is a keyword guess at the post's lean for stocks, shown only when it is clear. Posts can move futures quickly, and nothing here predicts how.${posts.error ? ` <span style="color:var(--warn)">${esc(posts.error)}</span>` : ""}`;
 }
 
+// ---------- Indicator page: the TradingView script, always the current file
+const PINE_KW = new Set("if else for to by in while switch var varip true false na and or not import export method type return continue break series simple const".split(" "));
+function pineHtml(line){
+  const re = /(\/\/.*$)|("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')|(#[0-9a-fA-F]{6,8}\b|\b\d+(?:\.\d+)?\b)|\b([A-Za-z_]\w*)(\s*\.\s*[A-Za-z_]\w*)?(?=\s*\()|\b([A-Za-z_]\w*)\b/g;
+  let out = "", last = 0, m;
+  while((m = re.exec(line))){
+    out += esc(line.slice(last, m.index)); last = re.lastIndex;
+    if(m[1]) out += `<span class="tk-c">${esc(m[1])}</span>`;
+    else if(m[2]) out += `<span class="tk-s">${esc(m[2])}</span>`;
+    else if(m[3]) out += `<span class="tk-n">${esc(m[3])}</span>`;
+    else if(m[4]) out += m[5] ? `<span class="tk-ns">${esc(m[4])}</span><span class="tk-f">${esc(m[5])}</span>` : (PINE_KW.has(m[4]) ? `<span class="tk-k">${esc(m[4])}</span>` : `<span class="tk-f">${esc(m[4])}</span>`);
+    else out += PINE_KW.has(m[6]) ? `<span class="tk-k">${esc(m[6])}</span>` : esc(m[6]);
+  }
+  return out + esc(line.slice(last));
+}
+let ind = null, indShown = null;
+async function loadIndicator(){
+  let d;
+  try { d = await (await fetch(API.indicator, {cache:"no-store"})).json(); }
+  catch(e){ $("indMeta").innerHTML = `<span class="chip"><i class="dot warn"></i>${OFFLINE}</span>`; return; }
+  const changed = ind && ind.version !== d.version;
+  ind = d;
+  if(changed) toast("The indicator code was just updated. Copy the new version into TradingView.");
+  renderIndicator();
+}
+function renderIndicator(){
+  if(!ind) return;
+  const when = new Date(ind.updated);
+  $("indName").textContent = ind.name;
+  $("indFile").textContent = ind.filename;
+  $("indMeta").innerHTML = `<span class="chip">Pine <b>v${esc(ind.pine_version)}</b></span><span class="chip">Version <b>${esc(ind.version)}</b></span>
+    <span class="chip" title="${esc(when.toLocaleString("en-US", {...ET}))} ET">Updated <b>${ago(ind.updated)}</b></span>
+    <span class="chip"><b>${num(ind.lines, 0)}</b> lines</span><span class="chip"><b>${num(ind.inputs, 0)}</b> settings</span>`;
+  if(indShown !== ind.version){                  // re-render the (long) code only when it changed
+    $("indCode").innerHTML = ind.code.split("\n").map((l, i) => `<div class="cl"><span class="ln">${i + 1}</span><span class="lc">${pineHtml(l) || " "}</span></div>`).join("");
+    indShown = ind.version;
+  }
+  $("indChanges").innerHTML = (ind.changes || []).map(c => `<div class="change"><code>${esc(c.commit)}</code><span>${esc(c.message)}</span><span class="when">${new Date(c.date).toLocaleDateString("en-US", {...ET, month:"short", day:"numeric"})} · ${ago(c.date)}</span></div>`).join("")
+    || `<div class="expl" style="margin-top:0">No change history available here.</div>`;
+  const pub = data && data.workers.find(w => w.published);
+  $("indPasteTime").textContent = pub ? `${pub.published.slot_et.slice(11)} ET paste` : "Waiting for the first paste";
+}
+async function copyCode(){
+  if(!ind) return;
+  try { await navigator.clipboard.writeText(ind.code); toast(`Copied ${num(ind.lines, 0)} lines of ${ind.name} (version ${ind.version}). Paste it into TradingView's Pine Editor and click Save.`); }
+  catch(e){ window.prompt("Copy the code (Ctrl+C):", ind.code); }
+}
+$("indCopy").onclick = copyCode;
+$("indCopy2").onclick = copyCode;
+$("indDownload").onclick = () => {
+  if(!ind) return;
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([ind.code], {type: "text/plain"}));
+  a.download = ind.filename; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+$("indPaste").onclick = () => copyFrom(pineUrl(""), "the latest levels for NQ and ES");
+
 function nextHighUSD(){
   const now = Date.now(), up = news ? (news.events || []).filter(e => e.country === "USD" && Date.parse(e.time) > now) : [];
   return up.find(e => e.impact === "High") || up.find(e => e.impact === "Medium");
@@ -403,7 +530,7 @@ function renderNews(){
 }
 
 async function load(){
-  try{ data = await (await fetch(API.all, {cache:"no-store"})).json(); render(); }
+  try{ data = await (await fetch(API.all, {cache:"no-store"})).json(); render(); if(page === "indicator") renderIndicator(); }
   catch(e){ $("banner").innerHTML = `<div class="banner bad">${OFFLINE}</div>`; }
 }
 
@@ -697,6 +824,7 @@ setInterval(load, STATIC ? 60000 : 20000);
 setInterval(loadPosts, 2 * 60 * 1000);                     // the service itself re-fetches at most every 5 min
 setInterval(loadNews, 10 * 60 * 1000);                      // the service itself re-fetches at most every 30 min
 setInterval(() => { if(page === "news") renderNews(); }, 60000);   // keep countdowns current
+setInterval(() => { if(page === "indicator") loadIndicator(); }, STATIC ? 5 * 60 * 1000 : 15000);   // pick up code edits
 window.addEventListener("resize", () => data && render());
 </script>
 </body>

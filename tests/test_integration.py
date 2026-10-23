@@ -157,6 +157,35 @@ class TestService(unittest.TestCase):
             self.assertIn("disconnected", w.health()["last_error"])
 
 
+class TestIndicatorSource(unittest.TestCase):
+    def test_info_tracks_the_file(self):
+        from gexsys.indicator import info
+        with tempfile.TemporaryDirectory() as tmp:
+            f = Path(tmp) / "x.pine"
+            f.write_text('//@version=6\nindicator("GEX PRO - NQ / ES")\nx = input.int(1, "a")\n', encoding="utf-8")
+            a = info(f, with_changes=False)
+            self.assertEqual((a["name"], a["pine_version"], a["lines"], a["inputs"]), ("GEX PRO - NQ / ES", 6, 4, 1))
+            f.write_text(f.read_text(encoding="utf-8") + "// edit\n", encoding="utf-8")
+            b = info(f, with_changes=False)
+            self.assertNotEqual(a["version"], b["version"])            # any edit changes the version
+            self.assertTrue(b["code"].endswith("// edit\n"))
+
+    def test_service_and_site_serve_the_real_script(self):
+        from gexsys.indicator import PINE
+        code = PINE.read_text(encoding="utf-8")
+        self.assertIn('indicator("GEX PRO', code)
+        with tempfile.TemporaryDirectory() as tmp:
+            w = MarketWorker(synth_cfg(tmp))
+            httpd = ThreadingHTTPServer(("127.0.0.1", 0), make_handler({"NQ": w}))
+            threading.Thread(target=httpd.serve_forever, daemon=True).start()
+            try:
+                with urllib.request.urlopen(f"http://127.0.0.1:{httpd.server_address[1]}/api/indicator") as r:
+                    self.assertEqual(json.loads(r.read())["code"], code)
+            finally:
+                httpd.shutdown()
+                httpd.server_close()
+
+
 class TestSingleServer(unittest.TestCase):
     def test_second_server_on_the_same_port_is_refused(self):
         from gexsys.service import ExclusiveHTTPServer
@@ -221,6 +250,9 @@ class TestStaticSite(unittest.TestCase):
             res = site.build([synth_cfg(tmp)], out, state)
             self.assertEqual(res["NQ-SYNTHETIC"][1], "OK")
             html = (out / "index.html").read_text(encoding="utf-8")
+            from gexsys.indicator import PINE
+            ind = json.loads((out / "data" / "indicator.json").read_text(encoding="utf-8"))
+            self.assertEqual(ind["code"], PINE.read_text(encoding="utf-8"))        # the hosted page gets the script
             self.assertIn("window.GEX_STATIC = true", html.split("const $ =")[0])     # flag set before the app script
             d = json.loads((out / "data" / "all.json").read_text(encoding="utf-8"))
             self.assertTrue(d["static"])

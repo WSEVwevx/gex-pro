@@ -1,10 +1,10 @@
 // This Pine Script(R) source is part of the gexsys project. Analytical indicator only - it places no orders.
 //@version=6
-indicator("GEX Levels - NQ / ES", shorttitle = "GEX Levels", overlay = true,
+indicator("GEX PRO - NQ / ES", shorttitle = "GEX PRO", overlay = true,
      max_lines_count = 200, max_labels_count = 200, max_boxes_count = 300)
 
 // =====================================================================================================
-// GEX Levels draws options levels computed by the gexsys service (open START.bat, then the website at
+// GEX PRO draws options levels computed by the gexsys service (open START.bat, then the website at
 // http://127.0.0.1:8765) and pasted into "Levels payload". Pine cannot download data, so the levels
 // change when you paste a new update (every hour on the hour). Levels come from index + ETF options
 // (SPX + SPY for ES, NDX + QQQ for NQ), are expressed in index prices and are mapped live to this futures
@@ -639,7 +639,7 @@ valOf(string k, Snap s, float f, float o, bool ok, string mst) =>
 if showTab and barstate.islast
     table.clear(tab, 0, 0, 2, 17)
     if not hasA
-        cell(0, 0, "GEX", cDim, cHead)
+        cell(0, 0, "GEX PRO", cDim, cHead)
         cell(1, 0, nParsed == 0 ? "no payload" : "no " + chartFam + " payload", cWarn, cHead)
         cell(0, 1, nParsed == 0 ? "Copy from 127.0.0.1:8765" : "Pasted: " + otherMkts, cDim)
     else

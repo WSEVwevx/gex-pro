@@ -1,8 +1,8 @@
 @echo off
-rem Starts the GEX service for NQ + ES and opens the website.
+rem Starts GEX PRO for NQ + ES and opens the website.
 rem Data: Cboe's free feed - SPX+SPY options for ES, NDX+QQQ for NQ (15 minutes delayed).
 cd /d "%~dp0"
-title GEX Levels service - keep this window open
+title GEX PRO - keep this window open
 set "PY=%LOCALAPPDATA%\Programs\Python\Python312\python.exe"
 if not exist "%PY%" set "PY=py"
 echo Checking dependencies...

@@ -4,7 +4,7 @@
 
 Runs every market once (exactly like one refresh of START.bat), then writes
   index.html                        the dashboard, switched to static mode
-  data/all.json, news.json, posts.json   what /api/all, /api/news and /api/posts return locally
+  data/all.json, news.json, posts.json, indicator.json   what the local /api endpoints return
   data/pine-latest[-NQ|-ES].txt     the newest TradingView payload
   data/pine-published[-NQ|-ES].txt  the payload from the last scheduled slot (every hour on the hour, ET)
 
@@ -64,6 +64,8 @@ def build(configs: list[MarketConfig], out: str | Path, state: str | Path, keep_
          "description": w.cfg.description, "health": w.health(), "published": w.published, "result": w.result}
         for w in workers]})))
     _write(data / "news.json", json.dumps(to_jsonable(Calendar(cache_path=state / "ff_calendar.json").get())))
+    from .indicator import info
+    _write(data / "indicator.json", json.dumps(info()))
     _write(data / "posts.json", json.dumps(to_jsonable(Posts(cache_path=state / "truth_posts.json").get())))
     for which, pick in (("latest", lambda w: w.result and w.result.get("pine")),
                         ("published", lambda w: w.published and w.published.get("payload"))):

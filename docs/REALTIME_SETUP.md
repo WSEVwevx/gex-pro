@@ -29,9 +29,9 @@ Double-click **START.bat**. It installs or updates the dependencies, starts the 
 **Every hour on the hour, 00:00 to 23:00 ET**, on trading days (weekends and market holidays have
 no updates, because the options data doesn't change then; early-close days still get all 24):
 
-1. A **Windows notification** appears ("GEX levels updated").
+1. A **Windows notification** appears ("GEX PRO levels updated").
 2. On the website, click **Copy for TradingView**. One paste holds NQ and ES.
-3. In TradingView, open the **GEX Levels** indicator settings, click into **Levels payload**, press
+3. In TradingView, open the **GEX PRO** indicator settings, click into **Levels payload**, press
    Ctrl+A, then Ctrl+V, then click OK.
 
 Use the same paste on your ES chart. Each chart draws only its own market's levels.

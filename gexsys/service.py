@@ -9,6 +9,7 @@ Endpoints (bound to 127.0.0.1 by default):
   GET /api/levels?key=NQ-CBOE          one worker's latest result (market=NQ picks the first NQ worker)
   GET /api/pine?key=NQ-CBOE[&which=published]   one worker's Pine payload (text/plain)
   GET /api/pine/all[?which=published]  ALL workers' payloads joined with "|" - one paste for every chart
+  GET /api/indicator                   the TradingView script, read from disk on every request
   GET /                                website (dashboard/index.html)
 """
 from __future__ import annotations
@@ -149,7 +150,7 @@ class MarketWorker(threading.Thread):
         log.info("published %s payload for slot %s", self.key, info["slot_et"])
         pc = self.cfg.publish
         if pc.desktop_notify and self.gate.first(slot):
-            self.notify_desktop(f"GEX levels updated ({slot:%H:%M} ET)",
+            self.notify_desktop(f"GEX PRO levels updated ({slot:%H:%M} ET)",
                                 "Open http://127.0.0.1:8765, click 'Copy for TradingView', "
                                 "paste into the indicator's Levels payload.")
         url = os.environ.get("GEX_PUBLISH_WEBHOOK_URL") or os.environ.get("GEX_ALERT_WEBHOOK_URL")
@@ -241,6 +242,9 @@ def make_handler(workers: dict[str, MarketWorker], calendar=None, posts=None):
                 return self._json(200, calendar.get())
             if u.path == "/api/posts":
                 return self._json(200, posts.get())
+            if u.path == "/api/indicator":
+                from .indicator import info
+                return self._json(200, info())
             if u.path == "/api/markets":
                 return self._json(200, [{"key": k, "market": w.cfg.market, "source": w.cfg.source,
                                          "provider": w.label, "description": w.cfg.description}
@@ -300,14 +304,14 @@ def serve(configs: list[MarketConfig], host: str = "127.0.0.1", port: int = 8765
     try:
         httpd = ExclusiveHTTPServer((host, port), make_handler(workers))   # bind first: fail fast if port busy
     except OSError:
-        print(f"\nGEX is ALREADY RUNNING in another window, so this copy will not start.\n"
+        print(f"\nGEX PRO is ALREADY RUNNING in another window, so this copy will not start.\n"
               f"Use that window, or close it and run START.bat again to pick up updates.\n"
               f"Website: http://{host}:{port}", flush=True)
         raise SystemExit(3)
     for w in workers.values():
         w.start()
     log.info("serving on http://%s:%d (workers: %s)", host, port, ", ".join(workers))
-    print(f"GEX service running - open http://{host}:{port}  (Ctrl+C to stop)", flush=True)
+    print(f"GEX PRO running - open http://{host}:{port}  (Ctrl+C to stop)", flush=True)
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
