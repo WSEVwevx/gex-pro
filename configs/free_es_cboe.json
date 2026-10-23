@@ -1,0 +1,53 @@
+{
+  "engine": {
+    "positioning": "conventional",
+    "unit": "usd_per_1pct",
+    "include_0dte": true,
+    "max_dte": 45,
+    "grid_pct": 0.05,
+    "grid_steps": 201,
+    "recompute_greeks": "always",
+    "max_spot_age_s": 1800
+  },
+  "levels": {
+    "top_n": 6,
+    "min_share": 0.04
+  },
+  "refresh": {
+    "rth_seconds": 300,
+    "eth_seconds": 1800,
+    "closed_seconds": 3600
+  },
+  "alerts": {
+    "level_shift_ticks": 20,
+    "cooldown_s": 900,
+    "stale_after_s": 2700
+  },
+  "storage": {
+    "root": "%LOCALAPPDATA%/gexsys/snapshots",
+    "store_raw": false
+  },
+  "publish": {
+    "times_et": [
+      "09:45",
+      "11:45",
+      "13:45",
+      "15:30"
+    ],
+    "desktop_notify": true,
+    "webhook_format": "json"
+  },
+  "mapping": {
+    "method": "ratio",
+    "max_skew_s": 60
+  },
+  "futures_ref": {
+    "mode": "carry"
+  },
+  "description": "ES from SPX options - Cboe free feed (15-min delayed)",
+  "market": "ES",
+  "source": "SPX",
+  "provider": {
+    "name": "cboe"
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "engine": {
+    "positioning": "conventional",
+    "unit": "usd_per_1pct",
+    "include_0dte": true,
+    "max_dte": 90,
+    "grid_pct": 0.05,
+    "grid_steps": 201
+  },
+  "levels": {
+    "top_n": 6,
+    "min_share": 0.04
+  },
+  "refresh": {
+    "rth_seconds": 60,
+    "eth_seconds": 900,
+    "closed_seconds": 3600
+  },
+  "alerts": {
+    "level_shift_ticks": 20,
+    "cooldown_s": 900,
+    "stale_after_s": 1800
+  },
+  "storage": {
+    "root": "data/snapshots",
+    "store_raw": false
+  },
+  "publish": {
+    "times_et": [
+      "09:45",
+      "11:45",
+      "13:45",
+      "15:30"
+    ],
+    "desktop_notify": true,
+    "webhook_format": "json"
+  },
+  "description": "ES levels from CME ES futures options via CSV export (sample file - replace path)",
+  "market": "ES",
+  "source": "ES_FOP",
+  "provider": {
+    "name": "csv",
+    "path": "tests/data/es_fop_sample.csv",
+    "quote_quality": "DL",
+    "greeks_quality": "PROV",
+    "spot_quality": "DL"
+  },
+  "mapping": {
+    "method": "identity"
+  }
+}

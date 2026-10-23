@@ -1,0 +1,657 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GEX Levels</title>
+<style>
+:root{
+  --page:#0b0e13; --panel:#12161d; --panel2:#171c25; --line:#222935; --line2:#2c3442;
+  --ink:#eef1f5; --ink2:#a9b2c0; --ink3:#6f7a8a;
+  --pos:#3987e5; --neg:#d95926; --vol:#199e70; --mp:#c98500; --oi:#9085e9; --zg:#b9bec7; --em:#8b95a5;
+  --good:#0ca30c; --warn:#e6c35c; --bad:#e05a5a;
+  --mono:"Cascadia Mono",ui-monospace,Consolas,monospace; --r:12px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--page);color:var(--ink);font:14px/1.5 "Segoe UI Variable","Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+button{font:inherit;cursor:pointer;color:inherit}
+.wrap{max-width:1360px;margin:0 auto;padding:0 20px 48px}
+/* top bar */
+header{position:sticky;top:0;z-index:10;background:rgba(11,14,19,.86);backdrop-filter:saturate(1.4) blur(10px);border-bottom:1px solid var(--line)}
+.bar{max-width:1360px;margin:0 auto;padding:12px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:.01em;font-size:16px}
+.brand i{width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,var(--pos),var(--neg));display:inline-block}
+.seg{display:flex;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:3px}
+.seg button{background:none;border:0;padding:6px 18px;border-radius:7px;color:var(--ink2);font-weight:650}
+.seg button[aria-selected=true]{background:var(--panel2);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line2)}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink2);padding:4px 10px;border:1px solid var(--line);border-radius:999px;white-space:nowrap}
+.chip b{color:var(--ink);font-weight:600}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--ink3)}
+.dot.ok{background:var(--good);box-shadow:0 0 0 3px rgba(12,163,12,.18)}
+.dot.warn{background:var(--warn)} .dot.bad{background:var(--bad)}
+.spacer{flex:1}
+.btn{border:0;border-radius:9px;padding:9px 16px;font-weight:700;background:var(--ink);color:#0b0e13}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line2);font-weight:600}
+/* cards */
+.hero{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:14px;margin-top:18px}
+@media(max-width:980px){.hero{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;min-width:0}
+.eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink3);font-weight:650}
+.big{font:650 28px/1.15 var(--mono);margin-top:6px;letter-spacing:-.01em}
+.big.sm{font-size:22px}
+.expl{color:var(--ink2);font-size:13px;margin-top:8px;max-width:60ch}
+.regime{display:flex;align-items:center;gap:10px;margin-top:6px;font-size:24px;font-weight:700}
+.regime .tag{font:700 12px var(--mono);padding:3px 8px;border-radius:6px;background:var(--panel2);border:1px solid var(--line2)}
+.kv{display:flex;justify-content:space-between;gap:10px;font-size:13px;color:var(--ink2);margin-top:6px}
+.kv b{font:600 13px var(--mono);color:var(--ink)}
+.main{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:14px;margin-top:14px;align-items:start}
+@media(max-width:1080px){.main{grid-template-columns:1fr}}
+.card h2{margin:0;font-size:15px;font-weight:650}
+.head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.filters{display:flex;gap:6px;flex-wrap:wrap}
+.filters{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:3px}
+.filters button{background:none;border:0;border-radius:7px;padding:5px 11px;font-size:12px;color:var(--ink2);font-weight:600}
+.filters button[aria-selected=true]{background:var(--ink);color:#0b0e13}
+.badge{font-size:10px;font-weight:800;letter-spacing:.08em;padding:2px 6px;border-radius:5px;background:var(--ink);color:#0b0e13}
+.row.key .name{font-size:15px}
+.row.key .px .p{font-size:19px}
+/* ladder */
+.ladder{display:flex;flex-direction:column}
+.row{display:grid;grid-template-columns:4px 1fr auto;gap:14px;padding:12px 4px 12px 0;border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+.rule{border-radius:4px}
+.name{display:flex;align-items:center;gap:8px;font-weight:650}
+.kind{font-size:11px;color:var(--ink3);font-weight:600;text-transform:uppercase;letter-spacing:.06em}
+.desc{color:var(--ink2);font-size:12.5px;margin-top:3px;line-height:1.45}
+.px{text-align:right;white-space:nowrap}
+.px .p{font:650 17px var(--mono)}
+.px .d{font:12px var(--mono);color:var(--ink3);margin-top:2px}
+.now{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px;padding:10px 0;color:var(--ink);font:600 12px var(--mono)}
+.now:before,.now:after{content:"";height:1px;background:var(--ink3)}
+/* chart */
+.chartwrap{position:relative}
+svg text{fill:var(--ink3);font:11px var(--mono)}
+.tip{position:absolute;pointer-events:none;background:var(--panel2);border:1px solid var(--line2);border-radius:8px;padding:7px 10px;font:12px var(--mono);color:var(--ink);opacity:0;transition:opacity .1s;white-space:nowrap}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--ink2);margin-top:8px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:14px;height:8px;border-radius:2px;display:inline-block}
+.linkbtn{background:none;border:0;color:var(--ink2);font-size:12px;text-decoration:underline;padding:0}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th,td{padding:7px 6px;border-bottom:1px solid var(--line);text-align:right;font-size:13px}
+th{color:var(--ink3);font-weight:600;font-size:12px}
+td:first-child,th:first-child{text-align:left}
+td.m{font-family:var(--mono)}
+.banner{margin-top:14px;padding:12px 16px;border-radius:10px;border:1px solid #5e5124;background:#1b180c;color:var(--warn);font-size:13px}
+.banner.bad{border-color:#5e2a2a;background:#1d1010;color:#f2a3a3}
+.foot{color:var(--ink3);font-size:12px;margin-top:22px;max-width:100ch;line-height:1.6}
+.toast{position:fixed;right:20px;bottom:20px;background:var(--panel2);border:1px solid var(--line2);padding:11px 15px;border-radius:10px;opacity:0;transform:translateY(6px);transition:all .18s;max-width:420px;font-size:13px}
+.toast.show{opacity:1;transform:none}
+.skeleton{color:var(--ink3)}
+/* stats strip */
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:14px}
+@media(max-width:1080px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:620px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;min-width:0}
+.stat .v{font:650 19px var(--mono);margin-top:4px}
+.stat .s{color:var(--ink3);font-size:12px;margin-top:2px;line-height:1.35}
+/* expiry bars */
+.xbar{display:inline-block;height:8px;border-radius:2px;vertical-align:middle}
+/* news */
+.news-day{margin-top:16px;font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink3);font-weight:650;padding-bottom:6px;border-bottom:1px solid var(--line)}
+.ev{display:grid;grid-template-columns:72px 78px 52px 1fr auto;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);font-size:13.5px}
+.ev.past{opacity:.45}
+.ev.next{background:linear-gradient(90deg,rgba(57,135,229,.12),transparent);border-radius:8px;padding-left:8px}
+.ev .tm{font-family:var(--mono);color:var(--ink2)}
+.imp{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;text-align:center;border:1px solid}
+.imp.High{color:#ff8a80;border-color:#7a2e2e;background:#2a1414}
+.imp.Medium{color:var(--warn);border-color:#5e5124;background:#1b180c}
+.imp.Low,.imp.Holiday{color:var(--ink3);border-color:var(--line2)}
+.ev .cur{font:600 12px var(--mono);color:var(--ink2)}
+.ev .fp{font:12px var(--mono);color:var(--ink3);text-align:right;white-space:nowrap}
+.ev .fp b{color:var(--ink2);font-weight:600}
+@media(max-width:700px){.ev{grid-template-columns:60px 70px 1fr}.ev .cur,.ev .fp{display:none}}
+/* Truth Social feed */
+.posts{max-height:860px;overflow-y:auto;margin-right:-6px;padding-right:6px}
+.post{padding:12px 0;border-bottom:1px solid var(--line);display:grid;gap:6px}
+.post .meta{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--ink3);flex-wrap:wrap}
+.post .meta b{color:var(--ink2);font-weight:600}
+.post .txt{font-size:13.5px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:7;-webkit-box-orient:vertical;overflow:hidden}
+.post .txt.open{-webkit-line-clamp:unset}
+.post img{max-width:100%;max-height:220px;border-radius:8px;border:1px solid var(--line);object-fit:cover}
+.post .tags{display:flex;gap:6px;flex-wrap:wrap}
+.mw{font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px;color:var(--warn);border:1px solid #5e5124;background:#1b180c}
+.post.hot{border-left:3px solid var(--warn);padding-left:10px}
+.tone{font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;padding:1px 8px;border-radius:999px;cursor:help}
+.tone.bullish{color:var(--good);border:1px solid #1d5a1d;background:#0c1a0c}
+.tone.bearish{color:var(--bad);border:1px solid #6a2a2a;background:#1e0e0e}
+.post a{color:var(--ink2)}
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <div class="brand"><i aria-hidden="true"></i>GEX Levels</div>
+    <div class="seg" role="tablist" id="pages" aria-label="Page">
+      <button role="tab" data-p="levels" aria-selected="true">Levels</button><button role="tab" data-p="bias" aria-selected="false">Bias</button><button role="tab" data-p="news" aria-selected="false">News</button></div>
+    <div class="seg" role="tablist" id="tabs"></div>
+    <div class="chips" id="status"></div>
+    <span class="spacer"></span>
+    <button class="btn ghost" id="copyMarket">Copy NQ only</button>
+    <button class="btn" id="copyAll">Copy for TradingView</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <div id="banner"></div>
+
+  <div id="biasView" hidden>
+    <section class="hero">
+      <div class="card" id="biasCard"><div class="eyebrow">Today's bias (positioning model)</div><div class="skeleton">Loading...</div></div>
+      <div class="card" id="targetCard"><div class="eyebrow">Base case by the close</div><div class="skeleton">Loading...</div></div>
+      <div class="card" id="rangeCard"><div class="eyebrow">Expected range</div><div class="skeleton">Loading...</div></div>
+    </section>
+    <section class="card" style="margin-top:14px">
+      <div class="head"><h2>How the session could unfold</h2><span class="spacer"></span><span class="sub" id="biasWhen" style="color:var(--ink3);font-size:12px"></span></div>
+      <div class="expl" id="biasSummary" style="max-width:none;margin:0 0 10px;color:var(--ink)"></div>
+      <div class="chartwrap" id="biasWrap"><svg id="biasChart" role="img" aria-label="Illustrative path for the session with expected-move cone and key levels"></svg><div class="tip" id="biasTip"></div></div>
+      <div class="legend"><span><i class="sw" id="pathSw" style="background:var(--ink);height:3px"></i>Base-case path</span><span><i class="sw" style="background:rgba(139,149,165,.35);height:10px"></i>±1σ expected-move cone</span><span><i class="sw" style="background:var(--pos);height:2px"></i>Call wall</span><span><i class="sw" style="background:var(--neg);height:2px"></i>Put wall</span><span><i class="sw" style="background:var(--zg);height:2px"></i>Zero gamma</span><span><i class="sw" style="background:#e6e6e6;height:2px"></i>Abs gamma</span><span><i class="sw" style="background:var(--mp);height:2px"></i>0DTE max pain</span></div>
+      <div class="expl">This is a scenario built from options positioning (15-min delayed, end-of-day open interest), not a prediction. News, flows and anything not in the options data can override it. About 1 day in 3, price leaves the cone.</div>
+    </section>
+    <section class="card" style="margin-top:14px">
+      <div class="head"><h2>Why: factor by factor</h2></div>
+      <div id="biasFactors"></div>
+      <div class="expl">Each factor adds or subtracts from the score: +0.75 or more = bullish, -0.75 or less = bearish, otherwise neutral. Gamma side sets the day type (range, trend or pivot) rather than the direction.</div>
+    </section>
+  </div>
+
+  <div id="newsView" hidden>
+   <div class="main" style="grid-template-columns:minmax(0,1.5fr) minmax(0,1fr)">
+    <section class="card" style="margin-top:4px">
+      <div class="head"><h2>Economic calendar</h2><span class="sub" id="newsNext" style="color:var(--ink2);font-size:13px"></span><span class="spacer"></span>
+        <div class="filters" id="impactF" role="tablist" aria-label="Impact"></div>
+        <div class="filters" id="curF" role="tablist" aria-label="Currency"></div></div>
+      <div id="news"><div class="skeleton">Loading calendar...</div></div>
+      <div class="expl" id="newsFoot"></div>
+    </section>
+    <section class="card" style="margin-top:4px">
+      <div class="head"><h2>Trump on Truth Social</h2><span class="spacer"></span>
+        <div class="filters" id="postF" role="tablist" aria-label="Posts"></div></div>
+      <div id="posts" class="posts"><div class="skeleton">Loading posts...</div></div>
+      <div class="expl" id="postsFoot"></div>
+    </section>
+   </div>
+  </div>
+
+  <div id="levelsView">
+  <section class="hero">
+    <div class="card" id="regimeCard"><div class="eyebrow">Gamma regime (model)</div><div class="skeleton">Loading...</div></div>
+    <div class="card" id="priceCard"><div class="eyebrow">Reference price</div><div class="skeleton">Loading...</div></div>
+    <div class="card" id="netCard"><div class="eyebrow">Net gamma exposure</div><div class="skeleton">Loading...</div></div>
+  </section>
+
+  <section class="stats" id="stats"></section>
+
+  <section class="main">
+    <div class="card">
+      <div class="head"><h2>Levels</h2><span class="spacer"></span>
+        <div class="filters" id="filters" role="tablist" aria-label="Show levels"></div></div>
+      <div class="ladder" id="ladder"></div>
+    </div>
+    <div style="display:grid;gap:14px">
+      <div class="card">
+        <div class="head"><h2>Gamma exposure by price</h2><span class="spacer"></span>
+          <button class="linkbtn" id="tableToggle">View as table</button></div>
+        <div class="chartwrap" id="chartwrap"><svg id="chart" role="img" aria-label="Net gamma exposure by strike"></svg><div class="tip" id="tip"></div></div>
+        <div id="chartTable" hidden></div>
+        <div class="legend"><span><i class="sw" style="background:var(--pos)"></i>Positive gamma</span><span><i class="sw" style="background:var(--neg)"></i>Negative gamma</span><span><i class="sw" style="background:var(--zg);height:2px"></i>Zero gamma (est.)</span><span><i class="sw" style="background:var(--pos);height:2px"></i>Call wall</span><span><i class="sw" style="background:var(--neg);height:2px"></i>Put wall</span><span><i class="sw" style="background:var(--ink);height:2px"></i>Reference price</span></div>
+        <div class="expl">Longer bars mean more modeled dealer gamma at that price. Blue strikes tend to slow price down; orange strikes tend to speed it up.</div>
+      </div>
+      <div class="card">
+        <div class="head"><h2>Max pain by expiration</h2></div>
+        <div id="maxpain"></div>
+        <div class="expl">The price where option holders as a group would lose the most at each expiration. Some traders watch for drift toward it into expiry; it is not a price target.</div>
+      </div>
+      <div class="card">
+        <div class="head"><h2>Gamma by expiration</h2></div>
+        <div id="byExpiry"></div>
+        <div class="expl">Which expirations carry the most gamma. A large near-term share means today's and this week's options dominate the levels, and they can shift quickly.</div>
+      </div>
+    </div>
+  </section>
+
+  <p class="foot" id="foot"></p>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const num = (x, d=2) => x == null || !isFinite(x) ? "-" : Number(x).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
+const money = x => x == null || !isFinite(x) ? "-" : (x<0?"-":"+") + "$" + (Math.abs(x)>=1e9 ? num(Math.abs(x)/1e9,2)+"B" : num(Math.abs(x)/1e6,0)+"M");
+const signed = (x, d=2) => x == null || !isFinite(x) ? "" : (x>=0?"+":"-") + num(Math.abs(x), d);
+const store = { get(k, d){ try { return localStorage.getItem(k) ?? d; } catch(e){ return d; } }, set(k, v){ try { localStorage.setItem(k, v); } catch(e){} } };
+
+// Static mode: the hosted copy (python -m gexsys build-site) reads files that a scheduled job rewrites,
+// instead of the local service's /api endpoints.
+const STATIC = !!window.GEX_STATIC;
+const API = STATIC ? {all: "data/all.json", news: "data/news.json", posts: "data/posts.json"}
+                   : {all: "/api/all", news: "/api/news", posts: "/api/posts"};
+const pineUrl = m => STATIC ? `data/pine-published${m ? "-" + m : ""}.txt`
+                            : `/api/pine/all?which=published${m ? "&market=" + encodeURIComponent(m) : ""}`;
+const OFFLINE = STATIC ? "Can't load the latest data file. Check your connection; retrying."
+                       : "Can't reach the GEX service. Is START.bat still running? Retrying every 20 seconds.";
+
+if (location.protocol === "file:" && !STATIC) {
+  document.body.innerHTML = `<div class="wrap"><div class="banner bad" style="margin-top:40px;font-size:15px;line-height:1.7">
+  This page only works while the GEX service is running.<br>1. Double-click <b>START.bat</b> in your Options Indicator folder.<br>
+  2. Your browser opens <b>http://127.0.0.1:8765</b> automatically.</div></div>`;
+  throw new Error("opened as file");
+}
+
+let data = null, market = store.get("gex.market", "NQ");
+// One view at a time ("show only"). The old on/off toggles could hide the key levels by accident.
+try { localStorage.removeItem("gex.groups"); } catch(e) {}
+let view = store.get("gex.view", "all");
+let showTable = false;
+
+const GROUPS = [["key","Key levels"],["odte","0DTE"],["flow","Volume & OI"],["mp","Max pain"],["range","Expected move"]];
+const VIEWS = [["all","All"], ...GROUPS];
+const KIND_COLOR = {ag:"#e6e6e6", zg:"var(--zg)", call:"var(--pos)", put:"var(--neg)", vol:"var(--vol)", oi:"var(--oi)", mp:"var(--mp)", em:"var(--em)"};
+
+function toast(msg){ const t=$("toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove("show"),3800); }
+async function copyFrom(url, what){
+  const text = (await (await fetch(url, {cache:"no-store"})).text()).trim();
+  if(!text){ toast("Nothing to copy yet - the first scheduled update hasn't happened."); return; }
+  try{ await navigator.clipboard.writeText(text); toast(`Copied ${what}. In TradingView: indicator settings > Levels payload > Ctrl+A, Ctrl+V > OK.`); }
+  catch(e){ window.prompt("Copy this (Ctrl+C):", text); }
+}
+$("copyAll").onclick = () => copyFrom(pineUrl(""), "the scheduled update for NQ and ES");
+$("copyMarket").onclick = () => copyFrom(pineUrl(market), `the scheduled update for ${market}`);
+$("tableToggle").onclick = () => { showTable = !showTable; render(); };
+
+// ---------- pages: Levels | News
+let page = store.get("gex.page", "levels");
+let impactF = store.get("gex.impact", "med");       // high | med | all
+let curF = store.get("gex.cur", "USD");             // USD | all
+let news = null;
+function setPage(p){
+  page = p; store.set("gex.page", p);
+  [...$("pages").children].forEach(b => b.setAttribute("aria-selected", String(b.dataset.p === p)));
+  $("levelsView").hidden = p !== "levels"; $("newsView").hidden = p !== "news"; $("biasView").hidden = p !== "bias";
+  $("tabs").style.display = p === "news" ? "none" : "";
+  if(p === "news") renderNews();
+  if(p !== "news" && data) render();
+}
+[...$("pages").children].forEach(b => b.onclick = () => setPage(b.dataset.p));
+async function loadNews(){
+  try { news = await (await fetch(API.news, {cache:"no-store"})).json(); }
+  catch(e) { news = news || {events: [], error: OFFLINE}; }
+  renderNews(); if(data) render();
+}
+const ET = {timeZone: "America/New_York"};
+const dur = ms => { const m = Math.max(0, Math.round(ms/60000)); return m < 60 ? `${m}m` : m < 1440 ? `${Math.floor(m/60)}h ${m%60}m` : `${Math.floor(m/1440)}d ${Math.floor(m%1440/60)}h`; };
+const etTime = iso => new Date(iso).toLocaleTimeString("en-US", {...ET, hour:"numeric", minute:"2-digit"});
+function newsFilter(e){
+  const imp = {high:["High"], med:["High","Medium"], all:["High","Medium","Low","Holiday"]}[impactF] || ["High"];
+  return imp.includes(e.impact) && (curF === "all" || e.country === curF);
+}
+// next high-impact USD event, else the next medium one (some weeks have no high-impact USD events)
+// ---------- Trump posts (Truth Social)
+let posts = null, postF = store.get("gex.postf", "all");      // all | market
+async function loadPosts(){
+  try { posts = await (await fetch(API.posts, {cache:"no-store"})).json(); }
+  catch(e) { posts = posts || {posts: [], error: OFFLINE}; }
+  renderPosts();
+}
+function renderPosts(){
+  $("postF").innerHTML = [["all","All"],["market","Market-related"]].map(([k, t]) => `<button role="tab" aria-selected="${postF === k}" data-k="${k}">${t}</button>`).join("");
+  [...$("postF").children].forEach(b => b.onclick = () => { postF = b.dataset.k; store.set("gex.postf", postF); renderPosts(); });
+  if(!posts) return;
+  const list = (posts.posts || []).filter(p => postF === "all" || (p.market_words || []).length);
+  const when = iso => { const t = new Date(iso); return `${ago(iso)} · ${t.toLocaleString("en-US", {...ET, weekday:"short", hour:"numeric", minute:"2-digit"})} ET`; };
+  $("posts").innerHTML = list.map(p => {
+    const hot = (p.market_words || []).length > 0;
+    const kind = p.kind === "retruth" ? `<span class="chip">ReTruth${p.author ? " of @" + esc(p.author) : ""}</span>` : p.kind === "quote" ? `<span class="chip">Quote</span>` : "";
+    const media = (p.media || [])[0];
+    const counts = p.counts ? `<span>${num(p.counts.likes, 0)} likes · ${num(p.counts.retruths, 0)} ReTruths</span>` : "";
+    return `<div class="post${hot ? " hot" : ""}">
+      <div class="meta"><b>${when(p.time)}</b>${kind}${counts}${p.url ? `<a href="${esc(p.url)}" target="_blank" rel="noopener">open</a>` : ""}</div>
+      ${p.text ? `<div class="txt" onclick="this.classList.toggle('open')" title="Click to expand">${esc(p.text)}</div>` : `<div class="txt" style="color:var(--ink3)">${media ? (media.type === "video" ? "Video post" : "Image post") : "Post without text"}</div>`}
+      ${media && media.preview ? `<img loading="lazy" src="${esc(media.preview)}" alt="${media.type === "video" ? "video preview" : "image"} from the post" referrerpolicy="no-referrer">` : ""}
+      ${p.link && p.link.url ? `<a href="${esc(p.link.url)}" target="_blank" rel="noopener" style="font-size:12.5px">${esc(p.link.title || p.link.url)}</a>` : ""}
+      ${hot ? `<div class="tags">${p.tone ? `<span class="tone ${p.tone}" title="Keyword guess at what this post means for stocks, not a forecast">${p.tone}</span>` : ""}${p.market_words.map(w => `<span class="mw">${esc(w)}</span>`).join("")}</div>` : ""}
+    </div>`; }).join("") || `<div class="expl">${postF === "market" ? "No recent posts mention market topics." : "No posts available."}</div>`;
+  $("postsFoot").innerHTML = `Source: ${esc(posts.source || "-")}${posts.fetched_at ? `, updated ${ago(posts.fetched_at)}` : ""}; checked every 5 min. Yellow tags flag market topics (tariffs, the Fed, China, oil...); Bullish / Bearish is a keyword guess at the post's lean for stocks, shown only when it is clear. Posts can move futures quickly, and nothing here predicts how.${posts.error ? ` <span style="color:var(--warn)">${esc(posts.error)}</span>` : ""}`;
+}
+
+function nextHighUSD(){
+  const now = Date.now(), up = news ? (news.events || []).filter(e => e.country === "USD" && Date.parse(e.time) > now) : [];
+  return up.find(e => e.impact === "High") || up.find(e => e.impact === "Medium");
+}
+function renderNews(){
+  const opt = (id, cur, items, key) => {
+    $(id).innerHTML = items.map(([k, t]) => `<button role="tab" aria-selected="${cur === k}" data-k="${k}">${t}</button>`).join("");
+    [...$(id).children].forEach(b => b.onclick = () => { if(key === "imp"){ impactF = b.dataset.k; store.set("gex.impact", impactF); } else { curF = b.dataset.k; store.set("gex.cur", curF); } renderNews(); });
+  };
+  opt("impactF", impactF, [["high","High"],["med","High + Medium"],["all","All"]], "imp");
+  opt("curF", curF, [["USD","USD"],["all","All currencies"]], "cur");
+  if(!news){ return; }
+  const now = Date.now(), evs = (news.events || []).filter(newsFilter);
+  const next = evs.find(e => Date.parse(e.time) > now);
+  let html = "", day = "";
+  for(const e of evs){
+    const d = new Date(e.time).toLocaleDateString("en-US", {...ET, weekday:"long", month:"short", day:"numeric"});
+    if(d !== day){ day = d; html += `<div class="news-day">${esc(d)}</div>`; }
+    const t = Date.parse(e.time), allDay = etTime(e.time) === "12:00 AM";
+    html += `<div class="ev${t < now ? " past" : ""}${e === next ? " next" : ""}">
+      <span class="tm">${allDay ? "All day" : etTime(e.time)}</span><span class="imp ${esc(e.impact)}">${esc(e.impact === "Medium" ? "Med" : e.impact)}</span>
+      <span class="cur">${esc(e.country)}</span><span>${esc(e.title)}${e === next ? ` <span class="chip">in ${dur(t - now)}</span>` : ""}</span>
+      <span class="fp">${e.forecast ? `F <b>${esc(e.forecast)}</b>` : ""}${e.forecast && e.previous ? " · " : ""}${e.previous ? `P <b>${esc(e.previous)}</b>` : ""}</span></div>`;
+  }
+  $("news").innerHTML = html || `<div class="expl">No ${impactF === "high" ? "high-impact " : impactF === "med" ? "high- or medium-impact " : ""}${curF === "all" ? "" : curF + " "}events this week. Try a wider filter above.</div>`;
+  const nh = nextHighUSD();
+  $("newsNext").textContent = nh ? `Next ${nh.impact === "High" ? "high" : "medium"}-impact USD: ${nh.title}, ${new Date(nh.time).toLocaleDateString("en-US", {...ET, weekday:"short"})} ${etTime(nh.time)} ET (in ${dur(Date.parse(nh.time) - now)})` : "";
+  $("newsFoot").innerHTML = `Source: <a href="https://www.forexfactory.com/calendar" target="_blank" rel="noopener" style="color:var(--ink2)">ForexFactory calendar</a> (weekly export feed), checked every 30 min${news.fetched_at ? `, last updated ${ago(news.fetched_at)}` : ""}. Times in ET. F = forecast, P = previous; the feed has no actual results - see ForexFactory for those.${news.error ? ` <span style="color:var(--warn)">${esc(news.error)}</span>` : ""}`;
+}
+
+async function load(){
+  try{ data = await (await fetch(API.all, {cache:"no-store"})).json(); render(); }
+  catch(e){ $("banner").innerHTML = `<div class="banner bad">${OFFLINE}</div>`; }
+}
+
+function ago(iso){ const m = (Date.now() - Date.parse(iso))/60000; return m < 1 ? "just now" : m < 60 ? `${Math.round(m)} min ago` : `${Math.floor(m/60)} h ${Math.round(m%60)} min ago`; }
+
+function render(){
+  const ws = data.workers, markets = [...new Set(ws.map(w => w.market))];
+  if(!markets.includes(market)) market = markets[0];
+  $("tabs").innerHTML = markets.map(m => `<button role="tab" aria-selected="${m===market}" data-m="${m}">${m}</button>`).join("");
+  [...$("tabs").children].forEach(b => b.onclick = () => { market = b.dataset.m; store.set("gex.market", market); render(); });
+  $("copyMarket").textContent = `Copy ${market} only`;
+  const anyPub = ws.some(w => w.published);
+  $("copyAll").disabled = !anyPub;
+  $("copyAll").textContent = anyPub ? `Copy for TradingView · ${ws.find(w=>w.published).published.slot_et.slice(11)} ET` : "Copy for TradingView";
+
+  const w = ws.find(x => x.market === market && x.result) || ws.find(x => x.market === market);
+  const h = w.health;
+  const s = w.result && w.result.summary;
+  // hosted copy: health was taken when the site was built, so also judge how old the build is
+  const built = STATIC ? (Date.now() - Date.parse(data.now)) / 60000 : 0;
+  const svc = h.status === "ok" && built < 45 ? "ok" : h.status === "starting" ? "" : "warn";
+  const used = (s && s.provider) || w.provider, rt = s && s.ref_quality === "RT";
+  const sw = data.schwab;
+  const swChip = !sw ? "" : sw.logged_in
+    ? `<span class="chip"><i class="dot ${sw.refresh_days_left < 1 ? "warn" : "ok"}"></i>Schwab login <b>${sw.refresh_days_left < 1 ? Math.max(0, Math.round(sw.refresh_days_left*24)) + " h" : sw.refresh_days_left.toFixed(1) + " days"}</b> left</span>`
+    : `<span class="chip"><i class="dot warn"></i>Schwab: <b>run SCHWAB_LOGIN.bat</b></span>`;
+  $("status").innerHTML = `<span class="chip"><i class="dot ${svc}"></i>Data <b>${esc(used)}</b>${used !== w.provider ? " (fallback)" : ""}</span>
+    <span class="chip">Options <b>${rt ? "real time" : "15-min delayed"}</b></span>
+    ${s ? `<span class="chip">Updated <b>${ago(s.asof)}</b></span>` : ""}${swChip}
+    ${STATIC ? `<span class="chip" title="The hosted site is rebuilt about every 15 minutes while the market is open">Site rebuilt <b>${ago(data.now)}</b></span>` : ""}
+    <span class="chip">Next paste <b>${h.next_publish_et ? esc(h.next_publish_et.slice(11)) + " ET" : "-"}</b></span>
+    ${(() => { const e = nextHighUSD(); return e ? `<span class="chip" title="Next ${e.impact.toLowerCase()}-impact USD event (ForexFactory)"><i class="dot ${e.impact === "High" ? "bad" : "warn"}"></i>${esc(e.title)} <b>in ${dur(Date.parse(e.time) - Date.now())}</b></span>` : ""; })()}`;
+  $("banner").innerHTML = !w.result ? `<div class="banner">${h.last_error ? "Data error: " + esc(h.last_error) : "First calculation in progress..."}</div>`
+    : h.last_error ? `<div class="banner">${esc(h.last_error)}</div>` : "";
+  if(!w.result) return;
+  const L = w.result.mapped || s, X = L.extras || {};
+  const ref = L.futures_equiv_of_ref ?? s.ref_price;
+  renderHero(w, s, L, X, ref);
+  renderLadder(L, X, ref, !!w.result.mapped);
+  renderChart(w, s, L, ref);
+  renderMaxPain(X);
+  renderStats(w, s, L, X);
+  renderExpiry(s);
+  if(page === "bias") renderBias(w);
+  $("foot").innerHTML = `Model estimates from ${esc(s.provider || w.provider)} ${esc(w.source)} options (${s.ref_quality === "RT" ? "real-time quotes" : "15-minute-delayed quotes"}) and end-of-day open interest, assuming dealers are long calls and short puts.
+    ${w.result.mapped ? "Futures prices use " + esc(w.result.mapped.mapping.futures_ref_mode) + "; TradingView re-maps with your live chart." : esc(s.mapping_note || "")}
+    These are proxy levels from index options, not NQ/ES futures options, and not trading advice.`;
+}
+
+function renderHero(w, s, L, X, ref){
+  const R = {POSITIVE:["Positive gamma","+","var(--pos)","Modeled dealers are long gamma, so their hedging leans against moves. That tends to mean tighter ranges and more mean reversion."],
+             NEGATIVE:["Negative gamma","-","var(--neg)","Modeled dealers are short gamma, so their hedging follows the move. That tends to mean wider ranges and more trend days."],
+             INDETERMINATE:["Balanced","~","var(--zg)","Exposure is close to balanced, or price sits near zero gamma, so there's no clear tilt either way."]}[s.regime]
+             || [s.regime, "?", "var(--ink3)", "No usable estimate right now."];
+  const changed = w.result.delta && w.result.delta.regime_changed;
+  // distance to zero gamma measured in today's expected moves: < 0.3 means price sits right at the flip
+  const zgp = L.zero_gamma && L.zero_gamma.price, emx = X.expected_move || {}, emd = emx.daily_points_fut ?? emx.daily_points;
+  const sig = zgp != null && emd ? (ref - zgp) / emd : null;
+  const sigTxt = sig == null ? "" : `<div class="kv" style="margin-top:10px"><span>Price vs zero gamma</span><b>${num(Math.abs(sig), 1)}σ ${sig >= 0 ? "above" : "below"}</b></div>
+    <div class="expl" style="margin-top:4px">${Math.abs(sig) < 0.3 ? "Right at the flip: the regime can change with a small move." : Math.abs(sig) < 1 ? "Within one expected move of the flip." : "More than a full expected move from the flip; the regime is well established."}</div>`;
+  $("regimeCard").innerHTML = `<div class="eyebrow">Gamma regime (model)</div>
+    <div class="regime"><span class="tag" style="color:${R[2]};border-color:${R[2]}">${R[1]}</span><span style="color:${R[2]}">${R[0]}</span>${changed ? '<span class="chip">changed since last update</span>' : ""}</div>
+    <div class="expl">${R[3]}</div>${sigTxt}`;
+  const em = X.expected_move || {};
+  $("priceCard").innerHTML = `<div class="eyebrow">Reference price</div>
+    <div class="big">${num(ref)}</div>
+    <div class="kv"><span>${esc(w.source)} close / last</span><b>${num(s.ref_price)}</b></div>
+    <div class="kv"><span>Expected move today (1 sd)</span><b>±${num(em.daily_points_fut ?? em.daily_points, 0)} pts</b></div>
+    <div class="expl">${w.result.mapped ? market + " equivalent of the index price, from the carry model. Your TradingView chart uses the live price." : "Options-underlying price (no futures conversion available)."}</div>`;
+  $("netCard").innerHTML = `<div class="eyebrow">Net gamma exposure</div>
+    <div class="big sm" style="color:${s.net>=0?"var(--pos)":"var(--neg)"}">${money(s.net)}<span style="font-size:13px;color:var(--ink3)"> per 1% move</span></div>
+    <div class="kv"><span>Expirations included</span><b>${s.basket.length} (to ${esc((s.basket.at(-1)||"").slice(5))})</b></div>
+    <div class="expl">Roughly how many dollars of stock or futures dealers would trade for a 1% move. The bigger the number, the stronger the effect described on the left.</div>`;
+}
+
+function levels(L, X){
+  const p = v => v && typeof v === "object" ? v.price : v;
+  const n = X.nearest || {}, lab = n.label || "0DTE", em = X.expected_move || {};
+  const a = em.anchor_fut ?? em.anchor, d = em.daily_points_fut ?? em.daily_points, wk = em.weekly_points_fut ?? em.weekly_points;
+  const out = [
+    ["key","zg","Zero gamma (est.)", p(L.zero_gamma), "Estimated price where modeled dealer gamma flips sign. Above it hedging tends to calm moves; below it hedging tends to amplify them."],
+    ["key","call","Call wall", p(L.call_wall), "Strike at or above price with the most call gamma. Often watched as resistance, since hedging there can slow a rally."],
+    ["key","put","Put wall", p(L.put_wall), "Strike at or below price with the most put gamma. Often watched as support; a clean break below can speed up selling."],
+    ["key","call","Largest +GEX strike", p(L.max_positive), "Strike with the most positive gamma. Price often gets 'sticky' around big positive-gamma strikes."],
+    ["key","put","Largest -GEX strike", p(L.max_negative), "Strike with the most negative gamma. Moves through it can accelerate."],
+    ["key","ag","Absolute gamma strike", p(L.abs_gamma), "Strike with the most total gamma, calls and puts together. It often acts like a magnet, and it doesn't depend on any assumption about who holds the options."],
+    ["odte","zg",`${lab} zero gamma`, p(n.zero_gamma), "The same flip point using only today's expiring options. It matters most intraday and stops mattering at the close."],
+    ["odte","call",`${lab} call wall`, p(n.call_wall), "Biggest call-gamma strike above price for today's expiration. A common intraday ceiling."],
+    ["odte","put",`${lab} put wall`, p(n.put_wall), "Biggest put-gamma strike below price for today's expiration. A common intraday floor."],
+    ["flow","vol","Volume call wall", p(X.vol_call), "Strike above price where the most calls traded today. Shows where today's upside bets are concentrated; it moves during the session."],
+    ["flow","vol","Volume put wall", p(X.vol_put), "Strike below price where the most puts traded today. Shows where today's hedging or downside bets are concentrated."],
+    ["flow","oi","OI call wall", p(X.oi_call), "Strike above price with the most open calls as of yesterday's close. Large open positions that dealers may be hedging."],
+    ["flow","oi","OI put wall", p(X.oi_put), "Strike below price with the most open puts as of yesterday's close."],
+    ...(X.max_pain || []).slice(0, 2).map((m, i) => ["mp","mp",`Max pain ${m.expiration.slice(5)}`, m.price, i === 0 ? "Price where option holders lose the most at this expiration. Some traders watch for a drift toward it into the close; it is not a target." : "Max pain for the next expiration."]),
+    ["range","em","Expected high today", a != null && d != null ? a + d : null, "One standard deviation above the previous close, priced from options. If options are priced right, about two days in three stay inside the band."],
+    ["range","em","Expected low today", a != null && d != null ? a - d : null, "One standard deviation below the previous close."],
+    ["range","em",`Expected high this week`, a != null && wk != null ? a + wk : null, `The same range through ${esc((em.weekly_expiry||"").slice(5))}, this week's last expiration.`],
+    ["range","em","Expected low this week", a != null && wk != null ? a - wk : null, "One standard deviation below, through this week's last expiration."],
+  ];
+  return out.filter(x => x[3] != null && isFinite(x[3]));
+}
+
+function renderLadder(L, X, ref){
+  if(!VIEWS.some(v => v[0] === view)) view = "all";
+  $("filters").innerHTML = VIEWS.map(([k, t]) => `<button role="tab" aria-selected="${view === k}" data-v="${k}">${t}</button>`).join("");
+  [...$("filters").children].forEach(b => b.onclick = () => { view = b.dataset.v; store.set("gex.view", view); render(); });
+  const all = levels(L, X);
+  const rows = all.filter(x => view === "all" || x[0] === view).sort((a, b) => b[3] - a[3]);
+  let html = "", placed = false;
+  for(const [g, kind, name, price, desc] of rows){
+    if(!placed && price < ref){ html += nowRow(ref); placed = true; }
+    const isKey = g === "key";
+    html += `<div class="row${isKey ? " key" : ""}"><div class="rule" style="background:${KIND_COLOR[kind]}"></div>
+      <div><div class="name">${esc(name)} ${isKey ? '<span class="badge">KEY</span>' : `<span class="kind">${esc(GROUPS.find(x => x[0] === g)[1])}</span>`}</div><div class="desc">${desc}</div></div>
+      <div class="px"><div class="p">${num(price)}</div><div class="d">${signed(price - ref)} pts</div></div></div>`;
+  }
+  if(!placed) html += nowRow(ref);
+  const missing = view === "all" || view === "key" ? KEY_NAMES.filter(n => !all.some(x => x[2] === n)) : [];
+  $("ladder").innerHTML = (rows.length ? html : `<div class="expl">No levels in this group right now.</div>`)
+    + (missing.length ? `<div class="expl">Not available right now: ${missing.map(esc).join(", ")}. ${KEY_WHY}</div>` : "");
+}
+const KEY_NAMES = ["Zero gamma (est.)", "Call wall", "Put wall", "Largest +GEX strike", "Largest -GEX strike", "Absolute gamma strike"];
+const KEY_WHY = "Zero gamma is shown only when the model finds a crossing near price; a wall is missing when no strike on that side has exposure.";
+const nowRow = ref => `<div class="now"><span>PRICE ${num(ref)}</span></div>`;
+
+function renderChart(w, s, L, ref){
+  const m = w.result.mapped, f = m ? (p => p*m.mapping.factor + m.mapping.offset) : (p => p);
+  // window: +/-3% of price, widened to include zero gamma and both walls (up to +/-8%)
+  const pr0 = v => v && typeof v === "object" ? v.price : v;
+  const keys = [pr0(L.zero_gamma), pr0(L.call_wall), pr0(L.put_wall)].filter(p => p != null && Math.abs(p / ref - 1) <= 0.08);
+  const win = ref * 0.03, pad = ref * 0.004;
+  const lo = Math.min(ref - win, ...keys.map(p => p - pad)), hi = Math.max(ref + win, ...keys.map(p => p + pad));
+  const bars =w.result.by_strike.map(b => ({p:f(b.strike), k:b.strike, net:b.net})).filter(b => b.p >= lo && b.p <= hi);
+  if(showTable){
+    $("chartwrap").hidden = true; $("chartTable").hidden = false; $("tableToggle").textContent = "View as chart";
+    $("chartTable").innerHTML = `<table><tr><th>Price</th><th>Strike (${esc(w.source)})</th><th>Net GEX per 1%</th></tr>${bars.slice().reverse().map(b => `<tr><td class="m">${num(b.p)}</td><td class="m">${num(b.k,0)}</td><td class="m" style="color:${b.net>=0?"var(--pos)":"var(--neg)"}">${money(b.net)}</td></tr>`).join("")}</table>`;
+    return;
+  }
+  $("chartwrap").hidden = false; $("chartTable").hidden = true; $("tableToggle").textContent = "View as table";
+  const svg = $("chart"), W = Math.max($("chartwrap").clientWidth, 320), H = 440, padL = 66, padR = 150, padT = 8, padB = 8;
+  const y = p => padT + (hi - p) / (hi - lo) * (H - padT - padB);
+  const mx = Math.max(1, ...bars.map(b => Math.abs(b.net)));
+  const cx = padL + (W - padL - padR) / 2, xs = (W - padL - padR) / 2 - 4;
+  const step = bars.length > 1 ? Math.min(...bars.slice(1).map((b, i) => Math.abs(b.p - bars[i].p)).filter(d => d > 0)) : win;
+  const bh = Math.max(2, Math.min(12, step / (hi - lo) * (H - padT - padB) - 2));   // 2px surface gap between bars
+  let g = "";
+  for(let i = 0; i <= 6; i++){ const p = lo + (hi - lo) * i / 6; g += `<line x1="${padL}" x2="${W-padR}" y1="${y(p)}" y2="${y(p)}" stroke="var(--line)"/><text x="${padL-8}" y="${y(p)+4}" text-anchor="end">${num(p,0)}</text>`; }
+  g += `<line x1="${cx}" x2="${cx}" y1="${padT}" y2="${H-padB}" stroke="var(--line2)"/>`;
+  bars.forEach((b, i) => {
+    const len = Math.abs(b.net) / mx * xs, x = b.net >= 0 ? cx : cx - len;
+    g += `<rect data-i="${i}" x="${x}" y="${y(b.p) - bh/2}" width="${Math.max(len, 1)}" height="${bh}" rx="2" fill="${b.net>=0?"var(--pos)":"var(--neg)"}"/>`;
+  });
+  const pr = v => v && typeof v === "object" ? v.price : v;
+  const marks = [[ref, "Price", "var(--ink)", ""], [pr(L.zero_gamma), "Zero gamma", "var(--zg)", "5 4"],
+                 [pr(L.call_wall), "Call wall", "var(--pos)", "2 3"], [pr(L.put_wall), "Put wall", "var(--neg)", "2 3"],
+                 [pr(L.abs_gamma), "Abs gamma", "#e6e6e6", "1 3"]]
+    .filter(m => m[0] != null && m[0] >= lo && m[0] <= hi);
+  marks.forEach(([p, , color, dash]) => { g += `<line x1="${padL}" x2="${W-padR}" y1="${y(p)}" y2="${y(p)}" stroke="${color}" stroke-width="1.5" ${dash ? `stroke-dasharray="${dash}"` : ""}/>`; });
+  // labels sorted top to bottom and pushed apart so they never overlap
+  let lastY = -1e9;
+  marks.slice().sort((a, b) => y(a[0]) - y(b[0])).forEach(([p, name, color]) => {
+    const ly = Math.max(y(p) + 4, lastY + 14); lastY = ly;
+    g += `<text x="${W-padR+8}" y="${ly}" style="fill:${color}">${name} ${num(p,0)}</text>`;
+  });
+  svg.setAttribute("width", W); svg.setAttribute("height", H); svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.innerHTML = g;
+  const tip = $("tip");
+  svg.onmousemove = e => {
+    const r = svg.getBoundingClientRect(), py = e.clientY - r.top;
+    if(!bars.length) return;
+    let best = 0; bars.forEach((b, i) => { if(Math.abs(y(b.p) - py) < Math.abs(y(bars[best].p) - py)) best = i; });
+    const b = bars[best];
+    tip.innerHTML = `${num(b.p)} <span style="color:var(--ink3)">(${esc(w.source)} ${num(b.k,0)})</span><br><span style="color:${b.net>=0?"var(--pos)":"var(--neg)"}">${money(b.net)}</span> per 1%`;
+    tip.style.opacity = 1; tip.style.left = Math.min(e.clientX - r.left + 14, W - 190) + "px"; tip.style.top = (y(b.p) - 18) + "px";
+  };
+  svg.onmouseleave = () => { tip.style.opacity = 0; };
+}
+
+const POINT_VALUE = {NQ: 20, MNQ: 2, ES: 50, MES: 5};        // $ per index point per futures contract
+function renderStats(w, s, L, X){
+  const r = X.ratios || {}, em = X.expected_move || {}, g = X.greeks || {}, d = w.result.delta, f = w.result.mapped ? w.result.mapped.mapping.factor : 1;
+  const nearExp = s.basket[0], near = (s.by_expiry || {})[nearExp], lab = (X.nearest && X.nearest.label) || "Nearest";
+  const fut = L.futures_equiv_of_ref ?? s.ref_price, contract = fut * (POINT_VALUE[market] || 1);    // $ notional of one contract
+  const ct = usd => usd == null || !isFinite(usd) ? null : usd / contract;
+  const tile = (k, v, sub, color) => `<div class="stat"><div class="eyebrow">${k}</div><div class="v"${color ? ` style="color:${color}"` : ""}>${v}</div><div class="s">${sub}</div></div>`;
+  const hedge = ct(s.net), charm = ct(g.charm_flow_usd_per_day), vanna = ct(g.vanna_usd_per_vol_pt == null ? null : -g.vanna_usd_per_vol_pt);
+  const cts = x => num(Math.abs(x), 0) + " " + market;
+  $("stats").innerHTML = [
+    tile("Hedging per 1% move", hedge == null ? "-" : cts(hedge), hedge == null ? "" : hedge >= 0
+      ? "dealers trade AGAINST a 1% move (sell rallies, buy dips), which calms price" : "dealers trade WITH a 1% move (buy rallies, sell dips), which adds fuel", hedge == null ? "" : hedge >= 0 ? "var(--pos)" : "var(--neg)"),
+    tile("Charm flow per day", charm == null ? "-" : (charm >= 0 ? "Buy " : "Sell ") + cts(charm), "dealer hedging from time decay alone, strongest in the last 2 hours; can pull price toward big strikes into the close", charm == null ? "" : charm >= 0 ? "var(--pos)" : "var(--neg)"),
+    tile("Vanna: if IV rises 1 pt", vanna == null ? "-" : (vanna >= 0 ? "Buy " : "Sell ") + cts(vanna), "dealer hedging if implied vol rises one point (the reverse if it falls); vol crushes after events often trigger this", vanna == null ? "" : vanna >= 0 ? "var(--pos)" : "var(--neg)"),
+    tile("Zero gamma moved", !d || d.zero_gamma == null ? "-" : signed(d.zero_gamma * f) + " pts", `since the previous update${!d || d.net_change == null ? "" : "; net GEX " + money(d.net_change)}`, !d || d.zero_gamma == null ? "" : d.zero_gamma >= 0 ? "var(--pos)" : "var(--neg)"),
+    tile("Put / call OI", r.pc_oi == null ? "-" : num(r.pc_oi), "open puts per open call; above 1 = more puts held"),
+    tile("Put / call volume", r.pc_volume == null ? "-" : num(r.pc_volume), "puts traded per call today; jumps on hedging days"),
+    tile("ATM implied vol", em.daily_iv == null ? "-" : num(em.daily_iv * 100, 1) + "%", "annualized, next expiration; higher = bigger expected swings"),
+    tile(`${esc(lab)} share of gamma`, near && s.gross ? num(100 * near.abs / s.gross, 0) + "%" : "-", "how much of all gamma expires next; high = levels can shift fast"),
+  ].join("");
+}
+
+const BIAS_COLOR = {Bullish: "var(--pos)", Bearish: "var(--neg)", Neutral: "var(--zg)"};
+function renderBias(w){
+  const b = w.result.bias;
+  if(!b){ $("biasCard").innerHTML = `<div class="eyebrow">Today's bias</div><div class="expl">Not available right now (needs levels and an expected move).</div>`; return; }
+  const col = BIAS_COLOR[b.bias], ref = b.ref;
+  const tm = iso => new Date(iso).toLocaleTimeString("en-US", {...ET, hour:"numeric", minute:"2-digit"});
+  $("biasCard").innerHTML = `<div class="eyebrow">Today's bias (positioning model)</div>
+    <div class="regime"><span class="tag" style="color:${col};border-color:${col}">${b.bias === "Bullish" ? "▲" : b.bias === "Bearish" ? "▼" : "◆"}</span><span style="color:${col}">${b.bias}</span><span class="chip">${b.confidence} confidence</span></div>
+    <div class="kv"><span>Day type</span><b>${esc(b.day_type)}</b></div>
+    <div class="kv"><span>Score</span><b>${b.score >= 0 ? "+" : ""}${num(b.score)}</b></div>`;
+  $("targetCard").innerHTML = `<div class="eyebrow">Base case by the close</div>
+    <div class="big" style="color:${col}">${num(b.target)}</div>
+    <div class="kv"><span>From ${num(ref)}</span><b>${signed(b.target - ref)} pts</b></div>
+    <div class="expl">Where the positioning factors point by 4 pm ET if nothing else intervenes.</div>`;
+  $("rangeCard").innerHTML = `<div class="eyebrow">Expected range</div>
+    <div class="big sm">${num(b.range[0])} – ${num(b.range[1])}</div>
+    <div class="kv"><span>1σ expected move</span><b>±${num(b.expected_move, 0)} pts</b></div>
+    <div class="expl">${b.side === "positive" ? "Tighter than the full expected move: positive gamma tends to cap the range, often at the walls." : b.side === "negative" ? "Wider on the side of the bias: negative gamma lets moves run." : "Full range: the day type depends on which side of zero gamma price holds."}</div>`;
+  $("biasSummary").textContent = b.summary;
+  $("biasWhen").textContent = b.session.live ? `Session in progress · calculated ${ago(w.result.summary.asof)}` : `Plan for the ${new Date(b.session.open).toLocaleDateString("en-US", {...ET, weekday:"long", month:"short", day:"numeric"})} session`;
+  $("biasFactors").innerHTML = `<table><tr><th>Factor</th><th style="text-align:center">Lean</th><th style="text-align:left">Why</th></tr>${b.factors.map(f => {
+    const c = f.score > 0 ? "var(--pos)" : f.score < 0 ? "var(--neg)" : "var(--ink3)";
+    return `<tr><td style="white-space:nowrap">${esc(f.name)}</td><td class="m" style="text-align:center;color:${c};white-space:nowrap">${f.score > 0 ? "▲ +" + num(f.score) : f.score < 0 ? "▼ " + num(f.score) : "· day type"}</td><td style="text-align:left;white-space:normal;color:var(--ink2)">${esc(f.why)}</td></tr>`; }).join("")}</table>`;
+  drawBias(b, col);
+}
+
+function drawBias(b, col){
+  const svg = $("biasChart"), W = Math.max($("biasWrap").clientWidth, 320), H = 420, padL = 70, padR = 132, padT = 14, padB = 30;
+  const lv = Object.entries(b.levels || {}).filter(([, p]) => Math.abs(p - b.ref) <= 1.6 * b.expected_move);
+  const ys = [...b.cone.flatMap(c => [c[1], c[2]]), ...b.path.map(p => p[1]), ...b.range, ...lv.map(([, p]) => p)];
+  const lo = Math.min(...ys) - b.expected_move * 0.08, hi = Math.max(...ys) + b.expected_move * 0.08, T = b.session.minutes;
+  const x = m => padL + m / T * (W - padL - padR), y = p => padT + (hi - p) / (hi - lo) * (H - padT - padB);
+  const open = new Date(b.session.open);
+  const clock = m => new Date(open.getTime() + m * 60000).toLocaleTimeString("en-US", {...ET, hour:"numeric", minute:"2-digit"});
+  let g = "";
+  for(let i = 0; i <= 6; i++){ const p = lo + (hi - lo) * i / 6; g += `<line x1="${padL}" x2="${W-padR}" y1="${y(p)}" y2="${y(p)}" stroke="var(--line)"/><text x="${padL-8}" y="${y(p)+4}" text-anchor="end">${num(p,0)}</text>`; }
+  for(let m = 30; m <= T; m += 60){ g += `<line x1="${x(m)}" x2="${x(m)}" y1="${padT}" y2="${H-padB}" stroke="var(--line)"/><text x="${x(m)}" y="${H-10}" text-anchor="middle">${clock(m)}</text>`; }
+  // range band and cone
+  g += `<rect x="${x(b.session.start_minute)}" y="${y(b.range[1])}" width="${x(T) - x(b.session.start_minute)}" height="${y(b.range[0]) - y(b.range[1])}" fill="${col}" opacity=".06"/>`;
+  g += `<polygon points="${b.cone.map(c => `${x(c[0])},${y(c[2])}`).join(" ")} ${b.cone.slice().reverse().map(c => `${x(c[0])},${y(c[1])}`).join(" ")}" fill="rgba(139,149,165,.22)" stroke="rgba(139,149,165,.45)" stroke-width="1"/>`;
+  // key levels with collision-free labels
+  const LC = {"Call wall": "var(--pos)", "Put wall": "var(--neg)", "Zero gamma": "var(--zg)", "Abs gamma": "#e6e6e6", "Max pain 0DTE": "var(--mp)"};
+  lv.forEach(([n, p]) => { g += `<line x1="${padL}" x2="${W-padR}" y1="${y(p)}" y2="${y(p)}" stroke="${LC[n]}" stroke-width="1.3" stroke-dasharray="${n === "Zero gamma" ? "6 4" : "2 3"}"/>`; });
+  const labels = [...lv.map(([n, p]) => [p, `${n} ${num(p,0)}`, LC[n]]), [b.target, `Base case ${num(b.target,0)}`, col]];
+  let last = -1e9;
+  labels.sort((a, c) => y(a[0]) - y(c[0])).forEach(([p, t, c]) => { const ly = Math.max(y(p) + 4, last + 14); last = ly; g += `<text x="${W-padR+8}" y="${ly}" style="fill:${c}">${esc(t)}</text>`; });
+  // path, start and now markers
+  g += `<polyline fill="none" stroke="${col}" stroke-width="2.5" stroke-linejoin="round" points="${b.path.map(p => `${x(p[0])},${y(p[1])}`).join(" ")}"/>`;
+  const s0 = b.path[0];
+  g += `<circle cx="${x(s0[0])}" cy="${y(s0[1])}" r="5" fill="${col}" stroke="var(--panel)" stroke-width="2"/>`;
+  if(b.session.live) g += `<line x1="${x(s0[0])}" x2="${x(s0[0])}" y1="${padT}" y2="${H-padB}" stroke="var(--ink3)" stroke-dasharray="3 3"/><text x="${x(s0[0]) + 6}" y="${padT + 12}" style="fill:var(--ink2)">now</text>`;
+  else g += `<text x="${x(0) + 6}" y="${padT + 12}" style="fill:var(--ink2)">open</text>`;
+  const pe = b.path.at(-1);
+  g += `<circle cx="${x(pe[0])}" cy="${y(pe[1])}" r="4" fill="var(--panel)" stroke="${col}" stroke-width="2"/>`;
+  svg.setAttribute("width", W); svg.setAttribute("height", H); svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.innerHTML = g;
+  $("pathSw").style.background = col;
+  const tip = $("biasTip");
+  svg.onmousemove = e => {
+    const r = svg.getBoundingClientRect(), mx = (e.clientX - r.left - padL) / (W - padL - padR) * T;
+    let i = 0; b.path.forEach((p, k) => { if(Math.abs(p[0] - mx) < Math.abs(b.path[i][0] - mx)) i = k; });
+    const p = b.path[i], c = b.cone[i];
+    tip.innerHTML = `${clock(p[0])} ET<br>Base case <b style="color:${col}">${num(p[1])}</b><br><span style="color:var(--ink3)">1σ ${num(c[1],0)} – ${num(c[2],0)}</span>`;
+    tip.style.opacity = 1; tip.style.left = Math.min(x(p[0]) + 12, W - 170) + "px"; tip.style.top = (y(p[1]) - 30) + "px";
+  };
+  svg.onmouseleave = () => { tip.style.opacity = 0; };
+}
+
+function renderExpiry(s){
+  const rows = Object.entries(s.by_expiry || {}).sort((a, b) => a[0].localeCompare(b[0])).slice(0, 8);
+  const mx = Math.max(1, ...rows.map(([, v]) => v.abs));
+  $("byExpiry").innerHTML = rows.length ? `<table><tr><th>Expiration</th><th>Net gamma</th><th style="width:38%">Share of total</th></tr>${rows.map(([e, v]) => {
+    const dLbl = new Date(e + "T12:00:00Z").toLocaleDateString("en-US", {weekday:"short", month:"short", day:"numeric", timeZone:"UTC"});
+    return `<tr><td>${esc(dLbl)}</td><td class="m" style="color:${v.net >= 0 ? "var(--pos)" : "var(--neg)"}">${money(v.net)}</td>
+      <td><span class="xbar" style="width:${Math.max(2, 100 * v.abs / mx * 0.7)}%;background:${v.net >= 0 ? "var(--pos)" : "var(--neg)"}"></span> <span class="m" style="color:var(--ink3)">${s.gross ? num(100 * v.abs / s.gross, 0) : "-"}%</span></td></tr>`; }).join("")}</table>` : `<div class="expl">No data.</div>`;
+}
+
+function renderMaxPain(X){
+  const mp = (X.max_pain || []).slice(0, 8);
+  $("maxpain").innerHTML = mp.length ? `<table><tr><th>Expiration</th><th>Max pain</th><th>Open interest</th></tr>${mp.map(m => {
+    const d = new Date(m.expiration + "T12:00:00Z").toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric",timeZone:"UTC"});
+    return `<tr><td>${esc(d)}</td><td class="m" style="color:var(--mp)">${num(m.price)}</td><td class="m">${num(m.oi,0)}</td></tr>`; }).join("")}</table>` : `<div class="expl">No data.</div>`;
+}
+
+setPage(page);
+load();
+loadNews();
+loadPosts();
+setInterval(load, STATIC ? 60000 : 20000);
+setInterval(loadPosts, 2 * 60 * 1000);                     // the service itself re-fetches at most every 5 min
+setInterval(loadNews, 10 * 60 * 1000);                      // the service itself re-fetches at most every 30 min
+setInterval(() => { if(page === "news") renderNews(); }, 60000);   // keep countdowns current
+window.addEventListener("resize", () => data && render());
+</script>
+</body>
+</html>

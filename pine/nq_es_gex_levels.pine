@@ -1,0 +1,699 @@
+// This Pine Script(R) source is part of the gexsys project. Analytical indicator only - it places no orders.
+//@version=6
+indicator("GEX Levels - NQ / ES", shorttitle = "GEX Levels", overlay = true,
+     max_lines_count = 200, max_labels_count = 200, max_boxes_count = 300)
+
+// =====================================================================================================
+// GEX Levels draws options levels computed by the gexsys service (open START.bat, then the website at
+// http://127.0.0.1:8765) and pasted into "Levels payload". Pine cannot download data, so the levels
+// change when you paste a new update (about every 2 hours). Index prices (NDX / SPX) are mapped live to
+// this futures chart. Levels are model estimates for the current session; nothing is back-plotted.
+// =====================================================================================================
+
+// ---------- 1 - Data
+G1 = "1 - Data"
+payload = input.text_area("", "Levels payload", group = G1,
+     tooltip = "On the GEX website click 'Copy for TradingView', then click here, Ctrl+A, Ctrl+V, OK. The same paste works on NQ and ES charts.")
+mapMode = input.string("Live reference", "Price mapping", options = ["Live reference", "Snapshot factor", "None"], group = G1,
+     tooltip = "Live reference (recommended): converts index prices with this chart vs. the live index (NASDAQ:NDX / SP:SPX); held from the last bar when the index is closed.\nSnapshot factor: the service's conversion factor.\nNone: draw the index prices unconverted.")
+
+// ---------- 2 - Key levels: one clean row each, on/off + colour swatch
+G2 = "2 - Key levels"
+showZG   = input.bool(true, "Zero gamma", inline = "zg", group = G2)
+cZG      = input.color(#c9ced6, "", inline = "zg", group = G2, tooltip = "Estimated price where modeled dealer gamma flips sign. Dashed line.")
+showCW   = input.bool(true, "Call wall", inline = "cw", group = G2)
+cPos     = input.color(#3987e5, "", inline = "cw", group = G2, tooltip = "Strike above price with the most call gamma. Also the colour of positive-gamma levels and profile bars.")
+showPW   = input.bool(true, "Put wall", inline = "pw", group = G2)
+cNeg     = input.color(#d95926, "", inline = "pw", group = G2, tooltip = "Strike below price with the most put gamma. Also the colour of negative-gamma levels and profile bars.")
+showAG   = input.bool(true, "Absolute gamma", inline = "ag", group = G2)
+cAG      = input.color(#e6e6e6, "", inline = "ag", group = G2, tooltip = "Strike with the most TOTAL gamma (calls + puts). Often acts like a magnet. Doesn't depend on any dealer-positioning assumption. Dotted.")
+showMax  = input.bool(true, "Largest +/- GEX and concentrations", group = G2, tooltip = "Strikes with the most positive / negative gamma, plus the extra concentrations below. Dotted, in the call / put colours.")
+nConc    = input.int(3, "Other concentrations", minval = 0, maxval = 6, inline = "cc", group = G2)
+minShare = input.float(5.0, "min %", minval = 0, step = 0.5, inline = "cc", group = G2,
+     tooltip = "Extra big-gamma strikes, labeled +G / -G with their share of total exposure. 0 = off.")
+
+// ---------- 3 - More levels: same clean rows
+G3 = "3 - More levels"
+show0   = input.bool(true, "0DTE zero gamma and walls", group = G3,
+     tooltip = "The same levels from today's expiring options only (\"next MM-DD\" when nothing expires today). Thin lines in lighter key-level colours.")
+showVol = input.bool(true, "Volume walls", inline = "vo", group = G3)
+cVol    = input.color(#199e70, "", inline = "vo", group = G3, tooltip = "Strikes with the most calls / puts traded today. Moves during the session. Dashed.")
+showOI  = input.bool(false, "OI walls", inline = "oi", group = G3)
+cOI     = input.color(#9085e9, "", inline = "oi", group = G3, tooltip = "Strikes with the most open calls / puts as of yesterday's close. Dotted.")
+showMP  = input.bool(true, "Max pain", inline = "mp", group = G3)
+cMP     = input.color(#c98500, "", inline = "mp", group = G3, tooltip = "Price where option holders lose the most at expiration. Dotted.")
+mpCount = input.string("Nearest", "Max pain expirations", options = ["Nearest", "Nearest + next"], group = G3)
+showEM  = input.bool(true, "Expected move", inline = "em", group = G3)
+cEM     = input.color(#8b95a5, "", inline = "em", group = G3, tooltip = "1 standard-deviation range implied by options, from the previous close. Dashed (weekly: lighter).")
+emMode  = input.string("Daily", "Expected move range", options = ["Daily", "Weekly", "Daily + weekly"], group = G3)
+
+// Fixed line looks: key levels 2 px, everything else 1 px; dash styles chosen per level type.
+styZG = "Dashed"
+styAG = "Dotted"
+wAG = 2
+styCW = "Solid"
+styPW = "Solid"
+styMax = "Dotted"
+sty0 = "Solid"
+styVol = "Dashed"
+styOI = "Dotted"
+styMP = "Dotted"
+styEM = "Dashed"
+wZG = 2
+wCW = 2
+wPW = 2
+wMax = 1
+w0 = 1
+wVol = 1
+wOI = 1
+wMP = 2
+wEM = 1
+
+// ---------- 4 - Lines & labels (shared by every level)
+G4 = "4 - Lines & labels"
+extent   = input.string("From session open", "Lines start", options = ["From session open", "Full chart", "Right of price"], group = G4)
+lblMode  = input.string("Short", "Labels", options = ["Short", "Full", "Off"], inline = "lb", group = G4,
+     tooltip = "Short: ZG, CW, PW, +GEX, -GEX, 0D ZG, VOL C, MP 10-21, EM day +...\nFull: Zero gamma, Call wall, ...")
+lblSize  = input.string("Small", "", options = ["Tiny", "Small", "Normal"], inline = "lb", group = G4)
+lblBg    = input.bool(true, "Label background", inline = "lb2", group = G4)
+lblOff   = input.int(6, "offset (bars)", minval = 0, maxval = 200, inline = "lb2", group = G4, tooltip = "Used when the GEX profile is off; with the profile on, labels sit just right of it.")
+emFill   = input.bool(false, "Shade daily expected-move band", group = G4, tooltip = "Faint fill between today's expected high and low (uses the expected-move colour).")
+regimeBg = input.bool(false, "Tint today's session by gamma side", group = G4,
+     tooltip = "Faint blue while price is above zero gamma (modeled positive gamma: calmer, mean-reverting), faint orange below it (negative gamma: bigger, trending moves). Today's session only.")
+
+// ---------- 5 - GEX profile
+G5 = "5 - GEX profile"
+showProf   = input.bool(true, "Show profile", inline = "pf", group = G5,
+     tooltip = "Gamma exposure by price, drawn right of the last bar. Blue extends right (positive), orange extends left (negative).")
+profSrc    = input.string("First source", "", options = ["First source", "Second source"], inline = "pf", group = G5)
+profWidth  = input.int(40, "Width", minval = 10, maxval = 200, inline = "pw", group = G5)
+profOffset = input.int(3, "gap", minval = 1, maxval = 100, inline = "pw", group = G5)
+profOpac   = input.int(65, "Opacity %", minval = 10, maxval = 100, group = G5)
+
+// ---------- 6 - Info panel
+G6 = "6 - Info panel"
+showTab   = input.bool(true, "Show panel", inline = "t1", group = G6, tooltip = "Off hides the panel completely; levels stay on the chart.")
+tabDetail = input.string("Compact", "", options = ["Minimal", "Compact", "Full"], inline = "t1", group = G6,
+     tooltip = "Minimal: regime, zero gamma, data age.\nCompact: + call and put walls.\nFull: + net GEX, +/- GEX strikes, 0DTE levels, volume walls, max pain, expected move, mapping.")
+tabPos    = input.string("Top right", "Position", options = ["Top right", "Top left", "Bottom right", "Bottom left"], inline = "t2", group = G6)
+tabSize   = input.string("Small", "", options = ["Tiny", "Small", "Normal"], inline = "t2", group = G6)
+
+// ---------- 7 - Alerts (real-time bars; create an alert with "Any alert() function call")
+G7 = "7 - Alerts"
+alApproach      = input.bool(true, "Approaching a key level", inline = "a1", group = G7)
+alApproachTicks = input.int(20, "within ticks", minval = 1, inline = "a1", group = G7)
+alCross         = input.bool(true, "Wall cross", inline = "a2", group = G7)
+alZG            = input.bool(true, "Zero-gamma cross", inline = "a2", group = G7)
+alStale         = input.bool(true, "Stale update", inline = "a3", group = G7)
+alCooldownMin   = input.int(15, "cooldown min", minval = 0, inline = "a3", group = G7)
+
+// ---------- 8 - Advanced
+G8 = "8 - Advanced"
+extFrom     = input.string("First source", "More levels from", options = ["First source", "Both sources"], group = G8,
+     tooltip = "Only matters when a paste holds two sources for this market.")
+provFilter  = input.string("", "Only this source", group = G8, tooltip = "Blank = all sources in the paste (e.g. SCHWAB, CBOE).")
+refOverride = input.string("", "Reference symbol override", group = G8, tooltip = "Blank = the symbol in the paste (NASDAQ:NDX, SP:SPX, ...).")
+staleMin    = input.int(150, "Stale after (minutes)", minval = 1, group = G8, tooltip = "Default suits the ~2-hour update schedule.")
+maxDistPct  = input.float(8.0, "Ignore levels farther than (%)", minval = 1, group = G8,
+     tooltip = "Safety check: a level this far from price means the mapping is wrong; it is not drawn.")
+manualTxt   = input.string("", "Manual levels", group = G8, tooltip = "Your own chart prices: price:name, comma separated. Example: 29900:Weekly high, 29500:Gap")
+
+// =====================================================================================================
+// Payload parsing (grammar of gexsys/export.py: GEX1;key=value;...;END, payloads joined by "|")
+// =====================================================================================================
+type Snap
+    string prov = ""
+    string mkt = ""
+    string src = ""
+    string kind = ""
+    string tv = ""
+    string mapm = ""
+    float  fac = na
+    float  off = 0.0
+    float  ts = na
+    float  ref = na
+    string q = ""
+    string oi = ""
+    string gk = ""
+    string model = ""
+    string unit = ""
+    float  net = na
+    string reg = ""
+    string st = ""
+    float  zg = na
+    string zgs = ""
+    float  cw = na
+    float  pw = na
+    float  mp = na
+    float  mn = na
+    float  em = na
+    string bk = ""
+    float  dzg = na
+    string preg = ""
+    string lv = ""
+    string x0 = ""
+    float  z0 = na
+    float  c0 = na
+    float  p0 = na
+    float  vc = na
+    float  vp = na
+    float  oc = na
+    float  op = na
+    string xp = ""
+    float  ema = na
+    float  emd = na
+    float  emw = na
+    string emx = ""
+    string prof = ""
+    float  ag = na
+    float  vxm = na
+    float  chm = na
+    bool   complete = false
+
+strOf(map<string, string> m, string k) =>
+    map.contains(m, k) ? map.get(m, k) : ""
+
+numOf(map<string, string> m, string k) =>
+    string v = strOf(m, k)
+    v == "" ? na : str.tonumber(v)
+
+parseOne(string txt) =>
+    map<string, string> m = map.new<string, string>()
+    array<string> toks = str.split(str.trim(txt), ";")
+    bool ok = array.size(toks) > 1 and array.get(toks, 0) == "GEX1"
+    Snap s = na
+    if ok
+        for t in toks
+            int p = str.pos(t, "=")
+            if not na(p) and p > 0
+                map.put(m, str.substring(t, 0, p), str.substring(t, p + 1))
+        s := Snap.new(prov = strOf(m, "prov"), mkt = strOf(m, "mkt"), src = strOf(m, "src"), kind = strOf(m, "kind"),
+             tv = strOf(m, "tv"), mapm = strOf(m, "map"), fac = numOf(m, "fac"), off = nz(numOf(m, "off")),
+             ts = numOf(m, "ts"), ref = numOf(m, "ref"), q = strOf(m, "q"), oi = strOf(m, "oi"), gk = strOf(m, "gk"),
+             model = strOf(m, "model"), unit = strOf(m, "unit"), net = numOf(m, "netb"), reg = strOf(m, "reg"),
+             st = strOf(m, "st"), zg = numOf(m, "zg"), zgs = strOf(m, "zgs"), cw = numOf(m, "cw"), pw = numOf(m, "pw"),
+             mp = numOf(m, "mp"), mn = numOf(m, "mn"), em = numOf(m, "em"), bk = strOf(m, "bk"),
+             dzg = numOf(m, "dzg"), preg = strOf(m, "preg"), lv = strOf(m, "L"),
+             x0 = strOf(m, "x0"), z0 = numOf(m, "z0"), c0 = numOf(m, "c0"), p0 = numOf(m, "p0"),
+             vc = numOf(m, "vc"), vp = numOf(m, "vp"), oc = numOf(m, "oc"), op = numOf(m, "op"), xp = strOf(m, "xp"),
+             ema = numOf(m, "ema"), emd = numOf(m, "emd"), emw = numOf(m, "emw"), emx = strOf(m, "emx"),
+             prof = strOf(m, "P"), ag = numOf(m, "ag"), vxm = numOf(m, "vxm"), chm = numOf(m, "chm"), complete = str.trim(array.get(toks, array.size(toks) - 1)) == "END")
+    s
+
+fam(string s) =>
+    s == "NQ" or s == "MNQ" ? "NQ" : s == "ES" or s == "MES" ? "ES" : s
+
+chartFam = fam(syminfo.root)
+
+// Select (once) the first two payloads for this chart's market
+var Snap sA = na
+var Snap sB = na
+var int nParsed = 0
+var string otherMkts = ""
+if barstate.isfirst
+    for chunk in str.split(payload, "|")
+        Snap s = parseOne(chunk)
+        if not na(s)
+            nParsed += 1
+            bool provOK = provFilter == "" or s.prov == str.upper(str.trim(provFilter))
+            bool mktOK = fam(s.mkt) == chartFam or (mapMode == "None" and syminfo.ticker == s.src)
+            if mktOK and provOK
+                if na(sA)
+                    sA := s
+                else if na(sB)
+                    sB := s
+            else if not mktOK and not str.contains(otherMkts, s.mkt)
+                otherMkts += (otherMkts == "" ? "" : ",") + s.mkt
+hasA = not na(sA)
+hasB = not na(sB)
+
+// =====================================================================================================
+// Mapping (one live reference per source slot)
+// =====================================================================================================
+string symA = syminfo.tickerid
+string symB = syminfo.tickerid
+if hasA
+    symA := refOverride != "" ? refOverride : sA.tv != "" ? sA.tv : syminfo.tickerid
+if hasB
+    symB := refOverride != "" ? refOverride : sB.tv != "" ? sB.tv : syminfo.tickerid
+refCA = request.security(symA, timeframe.period, close, gaps = barmerge.gaps_on, lookahead = barmerge.lookahead_off, ignore_invalid_symbol = true)
+refCB = request.security(symB, timeframe.period, close, gaps = barmerge.gaps_on, lookahead = barmerge.lookahead_off, ignore_invalid_symbol = true)
+var float lfA = na
+var float loA = na
+var float lfB = na
+var float loB = na
+if not na(refCA) and refCA > 0
+    lfA := close / refCA
+    loA := close - refCA
+if not na(refCB) and refCB > 0
+    lfB := close / refCB
+    loB := close - refCB
+
+mapInfo(Snap s, float lf, float lo, float refNow, string sym) =>
+    float f = na
+    float o = 0.0
+    string st = "n/a"
+    if not na(s)
+        if s.mapm == "identity"
+            f := 1.0
+            st := "identity (futures options)"
+        else if s.mapm == "calendar_offset"
+            f := 1.0
+            o := s.off
+            st := "calendar offset"
+        else if mapMode == "None"
+            f := 1.0
+            st := "none (index prices)"
+        else if mapMode == "Snapshot factor"
+            if not na(s.fac) and s.fac > 0
+                f := s.mapm == "ratio" ? s.fac : 1.0
+                o := s.mapm == "offset" ? s.off : 0.0
+                st := "snapshot " + s.mapm
+            else
+                st := "UNAVAILABLE (no snapshot factor)"
+        else
+            if not na(lf)
+                f := s.mapm == "ratio" ? lf : 1.0
+                o := s.mapm == "offset" ? lo : 0.0
+                st := (na(refNow) ? "held " : "live ") + s.mapm + " vs " + sym
+            else if not na(s.fac) and s.fac > 0
+                f := s.mapm == "ratio" ? s.fac : 1.0
+                o := s.mapm == "offset" ? s.off : 0.0
+                st := "snapshot (no " + sym + " data)"
+            else
+                st := "UNAVAILABLE (no " + sym + " data)"
+    [f, o, st]
+
+[facA, offA, mstA] = mapInfo(sA, lfA, loA, refCA, symA)
+[facB, offB, mstB] = mapInfo(sB, lfB, loB, refCB, symB)
+
+mapP(float p, float f, float o) =>
+    na(p) or na(f) ? na : math.round_to_mintick(p * f + o)
+
+sane(float p) =>
+    na(p) ? true : math.abs(p - close) / close * 100.0 <= maxDistPct
+
+slotOK(Snap s, float f, float o) =>
+    bool ok = false
+    if not na(s)
+        ok := not na(f) and s.st != "UNAVAILABLE" and sane(mapP(s.zg, f, o)) and sane(mapP(s.cw, f, o)) and sane(mapP(s.pw, f, o)) and sane(mapP(s.mp, f, o)) and sane(mapP(s.mn, f, o))
+    ok
+
+okA = slotOK(sA, facA, offA)
+okB = slotOK(sB, facB, offB)
+
+ageOf(Snap s) =>
+    float a = na
+    if not na(s)
+        if not na(s.ts)
+            a := (timenow - s.ts) / 60000.0
+    a
+staleOf(Snap s) =>
+    float a = ageOf(s)
+    na(a) or a > staleMin
+
+// Primary (alerts, data window): first drawable source. If-blocks so a missing slot's fields are never read.
+float zgF = na
+float cwF = na
+float pwF = na
+if okA
+    zgF := mapP(sA.zg, facA, offA)
+    cwF := mapP(sA.cw, facA, offA)
+    pwF := mapP(sA.pw, facA, offA)
+else if okB
+    zgF := mapP(sB.zg, facB, offB)
+    cwF := mapP(sB.cw, facB, offB)
+    pwF := mapP(sB.pw, facB, offB)
+
+// =====================================================================================================
+// Drawing (last bar only; levels are a current snapshot, not history)
+// =====================================================================================================
+var array<line>   gLines  = array.new<line>()
+var array<label>  gLabels = array.new<label>()
+var array<float>  gPrices = array.new<float>()
+var array<string> gBodies = array.new<string>()
+var array<box>    gBoxes  = array.new<box>()
+
+// Time of the current session's first bar (exchange day), where "From session open" lines start.
+// Lines are placed by TIME (xloc.bar_time): a bar-index start hundreds of bars back makes Pine look up
+// that bar's history, which overflows the history buffer on low timeframes (e.g. 1-minute charts).
+var int sessStartTime = time
+if timeframe.change("D")
+    sessStartTime := time
+
+lnStyle(string s) =>
+    s == "Dashed" ? line.style_dashed : s == "Dotted" ? line.style_dotted : line.style_solid
+lSz = lblSize == "Tiny" ? size.tiny : lblSize == "Small" ? size.small : size.normal
+lblX = showProf ? profOffset + profWidth + 2 : lblOff
+lblBgCol = lblBg ? color.new(#0b0e13, 25) : color.new(#0b0e13, 100)
+twoSrc = okA and okB
+
+// Short or full level name, e.g. nm("CW", "Call wall")
+nm(string short, string full) =>
+    lblMode == "Short" ? short : full
+
+fmtPx(float p) =>
+    str.tostring(p, "#,##0.00")
+
+clearAll() =>
+    for l in gLines
+        line.delete(l)
+    for lb in gLabels
+        label.delete(lb)
+    for b in gBoxes
+        box.delete(b)
+    array.clear(gLines)
+    array.clear(gLabels)
+    array.clear(gPrices)
+    array.clear(gBodies)
+    array.clear(gBoxes)
+
+// One line per price; another level at the same price joins the label: "CW · +GEX  29,883.25".
+drawLevel(float p, string name, string tag, color col, int width, string style) =>
+    if not na(p) and sane(p)
+        string item = name + tag
+        int idx = -1
+        for [i, q] in gPrices
+            if math.abs(q - p) < syminfo.mintick / 2
+                idx := i
+        if idx >= 0
+            string body = array.get(gBodies, idx)
+            if not str.contains(body, item)
+                body := body + " · " + item
+                array.set(gBodies, idx, body)
+                label lb = array.get(gLabels, idx)
+                if not na(lb)
+                    label.set_text(lb, body + "  " + fmtPx(p))
+        else
+            int t1 = extent == "Right of price" ? time : extent == "Full chart" ? time - 1 : math.min(sessStartTime, time - 1)
+            int t2 = extent == "Right of price" ? time + 1 : time      // t2 > t1 gives the line a direction to extend
+            array.push(gPrices, p)
+            array.push(gBodies, item)
+            array.push(gLines, line.new(t1, p, t2, p, xloc = xloc.bar_time, extend = extent == "Full chart" ? extend.both : extend.right,
+                 color = col, width = width, style = style))
+            array.push(gLabels, lblMode != "Off" ? label.new(bar_index + lblX, p, item + "  " + fmtPx(p), style = label.style_label_left,
+                 color = lblBgCol, textcolor = col, size = lSz, textalign = text.align_left) : label(na))
+    p
+
+tagOf(Snap s) =>
+    (twoSrc ? " " + s.prov : "") + (staleOf(s) ? " STALE" : "")
+
+drawKey(Snap s, float f, float o, bool isSecond) =>
+    string tag = tagOf(s)
+    int tr = isSecond ? 40 : 0
+    if showZG
+        drawLevel(mapP(s.zg, f, o), nm("ZG", "Zero gamma"), tag, color.new(cZG, tr), wZG, lnStyle(styZG))
+    if showCW
+        drawLevel(mapP(s.cw, f, o), nm("CW", "Call wall"), tag, color.new(cPos, tr), wCW, isSecond ? line.style_dashed : lnStyle(styCW))
+    if showPW
+        drawLevel(mapP(s.pw, f, o), nm("PW", "Put wall"), tag, color.new(cNeg, tr), wPW, isSecond ? line.style_dashed : lnStyle(styPW))
+    if showAG
+        drawLevel(mapP(s.ag, f, o), nm("AG", "Abs gamma"), tag, color.new(cAG, tr), wAG, lnStyle(styAG))
+    if showMax
+        drawLevel(mapP(s.mp, f, o), nm("+GEX", "Largest +GEX"), tag, color.new(cPos, tr), wMax, lnStyle(styMax))
+        drawLevel(mapP(s.mn, f, o), nm("-GEX", "Largest -GEX"), tag, color.new(cNeg, tr), wMax, lnStyle(styMax))
+    if nConc > 0 and s.lv != ""
+        int shown = 0
+        for item in str.split(s.lv, ",")
+            parts = str.split(item, ":")
+            if array.size(parts) == 3 and shown < nConc
+                float sp = str.tonumber(array.get(parts, 0))
+                float sh = str.tonumber(array.get(parts, 2))
+                bool  isPos = array.get(parts, 1) == "+"
+                if not na(sp) and not na(sh) and sh * 100.0 >= minShare
+                    drawLevel(mapP(sp, f, o), (isPos ? "+G " : "-G ") + str.tostring(sh * 100.0, "#") + "%", tag,
+                         color.new(isPos ? cPos : cNeg, tr + 35), wMax, lnStyle(styMax))
+                    shown += 1
+    true
+
+drawMore(Snap s, float f, float o, bool isSecond) =>
+    string tag = tagOf(s)
+    int tr = isSecond ? 40 : 0
+    if show0 and s.x0 != ""
+        string d0 = s.x0 == "0DTE" ? "0D" : s.x0
+        drawLevel(mapP(s.z0, f, o), nm(d0 + " ZG", s.x0 + " zero gamma"), tag, color.new(cZG, tr + 25), w0, line.style_dashed)
+        drawLevel(mapP(s.c0, f, o), nm(d0 + " CW", s.x0 + " call wall"), tag, color.new(cPos, tr + 25), w0, lnStyle(sty0))
+        drawLevel(mapP(s.p0, f, o), nm(d0 + " PW", s.x0 + " put wall"), tag, color.new(cNeg, tr + 25), w0, lnStyle(sty0))
+    if showVol
+        drawLevel(mapP(s.vc, f, o), nm("VOL C", "Volume call wall"), tag, color.new(cVol, tr), wVol, lnStyle(styVol))
+        drawLevel(mapP(s.vp, f, o), nm("VOL P", "Volume put wall"), tag, color.new(cVol, tr), wVol, lnStyle(styVol))
+    if showOI
+        drawLevel(mapP(s.oc, f, o), nm("OI C", "OI call wall"), tag, color.new(cOI, tr), wOI, lnStyle(styOI))
+        drawLevel(mapP(s.op, f, o), nm("OI P", "OI put wall"), tag, color.new(cOI, tr), wOI, lnStyle(styOI))
+    if showMP and s.xp != ""
+        int k = 0
+        for item in str.split(s.xp, ",")
+            parts = str.split(item, ":")
+            if array.size(parts) == 2 and (k == 0 or mpCount == "Nearest + next")
+                string d = str.substring(array.get(parts, 0), 5)
+                drawLevel(mapP(str.tonumber(array.get(parts, 1)), f, o), nm("MP " + d, "Max pain " + d), tag, color.new(cMP, tr), wMP, lnStyle(styMP))
+            k += 1
+    if showEM and not na(s.ema)
+        if emMode != "Weekly" and not na(s.emd)
+            drawLevel(mapP(s.ema + s.emd, f, o), nm("EM day +", "Expected high today"), tag, color.new(cEM, tr), wEM, lnStyle(styEM))
+            drawLevel(mapP(s.ema - s.emd, f, o), nm("EM day -", "Expected low today"), tag, color.new(cEM, tr), wEM, lnStyle(styEM))
+            float bandHi = mapP(s.ema + s.emd, f, o)
+            float bandLo = mapP(s.ema - s.emd, f, o)
+            if emFill and not isSecond and not na(bandHi) and not na(bandLo) and sane(bandHi) and sane(bandLo)
+                array.push(gBoxes, box.new(math.min(sessStartTime, time - 1), bandHi, time, bandLo, xloc = xloc.bar_time,
+                     extend = extend.right, border_width = 0, border_color = color.new(cEM, 100), bgcolor = color.new(cEM, 92)))
+        if emMode != "Daily" and not na(s.emw)
+            drawLevel(mapP(s.ema + s.emw, f, o), nm("EM wk +", "Expected high this week"), tag, color.new(cEM, tr + 25), wEM, lnStyle(styEM))
+            drawLevel(mapP(s.ema - s.emw, f, o), nm("EM wk -", "Expected low this week"), tag, color.new(cEM, tr + 25), wEM, lnStyle(styEM))
+    true
+
+// GEX profile: "base/width/v1,v2,..." with v in -99..99; bin i is centred at base + i*width (index prices).
+drawProfile(Snap s, float f, float o) =>
+    parts = str.split(s.prof, "/")
+    if array.size(parts) == 3 and not na(f)
+        float base = str.tonumber(array.get(parts, 0))
+        float w = str.tonumber(array.get(parts, 1))
+        array<string> vals = str.split(array.get(parts, 2), ",")
+        int half = math.round(profWidth / 2)
+        int axisX = bar_index + profOffset + half
+        int tr = 100 - profOpac
+        if not na(base) and not na(w) and w > 0
+            float lo = (base - w / 2) * f + o
+            float hi = (base + (array.size(vals) - 0.5) * w) * f + o
+            array.push(gBoxes, box.new(axisX, hi, axisX, lo, border_color = color.new(cZG, 55), border_width = 1, bgcolor = color.new(cZG, 100)))
+            for [i, v] in vals
+                float val = str.tonumber(v)
+                if not na(val) and val != 0
+                    float c = (base + i * w) * f + o
+                    float hh = w * f * 0.40
+                    int len = math.max(1, math.round(math.abs(val) / 99.0 * half))
+                    int x1 = val > 0 ? axisX : axisX - len
+                    int x2 = val > 0 ? axisX + len : axisX
+                    array.push(gBoxes, box.new(x1, c + hh, x2, c - hh, border_width = 0,
+                         border_color = color.new(color.black, 100), bgcolor = color.new(val > 0 ? cPos : cNeg, tr)))
+    true
+
+bool extB = extFrom == "Both sources"
+if barstate.islast
+    clearAll()
+    if okA
+        drawKey(sA, facA, offA, false)
+        drawMore(sA, facA, offA, false)
+    if okB
+        drawKey(sB, facB, offB, true)
+        if extB or not okA
+            drawMore(sB, facB, offB, true)
+    if showProf
+        if profSrc == "Second source" and okB
+            drawProfile(sB, facB, offB)
+        else if okA
+            drawProfile(sA, facA, offA)
+        else if okB
+            drawProfile(sB, facB, offB)
+    if manualTxt != ""
+        for item in str.split(manualTxt, ",")
+            parts = str.split(str.trim(item), ":")
+            float mpx = array.size(parts) >= 1 ? str.tonumber(array.get(parts, 0)) : na
+            string mname = array.size(parts) >= 2 ? str.trim(array.get(parts, 1)) : "Manual"
+            drawLevel(mpx, mname, " (MAN)", color.new(color.silver, 0), 1, line.style_dashed)
+
+// =====================================================================================================
+// Info panel: a row per item, a column per source. Hidden entirely when "Show panel" is off.
+// =====================================================================================================
+tPos = tabPos == "Top right" ? position.top_right : tabPos == "Top left" ? position.top_left : tabPos == "Bottom right" ? position.bottom_right : position.bottom_left
+tSz  = tabSize == "Tiny" ? size.tiny : tabSize == "Small" ? size.small : size.normal
+var table tab = showTab ? table.new(tPos, 3, 18, bgcolor = color.new(#0b0e13, 12), frame_color = color.new(#2a313c, 0), frame_width = 1, border_width = 0) : table(na)
+cTxt  = color.new(#e3e7ee, 0)
+cDim  = color.new(#7d8796, 0)
+cWarn = color.new(#e6c35c, 0)
+cHead = color.new(#171c25, 0)
+
+ps(float p) =>
+    na(p) ? "-" : fmtPx(p)
+
+// price plus signed distance from the last close in points, e.g. "29,883.25  +186"
+lvl(float p) =>
+    na(p) ? "-" : fmtPx(p) + "  " + (p >= close ? "+" : "-") + str.tostring(math.abs(p - close), "#.##")
+
+ageTxt(float a) =>
+    na(a) ? "?" : a < 60 ? str.tostring(math.round(a)) + "m" : str.tostring(math.floor(a / 60)) + "h" + str.tostring(math.round(a % 60)) + "m"
+
+mpFirst(Snap s, float f, float o) =>
+    string out = "-"
+    if s.xp != ""
+        parts = str.split(array.get(str.split(s.xp, ","), 0), ":")
+        if array.size(parts) == 2
+            out := ps(mapP(str.tonumber(array.get(parts, 1)), f, o)) + "  " + str.substring(array.get(parts, 0), 5)
+    out
+
+cell(int c, int r, string t, color col, color bg = na) =>
+    table.cell(tab, c, r, t, text_color = col, text_halign = c == 0 ? text.align_left : text.align_right, text_size = tSz, bgcolor = bg)
+
+rowKeys = tabDetail == "Minimal" ? array.from("reg", "zg", "data") : tabDetail == "Compact" ? array.from("reg", "zg", "cw", "pw", "data")
+     : array.from("reg", "net", "hedge", "charm", "zg", "cw", "pw", "ag", "mx", "x0", "vol", "mp", "em", "map", "data")
+
+rowName(string k) =>
+    switch k
+        "reg"  => "Regime"
+        "net"  => "Net GEX"
+        "zg"   => "Zero gamma"
+        "cw"   => "Call wall"
+        "pw"   => "Put wall"
+        "mx"   => "+GEX / -GEX"
+        "x0"   => (hasA and sA.x0 != "" ? sA.x0 : "0DTE") + " ZG/CW/PW"
+        "vol"  => "Vol walls C/P"
+        "mp"   => "Max pain"
+        "em"   => "Exp. move"
+        "ag"   => "Abs gamma"
+        "hedge" => "Hedge per 1%"
+        "charm" => "Charm flow"
+        "map"  => "Mapping"
+        "data" => "Data"
+        => k
+
+valOf(string k, Snap s, float f, float o, bool ok, string mst) =>
+    string t = "-"
+    color c = cTxt
+    if k == "data"
+        bool bad = staleOf(s) or not s.complete or (s.st != "OK" and s.st != "")
+        t := (s.q == "RT" ? "RT " : s.q == "SYN" ? "SYN " : "DL ") + ageTxt(ageOf(s)) + (staleOf(s) ? " STALE" : "") + (s.complete ? "" : " CUT OFF") + (s.st != "OK" and s.st != "" ? " " + s.st : "")
+        c := bad ? cWarn : cDim
+    else if not ok
+        t := k == "reg" ? "BLOCKED" : "-"
+        c := k == "reg" ? cWarn : cDim
+    else
+        switch k
+            "reg" =>
+                t := s.reg == "POS" ? "+ Positive" : s.reg == "NEG" ? "- Negative" : s.reg == "IND" ? "~ Balanced" : "-"
+                t := t + (s.preg != "" and s.preg != s.reg ? " (new)" : "")
+                c := s.reg == "POS" ? cPos : s.reg == "NEG" ? cNeg : cTxt
+            "net" =>
+                t := na(s.net) ? "-" : (s.net >= 0 ? "+" : "") + str.tostring(s.net, "#.#") + "B"
+                c := na(s.net) ? cTxt : s.net >= 0 ? cPos : cNeg
+            "zg" =>
+                float zp = mapP(s.zg, f, o)
+                t := s.zgs == "X" ? "none nearby" : lvl(zp)
+                // distance in daily expected moves: under ~0.3 means price is right at the flip
+                if not na(zp) and not na(s.emd) and not na(f) and s.emd > 0
+                    t := t + "  (" + str.tostring(math.abs(close - zp) / (s.emd * f), "#.0") + "σ)"
+                c := cZG
+            "ag" =>
+                t := lvl(mapP(s.ag, f, o))
+                c := cAG
+            "hedge" =>
+                // dollars of dealer hedging per 1% move, as contracts of THIS chart (NQ, MNQ, ES or MES)
+                if not na(s.net)
+                    float n = s.net * 1e9 / (close * syminfo.pointvalue)
+                    t := str.tostring(math.abs(n), "#,###") + " " + syminfo.root + (s.net >= 0 ? " dampening" : " amplifying")
+                    c := s.net >= 0 ? cPos : cNeg
+            "charm" =>
+                // time decay shifts dealer delta by chm $M/day; staying hedged means trading the opposite way
+                if not na(s.chm)
+                    float n = -s.chm * 1e6 / (close * syminfo.pointvalue)
+                    t := (n >= 0 ? "buy " : "sell ") + str.tostring(math.abs(n), "#,###") + " " + syminfo.root + "/day"
+                    c := n >= 0 ? cPos : cNeg
+            "cw" =>
+                t := lvl(mapP(s.cw, f, o))
+                c := cPos
+            "pw" =>
+                t := lvl(mapP(s.pw, f, o))
+                c := cNeg
+            "mx" =>
+                t := ps(mapP(s.mp, f, o)) + " / " + ps(mapP(s.mn, f, o))
+            "x0" =>
+                t := ps(mapP(s.z0, f, o)) + " / " + ps(mapP(s.c0, f, o)) + " / " + ps(mapP(s.p0, f, o))
+            "vol" =>
+                t := ps(mapP(s.vc, f, o)) + " / " + ps(mapP(s.vp, f, o))
+                c := cVol
+            "mp" =>
+                t := mpFirst(s, f, o)
+                c := cMP
+            "em" =>
+                t := na(s.emd) or na(f) ? "-" : "+/-" + str.tostring(s.emd * f, "#") + (na(s.emw) ? "" : "  wk +/-" + str.tostring(s.emw * f, "#"))
+            "map" =>
+                t := mst
+                c := na(f) ? cWarn : cDim
+    [t, c]
+
+if showTab and barstate.islast
+    table.clear(tab, 0, 0, 2, 17)
+    if not hasA
+        cell(0, 0, "GEX", cDim, cHead)
+        cell(1, 0, nParsed == 0 ? "no payload" : "no " + chartFam + " payload", cWarn, cHead)
+        cell(0, 1, nParsed == 0 ? "Copy from 127.0.0.1:8765" : "Pasted: " + otherMkts, cDim)
+    else
+        cell(0, 0, syminfo.ticker, cDim, cHead)
+        cell(1, 0, sA.prov + " " + sA.src, cTxt, cHead)
+        if hasB
+            cell(2, 0, sB.prov + " " + sB.src, cTxt, cHead)
+        for [i, k] in rowKeys
+            cell(0, i + 1, rowName(k), cDim)
+            [t1, c1] = valOf(k, sA, facA, offA, okA, mstA)
+            cell(1, i + 1, t1, c1)
+            if hasB
+                [t2, c2] = valOf(k, sB, facB, offB, okB, mstB)
+                cell(2, i + 1, t2, c2)
+
+// =====================================================================================================
+// Alerts (real-time only, per-type cooldown) on the first drawable source.
+// Level shifts / regime changes between updates are alerted by the gexsys service instead.
+// =====================================================================================================
+var int lastAp = 0
+var int lastCr = 0
+var int lastZg = 0
+var int lastSt = 0
+cool(int last) =>
+    timenow - last >= alCooldownMin * 60000
+
+canDraw = okA or okB
+
+// Optional tint of today's session: above zero gamma = modeled positive gamma, below = negative
+bgcolor(regimeBg and canDraw and time >= sessStartTime and not na(zgF) ? (close >= zgF ? color.new(cPos, 93) : color.new(cNeg, 93)) : na,
+     title = "Gamma side tint", editable = false)
+nearest = na(cwF) and na(pwF) and na(zgF) ? na : array.min(array.from(nz(math.abs(close - cwF), 1e12), nz(math.abs(close - pwF), 1e12), nz(math.abs(close - zgF), 1e12)))
+// ta.cross must run on every bar (v6 `and` is lazy), so evaluate first and combine afterwards
+xCW = ta.cross(close, cwF)
+xPW = ta.cross(close, pwF)
+xZG = ta.cross(close, zgF)
+crossedMajor = canDraw and (xCW or xPW)
+crossedZG    = canDraw and xZG
+approaching  = canDraw and not na(nearest) and nearest <= alApproachTicks * syminfo.mintick and nz(nearest[1], 1e12) > alApproachTicks * syminfo.mintick
+anyStale     = (hasA and staleOf(sA)) or (hasB and staleOf(sB))
+
+if barstate.isrealtime
+    if alApproach and approaching and cool(lastAp)
+        alert(syminfo.ticker + " within " + str.tostring(alApproachTicks) + " ticks of a GEX level (call " + ps(cwF) + " / put " + ps(pwF) + " / ZG " + ps(zgF) + ").", alert.freq_once_per_bar)
+        lastAp := timenow
+    if alCross and crossedMajor and cool(lastCr)
+        alert(syminfo.ticker + " crossed a GEX wall (call " + ps(cwF) + " / put " + ps(pwF) + ").", alert.freq_once_per_bar)
+        lastCr := timenow
+    if alZG and crossedZG and cool(lastZg)
+        alert(syminfo.ticker + " crossed estimated zero gamma " + ps(zgF) + ".", alert.freq_once_per_bar)
+        lastZg := timenow
+    if alStale and anyStale and cool(lastSt)
+        alert("GEX update for " + syminfo.ticker + " is stale - paste a fresh one from the website.", alert.freq_once_per_bar)
+        lastSt := timenow
+
+alertcondition(crossedZG, "GEX: zero-gamma cross", "{{ticker}} crossed the estimated zero-gamma level")
+alertcondition(crossedMajor, "GEX: wall cross", "{{ticker}} crossed a GEX call or put wall")
+
+// Current mapped levels in TradingView's Data Window. editable = false keeps them off the settings
+// dialog's Style tab, so every visual setting lives on the Inputs tab.
+plot(zgF, "Zero gamma (est.)", display = display.data_window, editable = false)
+plot(cwF, "Call wall", display = display.data_window, editable = false)
+plot(pwF, "Put wall", display = display.data_window, editable = false)

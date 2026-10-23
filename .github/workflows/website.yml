@@ -1,0 +1,57 @@
+# Hosted copy of the GEX website on GitHub Pages: free, runs on GitHub's computers, not yours.
+# Every run fetches fresh Cboe (15-min delayed) data, ForexFactory and Truth Social, rebuilds the
+# site and publishes it. See docs/HOSTING.md.
+name: Website
+
+on:
+  schedule:
+    - cron: "*/15 13-21 * * 1-5"   # every 15 min around US market hours (times are UTC)
+    - cron: "40 */2 * * *"         # every 2 h otherwise, for overnight futures, news and posts
+  workflow_dispatch:                # "Run workflow" button on the Actions tab
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: website
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      # .state = last good result, scheduled payload, recent history and feed caches from earlier runs
+      - uses: actions/cache/restore@v4
+        with:
+          path: .state
+          key: gex-state-${{ github.run_id }}
+          restore-keys: gex-state-
+      - run: python -m gexsys --log-level WARNING build-site --out _site --state .state
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: .state
+          key: gex-state-${{ github.run_id }}
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

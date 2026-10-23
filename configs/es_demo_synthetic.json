@@ -1,0 +1,49 @@
+{
+  "engine": {
+    "positioning": "conventional",
+    "unit": "usd_per_1pct",
+    "include_0dte": true,
+    "max_dte": 45,
+    "grid_pct": 0.05,
+    "grid_steps": 201
+  },
+  "levels": {
+    "top_n": 6,
+    "min_share": 0.04
+  },
+  "refresh": {
+    "rth_seconds": 60,
+    "eth_seconds": 900,
+    "closed_seconds": 3600
+  },
+  "alerts": {
+    "level_shift_ticks": 20,
+    "cooldown_s": 900,
+    "stale_after_s": 1800
+  },
+  "storage": {
+    "root": "data/demo_snapshots",
+    "store_raw": false
+  },
+  "publish": {
+    "times_et": [
+      "09:45",
+      "11:45",
+      "13:45",
+      "15:30"
+    ],
+    "desktop_notify": true,
+    "webhook_format": "json"
+  },
+  "description": "SYNTHETIC ES demo - not market data",
+  "market": "ES",
+  "source": "SPX",
+  "provider": {
+    "name": "synthetic",
+    "seed": 11
+  },
+  "futures_ref": {
+    "mode": "synthetic_basis",
+    "factor": 1.0098
+  }
+}

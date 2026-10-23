@@ -1,0 +1,2 @@
+# Runtime: standard library only, plus the IANA tz database (Windows has none built in).
+tzdata==2025.2
