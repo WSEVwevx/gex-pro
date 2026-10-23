@@ -1,13 +1,15 @@
 """Scheduled publishing of TradingView payloads.
 
-Pine cannot pull data, so "levels that update every ~2 hours" is implemented as:
+Pine cannot pull data, so "levels that update every hour" is implemented as:
 the service recalculates continuously, and at fixed ET publish times it freezes
 a payload, notifies the user (Windows toast and/or webhook), and exposes it at
 /api/pine?market=X&which=published and on the dashboard's Copy button.
 The user pastes it into the indicator (about 10 seconds).
 
-Publish slots are ET wall-clock times on trading days; slots at or after an
-early close are skipped.  zoneinfo handles DST.
+Publish slots are ET wall-clock times on trading days. Default: every hour on the hour, around
+the clock (all_day=True), since the futures trade overnight. With all_day=False, slots at or after
+the cash close (16:00, or an early close) are skipped. Weekends and holidays have no slots: the
+options data doesn't change then. zoneinfo handles DST.
 """
 from __future__ import annotations
 
@@ -29,7 +31,8 @@ log = logging.getLogger("gexsys.publish")
 
 @dataclass
 class PublishConfig:
-    times_et: list[str] = field(default_factory=lambda: ["09:45", "11:45", "13:45", "15:30"])
+    times_et: list[str] = field(default_factory=lambda: [f"{h:02d}:00" for h in range(24)])
+    all_day: bool = True             # False: only slots before the cash close (16:00 / early close)
     desktop_notify: bool = True
     webhook_format: str = "json"     # json | discord | none
 
@@ -53,7 +56,7 @@ def _day_slots(d, cfg: PublishConfig) -> list[datetime]:
     if not marketcal.is_trading_day(d):
         return []
     close = marketcal.rth_close(d)
-    return [datetime.combine(d, s, marketcal.NY) for s in cfg.slots() if s < close]
+    return [datetime.combine(d, s, marketcal.NY) for s in cfg.slots() if cfg.all_day or s < close]
 
 
 def latest_slot(now: datetime, cfg: PublishConfig) -> Optional[datetime]:

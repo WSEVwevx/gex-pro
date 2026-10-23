@@ -1,4 +1,4 @@
-# Daily use: free data, 2-hour updates
+# Daily use: free data, hourly updates
 
 ## Start it
 
@@ -24,9 +24,10 @@ Double-click **START.bat**. It installs or updates the dependencies, starts the 
   F = index × e^((rate − dividend) × time to futures expiry). That's typically within a few points of
   the traded price. TradingView maps levels with your live chart instead.
 
-## Updates (about every 2 hours)
+## Updates (every hour)
 
-At **09:45, 11:45, 13:45 and 15:30 ET** (trading days only; times after an early close are skipped):
+**Every hour on the hour, 00:00 to 23:00 ET**, on trading days (weekends and market holidays have
+no updates, because the options data doesn't change then; early-close days still get all 24):
 
 1. A **Windows notification** appears ("GEX levels updated").
 2. On the website, click **Copy for TradingView**. One paste holds NQ and ES.
@@ -36,9 +37,11 @@ At **09:45, 11:45, 13:45 and 15:30 ET** (trading days only; times after an early
 Use the same paste on your ES chart. Each chart draws only its own market's levels.
 
 Between pastes, the indicator keeps converting index prices to your **real-time** futures price,
-using the live `NASDAQ:NDX` / `SP:SPX` reference. Levels are marked `[STALE]` after 150 minutes.
+using the live `NASDAQ:NDX` / `SP:SPX` reference. Levels are marked `[STALE]` after 90 minutes (one missed hourly update).
 
 ## Change the schedule
 
-Edit `"publish": {"times_et": [...]}` in `configs/free_nq_cboe.json` and `configs/free_es_cboe.json`,
-then restart START.bat.
+Edit `"publish": {"times_et": [...], "all_day": true}` in `configs/free_nq_cboe.json` and
+`configs/free_es_cboe.json`, then restart START.bat. `all_day: false` keeps only the times before the
+cash close (16:00 ET, or 13:00 on early-close days). To stop the hourly Windows notifications, set
+`"desktop_notify": false`; the website's Copy button still has each new paste.

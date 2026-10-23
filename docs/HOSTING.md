@@ -4,7 +4,7 @@ This puts the same dashboard (Levels, Bias, News with the Trump feed) on a real 
 `https://yourname.github.io/gex-levels/`. You can open it from any device, and your PC doesn't need to be on.
 
 **How it works:** GitHub runs a small job on its own computers about every 15 minutes during US market hours,
-and every 2 hours otherwise. The job:
+and every hour otherwise, so each hourly TradingView paste is ready shortly after the hour. The job:
 1. Fetches fresh Cboe options data, the ForexFactory calendar and Truth Social posts.
 2. Runs the same calculations as START.bat.
 3. Publishes the result as plain web pages.

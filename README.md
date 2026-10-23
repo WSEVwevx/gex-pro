@@ -107,22 +107,23 @@ Full details: [METHODOLOGY](docs/METHODOLOGY.md). Caveats: [LIMITATIONS](docs/LI
   about market topics (tariffs, the Fed, China, oil, ...) are tagged and highlighted, and a
   "Market-related" filter shows only those.
 
-**Hosted copy:** the same website can run for free on GitHub Pages, updated by GitHub every ~15 minutes
+**Hosted copy:** the same website can run for free on GitHub Pages, updated by GitHub every ~15 minutes in market hours and every hour otherwise
 in market hours with Cboe delayed data, so you can open it on any device without your PC
 (`python -m gexsys build-site`, `.github/workflows/website.yml`). Setup: [docs/HOSTING.md](docs/HOSTING.md).
 
 Only one copy of the service can run at a time. If START.bat is already open, a second copy
 prints "GEX is ALREADY RUNNING" and exits. To pick up updates, close the old window first.
 
-## Scheduled updates (about every 2 hours)
+## Scheduled updates (every hour)
 
-The service publishes a TradingView payload at 09:45, 11:45, 13:45 and 15:30 ET. It sends a
+The service publishes a TradingView payload every hour on the hour, around the clock (00:00 to
+23:00 ET) on trading days; weekends and market holidays have none. It sends a
 Windows notification (and an optional Discord/webhook message), and the dashboard's **Copy** button
 puts the payload on your clipboard. See [REALTIME_SETUP](docs/REALTIME_SETUP.md).
 
 ## Documentation
 
-- [Going live: real data and 2-hour updates](docs/REALTIME_SETUP.md)
+- [Daily use: free data and hourly updates](docs/REALTIME_SETUP.md)
 
 - [Architecture decision record](docs/ADR-001-architecture.md)
 - [Mathematical methodology](docs/METHODOLOGY.md)

@@ -6,7 +6,7 @@ indicator("GEX Levels - NQ / ES", shorttitle = "GEX Levels", overlay = true,
 // =====================================================================================================
 // GEX Levels draws options levels computed by the gexsys service (open START.bat, then the website at
 // http://127.0.0.1:8765) and pasted into "Levels payload". Pine cannot download data, so the levels
-// change when you paste a new update (about every 2 hours). Levels come from index + ETF options
+// change when you paste a new update (every hour on the hour). Levels come from index + ETF options
 // (SPX + SPY for ES, NDX + QQQ for NQ), are expressed in index prices and are mapped live to this futures
 // chart. Levels are model estimates for the current session; nothing is back-plotted.
 // =====================================================================================================
@@ -114,7 +114,7 @@ extFrom     = input.string("First source", "More levels from", options = ["First
      tooltip = "Only matters when a paste holds two sources for this market.")
 provFilter  = input.string("", "Only this source", group = G8, tooltip = "Blank = all sources in the paste (e.g. CBOE).")
 refOverride = input.string("", "Reference symbol override", group = G8, tooltip = "Blank = the symbol in the paste (NASDAQ:NDX, SP:SPX, ...).")
-staleMin    = input.int(150, "Stale after (minutes)", minval = 1, group = G8, tooltip = "Default suits the ~2-hour update schedule.")
+staleMin    = input.int(90, "Stale after (minutes)", minval = 1, group = G8, tooltip = "Default suits the hourly update schedule (one missed update plus slack).")
 maxDistPct  = input.float(8.0, "Ignore levels farther than (%)", minval = 1, group = G8,
      tooltip = "Safety check: a level this far from price means the mapping is wrong; it is not drawn.")
 manualTxt   = input.string("", "Manual levels", group = G8, tooltip = "Your own chart prices: price:name, comma separated. Example: 29900:Weekly high, 29500:Gap")

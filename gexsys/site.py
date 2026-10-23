@@ -6,7 +6,7 @@ Runs every market once (exactly like one refresh of START.bat), then writes
   index.html                        the dashboard, switched to static mode
   data/all.json, news.json, posts.json   what /api/all, /api/news and /api/posts return locally
   data/pine-latest[-NQ|-ES].txt     the newest TradingView payload
-  data/pine-published[-NQ|-ES].txt  the payload from the last scheduled slot (09:45, 11:45, 13:45, 15:30 ET)
+  data/pine-published[-NQ|-ES].txt  the payload from the last scheduled slot (every hour on the hour, ET)
 
 `--state` keeps what must survive between runs (last good result, scheduled payload, snapshot history
 for "zero gamma moved", news/posts caches). The GitHub workflow caches that folder between runs.

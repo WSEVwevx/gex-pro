@@ -6,7 +6,7 @@ name: Website
 on:
   schedule:
     - cron: "*/15 13-21 * * 1-5"   # every 15 min around US market hours (times are UTC)
-    - cron: "40 */2 * * *"         # every 2 h otherwise, for overnight futures, news and posts
+    - cron: "3 * * * *"            # every hour around the clock (the hourly TradingView paste, news, posts)
   workflow_dispatch:                # "Run workflow" button on the Actions tab
   push:
     branches: [main]
