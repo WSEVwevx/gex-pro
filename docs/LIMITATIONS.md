@@ -58,6 +58,15 @@ level as a *modeled concentration of option gamma*.
 - **The backtest is a proxy.** It uses the 30-day VIX / VXN, not GEX PRO's own same-day IV, and only tests
   the expected-move band. Hypothetical results: no orders, costs or slippage.
 
+## Strategy lab
+
+- **Option premiums are modeled**, not quoted: Black-Scholes at the VIX / VXN level with no skew and a 10%
+  spread cost. Real 1-day options are priced with skew and around events, so the real edge can be smaller.
+- **The regime is a proxy** in history (vol index vs its one-year median), not GEX.
+- **Daily bars can't order intraday moves**, so intraday rules are judged on about three years of hourly bars,
+  which still assume the worst case inside each hour. Fills, margin, assignment and halted markets are not modeled.
+- **Eight rules tested, results shown for all.** Testing more variations and keeping the winners would overstate them.
+
 ## Behaviour on bad data
 
 | Condition | Behaviour |

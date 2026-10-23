@@ -128,6 +128,9 @@ class FakeSource:
     def vol_index(self, underlying):
         return {}
 
+    def hourly(self, underlying):
+        return {}
+
 
 class TestSchedule(unittest.TestCase):
     def make(self, tmp, now, levels):

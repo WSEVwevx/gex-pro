@@ -4,7 +4,8 @@ Same shape as every GEX PRO component (see gexpro/components.py):
   routes()                    /api/trackrecord: every graded session, summary statistics, the historical backtest
   start() / stop()            a background check every 10 minutes that freezes and grades sessions
   build_static(data, state)   trackrecord.json for the hosted site (sessions kept in $GEXPRO_TRACK_DIR,
-                              else state/trackrecord; the GitHub workflow keeps that folder in a git branch)
+                              else state/trackrecord; the GitHub workflow keeps that folder in a git branch;
+                              the recomputable backtest is cached in state/trackrecord-cache)
 
 Inputs from the app shell:
   pre_open(session_date) -> {market: levels or None}   the last calculation timestamped before that
@@ -27,7 +28,7 @@ from pathlib import Path
 from typing import Callable, Optional
 from zoneinfo import ZoneInfo
 
-from . import backtest, prices
+from . import backtest, prices, strategies
 from .score import grade, make_plan, summarize
 
 log = logging.getLogger("trackrecord")
@@ -52,6 +53,7 @@ class TrackRecordComponent:
                  proof_url: Optional[str] = None):
         self.pre_open, self.is_trading_day, self.session_close, self.clock = pre_open, is_trading_day, session_close, clock
         self.dir = Path(store_dir) if store_dir else _default_dir()
+        self.cache_dir: Optional[Path] = None          # where the (recomputable) backtest is cached; default self.dir
         self.src = source
         self.proof_url = proof_url
         self._lock = threading.Lock()
@@ -151,7 +153,7 @@ class TrackRecordComponent:
 
     # ---------------------------------------------------------------- backtest (rebuilt about once a day)
     def backtest(self) -> dict:
-        path = self.dir / "backtest.json"
+        path = (self.cache_dir or self.dir) / "backtest.json"
         cached = self._read(path)
         now = self.clock()
         if cached and now - datetime.fromisoformat(cached["built"]) < BACKTEST_MAX_AGE:
@@ -164,6 +166,9 @@ class TrackRecordComponent:
                 bars = self.src.daily(und, since=date(1990, 1, 1))
                 vol = self.src.vol_index(und)
                 r = backtest.run(und, prices.VOL_INDEX[und], bars, vol, until=final) if bars and vol else None
+                if r:
+                    hourly = {d: v for d, v in self.src.hourly(und).items() if d <= final}
+                    r["strategies"] = strategies.history(und, bars, vol, until=final, hourly=hourly or None)
             except Exception:
                 log.exception("backtest %s failed", und)
                 r = None
@@ -172,7 +177,8 @@ class TrackRecordComponent:
         if not out["markets"] and cached:
             return cached                                       # keep the last good backtest when sources fail
         if out["markets"]:
-            self._write(path, out)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(out, separators=(",", ":")), encoding="utf-8")
         return out
 
     def payload(self) -> dict:
@@ -182,7 +188,7 @@ class TrackRecordComponent:
         return {"now": self.clock().isoformat(), "started": self._started(), "proof_url": self.proof_url,
                 "rules": {"touch_em": 0.05, "min_sample": 20, "freeze": "levels from the last calculation timestamped before 09:30 ET"},
                 "stats": dict({m: summarize([s for s in graded if s["market"] == m]) for m in markets}, ALL=summarize(graded)),
-                "sessions": ss, "backtest": self.backtest()}
+                "sessions": ss, "backtest": self.backtest(), "strategies_live": strategies.live(graded)}
 
     # ---------------------------------------------------------------- component contract
     def routes(self) -> dict:
@@ -208,6 +214,7 @@ class TrackRecordComponent:
 
     def build_static(self, data: Path, state: Path) -> dict:
         self.dir = Path(os.environ.get("GEXPRO_TRACK_DIR") or state / "trackrecord")
+        self.cache_dir = state / "trackrecord-cache"      # kept by the workflow's cache, not in the git branch
         repo = os.environ.get("GITHUB_REPOSITORY")
         if repo and not self.proof_url:
             self.proof_url = f"https://github.com/{repo}/commits/track-record"
