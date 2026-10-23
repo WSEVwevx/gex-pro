@@ -97,6 +97,9 @@ Enter, or press `/`), a ticker strip with both markets, a sidebar of pages (keys
 panel (the `?` on every module, or the EXPLAIN tab on the right edge, or `X`) that says in plain English
 what each module shows and what to watch, with the live numbers for the current market.
 
+* **Library:** a beginner course in 19 short lessons (options basics, dealers and the Greeks, GEX levels,
+  volatility, using GEX PRO), each with an example, diagrams, a link into the terminal and a quick check;
+  an A-Z glossary; search; progress saved in your browser. Every Explain panel links to its lesson.
 * **Gamma lab:** the gamma curve (net dealer gamma if price moved ±5%) with the flip zone and the 1σ band,
   gamma by time to expiry (0DTE, week, month, longer), and eight positioning metrics.
 * **Volatility:** IV term structure (ATM, 25-delta put and call) with its slope, put skew by expiration, and

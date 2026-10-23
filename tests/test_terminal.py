@@ -74,7 +74,7 @@ class TestAssets(unittest.TestCase):
                     self.assertEqual(cm.exception.code, 404, bad)
                 with urllib.request.urlopen(base + "/") as r:
                     page = r.read().decode()
-                for src in ("assets/app.js", "assets/terminal.css"):
+                for src in ("assets/app.js", "assets/terminal.css", "assets/library.js"):
                     self.assertIn(src, page)
                 with urllib.request.urlopen(base + "/api/timeline") as r:
                     self.assertIn("NQ", json.loads(r.read()))
@@ -92,6 +92,7 @@ class TestAssets(unittest.TestCase):
             html = (out / "index.html").read_text(encoding="utf-8")
             self.assertRegex(html, r'"assets/app\.js\?v=[0-9a-f]{10}"')
             self.assertRegex(html, r'"assets/terminal\.css\?v=[0-9a-f]{10}"')
+            self.assertRegex(html, r'"assets/library\.js\?v=[0-9a-f]{10}"')            # the Library's lessons
             self.assertLess(html.index("window.GEX_STATIC = true"), html.index("assets/app.js"))   # flag first
             self.assertTrue((out / "assets" / "app.js").exists() and (out / "data" / "timeline.json").exists())
 

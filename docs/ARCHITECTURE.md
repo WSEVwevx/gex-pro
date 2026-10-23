@@ -53,6 +53,8 @@ else it needs (`is_trading_day`, `notify`). The feature defines the snapshot's s
 (behaviour). The local server serves `/assets/<file>` (plain file names only); the hosted build copies
 the assets and adds `?v=<content hash>` to their links, so browsers never keep a stale copy. Every
 module with `data-help="key"` gets an Explain button; its text lives in the `HELP` table in `app.js`.
+The Library's lessons, glossary and diagrams are content only, in `dashboard/assets/library.js`
+(`forHelp` maps each Explain key to its lesson). Add a lesson by adding an entry there.
 
 ## Adding a feature
 

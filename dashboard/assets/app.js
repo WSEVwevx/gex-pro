@@ -49,7 +49,7 @@ try { localStorage.removeItem("gex.page"); } catch(e) {}
 let impactF = store.get("gex.impact", "med");       // high | med | all
 let curF = store.get("gex.cur", "USD");             // USD | all
 let news = null;
-const VIEW_IDS = ["levels", "gamma", "vol", "timeline", "bias", "briefings", "news", "indicator"];
+const VIEW_IDS = ["levels", "gamma", "vol", "timeline", "bias", "briefings", "news", "indicator", "library"];
 function setPage(p){
   if(!VIEW_IDS.includes(p)) p = "levels";
   page = p;
@@ -63,6 +63,7 @@ function setPage(p){
   if(p === "news") renderNews();
   if(p === "indicator") loadIndicator();
   if(p === "timeline") loadTimeline();
+  if(p === "library") renderLibrary();
   if(!NO_MARKET_PAGES.includes(p) && data) render();
   $("explainTab").title = "Explain this page (X)";
 }
@@ -541,8 +542,9 @@ function renderMaxPain(X){
 // =====================================================================================================
 const PAGES = [
   ["levels", "Levels", "LVL"], ["gamma", "Gamma lab", "GEX"], ["vol", "Volatility", "VOL"], ["timeline", "Timeline", "TL"],
-  ["bias", "Bias", "BIAS"], ["briefings", "Briefings", "BRF"], ["news", "News", "NEWS"], ["indicator", "Indicator", "IND"]];
-const NO_MARKET_PAGES = ["news", "indicator", "briefings"];
+  ["bias", "Bias", "BIAS"], ["briefings", "Briefings", "BRF"], ["news", "News", "NEWS"], ["indicator", "Indicator", "IND"],
+  ["library", "Library", "LIB"]];
+const NO_MARKET_PAGES = ["news", "indicator", "briefings", "library"];
 const pickP = v => v && typeof v === "object" ? v.price : v;
 const curW = () => data && (data.workers.find(x => x.market === market && x.result) || data.workers.find(x => x.market === market));
 
@@ -815,10 +817,12 @@ const HELP = {
     body: `<p>Yellow tags flag market words (tariffs, the Fed, China, oil). Bullish/bearish is a keyword guess, shown only when clear: read the post before acting.</p>`},
   indicator: {title: "GEX PRO indicator", tldr: "The TradingView script that draws these levels on your chart.",
     body: `<p>Copy the code into TradingView's Pine Editor once (and again whenever the version changes). Then paste the hourly levels payload into its settings: the indicator maps index levels to your live futures chart.</p>`},
+  library: {title: "The Library", tldr: "A short course that explains everything on this site from zero.",
+    body: `<p>Start with <b>What is an option?</b> and follow the lessons in order, or search for any term. Each lesson ends with a quick check; answer it correctly and the lesson is marked as read. Your progress is saved in this browser.</p><p>Every Explain panel links to the matching lesson, so you can jump from a number on the screen straight to the idea behind it.</p>`},
   paste: {title: "The hourly paste", tldr: "One text block that carries all levels to TradingView.",
     body: `<p>Published every hour on the hour (ET). One paste holds NQ and ES; each chart draws only its own market. The indicator marks levels stale after 90 minutes.</p>`},
 };
-const PAGE_HELP = {levels: "regime", gamma: "gamma_curve", vol: "term", timeline: "timeline", bias: "bias", briefings: "briefings", news: "calendar", indicator: "indicator"};
+const PAGE_HELP = {levels: "regime", gamma: "gamma_curve", vol: "term", timeline: "timeline", bias: "bias", briefings: "briefings", news: "calendar", indicator: "indicator", library: "library"};
 let exKey = null;
 function openExplain(key){
   const h = HELP[key]; if(!h) return;
@@ -829,8 +833,12 @@ function openExplain(key){
   const live = h.live && s ? `<h4>Right now (${esc(market)})</h4><div class="live">${esc(h.live(w, s, L))}</div>` : "";
   $("exBody").innerHTML = `<div class="tldr">${h.tldr}</div>${h.body}${h.watch ? `<h4>What to watch</h4><ul>${h.watch.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}${live}`;
   const rel = [...document.querySelectorAll(`#${page}View [data-help]`)].map(e => e.dataset.help).filter((k, i, a) => HELP[k] && k !== key && a.indexOf(k) === i);
-  $("exMore").innerHTML = rel.length ? `<span class="eyebrow" style="width:100%">Also on this page</span>` + rel.map(k => `<button data-k="${k}">${esc(HELP[k].title)}</button>`).join("") : "";
-  [...$("exMore").querySelectorAll("button")].forEach(b => b.onclick = () => openExplain(b.dataset.k));
+  const lesson = (window.GEX_LIBRARY || {lessons: []}).lessons.find(l => l.id === ((window.GEX_LIBRARY || {}).forHelp || {})[key]);
+  $("exMore").innerHTML = (lesson ? `<button class="ex-learn" data-lesson="${esc(lesson.id)}"><span class="eyebrow">Learn the basics</span><b>${esc(lesson.title)}</b><span>${lesson.minutes} min lesson in the Library →</span></button>` : "")
+    + (rel.length ? `<span class="eyebrow" style="width:100%">Also on this page</span>` + rel.map(k => `<button data-k="${k}">${esc(HELP[k].title)}</button>`).join("") : "");
+  [...$("exMore").querySelectorAll("button[data-k]")].forEach(b => b.onclick = () => openExplain(b.dataset.k));
+  const lb = $("exMore").querySelector("[data-lesson]");
+  if(lb) lb.onclick = () => { closeExplain(); openLesson(lb.dataset.lesson); };
   document.querySelectorAll(".ex").forEach(b => b.classList.toggle("on", b.dataset.help === key));
   $("explain").classList.add("open"); $("explain").setAttribute("aria-hidden", "false"); document.body.classList.add("ex-open");
 }
@@ -862,6 +870,8 @@ const COMMANDS = [
   {code: "EXPLAIN", desc: "Explain this page", run: () => openExplain(PAGE_HELP[page] || "regime")},
   {code: "REFRESH", desc: "Reload all data now", run: () => { load(); loadNews(); loadPosts(); if(page === "timeline") loadTimeline(); toast("Refreshing data..."); }},
   {code: "HELP", desc: "Keyboard shortcuts", run: () => showKeys(true)},
+  {code: "LEARN", desc: "Start the beginner course", run: () => openLesson(LIB.lessons[0].id)},
+  {code: "GLOSSARY", desc: "Open the A-Z glossary", run: () => { libTab = "glossary"; setPage("library"); }},
 ];
 let cmdSel = 0;
 function cmdMatches(q){ q = q.trim().toUpperCase(); return q ? COMMANDS.filter(c => c.code.startsWith(q) || c.desc.toUpperCase().includes(q)) : COMMANDS; }
@@ -886,7 +896,7 @@ $("cmd").addEventListener("keydown", e => {
 });
 
 // ---------- keyboard
-const KEYS = [["/  or  Ctrl+K", "Command line"], ["1 - 8", "Pages (Levels, Gamma lab, Volatility, Timeline, Bias, Briefings, News, Indicator)"],
+const KEYS = [["/  or  Ctrl+K", "Command line"], ["1 - 9", "Pages (Levels, Gamma lab, Volatility, Timeline, Bias, Briefings, News, Indicator, Library)"],
   ["N  /  E", "Switch to NQ / ES"], ["X", "Explain this page"], ["C", "Copy the TradingView paste"], ["?", "This list"], ["Esc", "Close panels"]];
 function showKeys(on){ $("keys").hidden = !on; if(on) $("keysGrid").innerHTML = KEYS.map(([k, d]) => `<kbd>${esc(k)}</kbd><span>${esc(d)}</span>`).join(""); }
 $("keysBtn").onclick = () => showKeys(true);
@@ -905,6 +915,67 @@ document.addEventListener("keydown", e => {
   else if(e.key === "c" || e.key === "C") $("copyAll").click();
   else if(e.key === "?") showKeys(true);
 });
+
+
+// ---------- Library: the beginner course (content in assets/library.js)
+const LIB = window.GEX_LIBRARY || {chapters: [], lessons: [], glossary: [], diagrams: {}, forHelp: {}};
+let libLesson = store.get("gex.lib", LIB.lessons[0] ? LIB.lessons[0].id : ""), libTab = "course";
+const libRead = (() => { try { return new Set(JSON.parse(store.get("gex.libread", "[]"))); } catch(e){ return new Set(); } })();
+const saveRead = () => store.set("gex.libread", JSON.stringify([...libRead]));
+function openLesson(id){ libLesson = id; store.set("gex.lib", id); libTab = "course"; if(page !== "library") setPage("library"); else renderLibrary(); document.querySelector(".area").scrollTo({top: 0, behavior: "smooth"}); }
+function renderLibrary(){
+  const q = ($("libSearch").value || "").trim().toLowerCase();
+  const hit = s => !q || s.toLowerCase().includes(q);
+  $("libTabs").innerHTML = [["course", "Course"], ["glossary", "Glossary"]].map(([k, t]) => `<button role="tab" aria-selected="${libTab === k}" data-k="${k}">${t}</button>`).join("");
+  [...$("libTabs").children].forEach(b => b.onclick = () => { libTab = b.dataset.k; renderLibrary(); });
+  const n = LIB.lessons.length, done = LIB.lessons.filter(l => libRead.has(l.id)).length;
+  $("libBar").style.width = (n ? 100 * done / n : 0) + "%";
+  $("libCount").textContent = `${done} of ${n} lessons read`;
+  $("libCourse").hidden = libTab !== "course"; $("libGlossary").hidden = libTab !== "glossary";
+  if(libTab === "glossary"){
+    const rows = LIB.glossary.filter(([t, d]) => hit(t + " " + d));
+    $("libGloss").innerHTML = rows.map(([t, d, id]) => `<div class="gterm"><b>${esc(t)}</b><span>${esc(d)}</span>${id ? `<button class="linkbtn" data-l="${esc(id)}">Lesson →</button>` : ""}</div>`).join("")
+      || `<div class="expl">No term matches "${esc(q)}".</div>`;
+    [...$("libGloss").querySelectorAll("[data-l]")].forEach(b => b.onclick = () => openLesson(b.dataset.l));
+    return;
+  }
+  const visible = LIB.lessons.filter(l => hit(l.title + " " + l.oneLiner + " " + l.body.replace(/<[^>]+>/g, " ")));
+  $("libToc").innerHTML = LIB.chapters.map(([ck, ct]) => {
+    const ls = visible.filter(l => l.chapter === ck);
+    return ls.length ? `<div class="toc-ch">${esc(ct)}</div>` + ls.map(l => `<button class="toc-l${l.id === libLesson ? " on" : ""}" data-l="${esc(l.id)}"><i class="${libRead.has(l.id) ? "rd" : ""}"></i><span>${esc(l.title)}</span><em>${l.minutes}m</em></button>`).join("") : "";
+  }).join("") || `<div class="expl" style="margin:8px">No lesson matches "${esc(q)}".</div>`;
+  [...$("libToc").querySelectorAll("[data-l]")].forEach(b => b.onclick = () => openLesson(b.dataset.l));
+  const i = Math.max(0, LIB.lessons.findIndex(l => l.id === libLesson)), L = LIB.lessons[i];
+  if(!L){ $("libArticle").innerHTML = ""; return; }
+  const ch = (LIB.chapters.find(c => c[0] === L.chapter) || ["", ""])[1];
+  const body = L.body.replace(/\{\{d:(\w+)\}\}/g, (_, k) => LIB.diagrams[k] ? `<figure class="lib-fig">${LIB.diagrams[k]()}</figure>` : "");
+  const prev = LIB.lessons[i - 1], next = LIB.lessons[i + 1];
+  $("libArticle").innerHTML = `<div class="eyebrow">${esc(ch)} · lesson ${i + 1} of ${n} · ${L.minutes} min</div>
+    <h2 class="lib-title">${esc(L.title)}</h2>
+    <div class="lib-one">${esc(L.oneLiner)}</div>
+    <div class="lib-body">${body}</div>
+    ${L.example ? `<div class="lib-ex"><div class="eyebrow">Example</div><p>${esc(L.example)}</p></div>` : ""}
+    ${L.gex ? `<button class="btn ghost lib-try" data-p="${esc(L.gex[0])}">Try it in GEX PRO: ${esc(L.gex[1])} →</button>` : ""}
+    ${L.quiz ? `<div class="lib-quiz" id="libQuiz"><div class="eyebrow">Quick check</div><p class="q">${esc(L.quiz.q)}</p>
+      <div class="choices">${L.quiz.choices.map((c, k) => `<button data-k="${k}">${esc(c)}</button>`).join("")}</div><p class="why" hidden></p></div>` : ""}
+    <div class="lib-nav">${prev ? `<button class="btn ghost" data-l="${esc(prev.id)}">← ${esc(prev.title)}</button>` : "<span></span>"}
+      <button class="btn ghost" id="libMark">${libRead.has(L.id) ? "✓ Read" : "Mark as read"}</button>
+      ${next ? `<button class="btn" data-l="${esc(next.id)}">${esc(next.title)} →</button>` : `<span></span>`}</div>`;
+  [...$("libArticle").querySelectorAll(".lib-nav [data-l]")].forEach(b => b.onclick = () => { libRead.add(L.id); saveRead(); openLesson(b.dataset.l); });
+  $("libMark").onclick = () => { libRead.has(L.id) ? libRead.delete(L.id) : libRead.add(L.id); saveRead(); renderLibrary(); };
+  const tryBtn = $("libArticle").querySelector(".lib-try");
+  if(tryBtn) tryBtn.onclick = () => setPage(tryBtn.dataset.p);
+  const qz = $("libQuiz");
+  if(qz) [...qz.querySelectorAll(".choices button")].forEach(b => b.onclick = () => {
+    const right = Number(b.dataset.k) === L.quiz.answer;
+    [...qz.querySelectorAll(".choices button")].forEach(x => { x.disabled = true; x.classList.toggle("right", Number(x.dataset.k) === L.quiz.answer); });
+    if(!right) b.classList.add("wrong");
+    const why = qz.querySelector(".why"); why.hidden = false; why.innerHTML = `<b>${right ? "Correct." : "Not quite."}</b> ${esc(L.quiz.why)}`;
+    if(right){ libRead.add(L.id); saveRead(); $("libMark").textContent = "✓ Read"; $("libBar").style.width = 100 * LIB.lessons.filter(l => libRead.has(l.id)).length / n + "%";
+      $("libCount").textContent = `${LIB.lessons.filter(l => libRead.has(l.id)).length} of ${n} lessons read`; }
+  });
+}
+$("libSearch").addEventListener("input", renderLibrary);
 
 setPage(page);
 load();
