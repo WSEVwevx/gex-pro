@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Optional
 
-log = logging.getLogger("gexsys.news")
+log = logging.getLogger("feeds.forexfactory")
 FEED_URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
 IMPACTS = ("High", "Medium", "Low", "Holiday")
 

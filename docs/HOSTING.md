@@ -10,7 +10,7 @@ and every hour otherwise, so each hourly TradingView paste is ready shortly afte
 3. Publishes the result as plain web pages.
 
 It costs nothing and does not rely on Claude or on your terminal. The job is in
-`.github/workflows/website.yml`; the build command is `python -m gexsys build-site`.
+`.github/workflows/website.yml`; the build command is `python -m gexpro build-site`.
 
 ## One-time setup (about 10 minutes, all in the browser)
 

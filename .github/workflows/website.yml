@@ -38,7 +38,7 @@ jobs:
           path: .state
           key: gex-state-${{ github.run_id }}
           restore-keys: gex-state-
-      - run: python -m gexsys --log-level WARNING build-site --out _site --state .state
+      - run: python -m gexpro --log-level WARNING build-site --out _site --state .state
       - uses: actions/cache/save@v4
         if: always()
         with:

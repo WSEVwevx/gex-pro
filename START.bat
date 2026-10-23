@@ -14,7 +14,7 @@ if errorlevel 1 (
   exit /b 1
 )
 start "" http://127.0.0.1:8765
-"%PY%" -m gexsys --log-level WARNING serve --auto
+"%PY%" -m gexpro --log-level WARNING serve --auto
 echo.
 echo The service stopped. If it says the port is in use, it is probably already running in another window.
 pause

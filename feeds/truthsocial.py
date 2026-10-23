@@ -28,7 +28,7 @@ from html.parser import HTMLParser
 from pathlib import Path
 from typing import Callable, Optional
 
-log = logging.getLogger("gexsys.posts")
+log = logging.getLogger("feeds.truthsocial")
 API_URL = "https://truthsocial.com/api/v1/accounts/107780257626128497/statuses?limit=20&exclude_replies=true"
 RSS_URL = "https://www.trumpstruth.org/feed"
 UA = {"User-Agent": "Mozilla/5.0 (gexsys personal use)", "Accept": "application/json, application/xml, */*"}

@@ -6,7 +6,7 @@ import unittest
 import urllib.error
 from pathlib import Path
 
-from gexsys.news import Calendar, normalize_events
+from feeds.forexfactory import Calendar, normalize_events
 
 SAMPLE = [
     {"title": "CPI m/m", "country": "USD", "date": "2026-10-22T08:30:00-04:00", "impact": "High", "forecast": "0.3%", "previous": "0.4%"},

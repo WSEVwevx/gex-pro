@@ -35,7 +35,7 @@ python -m gexsys demo --market NQ
 ```
 
 ```bash
-python -m gexsys serve --config configs/nq_demo_synthetic.json --config configs/es_demo_synthetic.json
+python -m gexpro serve --config configs/nq_demo_synthetic.json --config configs/es_demo_synthetic.json
 ```
 
 Then open http://127.0.0.1:8765. The demo data is **SYNTHETIC** and labeled as such everywhere.
@@ -47,7 +47,7 @@ python -m gexsys snapshot --config configs/free_es_cboe.json
 ```
 
 ```bash
-python -m gexsys serve --auto
+python -m gexpro serve --auto
 ```
 
 Other commands: `replay --market NQ` (level-stability statistics over stored snapshots) and
@@ -113,7 +113,7 @@ Full details: [METHODOLOGY](docs/METHODOLOGY.md). Caveats: [LIMITATIONS](docs/LI
 
 **Hosted copy:** the same website can run for free on GitHub Pages, updated by GitHub every ~15 minutes in market hours and every hour otherwise
 in market hours with Cboe delayed data, so you can open it on any device without your PC
-(`python -m gexsys build-site`, `.github/workflows/website.yml`). Setup: [docs/HOSTING.md](docs/HOSTING.md).
+(`python -m gexpro build-site`, `.github/workflows/website.yml`). Setup: [docs/HOSTING.md](docs/HOSTING.md).
 
 Only one copy of the service can run at a time. If START.bat is already open, a second copy
 prints "GEX PRO is ALREADY RUNNING" and exits. To pick up updates, close the old window first.
@@ -136,16 +136,23 @@ puts the payload on your clipboard. See [REALTIME_SETUP](docs/REALTIME_SETUP.md)
 - [Data quality and limitations](docs/LIMITATIONS.md)
 - [Troubleshooting](docs/TROUBLESHOOTING.md)
 - [Feature status: what works and what is unverified](docs/STATUS.md)
+- [Architecture: packages, components, adding features](docs/ARCHITECTURE.md)
 
 ## Layout
 
+Three independent packages; only the app shell joins them (a test enforces it). How to add a
+feature: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
 ```
-gexsys/            models, pricing, engine, levels, mapping, marketcal, normalize,
-                   providers/{base,cboe,csvfile,synthetic}, pipeline, storage, alerts,
-                   export (Pine payload), service (HTTP), replay, config, __main__ (CLI)
-pine/              TradingView Pine v6 indicator
-dashboard/         local dashboard (no external network calls)
-configs/           NQ / ES example configurations
+gexpro/            app shell: website server, hosted-site build, `python -m gexpro serve` (START.bat)
+gexsys/            GEX only: providers/{base,cboe,csvfile,synthetic}, pricing, engine, levels, extras,
+                   mapping, marketcal, pipeline, storage, alerts, publish (hourly paste), export (Pine
+                   payload), bias, indicator (script info), service (market workers), component
+                   (its website endpoints), audit, replay, config, __main__ (GEX tools CLI)
+feeds/             market news: forexfactory (calendar), truthsocial (posts), component
+dashboard/         the website (one page; reads each component's endpoints)
+pine/              TradingView Pine v6 indicator (GEX PRO)
+configs/           NQ / ES configurations
 tests/             unit + integration tests, tests/data synthetic fixtures
 docs/              documentation
 ```

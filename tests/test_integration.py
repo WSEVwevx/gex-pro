@@ -15,7 +15,10 @@ from gexsys.export import parse_payload, pine_payload
 from gexsys.pipeline import run_once
 from gexsys.providers.synthetic import SyntheticProvider, make_chain
 from gexsys.replay import sensitivity, stability
-from gexsys.service import MarketWorker, make_handler
+from feeds.component import FeedsComponent
+from gexpro.server import make_handler
+from gexsys.component import GexComponent
+from gexsys.service import MarketWorker
 from gexsys.storage import SnapshotStore
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -120,12 +123,22 @@ class TestAlerts(unittest.TestCase):
         self.assertEqual(a.stale_check("NQ", t[0] - 5000)[0]["type"], "data_stale")
 
 
+class _Empty:
+    """Stand-in for the calendar and posts feeds (no network in tests)."""
+    def get(self):
+        return {"events": [], "posts": [], "fetched_at": None}
+
+
+def app(workers):
+    return [GexComponent.from_workers(workers), FeedsComponent(_Empty(), _Empty())]
+
+
 class TestService(unittest.TestCase):
     def test_http_endpoints(self):
         with tempfile.TemporaryDirectory() as tmp:
             w = MarketWorker(synth_cfg(tmp))
             w.step()
-            httpd = ThreadingHTTPServer(("127.0.0.1", 0), make_handler({"NQ": w}))
+            httpd = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(app({"NQ": w})))
             th = threading.Thread(target=httpd.serve_forever, daemon=True)
             th.start()
             base = f"http://127.0.0.1:{httpd.server_address[1]}"
@@ -138,6 +151,8 @@ class TestService(unittest.TestCase):
                 self.assertIn("profile", json.loads(get("/api/levels?market=NQ")))
                 self.assertTrue(get("/api/pine?market=NQ").startswith("GEX1;"))
                 self.assertIn("<title>", get("/"))
+                self.assertEqual(json.loads(get("/api/news"))["events"], [])              # the feeds component
+                self.assertEqual(json.loads(get("/api/posts"))["posts"], [])
             finally:
                 httpd.shutdown()
                 httpd.server_close()
@@ -176,7 +191,7 @@ class TestIndicatorSource(unittest.TestCase):
         self.assertIn('indicator("GEX PRO', code)
         with tempfile.TemporaryDirectory() as tmp:
             w = MarketWorker(synth_cfg(tmp))
-            httpd = ThreadingHTTPServer(("127.0.0.1", 0), make_handler({"NQ": w}))
+            httpd = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(app({"NQ": w})))
             threading.Thread(target=httpd.serve_forever, daemon=True).start()
             try:
                 with urllib.request.urlopen(f"http://127.0.0.1:{httpd.server_address[1]}/api/indicator") as r:
@@ -188,7 +203,7 @@ class TestIndicatorSource(unittest.TestCase):
 
 class TestSingleServer(unittest.TestCase):
     def test_second_server_on_the_same_port_is_refused(self):
-        from gexsys.service import ExclusiveHTTPServer
+        from gexpro.server import ExclusiveHTTPServer
         from http.server import BaseHTTPRequestHandler
         first = ExclusiveHTTPServer(("127.0.0.1", 0), BaseHTTPRequestHandler)
         try:
@@ -240,14 +255,11 @@ class TestKeepLastGood(unittest.TestCase):
 
 class TestStaticSite(unittest.TestCase):
     def test_build_writes_site_and_keeps_state_between_runs(self):
-        from unittest import mock
-        from gexsys import site
-        empty = {"posts": [], "events": [], "fetched_at": None}
-        with tempfile.TemporaryDirectory() as tmp, \
-                mock.patch.object(site.Calendar, "get", return_value=empty), \
-                mock.patch.object(site.Posts, "get", return_value=empty):
+        from gexpro import site
+        with tempfile.TemporaryDirectory() as tmp:
             out, state = Path(tmp) / "site", Path(tmp) / "state"
-            res = site.build([synth_cfg(tmp)], out, state)
+            build = lambda: site.build([GexComponent([synth_cfg(tmp)]), FeedsComponent(_Empty(), _Empty())], out, state)
+            res = build()
             self.assertEqual(res["NQ-SYNTHETIC"][1], "OK")
             html = (out / "index.html").read_text(encoding="utf-8")
             from gexsys.indicator import PINE
@@ -256,10 +268,11 @@ class TestStaticSite(unittest.TestCase):
             self.assertIn("window.GEX_STATIC = true", html.split("const $ =")[0])     # flag set before the app script
             d = json.loads((out / "data" / "all.json").read_text(encoding="utf-8"))
             self.assertTrue(d["static"])
+            self.assertEqual(json.loads((out / "data" / "news.json").read_text(encoding="utf-8"))["events"], [])
             pub = d["workers"][0]["published"]
             self.assertIsNotNone(pub)                                                   # latest slot published
             self.assertTrue((out / "data" / "pine-published-NQ.txt").read_text().startswith("GEX1;"))
-            site.build([synth_cfg(tmp)], out, state)                                    # a fresh run, same state
+            build()                                                                     # a fresh run, same state
             d2 = json.loads((out / "data" / "all.json").read_text(encoding="utf-8"))
             self.assertEqual(d2["workers"][0]["published"]["published_at"], pub["published_at"])  # not re-published
             self.assertIsNotNone(d2["workers"][0]["result"]["delta"])                   # history carried over

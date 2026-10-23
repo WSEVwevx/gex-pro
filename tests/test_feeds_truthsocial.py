@@ -6,7 +6,7 @@ import unittest
 import urllib.error
 from pathlib import Path
 
-from gexsys.posts import Posts, from_api, from_rss, html_to_text, market_tone, market_words
+from feeds.truthsocial import Posts, from_api, from_rss, html_to_text, market_tone, market_words
 
 API = [
     {"id": "1", "created_at": "2026-10-21T20:43:03.502Z", "content": "<p></p>", "reblog": None, "quote_id": None,

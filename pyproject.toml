@@ -1,11 +1,12 @@
 [project]
-name = "gexsys"
+name = "gexpro"
 version = "0.1.0"
-description = "NQ/ES options gamma-exposure levels engine, local service and TradingView bridge"
+description = "GEX PRO: NQ/ES options gamma-exposure levels, market news feeds, website and TradingView bridge"
 requires-python = ">=3.11"
 dependencies = ["tzdata==2025.2"]
 
 [project.scripts]
+gexpro = "gexpro.__main__:main"
 gexsys = "gexsys.__main__:main"
 
 [build-system]
@@ -13,4 +14,4 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["gexsys*"]
+include = ["gexsys*", "feeds*", "gexpro*"]

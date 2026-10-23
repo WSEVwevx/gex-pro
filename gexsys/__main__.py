@@ -1,9 +1,7 @@
-"""Command-line interface.
+"""GEX command line (engine only). The app - website, START.bat, hosted site - is `python -m gexpro`.
 
   python -m gexsys demo [--market NQ|ES]          synthetic end-to-end run (no credentials)
   python -m gexsys snapshot --config configs/free_nq_cboe.json [--futures-price 20345.25]
-  python -m gexsys serve --config configs/nq.json --config configs/es.json [--port 8765]
-  python -m gexsys build-site [--out _site] [--state .state]   static website for free hosting
   python -m gexsys replay --market NQ [--root data/snapshots]
   python -m gexsys sensitivity --config configs/free_es_cboe.json
 """
@@ -50,16 +48,6 @@ def main(argv=None) -> int:
     sn = sub.add_parser("snapshot")
     sn.add_argument("--config", required=True)
     sn.add_argument("--futures-price", type=float)
-    sv = sub.add_parser("serve")
-    sv.add_argument("--config", action="append")
-    sv.add_argument("--auto", action="store_true",
-                    help="the free Cboe configs for NQ and ES")
-    sv.add_argument("--host", default="127.0.0.1")
-    sv.add_argument("--port", type=int, default=8765)
-    bs = sub.add_parser("build-site", help="write the dashboard + fresh data as static files (for free hosting)")
-    bs.add_argument("--config", action="append", help="default: the free Cboe configs")
-    bs.add_argument("--out", default="_site")
-    bs.add_argument("--state", default=".state", help="folder kept between runs (last good result, history, caches)")
     au = sub.add_parser("audit", help="check live data, levels and the TradingView paste end to end")
     au.add_argument("--config", action="append", help="default: the configs START.bat would use")
     rp = sub.add_parser("replay")
@@ -90,22 +78,6 @@ def main(argv=None) -> int:
         st = SnapshotStore(c.storage.get("root", "data/snapshots"), c.storage.get("store_raw", False))
         _print_result(run_once(c, cfgmod.make_provider(c), st, futures_ref=fr))
         return 0
-    if a.cmd == "serve":
-        from .service import serve
-        paths = a.config or []
-        if a.auto:
-            paths = auto_configs()
-        if not paths:
-            print("serve needs --config (one or more) or --auto", file=sys.stderr)
-            return 2
-        serve([cfgmod.load(p) for p in paths], a.host, a.port)
-        return 0
-    if a.cmd == "build-site":
-        from .site import build
-        res = build([cfgmod.load(p) for p in a.config or ["configs/free_nq_cboe.json", "configs/free_es_cboe.json"]],
-                    a.out, a.state)
-        print(json.dumps(res))
-        return 0 if any(calc and calc != "UNAVAILABLE" for _, calc in res.values()) else 1
     if a.cmd == "audit":
         from .audit import audit, print_report
         fails = 0
