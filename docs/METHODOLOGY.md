@@ -165,7 +165,7 @@ Set `"levels": {"wall_side_filter": false}` to search all strikes.
 | Volume walls | Strike within ±5% of S with the most call (put) **volume** summed over the basket. Volume is today's, 15-min delayed, so it moves intraday; outside RTH it is the last session's. |
 | OI walls | Strike within ±5% of S with the most raw call (put) open interest. |
 | Max pain (per expiration) | argmin over that expiration's strikes K* of Σ calls OI·max(0, K*−K) + Σ puts OI·max(0, K−K*). A popular statistic, not a price target. |
-| Daily expected move | anchor ± S·√V, V = implied variance of one full session from w(e) = IV_atm(e)²·T(e) (T in calendar years, as the IVs are annualized). Market closed: w of the expiration at the next session's close. Market open: forward variance w(next session) − w(today). No daily expirations: w(first) ÷ sessions until it. |
+| Daily expected move | anchor ± S·√V, V = implied variance of one full session from w(e) = IV_atm(e)²·T(e) (T in calendar years, as the IVs are annualized). Market closed: w of the expiration at the next session's close, with T counted from the quote time (at the latest the last close), since free quotes and IVs stay frozen overnight. Market open: forward variance w(next session) − w(today). No daily expirations: w(first) ÷ sessions until it. |
 | Weekly expected move | anchor ± S·√V, V = w(this week's last expiration); during RTH today's full-session variance + w(week) − w(today). |
 | Expected-move anchor | Previous session close during RTH; the last close outside RTH. The bands stay fixed for the session. |
 | GEX profile | Net exposure summed into equal-width bins (≈40 bins over ±2.5% of S, width from 0.5/1/2/2.5/5/10/25/50/100/250), scaled to −99..99 of the largest bin. |

@@ -84,9 +84,10 @@ class TrackRecordComponent:
         return min(firsts) if firsts else None
 
     # ---------------------------------------------------------------- prices
-    def _daily_bars(self, underlying: str, now: datetime) -> dict:
+    def _daily_bars(self, underlying: str, now: datetime, fresh_after: Optional[datetime] = None) -> dict:
+        """Cached 30 minutes; refetched when the cached copy is older than fresh_after (a partial day's bar)."""
         got = self._daily.get(underlying)
-        if not got or now - got[0] > timedelta(minutes=30):
+        if not got or now - got[0] > timedelta(minutes=30) or (fresh_after and got[0] < fresh_after):
             got = (now, self.src.daily(underlying, since=date.today() - timedelta(days=30)))
             self._daily[underlying] = got
         return got[1]
@@ -100,7 +101,7 @@ class TrackRecordComponent:
             b = self.src.intraday(underlying)
             if b and b["date"] == d.isoformat() and b.get("last", "") >= (close - timedelta(minutes=1)).astimezone(NY).strftime("%H:%M"):
                 return b
-        return self._daily_bars(underlying, now).get(d.isoformat())
+        return self._daily_bars(underlying, now, fresh_after=close + timedelta(minutes=20)).get(d.isoformat())
 
     # ---------------------------------------------------------------- freezing and grading
     def tick(self) -> list[str]:

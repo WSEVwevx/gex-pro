@@ -161,6 +161,19 @@ class TestSchedule(unittest.TestCase):
             self.assertEqual(p["stats"]["NQ"]["sessions"], 1)
             self.assertEqual([x["status"] for x in p["sessions"]], ["missed", "graded"])
 
+    def test_partial_daily_bar_is_never_used(self):
+        inp = {"market": "ES", "underlying": "SPX", "ref": 100.0, "em": 10.0}
+        with tempfile.TemporaryDirectory() as tmp:
+            c = self.make(tmp, datetime(2026, 10, 22, 15, 55, tzinfo=NY), lambda d: {"ES": dict(inp)} if d == date(2026, 10, 22) else {})
+            c.tick()
+            self.src.daily_bars = {"2026-10-22": {"open": 100, "high": 101, "low": 99, "close": 100.5, "source": "partial"}}
+            c._daily_bars("SPX", self.now)                             # cached before the close
+            self.now = datetime(2026, 10, 22, 16, 25, tzinfo=NY)
+            self.src.daily_bars = {"2026-10-22": {"open": 100, "high": 103, "low": 95, "close": 96, "source": "final"}}
+            c.tick()
+            s = [x for x in c.sessions() if x["session"] == "2026-10-22"][0]
+            self.assertEqual(s["outcome"]["source"], "final")
+
     def test_daily_bar_later_and_give_up(self):
         inp = {"market": "ES", "underlying": "SPX", "ref": 100.0, "em": 10.0}
         with tempfile.TemporaryDirectory() as tmp:
@@ -205,6 +218,8 @@ class TestPreOpen(unittest.TestCase):
             o = datetime(2026, 10, 22, 9, 30, tzinfo=NY)
             for t, ref in ((o - timedelta(hours=40), 1.0), (o - timedelta(hours=2), 2.0), (o - timedelta(minutes=1), 3.0), (o + timedelta(minutes=5), 4.0)):
                 w.store.save(w.key, dict(s, asof=t.astimezone(timezone.utc).isoformat(), ref_price=ref))
+            no_em = dict(s, extras=dict(s["extras"], expected_move=None))                 # unusable: skipped, not chosen
+            w.store.save(w.key, dict(no_em, asof=(o - timedelta(seconds=30)).astimezone(timezone.utc).isoformat(), ref_price=9.0))
             got = pre_open(GexComponent.from_workers({w.key: w}), date(2026, 10, 22))["NQ"]
             self.assertEqual(got["ref"], 3.0)                          # the last one before 09:30, never after
             self.assertEqual(got["underlying"], s["underlying"])

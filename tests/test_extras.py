@@ -116,8 +116,19 @@ class TestExpectedMove(unittest.TestCase):
     def test_after_close_uses_variance_to_next_session_expiry(self):
         snap, basket = self.mk()
         em = ex.expected_moves(snap, basket, TUE_CLOSE + timedelta(hours=3), snap.contracts)   # Tue 19:00 ET
-        self.assertAlmostEqual(em["daily_points"], 100 * math.sqrt(0.2 ** 2 * 21 / 8760))    # to Wed 16:00
-        self.assertAlmostEqual(em["weekly_points"], 100 * math.sqrt(0.2 ** 2 * 69 / 8760))   # to Fri 16:00
+        # quotes are from the session (before the close): the variance runs from Tue 16:00, not from 19:00
+        self.assertAlmostEqual(em["daily_points"], 100 * math.sqrt(0.2 ** 2 * 24 / 8760))    # to Wed 16:00
+        self.assertAlmostEqual(em["weekly_points"], 100 * math.sqrt(0.2 ** 2 * 72 / 8760))   # to Fri 16:00
+
+    def test_overnight_band_does_not_shrink_on_frozen_quotes(self):
+        snap, basket = self.mk()
+        snap = replace(snap, spot_time=TUE_CLOSE + timedelta(minutes=15))              # Cboe's last quote, 16:15
+        ems = [ex.expected_moves(snap, basket, TUE_CLOSE + timedelta(hours=h), snap.contracts)["daily_points"] for h in (1, 4, 9)]
+        self.assertAlmostEqual(ems[0], ems[2])                                          # same quotes, same band all night
+        self.assertAlmostEqual(ems[0], 100 * math.sqrt(0.2 ** 2 * 23.75 / 8760))
+        live = replace(snap, spot_time=TUE_CLOSE + timedelta(hours=9))                  # fresh overnight quotes count from now
+        self.assertAlmostEqual(ex.expected_moves(live, basket, TUE_CLOSE + timedelta(hours=9), live.contracts)["daily_points"],
+                               100 * math.sqrt(0.2 ** 2 * 15 / 8760))
 
     def test_index_options_preferred_over_converted_etf(self):
         # a converted ETF option sits closer to the money, but the band uses the index's own ATM IV

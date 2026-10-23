@@ -51,6 +51,8 @@ level as a *modeled concentration of option gamma*.
   the first saved session on (2026-10-21). Until about 20 sessions are graded the numbers mean little.
 - **Rebuilt plans.** Sessions before the track record existed were frozen later from saved snapshots. They
   use only data timestamped before the open, and the page marks them "rebuilt".
+- **Early bands were too narrow.** Plans for 2026-10-21 to 10-23 were frozen before the overnight
+  expected-move fix, so their bands are 10-20% narrower than a close-to-close band. They stay as they were shown.
 - **Index, not futures.** Plans are graded on SPX and NDX, so futures-only moves outside cash hours are not counted.
 - **Price sources.** NDX daily bars come from Yahoo (unofficial); SPX from Cboe; same-day bars from Cboe 1-minute data.
 - **The backtest is a proxy.** It uses the 30-day VIX / VXN, not GEX PRO's own same-day IV, and only tests

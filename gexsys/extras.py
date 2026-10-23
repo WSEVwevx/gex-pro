@@ -144,6 +144,18 @@ def _sessions(first: date, last: date) -> int:
     return sum(1 for i in range((last - first).days + 1) if marketcal.is_trading_day(first + timedelta(days=i)))
 
 
+def _last_close(t: datetime) -> datetime:
+    """The most recent regular-session close at or before t."""
+    d = t.astimezone(marketcal.NY).date()
+    for _ in range(12):
+        if marketcal.is_trading_day(d):
+            c = datetime.combine(d, marketcal.rth_close(d), marketcal.NY)
+            if c <= t:
+                return c
+        d -= timedelta(days=1)
+    return t
+
+
 def expected_moves(snap: ChainSnapshot, basket: list[str], asof: datetime, ivs_from: list[OptionContract]) -> Optional[dict]:
     if snap.spot is None or not basket:
         return None
@@ -152,7 +164,12 @@ def expected_moves(snap: ChainSnapshot, basket: list[str], asof: datetime, ivs_f
     anchor_kind = "previous close" if (rth and snap.prev_close) else "last close/price"
     sd = session_date(asof)
     out = {"anchor": anchor, "anchor_kind": anchor_kind, "session": sd.isoformat()}
-    # implied total variance to each expiration: ATM IV^2 x calendar years remaining
+    # implied total variance to each expiration: ATM IV^2 x calendar years remaining. Outside RTH the
+    # free quotes (and their IVs) stay frozen at the close, so the clock starts at the quote time, not at
+    # asof: otherwise the band would shrink all night on unchanged prices.
+    t0 = asof
+    if not rth and snap.spot_time and snap.spot_time < asof:
+        t0 = max(snap.spot_time, _last_close(asof))
     b = set(basket)
     days = sorted({c.expiration.date().isoformat() for c in ivs_from if c.iv and c.expiration > asof
                    and c.expiration.date().isoformat() in b})
@@ -160,7 +177,7 @@ def expected_moves(snap: ChainSnapshot, basket: list[str], asof: datetime, ivs_f
     for e in sorted({c.expiration for c in ivs_from if c.iv and c.expiration > asof and c.expiration.date().isoformat() in b}):
         iv = atm_iv([c for c in ivs_from if c.expiration == e], e.date().isoformat(), snap.spot)
         if iv:
-            w[e], iv_of[e] = iv * iv * (e - asof).total_seconds() / eng.YEAR_SECONDS, iv
+            w[e], iv_of[e] = iv * iv * (e - t0).total_seconds() / eng.YEAR_SECONDS, iv
     if not w or not days:
         return out if len(out) > 3 else None
     nxt = sd + timedelta(days=1)
@@ -178,7 +195,7 @@ def expected_moves(snap: ChainSnapshot, basket: list[str], asof: datetime, ivs_f
         n = _sessions(sd, used.astimezone(marketcal.NY).date())
         dvar, method = w[used] / max(n, 1), f"average per session over {max(n, 1)} sessions"
     out.update(daily_points=snap.spot * math.sqrt(dvar), daily_iv=iv_of[used],
-               daily_iv_expiry=used.date().isoformat(), daily_method=method)
+               daily_iv_expiry=used.date().isoformat(), daily_method=method, variance_from=t0.isoformat())
     friday = sd + timedelta(days=(4 - sd.weekday()) % 7)
     weekly = [e for e in w if sd <= e.astimezone(marketcal.NY).date() <= friday]
     if weekly:

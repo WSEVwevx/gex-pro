@@ -1080,7 +1080,7 @@ function renderBacktest(){
   const rich = O.close_in.rate > 0.683;
   const side = O.down_break.rate > O.up_break.rate ? `Breaks were more often to the downside (${pct(O.down_break.rate)} vs ${pct(O.up_break.rate)} up): falls come faster than rallies.` : `Breaks were more often to the upside (${pct(O.up_break.rate)} vs ${pct(O.down_break.rate)} down).`;
   $("btNote").innerHTML = `${rich ? `Implied volatility has usually <b>overstated</b> the next day's move: the close landed inside the band ${pct(O.close_in.rate)} of the time, more than the 68% a fair forecast would give. Option sellers are paid for taking risk, so implied moves tend to run larger than realized ones.` : `The close landed inside the band ${pct(O.close_in.rate)} of the time, close to or below the 68% a fair forecast would give.`}
-    ${side} After weekends and holidays the band held ${pct(gw.close_in.rate)} vs ${pct(g1.close_in.rate)} after one-day gaps, so counting calendar days overstates weekend risk.
+    ${side} After weekends and holidays the band held ${pct(gw.close_in.rate)} vs ${pct(g1.close_in.rate)} after one-day gaps${gw.close_in.rate > g1.close_in.rate + 0.05 ? ", so counting calendar days overstates weekend risk" : ""}.
     <br><b>Proxy:</b> this uses the 30-day ${B.vol_index} because free history of GEX PRO's own same-day IV does not exist. The live track record above uses GEX PRO's actual band.`;
   // by year
   const ys = B.by_year, wrap = $("btYearWrap"), svg = $("btYear");
@@ -1125,7 +1125,7 @@ function renderBacktest(){
   $("btVolSub").textContent = `${B.vol_index} the evening before, in five equal groups`;
   $("btVol").innerHTML = `<table class="trk-table"><tr><th>${esc(B.vol_index)} level</th><th>Sessions</th><th>Close inside</th><th>Whole range inside</th><th>Broke above</th><th>Broke below</th><th>Avg |move|</th></tr>${B.by_vol.map(r =>
     `<tr><td class="m">${num(r.lo, 1)} to ${num(r.hi, 1)}</td><td class="m">${r.n.toLocaleString("en-US")}</td><td class="m"><b>${pct(r.close_in.rate)}</b></td><td class="m">${pct(r.range_in.rate)}</td><td class="m">${pct(r.up_break.rate)}</td><td class="m">${pct(r.down_break.rate)}</td><td class="m">${num(r.mean_abs_move_em, 2)}σ</td></tr>`).join("")}</table>
-    <div class="expl">When implied vol is low the band is generous; in high-vol regimes realized moves catch up with it and breaks become more common.</div>`;
+    ${B.by_vol.length > 1 && B.by_vol[0].close_in.rate > B.by_vol.at(-1).close_in.rate ? `<div class="expl">When implied vol is low the band is generous; in high-vol regimes realized moves catch up with it and breaks become more common.</div>` : ""}`;
 }
 
 setPage(page);
