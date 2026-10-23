@@ -6,7 +6,7 @@
   --ink:#e8ecf2; --ink2:#a0aab8; --ink3:#66717f; --ink4:#465060;
   --pos:#3987e5; --neg:#d95926; --vol:#199e70; --mp:#c98500; --oi:#9085e9; --zg:#b9bec7; --em:#8b95a5;
   --good:#22b35e; --warn:#e6c35c; --bad:#e05a5a; --prompt:#e6b450;
-  --fg-rgb:255,255,255; --sunk:#06090d; --sunk2:#040609; --top:#0a0e14; --pagebar:rgba(5,7,10,.96);
+  --fg-rgb:255,255,255; --sunk:#06090d; --sunk2:#040609; --top-bg:#0a0e14; --pagebar:rgba(5,7,10,.96);
   --kpi-bg:rgba(11,15,21,.92); --tip-bg:rgba(16,21,29,.97); --overlay:rgba(3,5,8,.7);
   --shadow:var(--shadow); --shadow2:var(--shadow2); --btn-fg:#07090c; --ag:#e6e6e6;
   --bad-fg:#f2a3a3; --high-fg:#ff8a80; color-scheme:dark;
@@ -30,7 +30,7 @@ a{color:var(--ink2)}
   --ink:#0f172a; --ink2:#334155; --ink3:#5b6779; --ink4:#8b97a8;
   --pos:#2f74d0; --neg:#cf4f1c; --vol:#138a61; --mp:#a86f00; --oi:#6f62d8; --zg:#6b7280; --em:#64748b;
   --good:#138a45; --warn:#a87b00; --bad:#cc3a3a; --prompt:#a86a10;
-  --fg-rgb:15,23,42; --sunk:#f6f8fb; --sunk2:#f1f4f8; --top:#ffffff; --pagebar:rgba(243,245,248,.94);
+  --fg-rgb:15,23,42; --sunk:#f6f8fb; --sunk2:#f1f4f8; --top-bg:#ffffff; --pagebar:rgba(243,245,248,.94);
   --kpi-bg:rgba(255,255,255,.92); --tip-bg:rgba(255,255,255,.98); --overlay:rgba(15,23,42,.35);
   --shadow:rgba(15,23,42,.18); --shadow2:rgba(15,23,42,.16); --btn-fg:#ffffff; --ag:#1f2937;
   --bad-fg:#b42318; --high-fg:#c62828; color-scheme:light;
@@ -45,7 +45,7 @@ a{color:var(--ink2)}
 /* ---------------------------------------------------------------- frame */
 .term{display:grid;grid-template-columns:var(--side) minmax(0,1fr);grid-template-rows:var(--top) var(--tick) minmax(0,1fr);
   grid-template-areas:"top top" "tick tick" "side area";height:100vh}
-.topbar{grid-area:top;display:flex;align-items:center;gap:12px;padding:0 16px;background:linear-gradient(180deg,var(--top),var(--bar));border-bottom:1px solid var(--line)}
+.topbar{grid-area:top;display:flex;align-items:center;gap:12px;padding:0 16px;background:linear-gradient(180deg,var(--top-bg),var(--bar));border-bottom:1px solid var(--line)}
 .brand{display:flex;align-items:center;gap:9px;font-weight:650;font-size:15px;letter-spacing:.01em;width:calc(var(--side) - 28px);flex:none}
 .brand .pro{font-weight:800;letter-spacing:.08em;background:linear-gradient(90deg,#5aa2f0,#3987e5 60%,#7b6ff0);-webkit-background-clip:text;background-clip:text;color:transparent}
 .brand svg{filter:drop-shadow(0 0 6px rgba(57,135,229,.3))}
