@@ -1,7 +1,7 @@
 # Hosting the website for free (GitHub Pages)
 
 This puts the same dashboard (Levels, Bias, News with the Trump feed) on a real web address such as
-`https://yourname.github.io/gex-levels/`. You can open it from any device, and your PC doesn't need to be on.
+`https://yourname.github.io/gex-pro/`. You can open it from any device, and your PC doesn't need to be on.
 
 **How it works:** GitHub runs a small job on its own computers about every 15 minutes during US market hours,
 and every hour otherwise, so each hourly TradingView paste is ready shortly after the hour. The job:
@@ -16,7 +16,7 @@ It costs nothing and does not rely on Claude or on your terminal. The job is in
 
 1. **Create a free GitHub account** at github.com, if you don't have one.
 2. **Make a repository.** Click **+** (top right), then **New repository**.
-   - Name: `gex-levels` (any name works, and it becomes part of the web address).
+   - Name: `gex-pro` (any name works, and it becomes part of the web address).
    - Visibility: **Public**. Free GitHub Pages needs a public repository.
    - Leave "Add a README" unticked, then click **Create repository**.
 3. **Upload the project.** On the new repository page, click **uploading an existing file**.
@@ -29,7 +29,7 @@ It costs nothing and does not rely on Claude or on your terminal. The job is in
 5. **First run.** Go to the **Actions** tab. If it asks, click the green button to enable workflows. Then:
    - Click **Website** on the left, then **Run workflow > Run workflow**.
    - After 1–2 minutes the run shows a green tick.
-   - Your site is at `https://<your-username>.github.io/gex-levels/`. The link also appears in the run's
+   - Your site is at `https://<your-username>.github.io/gex-pro/`. The link also appears in the run's
      "deploy" box, and under Settings > Pages.
 
 **If the `.github` folder didn't upload** (some browsers skip folders that start with a dot):
