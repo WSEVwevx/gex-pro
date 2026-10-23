@@ -106,12 +106,12 @@ your browser, and the first visit follows your system setting.
   plan and grade to the public `track-record` branch. Plus a **historical backtest** of the expected-move
   band from VIX (S&P 500, since 1990) and VXN (Nasdaq-100, since 2009): by year, by vol level, and the
   distribution of daily moves against a normal curve. Hypothetical, not trading results.
-* **Strategies:** eight rule-based strategies on the expected-move band and the gamma regime (option
-  sales, fades, breakouts, gaps, close-outside-band trades), each fixed before testing and backtested after
-  costs on S&P 500 data since 1991 and Nasdaq-100 since 2010. Intraday rules are also replayed on three years
-  of hourly bars. Each comes with a verdict (holds up / mixed / does not work), its drawdown and worst trade,
-  how to use it with the levels, and a live column on GEX PRO's real levels. Today two hold up: the 1-day iron
-  condor and strangle sale in calm markets.
+* **Strategies:** a futures strategy lab for ES and NQ. Rules built on options data (the expected move,
+  the VIX term structure, intraday VIX, GEX PRO's levels) are fixed before testing. They are walked hour by
+  hour over the last 3 years on both markets, and swing rules are also checked out of sample on 2010-2023.
+  A rule is listed as a strategy only when it passes every test. Today 15 rules have been tested and none
+  passed; the research log shows each one and why. Four rules on GEX PRO's own walls, zero gamma and
+  regime are forward-tested as the track record grows.
 * **Library:** a beginner course in 19 short lessons (options basics, dealers and the Greeks, GEX levels,
   volatility, using GEX PRO), each with an example, diagrams, a link into the terminal and a quick check;
   an A-Z glossary; search; progress saved in your browser. Every Explain panel links to its lesson.

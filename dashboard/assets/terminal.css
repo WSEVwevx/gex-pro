@@ -355,6 +355,9 @@ td.m{font-family:var(--mono)}
 .st-method{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 22px;font-size:13px;color:var(--ink2);line-height:1.6}
 .st-method p{margin:0 0 10px}.st-method b{color:var(--ink)}
 .st-card .head{flex-wrap:wrap;gap:8px}
+.st-card+.st-card{margin-top:18px;padding-top:18px;border-top:1px solid var(--line)}
+.st-empty{padding:18px;border:1px dashed var(--line2);border-radius:10px;color:var(--ink2);font-size:13.5px;line-height:1.6}
+.st-empty b{color:var(--ink)}
 
 /* ---------------------------------------------------------------- explain drawer */
 .explain-tab{position:fixed;right:0;top:50%;transform:translateY(-50%);z-index:30;writing-mode:vertical-rl;background:var(--panel2);border:1px solid var(--line2);border-right:0;border-radius:9px 0 0 9px;padding:14px 7px;color:var(--ink3);font:700 10.5px var(--mono);letter-spacing:.22em;transition:color .12s,background .12s,right .2s}

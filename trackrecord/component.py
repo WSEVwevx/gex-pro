@@ -161,21 +161,31 @@ class TrackRecordComponent:
         today = now.astimezone(NY).date()
         final = today.isoformat() if now >= self.session_close(today) + timedelta(minutes=20) else (today - timedelta(days=1)).isoformat()
         out = {"built": now.isoformat(), "markets": {}}
+        lab = {}
         for market, und in (("ES", "SPX"), ("NQ", "NDX")):
             try:
                 bars = self.src.daily(und, since=date(1990, 1, 1))
                 vol = self.src.vol_index(und)
                 r = backtest.run(und, prices.VOL_INDEX[und], bars, vol, until=final) if bars and vol else None
-                if r:
-                    hourly = {d: v for d, v in self.src.hourly(und).items() if d <= final}
-                    r["strategies"] = strategies.history(und, bars, vol, until=final, hourly=hourly or None)
+                lab[und] = {"bars": bars, "vol": vol, "hourly": {d: v for d, v in self.src.hourly(und).items() if d <= final}}
             except Exception:
                 log.exception("backtest %s failed", und)
                 r = None
             if r:
                 out["markets"][market] = r
+        try:                                                    # the futures strategy lab (see strategies.py)
+            if len(lab) == 2:
+                lab["term"] = {"VIX": self.src.vol_index("SPX"), "VIX3M": self.src.cboe_index("VIX3M"), "VIX9D": self.src.cboe_index("VIX9D")}
+                lab["vixh"] = self.src.vix_hourly()
+                if lab["term"]["VIX3M"]:
+                    out["strategy_lab"] = dict(strategies.study(lab, final), built=now.isoformat(),
+                                               gex=strategies.gex_forward(self.sessions(), {u: lab[u]["hourly"] for u in ("SPX", "NDX")}))
+        except Exception:
+            log.exception("strategy lab failed")
         if not out["markets"] and cached:
             return cached                                       # keep the last good backtest when sources fail
+        if "strategy_lab" not in out and cached and cached.get("strategy_lab"):
+            out["strategy_lab"] = cached["strategy_lab"]        # and the last good strategy lab
         if out["markets"]:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(json.dumps(out, separators=(",", ":")), encoding="utf-8")
@@ -188,7 +198,7 @@ class TrackRecordComponent:
         return {"now": self.clock().isoformat(), "started": self._started(), "proof_url": self.proof_url,
                 "rules": {"touch_em": 0.05, "min_sample": 20, "freeze": "levels from the last calculation timestamped before 09:30 ET"},
                 "stats": dict({m: summarize([s for s in graded if s["market"] == m]) for m in markets}, ALL=summarize(graded)),
-                "sessions": ss, "backtest": self.backtest(), "strategies_live": strategies.live(graded)}
+                "sessions": ss, "backtest": self.backtest()}
 
     # ---------------------------------------------------------------- component contract
     def routes(self) -> dict:

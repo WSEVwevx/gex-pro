@@ -1,50 +1,38 @@
-"""Rule-based strategies built on the expected-move band and the gamma regime, backtested.
+"""The futures strategy lab: rules built on options data, tested on ES (S&P 500) and NQ (Nasdaq-100).
 
-The rules are fixed here before any result is looked at and use only what was known when the trade
-is placed (previous close, the vol index close, the regime). Every question a bar cannot answer is
-resolved against the trader: when one bar holds both a stop and a target, the stop comes first, and a
-trade filled inside a bar can be stopped in that bar but cannot reach its target there.
+Every rule is fixed here before it is run and is never tuned afterwards. A rule is LISTED as a
+strategy only when it passes every test below; the others stay in the research log with the reason
+they failed. Nothing is fitted to the results.
 
-Three tests per strategy:
-  daily    decades of daily bars (S&P 500 since 1991, Nasdaq-100 since 2010), each day one bar
-  hourly   about three years of hourly bars (Yahoo), so intraday orders are walked hour by hour; shown
-           next to the daily test over the same days, to see how much the bar size changes the answer
-  live     the track record's sessions, with GEX PRO's own band and regime
+Inputs, all free and all derived from options:
+  expected move   em = previous close x VIX (ES) or VXN (NQ) / sqrt(252)
+  term structure  VIX / VIX3M (contango below 1 = calm, above 1 = stress) and VIX9D / VIX (front end)
+  intraday VIX    hourly VIX closes (Yahoo)
+  GEX PRO levels  the track record's frozen pre-open plans (regime, walls, zero gamma, abs gamma)
 
-Regime: in history a PROXY, "calm" when the vol index closed at or below its median of the previous
-252 sessions (dealers more often long gamma), "stressed" above it; in the live test, GEX PRO's
-POSITIVE / NEGATIVE regime.
-Band: em = previous close x IV / sqrt(252), one session per trading day, weekends included. (Counting
-calendar days charges three days of option premium for a weekend that moves like one: an artifact
-that makes any weekend option sale look brilliant.)
-P&L: index points after a round-trip cost, and in em units ("R") so years and indexes compare.
-Option strategies are priced with Black-Scholes at the vol index level, with no skew and a 10% spread
-cost: a model of the premium, not real quotes.
+Execution: futures-style, one position at a time, a round trip costs 0.5 points (ES) or 2 points (NQ).
+Intraday rules walk hourly bars; when one hour touches both the stop and the target, the stop counts.
+
+The bar (fixed before running):
+  intraday rules  last 3 years of hourly bars: 30+ trades, a profit after costs (in $ and in R), t >= 2 and both halves
+                  profitable, on ES and on NQ. (Free hourly history only reaches back about 3 years.)
+  swing rules     the same 3 years: a profit in both halves on ES and on NQ; then OUT OF SAMPLE on
+                  2010 to the start of that window: both halves profitable and t >= 1.65 on ES and on NQ.
+  GEX rules       the track record's own sessions (forward only): 30+ trades, t >= 2, both halves
+                  profitable, on ES and NQ together. Until then they are evidence, not strategies.
 """
 from __future__ import annotations
 
 import math
+from datetime import date
 from typing import Callable, Optional
 
-COST = {"SPX": 0.5, "NDX": 2.0}           # index points per round trip (about 2 ticks of ES / 8 ticks of NQ)
-OPTION_COST = 0.10                       # share of the premium lost to spreads on option strategies
-REGIME_LOOKBACK = 252
+COST = {"SPX": 0.5, "NDX": 2.0}               # index points per round trip
+POINT_VALUE = {"SPX": 50.0, "NDX": 20.0}      # $ per point: ES, NQ
+FUTURE = {"SPX": "ES", "NDX": "NQ"}
 SESSIONS_PER_YEAR = 252
-
-
-def _ncdf(x: float) -> float:
-    return 0.5 * (1 + math.erf(x / math.sqrt(2)))
-
-
-def option_pair(ref: float, em: float, k: float = 1.0) -> float:
-    """Call + put struck at ref +/- k em, Black-Scholes at total vol em/ref (r = q = 0, no skew)."""
-    v = em / ref
-    out = 0.0
-    for strike, call in ((ref + k * em, True), (ref - k * em, False)):
-        d1 = (math.log(ref / strike) + 0.5 * v * v) / v
-        d2 = d1 - v
-        out += ref * _ncdf(d1) - strike * _ncdf(d2) if call else strike * _ncdf(-d2) - ref * _ncdf(-d1)
-    return out
+WINDOW_YEARS = 3
+OOS_START = "2010-01-01"
 
 
 # ---------------------------------------------------------------------------- order simulation
@@ -77,99 +65,175 @@ def trade(path: list, side: int, entry: Optional[float], kind: str, stop: float,
     return side * (path[-1][3] - fill)
 
 
-# ---------------------------------------------------------------------------- the rules
-# rule(days, i) -> list of P&Ls in index points before costs, for trades decided on day i.
-# days[i] = {date, date_prev, ref (previous close), em, o, h, l, c, path [(o, h, l, c), ...], regime}
-def band_fade(days, i) -> list:
-    """Resting limit orders at the band edges, stop 1 em further, out at the close."""
-    d = days[i]
-    ref, em, o, p = d["ref"], d["em"], d["o"], d["path"]
-    out = []
-    if o > ref - 2 * em:
-        out.append(trade(p, +1, ref - em, "limit", ref - 2 * em))
-    if o < ref + 2 * em:
-        out.append(trade(p, -1, ref + em, "limit", ref + 2 * em))
-    return [x for x in out if x is not None]
-
-
-def band_breakout(days, i) -> list:
-    """Stop orders at the band edges in the direction of the break, stop back at the previous close."""
-    d = days[i]
-    ref, em, p = d["ref"], d["em"], d["path"]
-    out = [trade(p, +1, ref + em, "stop", ref), trade(p, -1, ref - em, "stop", ref)]
-    return [x for x in out if x is not None]
-
-
-def gap_fade(days, i) -> list:
-    """Opens 0.5-1.5 em from the previous close: fade at the open toward it, stop 0.75 em further away."""
-    d = days[i]
-    ref, em, o = d["ref"], d["em"], d["o"]
-    g = o - ref
-    if not 0.5 * em <= abs(g) <= 1.5 * em:
+# ---------------------------------------------------------------------------- intraday rules: (day) -> [points]
+def last_half_hour_momentum(d) -> list:
+    """Price at 15:30 more than 0.25 em from the previous close: trade the last half hour in that direction."""
+    p = d["path"]
+    move = p[-1][0] - d["ref"]
+    if abs(move) < 0.25 * d["em"]:
         return []
-    side = -1 if g > 0 else 1
-    return [trade(d["path"], side, None, "open", o - side * 0.75 * em, ref)]
+    side = 1 if move > 0 else -1
+    return [side * (p[-1][3] - p[-1][0])]
 
 
-def gap_and_go(days, i) -> list:
-    """Opens at least 0.5 em away: go with the gap at the open, stop at the previous close."""
-    d = days[i]
-    g = d["o"] - d["ref"]
-    if abs(g) < 0.5 * d["em"]:
-        return []
-    side = 1 if g > 0 else -1
-    return [trade(d["path"], side, None, "open", d["ref"])]
-
-
-def short_strangle(days, i) -> list:
-    """Sell the 1-day +/-1 em strangle at the previous close, settle at the close."""
-    d = days[i]
-    ref, em, c = d["ref"], d["em"], d["c"]
-    prem = option_pair(ref, em) * (1 - OPTION_COST)
-    return [prem - max(0.0, c - (ref + em)) - max(0.0, (ref - em) - c)]
-
-
-def iron_condor(days, i) -> list:
-    """The strangle with wings bought at +/-2 em, so no day can lose more than 1 em minus the credit."""
-    d = days[i]
-    ref, em, c = d["ref"], d["em"], d["c"]
-    credit = (option_pair(ref, em) - option_pair(ref, em, 2.0)) * (1 - OPTION_COST)
-    return [credit - min(em, max(0.0, c - (ref + em))) - min(em, max(0.0, (ref - em) - c))]
-
-
-def close_reversal(days, i) -> list:
-    """A close outside the band: take the other side at the close, out at the next close."""
-    d = days[i]
-    if i + 1 >= len(days) or days[i + 1]["date_prev"] != d["date"]:
-        return []
-    nxt = days[i + 1]["c"]
-    if d["c"] < d["ref"] - d["em"]:
-        return [nxt - d["c"]]
-    if d["c"] > d["ref"] + d["em"]:
-        return [d["c"] - nxt]
+def _orb(d) -> list:
+    p = d["path"]
+    hi, lo = p[0][1], p[0][2]
+    rest = p[1:]
+    up, dn = trade(rest, +1, hi, "stop", lo), trade(rest, -1, lo, "stop", hi)
+    for o, h, l, c in rest:                                  # one-cancels-other; both in one hour = the loser
+        if h >= hi and l <= lo:
+            return [min(x for x in (up, dn) if x is not None)]
+        if h >= hi:
+            return [up]
+        if l <= lo:
+            return [dn]
     return []
 
 
-def close_follow(days, i) -> list:
-    """A close outside the band: go with it at the close, out at the next close."""
-    return [-x for x in close_reversal(days, i)]
+def orb_front_stress(d) -> list:
+    """VIX9D above VIX the evening before: trade a break of the first hour's range, stop at the other side."""
+    return _orb(d) if d["front_prev"] > 1.0 else []
 
 
-STRATEGIES = [
-    {"id": "iron_condor", "name": "1-day iron condor", "regime": "calm", "rule": iron_condor, "options": True, "intraday": False},
-    {"id": "short_strangle", "name": "1-day strangle sale", "regime": "calm", "rule": short_strangle, "options": True, "intraday": False},
-    {"id": "close_reversal", "name": "Close-outside-band reversal", "regime": "calm", "rule": close_reversal, "options": False, "intraday": False},
-    {"id": "close_follow", "name": "Close-outside-band follow-through", "regime": "stressed", "rule": close_follow, "options": False, "intraday": False},
-    {"id": "band_fade", "name": "Band-edge fade", "regime": "calm", "rule": band_fade, "options": False, "intraday": True},
-    {"id": "gap_fade", "name": "Gap fade", "regime": "calm", "rule": gap_fade, "options": False, "intraday": True},
-    {"id": "band_breakout", "name": "Band breakout", "regime": "stressed", "rule": band_breakout, "options": False, "intraday": True},
-    {"id": "gap_and_go", "name": "Gap and go", "regime": "stressed", "rule": gap_and_go, "options": False, "intraday": True},
+def orb_calm(d) -> list:
+    """VIX9D at least 10% under VIX: the same first-hour breakout."""
+    return _orb(d) if d["front_prev"] <= 0.9 else []
+
+
+def first_hour_fade(d) -> list:
+    """Contango (VIX/VIX3M < 0.9) and a first hour that ran 0.5 em from the previous close: fade it at 10:30,
+    target the previous close, stop 0.5 em past the first hour's extreme."""
+    if d["ts_prev"] >= 0.9:
+        return []
+    p = d["path"]
+    move = p[0][3] - d["ref"]
+    if abs(move) < 0.5 * d["em"]:
+        return []
+    side = -1 if move > 0 else 1
+    ext = p[0][1] if side < 0 else p[0][2]
+    return [trade(p[1:], side, None, "open", ext - side * 0.5 * d["em"], d["ref"])]
+
+
+def vanna_afternoon(d) -> list:
+    """VIX at 13:00 down 3%+ from yesterday's close: long from 13:30 to the close; up 5%+: short."""
+    v = d["vixh"].get("12:00")                               # the 12:00 bar closes at 13:00
+    if not v or len(d["path"]) < 7:
+        return []
+    ch = v / d["vix_prev"] - 1
+    side = 1 if ch <= -0.03 else -1 if ch >= 0.05 else 0
+    return [side * (d["path"][-1][3] - d["path"][4][0])] if side else []
+
+
+def band_fade_contango(d) -> list:
+    """Contango (VIX/VIX3M < 0.9): resting orders at +/-1 em, stop at +/-1.75 em, out at the close."""
+    if d["ts_prev"] >= 0.9:
+        return []
+    ref, em, p = d["ref"], d["em"], d["path"]
+    out = [trade(p, +1, ref - em, "limit", ref - 1.75 * em), trade(p, -1, ref + em, "limit", ref + 1.75 * em)]
+    return [x for x in out if x is not None]
+
+
+# ---------------------------------------------------------------------------- swing rules: signal at day i's close
+# (signal(D, i) -> bool, entry "close" | "next_open", exit after `hold` sessions at the close, or at the next open)
+def contango(D, i):       return D[i]["ts"] < 0.95
+def backwardation(D, i):  return D[i]["ts"] > 1.0
+def dip_contango(D, i):   return D[i]["ts"] < 1.0 and D[i]["c"] < D[i]["ref"] - D[i]["em"]
+def strength(D, i):       return D[i]["ts"] < 0.95 and D[i]["c"] > D[i]["ref"] + D[i]["em"]
+def vix_spike(D, i):      return D[i]["vix"] / D[i]["vix_prev"] >= 1.20
+def front_inverted(D, i): return D[i]["front"] >= 1.10
+def calm_close(D, i):     return D[i]["ts"] < 0.90
+def exhaustion(D, i):     return i >= 3 and D[i]["ts"] < 1.0 and D[i - 3]["c"] - D[i]["c"] > 2 * D[i]["em"]
+
+
+RULES = [
+    # id, name, kind, rule, spec (swing), what options data it uses, the idea
+    {"id": "contango_hold", "name": "Contango trend hold", "kind": "swing", "signal": contango, "entry": "close", "hold": 1,
+     "uses": "VIX / VIX3M", "idea": "Long ES/NQ from close to close while the VIX curve is in steep contango (calm, dealers long gamma)."},
+    {"id": "backwardation_bounce", "name": "Backwardation bounce", "kind": "swing", "signal": backwardation, "entry": "close", "hold": 3,
+     "uses": "VIX / VIX3M", "idea": "Buy the close when the VIX curve inverts (stress), hold 3 sessions: panic tends to be overdone."},
+    {"id": "dip_buy_contango", "name": "Dip buy in contango", "kind": "swing", "signal": dip_contango, "entry": "close", "hold": 3,
+     "uses": "Expected move, VIX / VIX3M", "idea": "A close below the expected move while the curve stays in contango: buy, hold 3 sessions."},
+    {"id": "strength_follow", "name": "Strength follow-through", "kind": "swing", "signal": strength, "entry": "close", "hold": 1,
+     "uses": "Expected move, VIX / VIX3M", "idea": "A close above the expected move in steep contango: hold long one more session."},
+    {"id": "vix_spike_buy", "name": "VIX spike buy", "kind": "swing", "signal": vix_spike, "entry": "close", "hold": 3,
+     "uses": "VIX", "idea": "VIX up 20%+ in a day: buy the close, hold 3 sessions."},
+    {"id": "front_inversion_buy", "name": "Front-end inversion buy", "kind": "swing", "signal": front_inverted, "entry": "close", "hold": 3,
+     "uses": "VIX9D / VIX", "idea": "9-day vol 10%+ over 30-day vol (event stress): buy the close, hold 3 sessions."},
+    {"id": "overnight_contango", "name": "Overnight hold in contango", "kind": "swing", "signal": contango, "entry": "close", "exit": "next_open", "hold": 1,
+     "uses": "VIX / VIX3M", "idea": "In contango, hold long from the close to the next open (the overnight drift)."},
+    {"id": "calm_day_long", "name": "Calm-day long", "kind": "swing", "signal": calm_close, "entry": "next_open", "hold": 1,
+     "uses": "VIX / VIX3M", "idea": "In steep contango, buy the next open and sell its close."},
+    {"id": "exhaustion_dip", "name": "Exhaustion dip buy", "kind": "swing", "signal": exhaustion, "entry": "close", "hold": 3,
+     "uses": "Expected move, VIX / VIX3M", "idea": "Down more than two expected moves in 3 sessions without curve inversion: buy, hold 3 sessions."},
+    {"id": "last_half_hour", "name": "Last-half-hour momentum", "kind": "intraday", "rule": last_half_hour_momentum,
+     "uses": "Expected move", "idea": "The day's direction at 15:30 carries into the close (late hedging flows)."},
+    {"id": "orb_stress", "name": "Opening-range breakout in stress", "kind": "intraday", "rule": orb_front_stress,
+     "uses": "VIX9D / VIX", "idea": "When short-dated vol is bid, trade the break of the first hour's range."},
+    {"id": "orb_calm", "name": "Opening-range breakout in calm", "kind": "intraday", "rule": orb_calm,
+     "uses": "VIX9D / VIX", "idea": "The same breakout on calm days."},
+    {"id": "first_hour_fade", "name": "First-hour fade in contango", "kind": "intraday", "rule": first_hour_fade,
+     "uses": "Expected move, VIX / VIX3M", "idea": "Calm markets mean-revert: fade a big first hour back toward the previous close."},
+    {"id": "vanna_afternoon", "name": "Vanna afternoon drift", "kind": "intraday", "rule": vanna_afternoon,
+     "uses": "Hourly VIX", "idea": "Falling implied vol makes dealers buy back hedges into the close (vanna); rising vol the opposite."},
+    {"id": "band_fade", "name": "Expected-move fade in contango", "kind": "intraday", "rule": band_fade_contango,
+     "uses": "Expected move, VIX / VIX3M", "idea": "In calm markets, fade touches of the expected-move band."},
 ]
 
 
-# ---------------------------------------------------------------------------- statistics
+# ---------------------------------------------------------------------------- GEX PRO level rules (forward test)
+def wall_fade(d) -> list:
+    """Positive gamma: resting order at the put wall (long) / call wall (short) within 1.5 em, stop 0.5 em
+    past the wall, target the previous close, out at the close."""
+    if d["regime"] != "POSITIVE":
+        return []
+    out = []
+    for lvl, side in ((d.get("pw"), +1), (d.get("cw"), -1)):
+        if lvl and 0 < side * (d["ref"] - lvl) <= 1.5 * d["em"]:
+            x = trade(d["path"], side, lvl, "limit", lvl - side * 0.5 * d["em"], d["ref"])
+            if x is not None:
+                out.append(x)
+    return out
+
+
+def zero_gamma_reject(d) -> list:
+    """Negative gamma with zero gamma above price: short a rally into zero gamma, stop 0.5 em above."""
+    zg = d.get("zg")
+    if d["regime"] != "NEGATIVE" or not zg or not 0 < zg - d["ref"] <= 1.5 * d["em"]:
+        return []
+    x = trade(d["path"], -1, zg, "limit", zg + 0.5 * d["em"])
+    return [] if x is None else [x]
+
+
+def negative_gamma_orb(d) -> list:
+    """Negative gamma: trade the break of the first hour's range."""
+    return _orb(d) if d["regime"] == "NEGATIVE" else []
+
+
+def magnet(d) -> list:
+    """Positive gamma: at 10:30, more than 0.5 em from the absolute gamma strike, trade toward it, target it,
+    stop 0.75 em further away."""
+    ag = d.get("ag")
+    if d["regime"] != "POSITIVE" or not ag:
+        return []
+    px = d["path"][1][0]
+    if abs(px - ag) <= 0.5 * d["em"]:
+        return []
+    side = 1 if ag > px else -1
+    return [trade(d["path"][1:], side, None, "open", px - side * 0.75 * d["em"], ag)]
+
+
+GEX_RULES = [
+    {"id": "wall_fade", "name": "Wall fade in positive gamma", "rule": wall_fade, "uses": "Call and put walls, regime"},
+    {"id": "zero_gamma_reject", "name": "Zero-gamma rejection in negative gamma", "rule": zero_gamma_reject, "uses": "Zero gamma, regime"},
+    {"id": "negative_gamma_orb", "name": "Negative-gamma opening-range breakout", "rule": negative_gamma_orb, "uses": "Regime"},
+    {"id": "magnet", "name": "Absolute-gamma magnet", "rule": magnet, "uses": "Absolute gamma strike, regime"},
+]
+
+
+# ---------------------------------------------------------------------------- statistics and the bar
 def stats(trades: list) -> dict:
-    """trades: (date, points, R)."""
+    """trades: (date, points, R). """
     n = len(trades)
     if not n:
         return {"n": 0}
@@ -189,18 +253,99 @@ def stats(trades: list) -> dict:
             "t": round(mean / sd * math.sqrt(n), 2) if sd else None, "worst_r": round(min(r), 2), "best_r": round(max(r), 2)}
 
 
-def verdict(s: dict, halves: list) -> str:
-    """Fixed before results: 'holds up' needs 30+ trades, t >= 2 and a positive average in both halves, after costs."""
-    if not s.get("n") or s["n"] < 30:
-        return "too few trades"
-    if s["avg_r"] <= 0:
-        return "does not work"
-    if (s.get("t") or 0) >= 2 and all(h.get("n") and h["avg_r"] > 0 for h in halves):
-        return "holds up"
-    return "mixed"
+def _halves(trades: list, mid: str) -> list:
+    return [stats([t for t in trades if t[0] < mid]), stats([t for t in trades if t[0] >= mid])]
 
 
-def _curve(trades: list, max_points: int = 300) -> list:
+def _both_up(h: list) -> bool:
+    return all(x.get("n") and x["avg_r"] > 0 for x in h)
+
+
+def verdict(kind: str, res: dict) -> tuple[bool, str]:
+    """(passed, reason) from the per-index results {"SPX": {...}, "NDX": {...}}."""
+    for und in ("SPX", "NDX"):
+        w = res[und]["window"]
+        if w["stats"].get("n", 0) < (30 if kind == "intraday" else 10):
+            return False, f"too few trades on {FUTURE[und]}"
+        if w["stats"]["avg_pts"] <= 0:
+            return False, f"loses money after costs on {FUTURE[und]}"
+        if w["stats"]["avg_r"] <= 0:
+            return False, f"loses money per unit of risk on {FUTURE[und]} (a few big wins carry the $ average)"
+        if not _both_up(w["halves"]):
+            return False, f"one half of the 3 years lost money on {FUTURE[und]}"
+        if kind == "intraday" and (w["stats"].get("t") or 0) < 2:
+            return False, f"profit too small to rule out luck on {FUTURE[und]} (t {w['stats'].get('t')})"
+    if kind == "swing":
+        for und in ("SPX", "NDX"):
+            o = res[und].get("oos")
+            if not o or o["stats"].get("n", 0) < 30:
+                return False, f"too few out-of-sample trades on {FUTURE[und]}"
+            if o["stats"]["avg_r"] <= 0 or o["stats"]["avg_pts"] <= 0 or not _both_up(o["halves"]):
+                return False, f"failed out of sample ({OOS_START[:4]}-) on {FUTURE[und]}"
+            if (o["stats"].get("t") or 0) < 1.65:
+                return False, f"out-of-sample profit too small to rule out luck on {FUTURE[und]} (t {o['stats'].get('t')})"
+    return True, "passed every test"
+
+
+# ---------------------------------------------------------------------------- running the study
+def build_days(bars: dict, vol: dict, term: dict, until: str, hourly: Optional[dict] = None, vixh: Optional[dict] = None) -> list:
+    """One record per session. term = {"VIX": {...}, "VIX3M": {...}, "VIX9D": {...}} (daily closes)."""
+    vix, v3, v9 = term["VIX"], term["VIX3M"], term.get("VIX9D", {})
+    ds = sorted(d for d in bars if d <= until)
+    out = []
+    for prev, d in zip(ds, ds[1:]):
+        if not (vol.get(prev) and vix.get(prev) and v3.get(prev) and vix.get(d) and v3.get(d)):
+            continue
+        ref, b = bars[prev]["close"], bars[d]
+        rec = {"date": d, "ref": ref, "em": ref * vol[prev] / 100 / math.sqrt(SESSIONS_PER_YEAR),
+               "o": b["open"], "h": b["high"], "l": b["low"], "c": b["close"],
+               "ts_prev": vix[prev] / v3[prev], "front_prev": (v9.get(prev) or vix[prev]) / vix[prev],
+               "ts": vix[d] / v3[d], "front": (v9.get(d) or vix[d]) / vix[d], "vix": vix[d], "vix_prev": vix[prev],
+               "path": None, "vixh": (vixh or {}).get(d, {})}
+        if hourly and len(hourly.get(d) or []) >= 6:
+            rec["path"] = hourly[d]
+        out.append(rec)
+    return out
+
+
+def run_swing(D: list, spec: dict, cost: float) -> list:
+    """One position at a time: a signal while a trade is open is ignored."""
+    out, i, hold = [], 0, spec["hold"]
+    while i < len(D):
+        if spec["signal"](D, i):
+            if spec.get("exit") == "next_open":
+                if i + 1 >= len(D):
+                    break
+                p, nxt = D[i + 1]["o"] - D[i]["c"], i + 1
+            elif spec["entry"] == "next_open":
+                if i + 1 >= len(D):
+                    break
+                p, nxt = D[i + 1]["c"] - D[i + 1]["o"], i + 2
+            else:
+                if i + hold >= len(D):
+                    break
+                p, nxt = D[i + hold]["c"] - D[i]["c"], i + hold
+            p -= cost
+            out.append((D[i]["date"], round(p, 3), p / D[i]["em"]))
+            i = nxt
+        else:
+            i += 1
+    return out
+
+
+def run_intraday(D: list, rule: Callable, cost: float) -> list:
+    out = []
+    for d in D:
+        if not d.get("path"):
+            continue
+        for x in rule(d):
+            if x is not None:
+                x -= cost
+                out.append((d["date"], round(x, 3), x / d["em"]))
+    return out
+
+
+def _curve(trades: list, max_points: int = 200) -> list:
     cum, out = 0.0, []
     step = max(1, len(trades) // max_points)
     for i, (d, _, r) in enumerate(trades):
@@ -210,93 +355,69 @@ def _curve(trades: list, max_points: int = 300) -> list:
     return out
 
 
-def run(days: list, rule: Callable, cost: float, regime: str = "any") -> list:
-    out = []
-    for i, d in enumerate(days):
-        if regime != "any" and d.get("regime") != regime:
-            continue
-        for p in rule(days, i):
-            p -= cost
-            out.append((d["date"], round(p, 3), p / d["em"]))
-    return out
-
-
-def build_days(bars: dict, vol: dict, until: Optional[str] = None, hourly: Optional[dict] = None) -> list:
-    """The day records the rules read. With `hourly`, only the days that have hourly bars, each with its path."""
-    ds = sorted(x for x in bars if until is None or x <= until)
-    days, past = [], []
-    for prev, d in zip(ds, ds[1:]):
-        v = vol.get(prev)
-        if not v:
-            continue
-        past.append(v)
-        if len(past) <= REGIME_LOOKBACK:
-            continue
-        window = sorted(past[-REGIME_LOOKBACK - 1:-1])
-        med = window[len(window) // 2]
-        ref, b = bars[prev]["close"], bars[d]
-        path = [(b["open"], b["high"], b["low"], b["close"])]
-        if hourly is not None:
-            if not hourly.get(d):
-                continue
-            path = hourly[d]
-        days.append({"date": d, "date_prev": prev, "ref": ref, "em": ref * v / 100 / math.sqrt(SESSIONS_PER_YEAR),
-                     "o": path[0][0], "h": max(x[1] for x in path), "l": min(x[2] for x in path), "c": path[-1][3],
-                     "path": path, "regime": "calm" if v <= med else "stressed"})
-    return days
-
-
-def history(underlying: str, bars: dict, vol: dict, until: Optional[str] = None, hourly: Optional[dict] = None) -> dict:
-    days = build_days(bars, vol, until)
-    if not days:
+def study(data: dict, until: str) -> dict:
+    """data = {"SPX": {"bars", "vol", "hourly"}, "NDX": {...}, "term": {...}, "vixh": {...}}."""
+    days = {}
+    for und in ("SPX", "NDX"):
+        x = data[und]
+        days[und] = build_days(x["bars"], x["vol"], data["term"], until, x.get("hourly"), data.get("vixh"))
+    hourly_days = {u: [d for d in D if d["path"]] for u, D in days.items()}
+    if not hourly_days["SPX"]:
         return {}
-    hdays = build_days(bars, vol, until, hourly) if hourly else []
-    hset = {d["date"] for d in hdays}
-    mid = days[len(days) // 2]["date"]
-    last3 = f"{int(days[-1]['date'][:4]) - 3}{days[-1]['date'][4:]}"
-    out = {"start": days[0]["date"], "end": days[-1]["date"], "sessions": len(days), "cost_pts": COST.get(underlying, 0.0),
-           "calm_share": round(sum(d["regime"] == "calm" for d in days) / len(days), 3),
-           "hourly_period": [hdays[0]["date"], hdays[-1]["date"]] if hdays else None, "strategies": {}}
-    for s in STRATEGIES:
-        cost = 0.0 if s["options"] else COST.get(underlying, 0.0)
-        on = run(days, s["rule"], cost, s["regime"])
-        halves = [stats([t for t in on if t[0] < mid]), stats([t for t in on if t[0] >= mid])]
-        st = stats(on)
-        r = {"stats": st, "unfiltered": stats(run(days, s["rule"], cost)), "halves": halves, "split": mid,
-             "last_3y": stats([t for t in on if t[0] >= last3]), "verdict": verdict(st, halves), "curve": _curve(on)}
-        if s["intraday"] and hdays:
-            # daily bars force the worst order of high and low on these rules, so the verdict comes from
-            # walking the hourly bars instead (fewer years, fairer fills)
-            ho = run(hdays, s["rule"], cost, s["regime"])
-            hmid = hdays[len(hdays) // 2]["date"]
-            hh = [stats([t for t in ho if t[0] < hmid]), stats([t for t in ho if t[0] >= hmid])]
-            r["hourly"] = {"stats": stats(ho), "halves": hh, "split": hmid, "curve": _curve(ho),
-                           "unfiltered": stats(run(hdays, s["rule"], cost)), "daily_same_days": stats([t for t in on if t[0] in hset])}
-            r["verdict"], r["verdict_basis"] = verdict(r["hourly"]["stats"], hh), "hourly"
-        else:
-            r["verdict_basis"] = "daily"
-        out["strategies"][s["id"]] = r
+    end = hourly_days["SPX"][-1]["date"]
+    start = f"{int(end[:4]) - WINDOW_YEARS}{end[4:]}"
+    start = max(start, hourly_days["SPX"][0]["date"])
+    out = {"window": [start, end], "oos": [OOS_START, start], "rules": [], "cost_pts": COST, "point_value": POINT_VALUE}
+    for spec in RULES:
+        res = {}
+        for und in ("SPX", "NDX"):
+            D = days[und]
+            if spec["kind"] == "swing":
+                win = run_swing([d for d in D if d["date"] >= start], spec, COST[und])
+                oos = run_swing([d for d in D if OOS_START <= d["date"] < start], spec, COST[und])
+                mid_o = next((d["date"] for d in D if d["date"] >= OOS_START), start)
+                omid = sorted(t[0] for t in oos)[len(oos) // 2] if oos else mid_o
+                res[und] = {"window": {"stats": stats(win), "halves": _halves(win, _mid(start, end))},
+                            "oos": {"stats": stats(oos), "halves": _halves(oos, omid)}, "curve": _curve(oos + win)}
+            else:
+                win = run_intraday([d for d in hourly_days[und] if d["date"] >= start], spec["rule"], COST[und])
+                res[und] = {"window": {"stats": stats(win), "halves": _halves(win, _mid(start, end))}, "curve": _curve(win)}
+        ok, why = verdict(spec["kind"], res)
+        out["rules"].append({"id": spec["id"], "name": spec["name"], "kind": spec["kind"], "uses": spec["uses"],
+                             "idea": spec["idea"], "hold": spec.get("hold"), "passed": ok, "why": why, "results": res})
     return out
 
 
-def live(sessions: list) -> dict:
-    """The same rules on the track record: GEX PRO's own band and regime (POSITIVE = calm, NEGATIVE =
-    stressed) from each frozen plan, on that session's daily bar."""
-    regime = {"POSITIVE": "calm", "NEGATIVE": "stressed"}
-    by: dict = {s["id"]: [] for s in STRATEGIES}
-    for m in sorted({x["market"] for x in sessions}):
-        days = []
-        for x in sorted((x for x in sessions if x["market"] == m), key=lambda s: s["session"]):
-            p, o = x.get("plan"), x.get("outcome")
-            if not p or not o or not p.get("em"):
-                continue
-            days.append({"date": x["session"], "date_prev": days[-1]["date"] if days else None, "ref": p["ref"], "em": p["em"],
-                         "o": o["open"], "h": o["high"], "l": o["low"], "c": o["close"],
-                         "path": [(o["open"], o["high"], o["low"], o["close"])],
-                         "regime": regime.get(p.get("regime"), "other"), "underlying": p.get("underlying")})
-        und = days[0]["underlying"] if days else ""
-        for s in STRATEGIES:
-            cost = 0.0 if s["options"] else COST.get(und or "", 0.0)
-            by[s["id"]] += [(f"{d} {m}", pts, r) for d, pts, r in run(days, s["rule"], cost, s["regime"])]
-    return {k: dict(stats(sorted(v)), trades=[{"session": t[0], "pts": t[1], "r": round(t[2], 3)} for t in sorted(v)[-20:]])
-            for k, v in by.items()}
+def _mid(a: str, b: str) -> str:
+    da, db = date.fromisoformat(a), date.fromisoformat(b)
+    return (da + (db - da) / 2).isoformat()
+
+
+def gex_forward(sessions: list, hourly: dict) -> dict:
+    """The GEX-level rules on the track record's sessions (frozen pre-open plans), walked on hourly bars.
+    hourly = {"SPX": {date: path}, "NDX": {...}}."""
+    days = []
+    for x in sessions:
+        p, o = x.get("plan"), x.get("outcome")
+        und = (p or {}).get("underlying")
+        path = (hourly.get(und) or {}).get(x["session"]) if und else None
+        if not p or not o or not p.get("em") or not path or len(path) < 6:
+            continue
+        days.append({"date": x["session"], "und": und, "ref": p["ref"], "em": p["em"], "regime": p.get("regime"),
+                     "cw": p.get("cw"), "pw": p.get("pw"), "zg": p.get("zg"), "ag": p.get("ag"), "path": path})
+    days.sort(key=lambda d: d["date"])
+    out = {"sessions": len(days), "rules": []}
+    for spec in GEX_RULES:
+        tr = []
+        for d in days:
+            for v in spec["rule"](d):
+                if v is not None:
+                    v -= COST[d["und"]]
+                    tr.append((d["date"], round(v, 3), v / d["em"]))
+        st = stats(tr)
+        mid = days[len(days) // 2]["date"] if days else ""
+        ok = st.get("n", 0) >= 30 and st["avg_r"] > 0 and st["avg_pts"] > 0 and (st.get("t") or 0) >= 2 and _both_up(_halves(tr, mid))
+        out["rules"].append({"id": spec["id"], "name": spec["name"], "uses": spec["uses"], "doc": (spec["rule"].__doc__ or "").strip(),
+                             "stats": st, "passed": ok, "why": "passed every test" if ok else f"collecting evidence: {st.get('n', 0)} of 30+ trades"
+                             if st.get("n", 0) < 30 else "has not passed (needs a profit, t >= 2 and both halves profitable)"})
+    return out

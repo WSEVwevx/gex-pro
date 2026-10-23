@@ -60,12 +60,14 @@ level as a *modeled concentration of option gamma*.
 
 ## Strategy lab
 
-- **Option premiums are modeled**, not quoted: Black-Scholes at the VIX / VXN level with no skew and a 10%
-  spread cost. Real 1-day options are priced with skew and around events, so the real edge can be smaller.
-- **The regime is a proxy** in history (vol index vs its one-year median), not GEX.
-- **Daily bars can't order intraday moves**, so intraday rules are judged on about three years of hourly bars,
-  which still assume the worst case inside each hour. Fills, margin, assignment and halted markets are not modeled.
-- **Eight rules tested, results shown for all.** Testing more variations and keeping the winners would overstate them.
+- **Free hourly history covers about 3 years**, so intraday rules have no out-of-sample period. Swing rules
+  are also checked on 2010-2023 daily data.
+- **Cash indexes stand in for futures.** SPX and NDX in regular hours are used for ES and NQ, so
+  futures-only overnight moves aren't traded. The index open is not a tradable futures price.
+- **Worst-case fills inside an hour** and a fixed cost (0.5 ES / 2 NQ points). Real slippage on fast days can be larger.
+- **GEX-level rules only start with the track record** (2026-10-21), because free historical gamma data doesn't exist.
+- **15 rules tested, results shown for all.** Testing many variations and keeping the winners would overstate them;
+  a rule that passes later still faces the same bar.
 
 ## Behaviour on bad data
 

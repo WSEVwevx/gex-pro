@@ -835,11 +835,15 @@ const HELP = {
     body: `<p>Bars count sessions by how many expected moves (σ) the close moved. The grey curve is a normal distribution, the shape the band assumes.</p><p>Real markets have a taller middle (most days are quieter than implied) and fatter tails (the big days are bigger than a normal curve allows). That's why a band can hold most days and still be blown through on a few.</p>`},
   backtest_vol: {title: "By volatility level", tldr: "Does the band hold better in calm or stressed markets?",
     body: `<p>Sessions split into five equal groups by the vol index the evening before. Compare the close-inside rate and the breaks across the groups to see when the band is most and least reliable.</p>`},
-  strategies: {title: "Strategy lab", tldr: "Trading rules built on the expected move and the gamma regime, tested on decades of data.",
-    body: `<p>Each strategy turns one GEX PRO idea into fixed rules (calm markets get pinned, stressed markets trend, the expected move bounds the day), then tests them on every eligible day since 1991 (S&P 500) or 2010 (Nasdaq-100), after costs.</p><p><b>R</b> is profit in expected moves, so a +0.08 R average means 8% of a typical day's expected move per trade. A strategy <b>holds up</b> only if it made money in both halves of the history with a t-statistic of at least 2.</p><p>The live column runs the same rules on GEX PRO's real levels from the track record.</p>`,
-    watch: ["Look at the worst trade and the drawdown, not just the win rate", "\"Without the regime filter\" shows whether the gamma regime adds anything"]},
-  strat_board: {title: "Leaderboard", tldr: "Every strategy's result side by side, best evidence first.",
-    body: `<p><b>Win</b> is the share of profitable trades. <b>Avg R</b> is profit per trade in expected moves, after costs. <b>Profit factor</b> is gross wins divided by gross losses. <b>Max DD</b> is the deepest fall from a peak, in expected moves. <b>t</b> above about 2 means the average is unlikely to be luck.</p><p>Intraday rules show the hourly replay, which treats their fills more fairly than daily bars. Click a row to open its card.</p>`},
+  strategies: {title: "Futures strategy lab", tldr: "Futures rules built on options data, listed only when they pass every test.",
+    body: `<p>Each rule turns an options signal into a futures trade on ES or NQ: the expected move, the VIX term structure, intraday VIX, or GEX PRO's gamma levels. Every rule is fixed before it is tested.</p><p>It must make money after costs over the last 3 years on both ES and NQ, in both halves of that period. Swing rules must also hold up on 2010-2023 data that was never used to choose them. Only rules that pass everything are listed as strategies.</p><p><b>R</b> is profit per trade in expected moves, and the $ figure is per full-size contract ($50 per ES point, $20 per NQ point).</p>`,
+    watch: ["Zero passed so far: there is no proven futures strategy here yet", "The forward test grows with every graded session"]},
+  strat_proven: {title: "Proven strategies", tldr: "Rules that passed every test. Empty until one does.",
+    body: `<p>A strategy appears here automatically once it passes: as the 3-year window rolls forward, or when a GEX-level rule collects 30+ trades with a significant profit. Nothing unproven is shown as a strategy.</p>`},
+  strat_log: {title: "Research log", tldr: "Every rule tested, with its numbers and the reason it failed.",
+    body: `<p>Each cell shows trades, the average profit per trade in expected moves (R), and the average in dollars per contract after costs. <b>Out of sample</b> is 2010 up to the 3-year window: data the rule never saw. A rule can be profitable and still fail when its profit is too small to rule out luck (t below the bar), or when one half of the period lost money.</p>`},
+  strat_gex: {title: "Forward test on GEX levels", tldr: "Rules on GEX PRO's real walls, zero gamma and regime, tested as sessions are graded.",
+    body: `<p>History has no free gamma data, so these rules can only be tested on the sessions the track record has frozen since it started. Each is run on that day's hourly bars with the plan made before the open. Results are shown once a rule has 30 trades.</p>`},
   paste: {title: "The hourly paste", tldr: "One text block that carries all levels to TradingView.",
     body: `<p>Published every hour on the hour (ET). One paste holds NQ and ES; each chart draws only its own market. The indicator marks levels stale after 90 minutes.</p>`},
 };
@@ -1143,139 +1147,51 @@ function renderBacktest(){
     ${B.by_vol.length > 1 && B.by_vol[0].close_in.rate > B.by_vol.at(-1).close_in.rate ? `<div class="expl">When implied vol is low the band is generous; in high-vol regimes realized moves catch up with it and breaks become more common.</div>` : ""}`;
 }
 
-// ---------- Strategy lab: rule-based strategies on the band and regime, with their backtests
-const STRAT_INFO = {
-  iron_condor: {kind: "Options · sells volatility, defined risk", regime: "Calm / positive gamma",
-    idea: "Sell the move the market prices for tomorrow, with insurance. When implied volatility overstates the next day's move, which the backtest shows is the usual case in calm markets, the seller keeps the difference.",
-    rules: ["Only when the vol index closed at or below its one-year median (live test: GEX regime positive)",
-      "At the close, sell a call and a put one expected move away (±1 em)", "Buy a call and a put two expected moves away (±2 em) as wings",
-      "Hold to the next close. Worst possible day: 1 em minus the credit"],
-    use: ["Trade it only on a positive gamma reading, with price at least 0.3σ above zero gamma (Levels page, σ distance)",
-      "Where the call or put wall sits just outside ±1 em, put the short strike at or beyond the wall: in the GEX model, dealer hedging there slows price down",
-      "Skip days with a high-impact US release during the session (News page), and FOMC days",
-      "If price crosses below zero gamma during the day, the reason for the trade is gone: close it early",
-      "Size it so a full 1 em loss on one day is small for your account"],
-    risk: "The wings cap each loss, but losses bunch together when markets turn. The backtest prices options without skew, and real put wings cost more."},
-  short_strangle: {kind: "Options · sells volatility, open risk", regime: "Calm / positive gamma",
-    idea: "The same edge as the iron condor without the wings: more premium kept, but no cap on a bad day.",
-    rules: ["Only when the vol index closed at or below its one-year median (live test: GEX regime positive)",
-      "At the close, sell a call and a put ±1 expected move away", "Hold to the next close"],
-    use: ["Same filters as the iron condor: positive gamma, well above zero gamma, no major event",
-      "Prefer the iron condor unless you can absorb a 3-4 em loss in a single day",
-      "Absolute gamma and wall strikes inside the band act as magnets in positive gamma: a close near them is the best case"],
-    risk: "The worst day in the backtest lost several expected moves at once. Uncapped option selling can wipe out months of gains in one session, and needs margin."},
-  close_reversal: {kind: "Futures · mean reversion, overnight", regime: "Calm / positive gamma",
-    idea: "In positive gamma, dealer hedging leans against big moves. After a close outside the expected move, bet on part of it coming back by the next close.",
-    rules: ["Only in a calm regime", "If the close is below the lower band, buy at the close; above the upper band, sell", "Exit at the next close"],
-    use: ["Mechanically it showed no reliable edge: use it as context, not as a signal",
-      "Look for a reversal only when the close came back up to a put wall (or down to a call wall) and GEX stayed positive overnight",
-      "Skip it when the move came from news: positioning doesn't fade information"],
-    risk: "It holds trades overnight, with gap risk in both directions."},
-  close_follow: {kind: "Futures · momentum, overnight", regime: "Stressed / negative gamma",
-    idea: "In negative gamma, dealer hedging adds to moves. After a close outside the band, bet that the move continues the next day.",
-    rules: ["Only in a stressed regime", "Close above the upper band: buy at the close; below the lower band: sell", "Exit at the next close"],
-    use: ["It lost money after costs: a big close in a stressed market doesn't reliably continue the next day",
-      "Negative gamma is modeled to widen the range, not to pick the direction",
-      "Use negative gamma to cut size and widen stops rather than to chase"],
-    risk: "Stressed markets reverse sharply, so the follow-through often fails overnight."},
-  band_fade: {kind: "Futures · mean reversion, intraday", regime: "Calm / positive gamma",
-    idea: "Positive gamma should cap the day near the expected-move edges, so fade the first touch of the band.",
-    rules: ["Only in a calm regime", "Resting buy order at the lower band, sell order at the upper band", "Stop one more expected move away (±2 em); out at the close"],
-    use: ["Fading the band blindly lost money, both on daily bars and when replayed hourly",
-      "Only fade a band edge where a wall sits at the same price, in positive gamma, with no event due",
-      "Let the live column tell you whether GEX's real regime and walls do better than the proxy"],
-    risk: "Touches of the band often keep going. The stop is hit on many of the days that reach the band."},
-  gap_fade: {kind: "Futures · mean reversion, intraday", regime: "Calm / positive gamma",
-    idea: "Opening gaps in calm markets tend to fill back toward the previous close.",
-    rules: ["Only in a calm regime, on opens 0.5-1.5 em from the previous close", "Fade at the open; target the previous close", "Stop 0.75 em further away"],
-    use: ["No reliable edge, daily or hourly",
-      "Favour gaps that open into a wall or the absolute gamma strike, which act as magnets in positive gamma",
-      "Never fade a gap caused by a data release or earnings in the index's biggest names"],
-    risk: "Gaps on news tend to extend, not fill."},
-  band_breakout: {kind: "Futures · momentum, intraday", regime: "Stressed / negative gamma",
-    idea: "In negative gamma a break of the expected-move band can turn into a trend day.",
-    rules: ["Only in a stressed regime", "Buy stop at the upper band, sell stop at the lower band", "Stop back at the previous close; out at the close"],
-    use: ["On daily bars it looked terrible, but only because daily bars force the worst order of moves. Replayed hourly, most of the losses disappear",
-      "Better as a reason to stay out of fades on negative gamma days than as an entry",
-      "A break that also clears zero gamma or the put wall is the version to watch in the live column"],
-    risk: "False breaks are common. The stop at the previous close is far away, so the losses are big."},
-  gap_and_go: {kind: "Futures · momentum, intraday", regime: "Stressed / negative gamma",
-    idea: "In negative gamma, a large opening gap keeps going in its direction.",
-    rules: ["Only in a stressed regime, on opens at least 0.5 em from the previous close", "Trade with the gap at the open", "Stop at the previous close (gap filled); out at the close"],
-    use: ["About breakeven: no reliable edge",
-      "More promising when the gap opens beyond a wall into open space with no big strikes nearby",
-      "Cut size: negative gamma days have larger ranges"],
-    risk: "A gap fill hits the far stop, and the losses are large."},
-};
-const VERDICT_TAG = {"holds up": "good", "mixed": "warn", "does not work": "bad", "too few trades": ""};
-const VERDICT_ORDER = {"holds up": 0, "mixed": 1, "too few trades": 2, "does not work": 3};
-let stM = store.get("gex.stm", "ES");
+// ---------- Strategy lab: futures rules on options data; only rules that pass every test are listed
+const FUT = {SPX: "ES", NDX: "NQ"};
 function renderStrategies(){
-  const BT = ((trk || {}).backtest || {}).markets || {};
-  const ms = Object.keys(BT).filter(m => BT[m].strategies);
-  if(!ms.length){ $("stTitle").textContent = trk && trk.error ? trk.error : "Strategy backtests not available yet"; return; }
-  if(!ms.includes(stM)) stM = ms[0];
-  $("stMarket").innerHTML = ms.map(m => `<button role="tab" aria-selected="${stM === m}" data-m="${m}">${m} · ${esc(MKT_NAME[BT[m].underlying] || m)}</button>`).join("");
-  [...$("stMarket").children].forEach(b => b.onclick = () => { stM = b.dataset.m; store.set("gex.stm", stM); renderStrategies(); });
-  const H = BT[stM].strategies, live = trk.strategies_live || {}, S = H.strategies;
-  const ids = Object.keys(S).sort((a, b) => (VERDICT_ORDER[S[a].verdict] - VERDICT_ORDER[S[b].verdict]) || ((S[b].stats.t || -99) - (S[a].stats.t || -99)));
-  const count = v => ids.filter(k => S[k].verdict === v).length;
-  $("stTitle").textContent = `${ids.length} strategies on ${MKT_NAME[BT[stM].underlying] || stM}, ${H.start.slice(0, 4)} to ${H.end.slice(0, 4)}: ${count("holds up")} hold${count("holds up") === 1 ? "s" : ""} up`;
-  $("stKpis").innerHTML = kpi("Hold up", String(count("holds up")), "profitable in both halves, t ≥ 2, after costs", "var(--good)")
-    + kpi("Mixed", String(count("mixed")), "positive on average, but not reliably")
-    + kpi("Don't work", String(count("does not work")), "lose money after costs", "var(--bad)")
-    + kpi("Sessions tested", H.sessions.toLocaleString("en-US"), `calm regime on ${pct(H.calm_share)} of them`);
-  $("stNote").innerHTML = `Each strategy trades the <b>expected-move band</b> and the <b>gamma regime</b>, the two things GEX PRO publishes every morning. The rules were fixed before testing. The honest result: in this test, <b>selling the expected move in calm markets</b> is what pays. The directional rules, fading or chasing the band edges, don't beat their costs when traded mechanically. For those, the levels work better as context for your own judgment, as each card explains. The <b>live</b> column runs the same rules on GEX PRO's real levels from the track record, and it fills in as sessions are graded.`;
-  // leaderboard
-  const cell = (st, k, f) => st && st.n ? f(st[k]) : "-";
+  const L = ((trk || {}).backtest || {}).strategy_lab;
+  if(!L || !L.rules){ $("stTitle").textContent = trk && trk.error ? trk.error : "The strategy lab is not built yet"; return; }
+  const rules = L.rules, passed = rules.filter(r => r.passed), pv = L.point_value || {SPX: 50, NDX: 20};
+  const ym = s => s.slice(0, 7);
+  $("stTitle").textContent = `${rules.length} futures strategies tested, ${passed.length} passed`;
+  $("stKpis").innerHTML = kpi("Tested", String(rules.length), "rules fixed before testing")
+    + kpi("Passed", String(passed.length), passed.length ? "listed below" : "none is shown as a strategy", passed.length ? "var(--good)" : "var(--ink2)")
+    + kpi("3-year test", `${ym(L.window[0])} to ${ym(L.window[1])}`, "hourly bars, ES and NQ")
+    + kpi("Out of sample", `${L.oos[0].slice(0, 4)} to ${ym(L.oos[1])}`, "swing rules, never used to choose them");
+  $("stNote").innerHTML = passed.length
+    ? `Only strategies that passed every test are listed as strategies. The research log shows the ones that didn't, and why.`
+    : `<b>No strategy has passed every test, so none is listed.</b> Rules built on the expected move and the VIX term structure didn't show an edge after costs that was large and consistent enough on both ES and NQ. A strategy is listed here automatically if it passes, either as the 3-year window rolls forward or once the forward test on GEX PRO's own levels has enough trades. Until then, use the levels as context: the Track record page shows how they've behaved.`;
+  // proven strategies
   const r2 = v => v == null ? "-" : signed(v, 3);
-  $("stBoardSub").textContent = `R = profit in expected moves per trade · sorted by verdict, then t`;
-  $("stBoard").innerHTML = `<table class="trk-table"><tr><th>Strategy</th><th>Regime</th><th>Verdict</th><th>Trades</th><th>Win</th><th>Avg R</th><th>Profit factor</th><th>Max DD (R)</th><th>t</th><th>Last 3 yrs</th><th>Live (GEX)</th></tr>${ids.map(k => {
-    const r = S[k], L = live[k] || {}, I = STRAT_INFO[k] || {};
-    const main = r.verdict_basis === "hourly" ? r.hourly.stats : r.stats;
-    return `<tr class="st-row" data-k="${k}"><td><b>${esc(stratName(k))}</b><div class="st-kind">${esc(I.kind || "")}</div></td><td>${esc((I.regime || "").split(" / ")[0])}</td>
-      <td><span class="trk-tag ${VERDICT_TAG[r.verdict] || ""}">${esc(r.verdict)}</span>${r.verdict_basis === "hourly" ? `<div class="st-kind">hourly test</div>` : ""}</td>
-      <td class="m">${main.n ? main.n.toLocaleString("en-US") : "-"}</td><td class="m">${cell(main, "win", pct)}</td><td class="m">${cell(main, "avg_r", r2)}</td>
-      <td class="m">${cell(main, "pf", v => v == null ? "-" : num(v, 2))}</td><td class="m">${cell(main, "max_dd_r", v => num(v, 1))}</td><td class="m">${cell(main, "t", v => v == null ? "-" : num(v, 1))}</td>
-      <td class="m">${cell(r.last_3y, "avg_r", r2)}</td><td class="m">${L.n ? `${L.n} · ${r2(L.avg_r)}` : `<span class="dim">no trades yet</span>`}</td></tr>`; }).join("")}</table>`;
-  [...$("stBoard").querySelectorAll(".st-row")].forEach(tr => tr.onclick = () => { const c = $("st-" + tr.dataset.k); if(c) c.scrollIntoView({behavior: "smooth", block: "start"}); });
-  // one card per strategy
-  $("stCards").innerHTML = ids.map(k => {
-    const r = S[k], I = STRAT_INFO[k] || {}, L = live[k] || {}, hr = r.hourly, byHour = r.verdict_basis === "hourly";
-    const T = byHour ? hr : r, st = T.stats, hv = T.halves, span = byHour ? `hourly replay, ${esc(H.hourly_period[0].slice(0, 7))} to ${esc(H.hourly_period[1].slice(0, 7))}` : `daily test, ${esc(H.start.slice(0, 4))}-${esc(H.end.slice(0, 4))}`;
+  const usd = (s, und) => (s.avg_pts >= 0 ? "+$" : "-$") + num(Math.abs(s.avg_pts * pv[und]), 0);
+  const cell = (s, und) => s && s.n ? `<b style="color:${s.avg_pts > 0 ? "var(--good)" : "var(--bad)"}">${usd(s, und)}</b> <span class="dim">/ trade</span><div class="st-kind">${s.n.toLocaleString("en-US")} trades · ${r2(s.avg_r)} R · t ${s.t == null ? "-" : num(s.t, 1)}</div>` : "-";
+  $("stProvenSub").textContent = passed.length ? `${passed.length} of ${rules.length}` : "";
+  $("stProven").innerHTML = passed.length ? passed.map(r => {
+    const a = r.results.SPX, b = r.results.NDX;
     const m = (label, v, sub) => `<div class="metric"><div class="eyebrow">${label}</div><div class="v">${v}</div><div class="s">${sub}</div></div>`;
-    const testLine = hr ? `<div class="st-test"><b>Daily-bar test</b> (${esc(H.start.slice(0, 4))}-${esc(H.end.slice(0, 4))}, worst-case order inside each day): ${r.stats.n.toLocaleString("en-US")} trades, avg ${r2(r.stats.avg_r)} R. On the replay's own days the daily bars gave ${r2(hr.daily_same_days.avg_r)} R against ${r2(hr.stats.avg_r)} R hour by hour, which is why <b>the verdict uses the hourly replay</b>.</div>` : "";
-    return `<section class="card st-card" id="st-${k}" style="margin-top:14px">
-      <div class="head"><h2>${esc(stratName(k))}</h2><span class="trk-tag ${VERDICT_TAG[r.verdict] || ""}">${esc(r.verdict)}</span><span class="sub">${esc(I.kind || "")} · ${esc(I.regime || "")}</span></div>
-      <div class="st-grid"><div>
-        <p class="st-idea">${esc(I.idea || "")}</p>
-        <div class="eyebrow">Rules (fixed before testing)</div><ol class="st-list">${(I.rules || []).map(x => `<li>${esc(x)}</li>`).join("")}</ol>
-        <div class="eyebrow">Using it with GEX PRO levels</div><ul class="st-list">${(I.use || []).map(x => `<li>${esc(x)}</li>`).join("")}</ul>
-        <div class="st-risk"><b>Risk.</b> ${esc(I.risk || "")}</div>
-      </div><div>
-        <div class="metrics">${m("Trades · win rate", `${st.n.toLocaleString("en-US")} · ${pct(st.win)}`, span)}
-          ${m("Average per trade", `${r2(st.avg_r)} R`, `${signed(st.avg_pts, 2)} index pts after costs`)}
-          ${m("Profit factor · t", `${st.pf == null ? "-" : num(st.pf, 2)} · ${st.t == null ? "-" : num(st.t, 1)}`, "t ≥ 2 = unlikely to be luck")}
-          ${m("Worst trade · max drawdown", `${num(st.worst_r, 2)} R · ${num(st.max_dd_r, 1)} R`, "in expected moves")}
-          ${m("First half · second half", `${r2(hv[0].avg_r)} · ${r2(hv[1].avg_r)} R`, `split at ${esc(T.split.slice(0, 7))}`)}
-          ${m("Without the regime filter", `${r2(T.unfiltered.avg_r)} R`, `on all ${T.unfiltered.n.toLocaleString("en-US")} trades: does the filter help?`)}</div>
-        <div class="eyebrow" style="margin-top:12px">Cumulative R, ${byHour ? "hourly replay" : "daily test"}</div><div class="st-spark" data-k="${k}"></div>
-        ${testLine}
-        <div class="st-test"><b>Live with GEX PRO's levels:</b> ${L.n ? `${L.n} trade${L.n === 1 ? "" : "s"}, avg ${r2(L.avg_r)} R (${L.trades.map(t => `${esc(t.session)} ${signed(t.r, 2)}R`).join(", ")})` : "no qualifying session in the track record yet"}.</div>
-      </div></div></section>`;
-  }).join("");
-  document.querySelectorAll(".st-spark").forEach(el => {
-    const R = S[el.dataset.k], c = R.verdict_basis === "hourly" ? R.hourly.curve : R.curve, W = Math.max(el.clientWidth, 240), Hh = 90, n = c.length;
-    if(n < 2){ el.innerHTML = ""; return; }
-    const vs = c.map(p => p[1]), lo = Math.min(0, ...vs), hi = Math.max(0, ...vs), y = v => 6 + (hi - v) / ((hi - lo) || 1) * (Hh - 18);
-    const pts = c.map((p, i) => `${(i / (n - 1) * (W - 4) + 2).toFixed(1)},${y(p[1]).toFixed(1)}`).join(" ");
-    const col = vs[n - 1] >= 0 ? "var(--good)" : "var(--bad)";
-    el.innerHTML = `<svg width="${W}" height="${Hh}" viewBox="0 0 ${W} ${Hh}"><line x1="0" x2="${W}" y1="${y(0)}" y2="${y(0)}" stroke="rgba(var(--fg-rgb),.18)" stroke-dasharray="3 3"/>
-      <polyline fill="none" stroke="${col}" stroke-width="1.6" points="${pts}"/><text x="2" y="${Hh - 2}">${esc(c[0][0].slice(0, 4))}</text><text x="${W - 2}" y="${Hh - 2}" text-anchor="end">${esc(c[n - 1][0].slice(0, 4))} · ${signed(vs[n - 1], 0)} R</text></svg>`;
-  });
+    return `<div class="st-card"><div class="head"><h2>${esc(r.name)}</h2><span class="trk-tag good">passed</span><span class="sub">${esc(r.kind === "swing" ? `swing, ${r.hold} session${r.hold === 1 ? "" : "s"}` : "intraday")} · uses ${esc(r.uses)}</span></div>
+      <div class="st-grid"><div><p class="st-idea">${esc(r.idea)}</p></div>
+      <div class="metrics">${[["SPX", a], ["NDX", b]].map(([u, x]) => m(`${FUT[u]} · 3 years`, `${x.window.stats.n} trades · ${pct(x.window.stats.win)}`, `${usd(x.window.stats, u)} per contract per trade, ${r2(x.window.stats.avg_r)} R, t ${num(x.window.stats.t, 1)}`)
+        + (x.oos ? m(`${FUT[u]} · out of sample`, `${x.oos.stats.n} trades · ${pct(x.oos.stats.win)}`, `avg ${r2(x.oos.stats.avg_r)} R, t ${num(x.oos.stats.t, 1)}`) : "")).join("")}</div></div></div>`;
+  }).join("") : `<div class="st-empty"><b>None yet.</b> Every rule tested so far failed at least one test. The research log below shows each one and why.</div>`;
+  // research log
+  $("stLogSub").textContent = `every rule tested · average profit per trade after costs, per full-size contract · R = the same in expected moves`;
+  $("stLog").innerHTML = `<table class="trk-table"><tr><th>Strategy</th><th>Type</th><th>Options data</th><th>ES · 3 yrs</th><th>NQ · 3 yrs</th><th>ES · out of sample</th><th>NQ · out of sample</th><th>Result</th></tr>${rules.map(r => {
+    const a = r.results.SPX, b = r.results.NDX;
+    return `<tr><td><b>${esc(r.name)}</b><div class="st-kind">${esc(r.idea)}</div></td><td>${r.kind === "swing" ? `swing · ${r.hold}d` : "intraday"}</td><td>${esc(r.uses)}</td>
+      <td class="m">${cell(a.window.stats, "SPX")}</td><td class="m">${cell(b.window.stats, "NDX")}</td>
+      <td class="m">${a.oos ? cell(a.oos.stats, "SPX") : `<span class="dim">n/a</span>`}</td><td class="m">${b.oos ? cell(b.oos.stats, "NDX") : `<span class="dim">n/a</span>`}</td>
+      <td><span class="trk-tag ${r.passed ? "good" : "bad"}">${r.passed ? "passed" : "failed"}</span><div class="st-kind">${esc(r.why)}</div></td></tr>`; }).join("")}</table>
+    <div class="expl">Out-of-sample tests apply to swing rules only, because free hourly history doesn't reach back before ${ym(L.window[0])}.</div>`;
+  // forward test on GEX PRO's own levels
+  const G = L.gex || {rules: [], sessions: 0};
+  $("stGexSub").textContent = `${G.sessions} graded session${G.sessions === 1 ? "" : "s"} with hourly bars so far`;
+  $("stGex").innerHTML = `<table class="trk-table"><tr><th>Rule</th><th>GEX PRO levels used</th><th>Trades so far</th><th>Status</th></tr>${G.rules.map(r =>
+    `<tr><td><b>${esc(r.name)}</b><div class="st-kind">${esc(r.doc)}</div></td><td>${esc(r.uses)}</td><td class="m">${r.stats.n || 0}</td>
+     <td><span class="trk-tag ${r.passed ? "good" : ""}">${r.passed ? "passed" : "not proven"}</span><div class="st-kind">${esc(r.why)}</div></td></tr>`).join("")}</table>
+    <div class="expl">These rules need the real gamma levels, which exist only from the first saved session on, so they can only be tested going forward. Results are hidden until a rule has 30 trades: with fewer, a profit or a loss says nothing. A rule that then passes the same bar moves up to Proven strategies.</div>`;
 }
-const stratName = k => ({iron_condor: "1-day iron condor", short_strangle: "1-day strangle sale", close_reversal: "Close-outside-band reversal",
-  close_follow: "Close-outside-band follow-through", band_fade: "Band-edge fade", gap_fade: "Gap fade", band_breakout: "Band breakout", gap_and_go: "Gap and go"})[k] || k;
 
 setPage(page);
 load();

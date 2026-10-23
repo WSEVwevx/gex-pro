@@ -191,28 +191,34 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
     <!-- STRATEGIES -->
     <div id="strategiesView" hidden>
       <section class="card trk-hero" data-help="strategies">
-        <div class="head" style="margin-bottom:0"><div class="eyebrow">Strategy lab · backtested</div><span class="spacer"></span>
-          <div class="filters" id="stMarket" role="tablist" aria-label="Index"></div></div>
+        <div class="eyebrow">Futures strategy lab · ES and NQ · built on options data</div>
         <h2 class="trk-title" id="stTitle">Loading...</h2>
         <div class="trk-kpis" id="stKpis"></div>
         <div class="expl" id="stNote"></div>
       </section>
-      <section class="card" data-help="strat_board" style="margin-top:14px">
-        <div class="head"><h2>Leaderboard</h2><span class="sub" id="stBoardSub"></span></div>
-        <div class="trk-log" id="stBoard"></div>
+      <section class="card" data-help="strat_proven" style="margin-top:14px">
+        <div class="head"><h2>Proven strategies</h2><span class="sub" id="stProvenSub"></span></div>
+        <div id="stProven"></div>
       </section>
-      <div id="stCards"></div>
-      <section class="card" style="margin-top:14px"><div class="head"><h2>How these were tested</h2></div>
+      <section class="card" data-help="strat_log" style="margin-top:14px">
+        <div class="head"><h2>Research log</h2><span class="sub" id="stLogSub"></span></div>
+        <div class="trk-log" id="stLog"></div>
+      </section>
+      <section class="card" data-help="strat_gex" style="margin-top:14px">
+        <div class="head"><h2>Forward test on GEX PRO's own levels</h2><span class="sub" id="stGexSub"></span></div>
+        <div class="trk-log" id="stGex"></div>
+      </section>
+      <section class="card" style="margin-top:14px"><div class="head"><h2>How strategies are tested</h2></div>
         <div class="st-method">
-          <p><b>Rules first, results second.</b> Every rule, stop and filter was written down before any result was seen, and none was tuned afterwards. A strategy <b>holds up</b> only with 30+ trades, a t-statistic of 2 or more and a profit in both halves of the history, after costs.</p>
-          <p><b>No look-ahead.</b> Each trade uses only what was known when it was placed: the previous close, the vol index close and the regime from the evening before.</p>
-          <p><b>Worst case inside a bar.</b> When one bar touches both a stop and a target, the stop counts first. Intraday rules are also replayed on about three years of hourly bars, and their verdict comes from that replay.</p>
-          <p><b>Costs.</b> 0.5 S&P points and 2 Nasdaq-100 points per round trip on futures-style trades. Option trades lose 10% of the premium to spreads.</p>
-          <p><b>Regime proxy.</b> History has no free gamma data, so "calm" means the vol index closed at or below its one-year median (dealers are more often long gamma then). The <b>live</b> column uses GEX PRO's own regime and band from the track record.</p>
-          <p><b>Option pricing is a model.</b> Premiums come from Black-Scholes at the VIX or VXN level with no skew, not from real quotes. Real 1-day options can be priced differently, especially around events.</p>
+          <p><b>Futures only, built on options data.</b> Every rule trades ES or NQ. Its signals come from the options market: the expected move (VIX / VXN), the VIX term structure (VIX9D, VIX, VIX3M), intraday VIX, and GEX PRO's own gamma levels.</p>
+          <p><b>Rules first, results second.</b> Each rule's entry, stop, exit and filter were written down before it was run, and none was tuned afterwards. The research log shows every rule tested, not just the winners.</p>
+          <p><b>The 3-year test.</b> Intraday rules are walked hour by hour over the last 3 years. They need 30+ trades, a profit after costs, a t-statistic of 2 or more, and both halves profitable, on ES and on NQ.</p>
+          <p><b>The out-of-sample test.</b> Swing rules must also be profitable in both halves of the 3 years on both markets. They then have to hold on 2010 to the start of that window, data never used to choose them: both halves profitable and t ≥ 1.65, on ES and on NQ.</p>
+          <p><b>Worst case and costs.</b> One position at a time. When an hour touches both the stop and the target, the stop counts. A round trip costs 0.5 ES points or 2 NQ points ($25 / $40 per contract).</p>
+          <p><b>Proxies.</b> History uses the cash indexes (SPX, NDX) during regular hours as stand-ins for ES and NQ. Futures-only overnight moves are not traded or counted.</p>
         </div>
       </section>
-      <div class="expl trk-disclaimer">Hypothetical, rule-based results, not trading results and not investment advice. Backtests leave out real fills, margin, assignment and the days a market can't be traded. Selling options can lose many times the premium received. Past results don't guarantee future results.</div>
+      <div class="expl trk-disclaimer">Hypothetical, rule-based research, not trading results and not investment advice. Backtests leave out real fills, slippage beyond the assumed cost, margin and limit days. Futures are leveraged and can lose more than the margin posted.</div>
     </div>
 
     <!-- BRIEFINGS -->
