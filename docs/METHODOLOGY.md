@@ -75,6 +75,18 @@ Validation: `tests/test_pricing.py` compares analytic gamma against central fini
 the price (relative error < 1e-3), checks put-call parity, the IV round trip, and the hand value
 Γ(100,100,1y,σ=0.2) = φ(0.1)/20.
 
+### 4a. ETF options in index terms
+
+ES uses SPX and SPY options; NQ uses NDX and QQQ. With r = index price / ETF price, each ETF option
+becomes an index-equivalent contract: strike K·r (snapped to the nearest listed index strike), open
+interest OI/r, same IV. BSM gamma is homogeneous of degree -1 in (S, K), so
+Γ(rS, rK) = Γ(S, K)/r and
+
+  (OI/r) · Γ(rS, rK) · 100 · (rS)² = OI · Γ(S, K) · 100 · S²
+
+The converted contract carries exactly the ETF option's dollar gamma. Vanna and charm are degree 0, and
+their exposures use OI·multiplier·S, which is also unchanged.
+
 ## 5. Aggregation
 
 Exposure is kept per contract and aggregated by strike (call/put/net/abs plus OI), by expiration,

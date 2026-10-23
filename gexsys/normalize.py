@@ -52,7 +52,7 @@ def normalize(snap: ChainSnapshot, check_occ: bool = False, max_quote_age_s: Opt
                 or c.expiration is None or c.expiration.tzinfo is None:
             counts["invalid"] += 1
             continue
-        if check_occ:
+        if check_occ and "@" not in c.symbol:          # "SPY...@SPX": ETF option converted to index terms
             p = parse_occ(c.symbol)
             if p is None:
                 counts["invalid"] += 1

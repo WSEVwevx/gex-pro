@@ -44,10 +44,11 @@
   "futures_ref": {
     "mode": "carry"
   },
-  "description": "NQ from NDX options - Cboe free feed (15-min delayed)",
+  "description": "NQ levels from NDX + QQQ options (Cboe free feed, 15-min delayed), QQQ converted to NDX terms, mapped to NQ futures",
   "market": "NQ",
   "source": "NDX",
   "provider": {
-    "name": "cboe"
+    "name": "cboe",
+    "include_etf": true
   }
 }

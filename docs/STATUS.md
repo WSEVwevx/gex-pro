@@ -14,8 +14,8 @@ system. **Awaiting credentials**: needs your provider account. **Simulated**: te
 | Levels | Snapshot diff (level shifts, regime change, concentration shift) | Working |
 | Data | Normalization (dupes, OCC validation, bad fields, stale quotes) | Working |
 | Data | HTTP retry, backoff, Retry-After, rate limiter, auth classification | Working (tested with simulated responses) |
-| Data | Databento: CME NQ/ES options on futures (all quarterly, EOM, weekly and daily series), live futures + option quotes, CME OI and settlements, Black-76 IV, calendar-spread shift | **Awaiting your key / Unverified live**: built from Databento's documented API and package source, tested against canned responses (6 tests) |
-| Data | Tradier adapter | **Removed** 2026-10-23 at your request |
+| Data | SPY merged into SPX (ES) and QQQ into NDX (NQ): strikes x ratio snapped to index strikes, OI and volume / ratio | **Working with live data** (2026-10-23): dollar gamma identical before and after conversion; audit 18/18 for NQ and ES |
+| Data | Tradier, Schwab, Databento adapters | **Removed** 2026-10-23 (free data only) |
 | Data | Cboe free delayed feed (SPX, NDX, SPY, QQQ) | **Working with live data** (checked 2026-10-21 overnight; RTH behaviour not yet observed) |
 | Data | Schwab Trader API | **Removed** 2026-10-23 (API access denied) |
 | Math | Vanna and charm exposure, absolute gamma strike, hedge size in contracts, zero-gamma distance in σ | Working: vanna/charm validated by finite differences; live numbers hand-checked |
@@ -36,7 +36,7 @@ system. **Awaiting credentials**: needs your provider account. **Simulated**: te
 | Pine | New level groups, on-chart GEX profile, cut-off paste detection, info panel (Minimal/Compact/Full, hideable) | **Unverified**: not compiled in TradingView |
 | Data | CSV adapter (ES/NQ futures options, any vendor export) | Working (sample file is hand-made) |
 | Data | Synthetic provider | Simulated: labeled SYNTHETIC everywhere |
-| Data | Databento / IBKR / Polygon native adapters | Not built: use CSV, or add a `Provider` subclass |
+| Data | Paid feeds (Databento, IBKR, Polygon/Massive) | Not built: free data only. Use CSV or add a `Provider` subclass |
 | Mapping | ratio / offset / identity / calendar_offset with skew and cross-index guards, tick rounding | Working |
 | Calendar | NYSE holidays and early closes, Globex sessions, DST, roll schedule, expiry times | Working (rules-based; ad-hoc closures are manual) |
 | Service | Background refresh workers, session-aware cadence, recovery backoff, `/health`, `/api/levels`, `/api/pine` | Working (synthetic) |

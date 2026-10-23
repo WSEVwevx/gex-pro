@@ -58,6 +58,62 @@ class TestCboe(unittest.TestCase):
             CboeProvider(http=lambda *a, **k: {"data": {}}).fetch_snapshot("NDX")
 
 
+def qqq_json(spot=715.0):
+    opts = []
+    for k in (703, 704, 712, 713, 715, 716, 740):
+        for cp in "CP":
+            opts.append({"option": f"QQQ{OCC}{cp}{k * 1000:08d}", "bid": 5.0, "ask": 5.2, "iv": 0.2,
+                         "open_interest": 4120.0, "volume": 824.0, "gamma": 0.01})
+    return {"timestamp": NOW.strftime("%Y-%m-%d %H:%M:%S"), "symbol": "QQQ",
+            "data": {"symbol": "QQQ", "current_price": spot, "prev_day_close": 712.0, "options": opts}}
+
+
+class TestEtfMerge(unittest.TestCase):
+    def snap(self, qqq=True):
+        http = lambda url, headers, limiter=None: qqq_json() if "QQQ" in url else cboe_json()
+        if not qqq:
+            http = lambda url, headers, limiter=None: (_ for _ in ()).throw(ProviderError("down")) \
+                if "QQQ" in url else cboe_json()
+        return CboeProvider(http=http, include_etf=True).fetch_snapshot("NDX", max_dte=45)
+
+    def test_converted_into_index_contracts(self):
+        from gexsys import pricing
+        s = self.snap()
+        r = 29490.28 / 715.0
+        q = [c for c in s.contracts if c.root == "QQQ"]
+        self.assertTrue(q and all(c.symbol.endswith("@NDX") and c.multiplier == 100 for c in q))
+        self.assertTrue(all(c.bid is None and c.gamma is None and c.iv == 0.2 for c in q))
+        self.assertTrue(any("includes QQQ options in NDX terms" in w for w in s.warnings))
+        # strikes snap to listed NDX strikes (100 apart here) when within 0.75 x spacing, else stay exact
+        on = {round(c.strike, 2) for c in q}
+        self.assertIn(29000.0, on)                       # 703 x 41.25 = 28997.6 -> 29000
+        self.assertIn(round(740 * r, 2), on)             # 30521: past the last NDX strike (30000), kept exact
+        # 712 and 713 (29368, 29409) both snap to 29400: added together, not dropped
+        both = [c for c in q if c.strike == 29400.0 and c.option_type.value == "C"]
+        self.assertEqual(len(both), 1)
+        self.assertAlmostEqual(both[0].open_interest, 2 * 4120.0 / r, places=6)
+        self.assertAlmostEqual(both[0].volume, 2 * 824.0 / r, places=6)
+        # dollar gamma is unchanged by the conversion (exact identity, not an approximation)
+        t, iv = 3 / 365, 0.2
+        own = 4120.0 * pricing.bsm_gamma(715.0, 715.0, t, 0.04, 0, iv) * 100 * 715.0 ** 2
+        conv = 4120.0 / r * pricing.bsm_gamma(29490.28, 715.0 * r, t, 0.04, 0, iv) * 100 * 29490.28 ** 2
+        self.assertAlmostEqual(own / conv, 1.0, places=9)
+
+    def test_etf_failure_keeps_index_levels(self):
+        s = self.snap(qqq=False)
+        self.assertFalse(any(c.root == "QQQ" for c in s.contracts))
+        self.assertTrue(any("QQQ options unavailable" in w for w in s.warnings))
+
+    def test_survives_normalize_and_pipeline(self):
+        from gexsys.normalize import normalize
+        s = normalize(self.snap(), check_occ=True)
+        self.assertTrue(any(c.root == "QQQ" for c in s.contracts))     # not rejected as OCC mismatches
+        with self.assertRaises(Exception):
+            cfgmod.from_dict({"market": "NQ", "source": "QQQ", "provider": {"name": "cboe", "include_etf": True},
+                              "mapping": {"method": "ratio"}})
+        self.assertTrue(cfgmod.load("configs/free_nq_cboe.json").provider["include_etf"])
+
+
 class TestCarryBasis(unittest.TestCase):
     def test_hand_calculated_fair_value(self):
         asof = datetime(2026, 10, 20, 16, 0, tzinfo=NY)

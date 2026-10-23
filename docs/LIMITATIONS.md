@@ -10,7 +10,7 @@ level as a *modeled concentration of option gamma*.
 
 | Label | Meaning |
 |---|---|
-| RT | real-time quote (Databento quote less than 3 minutes old) |
+| RT | real-time quote (not produced by the free Cboe feed) |
 | DL / DELAYED | exchange-delayed quote |
 | EOD | end-of-day value. **Open interest is always EOD.** Intraday trading does not change today's OI until the next morning. |
 | PROV | Greek/IV computed by the vendor (Cboe) |
@@ -40,7 +40,9 @@ level as a *modeled concentration of option gamma*.
    to `EXTRA_CLOSURES`. CME's abbreviated holiday sessions are treated as `HOLIDAY`.
 10. **Rollover.** `front_contract` uses the conventional roll (8 days before the third Friday).
     Futures-options payloads must name the same contract month as the chart, or use `calendar_offset`.
-11. **Databento adapter** has been tested against canned responses only, not yet a live account. CME product codes for the weekly/daily option series are built in; one CME stops listing is skipped with a warning, but a NEW code would be missed until added.
+11. **SPY/QQQ in index terms.** ETF options are converted with the live index/ETF price ratio. Dollar
+    gamma is exact, but the ETF's own IV and its American exercise are kept, and strikes are snapped to
+    the nearest index strike (an error of at most 0.75 strike spacings, e.g. under 4 SPX points).
 
 ## Behaviour on bad data
 

@@ -19,7 +19,7 @@ from .publish import PublishConfig
 
 TOP_KEYS = {"market", "source", "provider", "engine", "levels", "mapping", "futures_ref", "refresh",
             "alerts", "storage", "description", "publish"}
-PROVIDERS = {"csv", "synthetic", "cboe", "databento"}
+PROVIDERS = {"csv", "synthetic", "cboe"}
 FREE_INDEX_SOURCES = {"SPX", "NDX", "SPY", "QQQ"}
 
 
@@ -68,10 +68,10 @@ class MarketConfig:
             raise ConfigError(f"provider.name must be one of {sorted(PROVIDERS)}")
         if name == "csv" and not self.provider.get("path"):
             raise ConfigError("csv provider requires provider.path")
-        if name == "databento" and src.kind.value != "FUT":
-            raise ConfigError("databento provider reads CME futures options: use source NQ_FOP or ES_FOP")
         if name == "cboe" and self.source not in FREE_INDEX_SOURCES:
             raise ConfigError(f"{name} provider supports sources {sorted(FREE_INDEX_SOURCES)}")
+        if self.provider.get("include_etf") and self.source not in ("SPX", "NDX"):
+            raise ConfigError("provider.include_etf adds SPY to SPX or QQQ to NDX: source must be SPX or NDX")
         mode = self.futures_ref.get("mode", "none")
         if mode not in ("none", "manual", "synthetic_basis", "carry"):
             raise ConfigError("futures_ref.mode must be none | manual | synthetic_basis | carry")
@@ -119,9 +119,6 @@ def make_provider(cfg: MarketConfig):
     if name == "cboe":
         from .providers.cboe import CboeProvider
         return CboeProvider(**p)
-    if name == "databento":
-        from .providers.databento import DatabentoProvider
-        return DatabentoProvider(**p)
     from .providers.synthetic import SyntheticProvider
     return SyntheticProvider(**p)
 

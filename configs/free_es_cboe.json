@@ -44,10 +44,11 @@
   "futures_ref": {
     "mode": "carry"
   },
-  "description": "ES from SPX options - Cboe free feed (15-min delayed)",
+  "description": "ES levels from SPX + SPY options (Cboe free feed, 15-min delayed), SPY converted to SPX terms, mapped to ES futures",
   "market": "ES",
   "source": "SPX",
   "provider": {
-    "name": "cboe"
+    "name": "cboe",
+    "include_etf": true
   }
 }

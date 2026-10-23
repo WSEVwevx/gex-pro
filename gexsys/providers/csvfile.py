@@ -1,6 +1,6 @@
 """CSV chain adapter - the integration path for any licensed source without a
-built-in adapter, notably CME ES/NQ futures options (e.g. Databento GLBX.MDP3
-definitions + statistics + quotes, or CME DataMine), exported to this schema.
+built-in adapter, notably CME ES/NQ futures options (e.g. a broker or
+CME DataMine export), exported to this schema.
 
 Required columns: root, type (C|P), strike, expiration (YYYY-MM-DD), multiplier,
 open_interest

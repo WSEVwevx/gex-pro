@@ -34,48 +34,10 @@ def _print_result(r: dict) -> None:
     print(r["pine"])
 
 
-def local_env_path():
-    """Secrets live outside the OneDrive-synced project folder."""
-    import os
-    from pathlib import Path
-    return Path(os.environ.get("LOCALAPPDATA") or Path.home()) / "gexsys" / ".env"
-
-
 def auto_configs() -> list[str]:
-    """CME futures options via Databento when a key is set up, else the free Cboe index-options configs."""
-    import os
-    key = os.environ.get("DATABENTO_API_KEY", "")
-    if key and "replace" not in key.lower():
-        print("Data: Databento - CME NQ/ES options on futures.")
-        return ["configs/databento_nq.json", "configs/databento_es.json"]
-    print("Data: Cboe free feed (NDX/SPX options, 15-min delayed). For true NQ/ES futures options run DATABENTO_SETUP.bat.")
+    """The free Cboe configs: ES from SPX + SPY options, NQ from NDX + QQQ options."""
+    print("Data: Cboe free feed (SPX+SPY options for ES, NDX+QQQ for NQ; 15-min delayed).")
     return ["configs/free_nq_cboe.json", "configs/free_es_cboe.json"]
-
-
-def databento_setup() -> int:
-    import getpass
-    print("Your Databento API key is on databento.com > Portal > API keys (starts with 'db-').")
-    print(f"It is saved only on this PC ({local_env_path()}), not in the OneDrive or GitHub folder.\n")
-    key = getpass.getpass("Paste the API key (typing is hidden) and press Enter: ").strip()
-    if not key.startswith("db-"):
-        print("That doesn't look like a Databento key (they start with 'db-'). Nothing saved.")
-        return 1
-    p = local_env_path()
-    p.parent.mkdir(parents=True, exist_ok=True)
-    lines = [ln for ln in (p.read_text(encoding="utf-8").splitlines() if p.exists() else [])
-             if not ln.startswith("DATABENTO_API_KEY=")]
-    p.write_text("\n".join(lines + [f"DATABENTO_API_KEY={key}"]) + "\n", encoding="utf-8")
-    import os
-    os.environ["DATABENTO_API_KEY"] = key
-    from .providers.databento import DatabentoProvider
-    try:
-        end = DatabentoProvider(api_key=key).available_end()
-        print(f"\nKey works. CME data available up to {end:%Y-%m-%d %H:%M} UTC.")
-    except Exception as e:                                    # saved anyway; START.bat shows errors too
-        print(f"\nSaved, but the test request failed: {e}")
-        return 1
-    print("Close START.bat if it is open and run it again: the levels now come from CME futures options.")
-    return 0
 
 
 def main(argv=None) -> int:
@@ -91,10 +53,9 @@ def main(argv=None) -> int:
     sv = sub.add_parser("serve")
     sv.add_argument("--config", action="append")
     sv.add_argument("--auto", action="store_true",
-                    help="Databento futures-options configs when DATABENTO_API_KEY is set, else the free Cboe configs")
+                    help="the free Cboe configs for NQ and ES")
     sv.add_argument("--host", default="127.0.0.1")
     sv.add_argument("--port", type=int, default=8765)
-    sub.add_parser("databento-setup", help="save your Databento API key on this PC and test it")
     bs = sub.add_parser("build-site", help="write the dashboard + fresh data as static files (for free hosting)")
     bs.add_argument("--config", action="append", help="default: the free Cboe configs")
     bs.add_argument("--out", default="_site")
@@ -109,7 +70,6 @@ def main(argv=None) -> int:
     a = ap.parse_args(argv)
     _setup_logging(a.log_level)
     cfgmod.load_dotenv(a.env_file)
-    cfgmod.load_dotenv(str(local_env_path()))
 
     from .pipeline import run_once
     from .storage import SnapshotStore
@@ -140,8 +100,6 @@ def main(argv=None) -> int:
             return 2
         serve([cfgmod.load(p) for p in paths], a.host, a.port)
         return 0
-    if a.cmd == "databento-setup":
-        return databento_setup()
     if a.cmd == "build-site":
         from .site import build
         res = build([cfgmod.load(p) for p in a.config or ["configs/free_nq_cboe.json", "configs/free_es_cboe.json"]],
