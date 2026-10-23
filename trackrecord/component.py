@@ -156,8 +156,9 @@ class TrackRecordComponent:
         path = (self.cache_dir or self.dir) / "backtest.json"
         cached = self._read(path)
         now = self.clock()
-        if cached and "strategy_lab" in cached and now - datetime.fromisoformat(cached["built"]) < BACKTEST_MAX_AGE:
-            return cached                                       # (a cache from before the lab existed is rebuilt)
+        lab_ok = cached and (cached.get("strategy_lab") or {}).get("version") == strategies.VERSION
+        if lab_ok and now - datetime.fromisoformat(cached["built"]) < BACKTEST_MAX_AGE:
+            return cached                                       # (a cache from older rules or simulator is rebuilt)
         today = now.astimezone(NY).date()
         final = today.isoformat() if now >= self.session_close(today) + timedelta(minutes=20) else (today - timedelta(days=1)).isoformat()
         out = {"built": now.isoformat(), "markets": {}}
@@ -184,7 +185,7 @@ class TrackRecordComponent:
             log.exception("strategy lab failed")
         if not out["markets"] and cached:
             return cached                                       # keep the last good backtest when sources fail
-        if "strategy_lab" not in out and cached and cached.get("strategy_lab"):
+        if "strategy_lab" not in out and lab_ok:
             out["strategy_lab"] = cached["strategy_lab"]        # and the last good strategy lab
         if out["markets"]:
             path.parent.mkdir(parents=True, exist_ok=True)

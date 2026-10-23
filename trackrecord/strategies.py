@@ -27,6 +27,7 @@ import math
 from datetime import date
 from typing import Callable, Optional
 
+VERSION = 2                                   # bump when rules or the simulator change: cached results are rebuilt
 COST = {"SPX": 0.5, "NDX": 2.0}               # index points per round trip
 POINT_VALUE = {"SPX": 50.0, "NDX": 20.0}      # $ per point: ES, NQ
 FUTURE = {"SPX": "ES", "NDX": "NQ"}
@@ -430,7 +431,7 @@ def study(data: dict, until: str) -> dict:
     start = f"{int(end[:4]) - WINDOW_YEARS}{end[4:]}"
     start = max(start, hourly_days["SPX"][0]["date"])
     last = days["SPX"][-1] if days["SPX"] else None
-    out = {"window": [start, end], "oos": [OOS_START, start], "rules": [], "cost_pts": COST, "point_value": POINT_VALUE,
+    out = {"version": VERSION, "window": [start, end], "oos": [OOS_START, start], "rules": [], "cost_pts": COST, "point_value": POINT_VALUE,
            "now": {"date": last["date"], "vix_vix3m": round(last["ts"], 4), "vix9d_vix": round(last["front"], 4), "vix": last["vix"]} if last else None}
     for spec in RULES:
         res = {}
