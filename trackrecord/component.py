@@ -156,8 +156,8 @@ class TrackRecordComponent:
         path = (self.cache_dir or self.dir) / "backtest.json"
         cached = self._read(path)
         now = self.clock()
-        if cached and now - datetime.fromisoformat(cached["built"]) < BACKTEST_MAX_AGE:
-            return cached
+        if cached and "strategy_lab" in cached and now - datetime.fromisoformat(cached["built"]) < BACKTEST_MAX_AGE:
+            return cached                                       # (a cache from before the lab existed is rebuilt)
         today = now.astimezone(NY).date()
         final = today.isoformat() if now >= self.session_close(today) + timedelta(minutes=20) else (today - timedelta(days=1)).isoformat()
         out = {"built": now.isoformat(), "markets": {}}
