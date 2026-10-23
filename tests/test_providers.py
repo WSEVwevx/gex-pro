@@ -1,5 +1,4 @@
 import io
-import os
 import unittest
 import urllib.error
 from email.message import Message

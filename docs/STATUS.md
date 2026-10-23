@@ -15,6 +15,7 @@ system. **Awaiting credentials**: needs your provider account. **Simulated**: te
 | Data | Normalization (dupes, OCC validation, bad fields, stale quotes) | Working |
 | Data | HTTP retry, backoff, Retry-After, rate limiter, auth classification | Working (tested with simulated responses) |
 | Data | SPY merged into SPX (ES) and QQQ into NDX (NQ): exact strikes x ratio (grouped at index strikes for levels), OI and volume / ratio | **Working with live data** (2026-10-23): dollar gamma identical before and after conversion; audit 18/18 for NQ and ES |
+| Math | Full audit 2026-10-23: pricing formulas vs finite differences and identities over 840 strike/time/vol/rate/dividend combinations; expected move moved to implied total variance (the old IV·√(1/252) overstated it 1.2-1.4x); calendar, roll, carry, payload parsing as Pine does it, and 61 website number/control checks | **All pass** |
 | Math | Independent recomputation from raw Cboe data (own BSM, IV solver, OCC parsing, zero-gamma search) | **Matches** (2026-10-23): net GEX within 0.006% / 0.002%, walls and abs-gamma identical, ZG within 0.001 / 1.2 pts; fixed: Cboe's rounded gamma no longer used for options without IV; rate/dividend now applied |
 | Pine | Panel header shows the folded-in ETF (`etf=` payload token, e.g. CBOE SPX+SPY); header text updated | Static tests pass; **not yet compiled in TradingView by me** - paste the updated script |
 | Data | Tradier, Schwab, Databento adapters | **Removed** 2026-10-23 (free data only) |

@@ -96,10 +96,28 @@ class TestExpectedMove(unittest.TestCase):
         snap, basket = self.mk()
         em = ex.expected_moves(snap, basket, ASOF, snap.contracts)      # Tue 11:00 ET, RTH
         self.assertEqual(em["anchor"], 98.0)
-        self.assertAlmostEqual(em["daily_points"], 98 * 0.2 * math.sqrt(1 / 252))
+        # no Tuesday expiration: per-session average of the variance to Wed 16:00 (29 h, 2 sessions)
+        self.assertAlmostEqual(em["daily_points"], 100 * math.sqrt(0.2 ** 2 * (29 / 8760) / 2))
         self.assertEqual(em["weekly_expiry"], "2026-10-23")
         self.assertEqual(em["weekly_days"], 4)                         # Tue, Wed, Thu, Fri
-        self.assertAlmostEqual(em["weekly_points"], 98 * 0.2 * math.sqrt(4 / 252))
+        self.assertAlmostEqual(em["weekly_points"], 100 * math.sqrt(0.2 ** 2 * (77 / 8760)))   # to Fri 16:00
+
+    def test_rth_full_session_is_forward_variance(self):
+        exp = lambda d: datetime.fromisoformat(d + "T16:00:00").replace(tzinfo=NY)
+        cs = [contract(100, cp, oi=10, iv=iv, exp=exp(d)) for d, iv in (("2026-10-20", 0.25), ("2026-10-21", 0.20),
+                                                                         ("2026-10-23", 0.18)) for cp in "CP"]
+        snap = replace(chain(cs, spot=100.0), prev_close=98.0)
+        em = ex.expected_moves(snap, ["2026-10-20", "2026-10-21", "2026-10-23"], ASOF, snap.contracts)
+        w_tue, w_wed, w_fri = 0.25 ** 2 * 5 / 8760, 0.20 ** 2 * 29 / 8760, 0.18 ** 2 * 77 / 8760
+        self.assertAlmostEqual(em["daily_points"], 100 * math.sqrt(w_wed - w_tue))     # one full session
+        self.assertAlmostEqual(em["weekly_points"], 100 * math.sqrt((w_wed - w_tue) + (w_fri - w_tue)))
+        self.assertIn("forward", em["daily_method"])
+
+    def test_after_close_uses_variance_to_next_session_expiry(self):
+        snap, basket = self.mk()
+        em = ex.expected_moves(snap, basket, TUE_CLOSE + timedelta(hours=3), snap.contracts)   # Tue 19:00 ET
+        self.assertAlmostEqual(em["daily_points"], 100 * math.sqrt(0.2 ** 2 * 21 / 8760))    # to Wed 16:00
+        self.assertAlmostEqual(em["weekly_points"], 100 * math.sqrt(0.2 ** 2 * 69 / 8760))   # to Fri 16:00
 
     def test_index_options_preferred_over_converted_etf(self):
         # a converted ETF option sits closer to the money, but the band uses the index's own ATM IV

@@ -13,13 +13,16 @@ All prices are in the options-underlying space (mapped to futures in mapping.py)
 * Max pain - per expiration, the settlement price that minimises the total intrinsic value
   paid to option holders:  argmin_K* sum_calls OI*max(0,K*-K) + sum_puts OI*max(0,K-K*),
   searched over that expiration's strikes.  A popular statistic, not a price target.
-* Expected-move bands - anchor +/- anchor * IV_atm * sqrt(N/252):
-    daily : N = 1, IV of the nearest expiration with >= 1 calendar day left (avoids 0DTE decay
-            distortion);
-    weekly: N = trading days from the session date through this week's last expiration, IV of
-            that expiration.
-  Anchor = previous session close during RTH, the last close outside RTH (so the bands are fixed
-  for the whole session instead of moving with every snapshot).
+* Expected-move bands - from implied total variance, w(e) = IV_atm(e)^2 * T(e), with T in calendar
+  years exactly as the IVs are annualized (so no 252-vs-365 mismatch):
+    daily : variance of one full session. Outside RTH: w of the expiration that settles at the next
+            session's close (it covers exactly the overnight plus that session). During RTH: the
+            forward variance w(next session) - w(today) between the two session-close expirations.
+            Without daily expirations: w(first expiration) / sessions until it.
+    weekly: through this week's last expiration: w(that expiration) outside RTH; during RTH today's
+            full-session variance plus w(week) - w(today).
+  1-sd points = price * sqrt(variance). Anchor = previous session close during RTH, the last close
+  outside RTH (so the bands are fixed for the whole session instead of moving with every snapshot).
 * GEX profile - net exposure aggregated into equal-width price bins around the reference price,
   scaled to integers -99..99 for compact transport to TradingView.
 """
@@ -132,6 +135,15 @@ def session_date(asof: datetime) -> date:
     return d
 
 
+def _session_close_expiry(w: dict, d: date) -> Optional[datetime]:
+    """The expiration settling at the close of session d (the latest one dated d)."""
+    return max((e for e in w if e.astimezone(marketcal.NY).date() == d), default=None)
+
+
+def _sessions(first: date, last: date) -> int:
+    return sum(1 for i in range((last - first).days + 1) if marketcal.is_trading_day(first + timedelta(days=i)))
+
+
 def expected_moves(snap: ChainSnapshot, basket: list[str], asof: datetime, ivs_from: list[OptionContract]) -> Optional[dict]:
     if snap.spot is None or not basket:
         return None
@@ -140,21 +152,44 @@ def expected_moves(snap: ChainSnapshot, basket: list[str], asof: datetime, ivs_f
     anchor_kind = "previous close" if (rth and snap.prev_close) else "last close/price"
     sd = session_date(asof)
     out = {"anchor": anchor, "anchor_kind": anchor_kind, "session": sd.isoformat()}
-    daily_exp = next((e for e in basket if date.fromisoformat(e) > asof.astimezone(marketcal.NY).date()), None)
-    if daily_exp:
-        iv = atm_iv(ivs_from, daily_exp, snap.spot)
+    # implied total variance to each expiration: ATM IV^2 x calendar years remaining
+    b = set(basket)
+    days = sorted({c.expiration.date().isoformat() for c in ivs_from if c.iv and c.expiration > asof
+                   and c.expiration.date().isoformat() in b})
+    w, iv_of = {}, {}
+    for e in sorted({c.expiration for c in ivs_from if c.iv and c.expiration > asof and c.expiration.date().isoformat() in b}):
+        iv = atm_iv([c for c in ivs_from if c.expiration == e], e.date().isoformat(), snap.spot)
         if iv:
-            out.update(daily_points=anchor * iv * math.sqrt(1 / 252), daily_iv=iv, daily_iv_expiry=daily_exp)
+            w[e], iv_of[e] = iv * iv * (e - asof).total_seconds() / eng.YEAR_SECONDS, iv
+    if not w or not days:
+        return out if len(out) > 3 else None
+    nxt = sd + timedelta(days=1)
+    while not marketcal.is_trading_day(nxt):
+        nxt += timedelta(days=1)
+    e_today = _session_close_expiry(w, sd) if rth else None
+    e_next = _session_close_expiry(w, nxt if rth else sd)
+    dvar, used = None, None
+    if rth and e_today and e_next and w[e_next] > w[e_today]:
+        dvar, used, method = w[e_next] - w[e_today], e_next, "forward variance between session expirations"
+    elif not rth and e_next:
+        dvar, used, method = w[e_next], e_next, "variance to the next session's expiration"
+    if dvar is None:
+        used = min(w)
+        n = _sessions(sd, used.astimezone(marketcal.NY).date())
+        dvar, method = w[used] / max(n, 1), f"average per session over {max(n, 1)} sessions"
+    out.update(daily_points=snap.spot * math.sqrt(dvar), daily_iv=iv_of[used],
+               daily_iv_expiry=used.date().isoformat(), daily_method=method)
     friday = sd + timedelta(days=(4 - sd.weekday()) % 7)
-    weekly = [e for e in basket if sd <= date.fromisoformat(e) <= friday]
+    weekly = [e for e in w if sd <= e.astimezone(marketcal.NY).date() <= friday]
     if weekly:
-        we = weekly[-1]
-        n = sum(1 for i in range((date.fromisoformat(we) - sd).days + 1)
-                if marketcal.is_trading_day(sd + timedelta(days=i)))
-        iv = atm_iv(ivs_from, we, snap.spot)
-        if iv and n > 0:
-            out.update(weekly_points=anchor * iv * math.sqrt(n / 252), weekly_iv=iv, weekly_expiry=we, weekly_days=n)
-    return out if len(out) > 3 else None
+        we = max(weekly)
+        if rth and e_today:
+            wvar = dvar + max(0.0, w[we] - w[e_today])      # today's full session + the rest of the week
+        else:
+            wvar = w[we] if not rth else max(w[we], dvar)
+        out.update(weekly_points=snap.spot * math.sqrt(wvar), weekly_iv=iv_of[we],
+                   weekly_expiry=we.date().isoformat(), weekly_days=_sessions(sd, we.astimezone(marketcal.NY).date()))
+    return out
 
 
 def profile_bins(res: eng.GexResult, window_pct: float = 0.025, target_bins: int = 40) -> Optional[dict]:

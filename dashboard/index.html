@@ -445,9 +445,9 @@ function render(){
   renderStats(w, s, L, X);
   renderExpiry(s);
   if(page === "bias") renderBias(w);
-  $("foot").innerHTML = `Model estimates from ${esc(s.provider || w.provider)} ${esc(w.source)} options (${s.ref_quality === "RT" ? "real-time quotes" : "15-minute-delayed quotes"}) and end-of-day open interest, assuming dealers are long calls and short puts.
+  $("foot").innerHTML = `Model estimates from ${esc(s.provider || w.provider)} ${opts} options (${s.ref_quality === "RT" ? "real-time quotes" : "15-minute-delayed quotes"}) and end-of-day open interest, assuming dealers are long calls and short puts.
     ${w.result.mapped ? "Futures prices use " + esc(w.result.mapped.mapping.futures_ref_mode) + "; TradingView re-maps with your live chart." : esc(s.mapping_note || "")}
-    These are proxy levels from index options, not NQ/ES futures options, and not trading advice.`;
+    These are proxy levels from index and ETF options, not NQ/ES futures options, and not trading advice.`;
 }
 
 function renderHero(w, s, L, X, ref){

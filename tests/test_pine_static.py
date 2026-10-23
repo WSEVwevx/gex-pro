@@ -10,7 +10,7 @@ import re
 import unittest
 from pathlib import Path
 
-from gexsys.export import extras_tokens, pine_payload
+from gexsys.export import pine_payload
 
 PINE = (Path(__file__).resolve().parent.parent / "pine" / "nq_es_gex_levels.pine").read_text(encoding="utf-8")
 CODE = "\n".join(l.split("//")[0] if not l.strip().startswith("//") else "" for l in PINE.splitlines())
