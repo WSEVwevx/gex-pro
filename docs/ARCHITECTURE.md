@@ -36,7 +36,7 @@ Today's components:
 
 | Component | Routes | Hosted files |
 |---|---|---|
-| `gexsys.component.GexComponent` | `/health`, `/api/markets`, `/api/all`, `/api/levels`, `/api/pine`, `/api/pine/all`, `/api/indicator` | `all.json`, `pine-*.txt`, `indicator.json` |
+| `gexsys.component.GexComponent` | `/health`, `/api/markets`, `/api/all`, `/api/levels`, `/api/pine`, `/api/pine/all`, `/api/indicator`, `/api/timeline` | `all.json`, `pine-*.txt`, `indicator.json`, `timeline.json` |
 | `feeds.component.FeedsComponent` | `/api/news`, `/api/posts` | `news.json`, `posts.json` |
 | `briefings.component.BriefingsComponent` | `/api/briefings` | `briefings.json` |
 
@@ -47,6 +47,13 @@ builds a plain snapshot (`gexpro/context.py`) and passes it in as `context()`, t
 else it needs (`is_trading_day`, `notify`). The feature defines the snapshot's shape in its own docs
 (`briefings/compose.py`), so it can be tested with hand-made data. Do the same for future features.
 
+## The website
+
+`dashboard/index.html` (markup), `dashboard/assets/terminal.css` (look) and `dashboard/assets/app.js`
+(behaviour). The local server serves `/assets/<file>` (plain file names only); the hosted build copies
+the assets and adds `?v=<content hash>` to their links, so browsers never keep a stale copy. Every
+module with `data-help="key"` gets an Explain button; its text lives in the `HELP` table in `app.js`.
+
 ## Adding a feature
 
 1. Make a new package next to the others, e.g. `flows/`. It imports only the standard library and
@@ -54,8 +61,9 @@ else it needs (`is_trading_day`, `notify`). The feature defines the snapshot's s
 2. Give it `flows/component.py` with a `FlowsComponent` that has the four parts above.
 3. Add it to `default_components()` in `gexpro/components.py`, and add `"flows"` to `ALLOWED["gexpro"]`
    and a `"flows": set()` row in `tests/test_architecture.py`, plus `"flows*"` in `pyproject.toml`.
-4. Add its page to `dashboard/index.html`: a tab button, a view `<div>`, an `API` entry, and a
-   load/render function. Copy the Indicator or News page as a template.
+4. Add its page: a sidebar button and a view `<div>` (with `data-help` on each module) in `dashboard/index.html`,
+   an `API` entry, a `PAGES` row, a `HELP` entry and a
+   load/render function in `dashboard/assets/app.js`. Copy the Volatility or Timeline page as a template.
 5. Add `tests/test_flows_*.py` with the network replaced by canned responses.
 
 ## Commands

@@ -63,6 +63,7 @@ class MarketWorker(threading.Thread):
         root = Path(os.path.expandvars(cfg.storage.get("root", "data/snapshots")))
         self._good_path = root / f"last_good_{self.key}.json"
         self._pub_path = root / f"published_{self.key}.json"
+        self._timeline_path = root / f"timeline_{self.key}.jsonl"
         self._restore_last_good()
         self._restore_published()
 
@@ -114,7 +115,45 @@ class MarketWorker(threading.Thread):
         self.result = r
         if not new_bad:
             self._save_last_good(r)
+            self._append_timeline(r)
         return True
+
+    TIMELINE_KEEP = 4000                  # about two weeks of 5-minute refreshes
+
+    def _append_timeline(self, r: dict) -> None:
+        """One compact line per good result (chart prices: futures when mapped), for the timeline view."""
+        s = r["summary"]
+        L = r.get("mapped") or s
+        p = lambda v: v.get("price") if isinstance(v, dict) else v
+        row = {"t": s.get("asof"), "ref": L.get("futures_equiv_of_ref") or s.get("ref_price"), "zg": p(L.get("zero_gamma")),
+               "cw": p(L.get("call_wall")), "pw": p(L.get("put_wall")), "ag": p(L.get("abs_gamma")),
+               "net": s.get("net"), "regime": s.get("regime")}
+        try:
+            self._timeline_path.parent.mkdir(parents=True, exist_ok=True)
+            with self._timeline_path.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(row) + "\n")
+            if self._timeline_path.stat().st_size > 1_500_000:          # trim now and then
+                lines = self._timeline_path.read_text(encoding="utf-8").splitlines()[-self.TIMELINE_KEEP:]
+                self._timeline_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        except OSError as e:
+            log.warning("could not append timeline for %s: %s", self.key, e)
+
+    def timeline(self, hours: float = 120) -> list[dict]:
+        """Rows from the last `hours`, oldest first."""
+        try:
+            lines = self._timeline_path.read_text(encoding="utf-8").splitlines()[-self.TIMELINE_KEEP:]
+        except OSError:
+            return []
+        cutoff = datetime.now(timezone.utc).timestamp() - hours * 3600
+        out = []
+        for ln in lines:
+            try:
+                row = json.loads(ln)
+                if datetime.fromisoformat(row["t"]).timestamp() >= cutoff:
+                    out.append(row)
+            except (ValueError, KeyError, TypeError):
+                continue
+        return out
 
     def run(self) -> None:
         while not self._stop.is_set():

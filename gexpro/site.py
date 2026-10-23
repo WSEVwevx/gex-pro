@@ -8,6 +8,8 @@ workflow (last good results, the scheduled paste, history, feed caches).
 """
 from __future__ import annotations
 
+import hashlib
+import shutil
 from pathlib import Path
 
 from .server import DASHBOARD
@@ -24,6 +26,14 @@ def build(components, out: str | Path, state: str | Path) -> dict:
     for c in components:
         status.update(c.build_static(data, state) or {})
     html = (DASHBOARD / "index.html").read_text(encoding="utf-8")
-    (out / "index.html").write_text(html.replace("<script>", STATIC_FLAG + "\n<script>", 1), encoding="utf-8")
+    assets = out / "assets"                           # the page's stylesheet and script
+    assets.mkdir(exist_ok=True)
+    for f in (DASHBOARD / "assets").glob("*"):
+        if f.is_file():
+            shutil.copy2(f, assets / f.name)
+            # version each link by content, so browsers fetch an updated file instead of a cached one
+            tag = hashlib.sha256(f.read_bytes()).hexdigest()[:10]
+            html = html.replace(f'"assets/{f.name}"', f'"assets/{f.name}?v={tag}"')
+    (out / "index.html").write_text(html.replace("<script", STATIC_FLAG + "\n<script", 1), encoding="utf-8")
     (out / ".nojekyll").write_text("", encoding="utf-8")
     return status

@@ -251,6 +251,42 @@ def flow_ratios(snap: ChainSnapshot, basket: list[str]) -> dict:
             "nearest_volume_share": vol0 / (c_v + p_v) if (c_v + p_v) else None}
 
 
+def term_structure(snap: ChainSnapshot, res: eng.GexResult, max_n: int = 12) -> list[dict]:
+    """Per expiration: ATM IV, and the IVs of the ~25-delta put and call (BSM delta at the reference
+    price with each option's own IV). skew_pts = put25 - call25 in vol points: how much more downside
+    protection costs than upside. The index's own options are used when present (ETF ones otherwise)."""
+    s = snap.spot
+    if not s or not res.basket:
+        return []
+    b = set(res.basket)
+    q = snap.rate if snap.source_kind.value == "FUT" else snap.div_yield
+    exps = sorted({c.expiration for c in snap.contracts if c.iv and c.expiration > res.asof
+                   and c.expiration.date().isoformat() in b})
+    out = []
+    for e in exps[:max_n]:
+        cs = [c for c in snap.contracts if c.expiration == e and c.iv]
+        cs = [c for c in cs if c.group_strike is None] or cs
+        t = (e - res.asof).total_seconds() / eng.YEAR_SECONDS
+        atm = atm_iv(cs, e.date().isoformat(), s)
+
+        def wing(is_call: bool):
+            best = None
+            for c in cs:
+                if (c.option_type == OptionType.CALL) != is_call:
+                    continue
+                d = pricing.bsm_delta(s, c.strike, t, snap.rate, q, c.iv, is_call)
+                if 0.10 <= abs(d) <= 0.40 and (best is None or abs(abs(d) - 0.25) < abs(abs(best[0]) - 0.25)):
+                    best = (d, c)
+            return best
+        p25, c25 = wing(False), wing(True)
+        out.append({"expiration": e.date().isoformat(), "settle": e.astimezone(marketcal.NY).strftime("%H:%M"),
+                    "dte": round(t * 365, 2), "atm_iv": atm,
+                    "put25_iv": p25[1].iv if p25 else None, "put25_strike": p25[1].strike if p25 else None,
+                    "call25_iv": c25[1].iv if c25 else None, "call25_strike": c25[1].strike if c25 else None,
+                    "skew_pts": (p25[1].iv - c25[1].iv) * 100 if p25 and c25 else None})
+    return out
+
+
 def compute_extras(snap: ChainSnapshot, cfg: eng.EngineConfig, res: eng.GexResult) -> dict:
     if res.status == "UNAVAILABLE":
         return {}
@@ -265,4 +301,5 @@ def compute_extras(snap: ChainSnapshot, cfg: eng.EngineConfig, res: eng.GexResul
         "profile": profile_bins(res),
         "ratios": flow_ratios(snap, res.basket),
         "greeks": greek_exposures(snap, res),
+        "term": term_structure(snap, res),
     }

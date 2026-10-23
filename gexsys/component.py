@@ -2,9 +2,10 @@
 
 Same shape as every GEX PRO component (see gexpro/components.py):
   routes()                    /health, /api/markets, /api/all, /api/levels, /api/pine, /api/pine/all,
-                              /api/indicator (the TradingView script, read from disk on every request)
+                              /api/indicator (the TradingView script, read from disk on every request),
+                              /api/timeline?hours=120 (zero gamma, walls, net GEX per refresh, per market)
   start() / stop()            one background refresh thread per market
-  build_static(data, state)   all.json, pine-*.txt and indicator.json for the hosted site
+  build_static(data, state)   all.json, pine-*.txt, indicator.json and timeline.json for the hosted site
 
 Endpoints, by example:
   /api/levels?key=NQ-CBOE                    one worker's latest result (market=NQ picks the first NQ worker)
@@ -82,7 +83,11 @@ class GexComponent:
     def routes(self) -> dict:
         return {"/health": self._health, "/api/markets": self._markets, "/api/all": lambda q: (200, _all(self.workers.values())),
                 "/api/pine/all": self._pine_all, "/api/levels": self._levels, "/api/pine": self._pine,
-                "/api/indicator": lambda q: (200, indicator_info())}
+                "/api/indicator": lambda q: (200, indicator_info()), "/api/timeline": self._timeline}
+
+    def _timeline(self, q):
+        hours = float((q.get("hours") or ["120"])[0])
+        return 200, {w.cfg.market: w.timeline(hours) for w in self.workers.values()}
 
     def _worker(self, q) -> Optional[MarketWorker]:
         if q.get("key"):
@@ -142,6 +147,7 @@ class GexComponent:
         self.workers = {w.key: w for w in workers}          # so the app can read this build's results
         _write(data / "all.json", json.dumps(_all(workers, static=True)))
         _write(data / "indicator.json", json.dumps(indicator_info()))
+        _write(data / "timeline.json", json.dumps({w.cfg.market: w.timeline(120) for w in workers}))
         for which, pick in (("latest", lambda w: w.result and w.result.get("pine")),
                             ("published", lambda w: w.published and w.published.get("payload"))):
             _write(data / f"pine-{which}.txt", combine([p for p in map(pick, workers) if p]))
