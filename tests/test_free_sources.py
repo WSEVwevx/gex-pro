@@ -84,15 +84,20 @@ class TestEtfMerge(unittest.TestCase):
         self.assertTrue(q and all(c.symbol.endswith("@NDX") and c.multiplier == 100 for c in q))
         self.assertTrue(all(c.bid is None and c.gamma is None and c.iv == 0.2 for c in q))
         self.assertTrue(any("includes QQQ options in NDX terms" in w for w in s.warnings))
-        # strikes snap to listed NDX strikes (100 apart here) when within 0.75 x spacing, else stay exact
-        on = {round(c.strike, 2) for c in q}
-        self.assertIn(29000.0, on)                       # 703 x 41.25 = 28997.6 -> 29000
-        self.assertIn(round(740 * r, 2), on)             # 30521: past the last NDX strike (30000), kept exact
-        # 712 and 713 (29368, 29409) both snap to 29400: added together, not dropped
-        both = [c for c in q if c.strike == 29400.0 and c.option_type.value == "C"]
-        self.assertEqual(len(both), 1)
-        self.assertAlmostEqual(both[0].open_interest, 2 * 4120.0 / r, places=6)
-        self.assertAlmostEqual(both[0].volume, 2 * 824.0 / r, places=6)
+        # math uses the exact converted strike; levels group it with the nearest listed NDX strike
+        # (100 apart here) when within 0.75 x spacing, else at the exact strike
+        self.assertTrue(all(abs(c.strike - float(c.symbol.split("@")[0][-8:]) / 1000 * r) < 1e-6 for c in q))
+        groups = {c.level_strike for c in q}
+        self.assertIn(29000.0, groups)                   # 703 x 41.25 = 28997.6 -> grouped at 29000
+        self.assertIn(round(740 * r, 2), groups)         # 30521: past the last NDX strike (30000), own level
+        # 712 and 713 (29368, 29409) stay two contracts with their own strikes, both grouped at 29400
+        both = [c for c in q if c.level_strike == 29400.0 and c.option_type.value == "C"]
+        self.assertEqual(sorted(round(c.strike, 1) for c in both), [round(712 * r, 1), round(713 * r, 1)])
+        self.assertAlmostEqual(sum(c.open_interest for c in both), 2 * 4120.0 / r, places=6)
+        from gexsys import engine as eng
+        res = eng.compute(s, eng.EngineConfig(max_dte=45))
+        self.assertIn(29400.0, res.by_strike)
+        self.assertFalse(any(abs(k - 712 * r) < 1e-6 for k in res.by_strike))   # no stray unsnapped level
         # dollar gamma is unchanged by the conversion (exact identity, not an approximation)
         t, iv = 3 / 365, 0.2
         own = 4120.0 * pricing.bsm_gamma(715.0, 715.0, t, 0.04, 0, iv) * 100 * 715.0 ** 2

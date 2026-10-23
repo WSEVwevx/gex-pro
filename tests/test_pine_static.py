@@ -73,7 +73,7 @@ class TestPineStatic(unittest.TestCase):
 
     def test_payload_keys_match_the_service(self):
         read = set(re.findall(r'(?:strOf|numOf)\(m, "(\w+)"\)', PINE))
-        summary = {"asof": "2026-10-20T15:00:00+00:00", "ref_price": 1.0, "ref_quality": "DL", "positioning": "conventional",
+        summary = {"asof": "2026-10-20T15:00:00+00:00", "etf": "QQQ", "ref_price": 1.0, "ref_quality": "DL", "positioning": "conventional",
                    "unit": "usd_per_1pct", "net": 1.0, "regime": "POSITIVE", "status": "OK", "zero_gamma_status": "ESTIMATE",
                    "basket": ["2026-10-20"], "concentrations": [{"price": 1.0, "sign": "+", "share": 0.1}],
                    "zero_gamma": {"price": 1.0}, "call_wall": {"price": 1.0}, "put_wall": {"price": 1.0},

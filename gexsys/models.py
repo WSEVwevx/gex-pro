@@ -62,6 +62,12 @@ class OptionContract:
     greeks_quality: Quality = Quality.MISSING
     greeks_time: Optional[datetime] = None
     exercise_style: str = "european"   # european | american
+    group_strike: Optional[float] = None   # strike used to GROUP levels when it differs from the exact
+                                           # strike (ETF options converted to index terms); math uses `strike`
+
+    @property
+    def level_strike(self) -> float:
+        return self.strike if self.group_strike is None else self.group_strike
 
     @property
     def mid(self) -> Optional[float]:

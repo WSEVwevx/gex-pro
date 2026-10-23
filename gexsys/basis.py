@@ -19,7 +19,7 @@ from . import marketcal
 from .mapping import FUTURES, SOURCES
 from .models import SourceKind
 
-DEFAULT_DIV_YIELD = {"SPX": 0.013, "NDX": 0.007}
+DEFAULT_DIV_YIELD = {"SPX": 0.013, "NDX": 0.007, "SPY": 0.013, "QQQ": 0.006}
 CODE_MONTH = {v: k for k, v in marketcal.QUARTER_CODES.items()}
 
 

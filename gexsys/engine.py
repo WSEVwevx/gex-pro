@@ -230,6 +230,13 @@ def compute(snap: ChainSnapshot, cfg: Optional[EngineConfig] = None, asof: Optio
 
     rows: list[ContractExposure] = []
     scale = unit_scale(cfg.unit, s)
+    # each expiration's quoted IVs by strike: the fallback when a contract has neither an IV nor a
+    # solvable mid (typically deep in the money, where the mid sits below intrinsic value)
+    smile: dict[datetime, list[tuple[float, float]]] = {}
+    n_borrowed = 0
+    for c in snap.contracts:
+        if c.iv is not None and c.iv > 0 and c.expiration in basket_set:
+            smile.setdefault(c.expiration, []).append((c.strike, c.iv))
     for c in snap.contracts:
         if c.expiration not in basket_set:
             excluded["expired_or_outside_basket"] += 1
@@ -244,8 +251,13 @@ def compute(snap: ChainSnapshot, cfg: Optional[EngineConfig] = None, asof: Optio
         if need:
             if iv is None:
                 iv = _solve_iv(c, s, t, snap)
+            if iv is None and smile.get(c.expiration):
+                iv = min(smile[c.expiration], key=lambda kv: abs(kv[0] - c.strike))[1]
+                n_borrowed += 1
             if iv is not None and iv > 0:
                 gamma, gq = _contract_gamma_at(c, s, t, iv, snap), Quality.MODEL_CALC
+            elif cfg.recompute_greeks == "always":
+                gamma = None              # never fall back to the vendor's rounded gamma in this mode
         if gamma is None or not math.isfinite(gamma) or gamma < 0:
             excluded["missing_greeks"] += 1
             continue
@@ -268,7 +280,7 @@ def compute(snap: ChainSnapshot, cfg: Optional[EngineConfig] = None, asof: Optio
     by_expiry: dict[str, dict] = {}
     by_bucket: dict[str, dict] = {}
     for r in rows:
-        k = r.contract.strike
+        k = r.contract.level_strike
         d = by_strike.setdefault(k, {"call": 0.0, "put": 0.0, "net": 0.0, "abs": 0.0, "call_oi": 0.0, "put_oi": 0.0})
         side = "call" if r.contract.option_type == OptionType.CALL else "put"
         d[side] += r.exposure
@@ -325,6 +337,8 @@ def compute(snap: ChainSnapshot, cfg: Optional[EngineConfig] = None, asof: Optio
     status = "OK"
     if excluded["missing_greeks"] > 0:
         warnings.append(f"{excluded['missing_greeks']} contracts excluded for missing Greeks/IV")
+    if n_borrowed:
+        warnings.append(f"{n_borrowed} contracts without a usable IV used the nearest strike's IV (same expiration)")
     if any("stale" in w for w in warnings) or coverage < cfg.min_profile_coverage:
         status = "DEGRADED"
 

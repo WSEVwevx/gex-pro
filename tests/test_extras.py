@@ -101,6 +101,14 @@ class TestExpectedMove(unittest.TestCase):
         self.assertEqual(em["weekly_days"], 4)                         # Tue, Wed, Thu, Fri
         self.assertAlmostEqual(em["weekly_points"], 98 * 0.2 * math.sqrt(4 / 252))
 
+    def test_index_options_preferred_over_converted_etf(self):
+        # a converted ETF option sits closer to the money, but the band uses the index's own ATM IV
+        snap, basket = self.mk(spot=100.4)
+        etf = [replace(c, strike=100.4, group_strike=100.0, iv=0.15, symbol="X@IDX") for c in snap.contracts]
+        em = ex.expected_moves(snap, basket, ASOF, snap.contracts + etf)
+        self.assertAlmostEqual(em["daily_iv"], 0.20)
+        self.assertAlmostEqual(ex.atm_iv(etf, "2026-10-21", 100.4), 0.15)      # ETF-only chain still works
+
     def test_after_close_anchor_is_last_price(self):
         snap, basket = self.mk()
         em = ex.expected_moves(snap, basket, TUE_CLOSE + timedelta(hours=3), snap.contracts)

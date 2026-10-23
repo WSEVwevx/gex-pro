@@ -381,7 +381,8 @@ function render(){
   const built = STATIC ? (Date.now() - Date.parse(data.now)) / 60000 : 0;
   const svc = h.status === "ok" && built < 45 ? "ok" : h.status === "starting" ? "" : "warn";
   const used = (s && s.provider) || w.provider, rt = s && s.ref_quality === "RT";
-  $("status").innerHTML = `<span class="chip"><i class="dot ${svc}"></i>Data <b>${esc(used)}</b></span>
+  const opts = s ? esc(s.options_source || w.source) + (s.etf ? "+" + esc(s.etf) : "") : esc(w.source);
+  $("status").innerHTML = `<span class="chip"><i class="dot ${svc}"></i>Data <b>${esc(used)}</b> · ${opts}</span>
     <span class="chip">Options <b>${rt ? "real time" : "15-min delayed"}</b></span>
     ${s ? `<span class="chip">Updated <b>${ago(s.asof)}</b></span>` : ""}
     ${STATIC ? `<span class="chip" title="The hosted site is rebuilt about every 15 minutes while the market is open">Site rebuilt <b>${ago(data.now)}</b></span>` : ""}

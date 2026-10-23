@@ -68,6 +68,7 @@ def run_once(cfg: MarketConfig, provider, store: Optional[SnapshotStore] = None,
     summary["tv_ref_symbol"] = src.tv_symbol
     summary["ref_time"] = snap.spot_time.isoformat() if snap.spot_time else None
 
+    summary["etf"] = next((c.root for c in snap.contracts if c.group_strike is not None), None)
     summary["provider"] = getattr(provider, "last_label", None) or getattr(provider, "label", getattr(provider, "name", "?").upper())
     mapped, map_note = None, ""
     fprice, ftime, fmode, sprice, stime = _futures_ref(cfg, snap, futures_ref, provider)

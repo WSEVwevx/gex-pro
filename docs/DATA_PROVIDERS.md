@@ -29,8 +29,8 @@ ES from -$56B to -$69B.
 How an ETF option joins the index chain (`provider.include_etf`, on in both free configs):
 
 * ratio r = index price / ETF price, from the same Cboe snapshot (about 10 for SPY, 41 for QQQ);
-* strike × r, snapped to the nearest listed index strike (within 0.75 of the usual strike spacing);
-  ETF strikes that land on the same index strike are added together;
+* strike × r, kept exact for the math and grouped with the nearest listed index strike (within 0.75 of
+  the usual strike spacing) for levels, walls and max pain;
 * open interest and volume ÷ r, so 10 SPY contracts count as 1 SPX contract;
 * the ETF's own IV is kept; gamma is recomputed at the index price.
 

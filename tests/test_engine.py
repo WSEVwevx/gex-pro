@@ -77,12 +77,27 @@ class TestFiltering(unittest.TestCase):
         self.assertIsNone(r.totals["net"])
 
     def test_missing_greeks(self):
-        # gamma missing but IV present -> model gamma; both missing and no quotes -> excluded
-        cs = [contract(100, "C", gamma=None, iv=0.2), contract(101, "C", gamma=None, iv=None)]
+        # gamma missing but IV present -> model gamma; no IV and no quotes -> the same expiration's
+        # nearest-strike IV; nothing to borrow (only contract in its expiration) -> excluded
+        cs = [contract(100, "C", gamma=None, iv=0.2), contract(104, "C", gamma=None, iv=None),
+              contract(101, "C", gamma=None, iv=None, days=14)]
         r = eng.compute(chain(cs))
         self.assertEqual(r.excluded["missing_greeks"], 1)
+        self.assertEqual(len(r.rows), 2)
         self.assertEqual(r.rows[0].gamma_quality.value, "CALC")
         self.assertAlmostEqual(r.rows[0].gamma, pricing.bsm_gamma(100, 100, 7 / 365, 0, 0, 0.2), places=10)
+        self.assertEqual(r.rows[1].iv, 0.2)                                    # borrowed from strike 100
+        self.assertAlmostEqual(r.rows[1].gamma, pricing.bsm_gamma(100, 104, 7 / 365, 0, 0, 0.2), places=10)
+        self.assertTrue(any("nearest strike's IV" in w for w in r.warnings))
+
+    def test_rounded_vendor_gamma_not_used_when_recomputing(self):
+        # Cboe rounds gamma to 4 decimals (0.0002 on a deep-ITM 0DTE put whose true gamma is ~0.000005);
+        # with recompute_greeks="always" that vendor number must never reach the totals
+        lone = contract(130, "P", gamma=0.0002, iv=None, days=1)
+        r = eng.compute(chain([lone, contract(100, "C", gamma=0.01, iv=0.2)]), eng.EngineConfig(recompute_greeks="always"))
+        self.assertEqual([x.contract.strike for x in r.rows], [100.0])
+        r2 = eng.compute(chain([lone, contract(100, "C", gamma=0.01, iv=0.2)]))          # missing_only keeps vendor
+        self.assertEqual(len(r2.rows), 2)
 
     def test_missing_greeks_solved_from_quotes(self):
         px = pricing.bsm_price(100, 100, 7 / 365, 0, 0, 0.25, True)

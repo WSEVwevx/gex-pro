@@ -18,8 +18,8 @@ Data-quality handling
 
 ETF options merged into the index chain (include_etf=True: SPY into SPX, QQQ into NDX)
 * The ETF tracks the index at ratio r = index price / ETF price (~10 for SPY, ~41 for QQQ).
-* Each ETF option becomes an index-equivalent contract: strike x r (snapped to the nearest
-  listed index strike), open interest and volume / r.  BSM gamma scales as 1/r when price and
+* Each ETF option becomes an index-equivalent contract: strike x r (exact, for the math; grouped
+  with the nearest listed index strike for levels), open interest and volume / r.  BSM gamma scales as 1/r when price and
   strike both scale by r, so OI/r x gamma/r x multiplier x (r S)^2 equals the ETF option's own
   dollar gamma: GEX, walls, max pain and put/call ratios stay consistent in index contracts.
 * IV is kept (the ETF's own); bid/ask are dropped because they are not in index units.
@@ -27,13 +27,14 @@ ETF options merged into the index chain (include_etf=True: SPY into SPX, QQQ int
 from __future__ import annotations
 
 import bisect
+import os
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from .. import marketcal
+from .. import marketcal, pricing
 from ..mapping import SOURCES
-from ..models import ChainSnapshot, OptionContract, Quality
+from ..models import ChainSnapshot, OptionContract, OptionType, Quality
 from ..normalize import parse_occ
 from .base import Provider, ProviderError, RateLimiter, http_get_json
 
@@ -129,38 +130,53 @@ class CboeProvider(Provider):
             else:
                 if ech["spot"] and ech["contracts"]:
                     r = spot / ech["spot"]
-                    contracts = contracts + merge_etf(contracts, ech["contracts"], r, source_key, src.multiplier)
+                    contracts = contracts + merge_etf(contracts, ech["contracts"], r, source_key, src.multiplier,
+                                                      etf_spot=ech["spot"], asof=ch["ts"], etf_q=dividend_yield(etf))
                     warnings.append(f"includes {etf} options in {source_key} terms "
                                     f"({r:.2f} {etf} contracts = 1 {source_key} contract)")
         return ChainSnapshot(underlying=src.vendor_symbol, source_kind=src.kind, spot=spot,
                              spot_time=ch["spot_time"] if spot else None,
                              spot_quality=Quality.DELAYED if spot else Quality.MISSING, contracts=contracts,
                              source="cboe:delayed", fetched_at=datetime.now(timezone.utc), warnings=warnings,
-                             prev_close=ch["prev_close"])
+                             prev_close=ch["prev_close"], rate=risk_free_rate(), div_yield=dividend_yield(source_key))
+
+
+def risk_free_rate() -> float:
+    return float(os.environ.get("GEX_RISK_FREE_RATE", "0.04"))
+
+
+def dividend_yield(source_key: str) -> float:
+    """Continuous dividend yield used when gamma is recomputed (GEX_DIV_YIELD_SPX etc. override)."""
+    from ..basis import DEFAULT_DIV_YIELD
+    return float(os.environ.get(f"GEX_DIV_YIELD_{source_key}", DEFAULT_DIV_YIELD.get(source_key, 0.0)))
 
 
 def merge_etf(index_contracts: list[OptionContract], etf_contracts: list[OptionContract], ratio: float,
-              index_key: str, index_multiplier: float) -> list[OptionContract]:
-    """ETF options -> index-equivalent contracts (see module notes). Strikes snap to listed index
-    strikes; ETF strikes that land on the same index strike are added together."""
+              index_key: str, index_multiplier: float, etf_spot: Optional[float] = None,
+              asof: Optional[datetime] = None, etf_q: float = 0.0) -> list[OptionContract]:
+    """ETF options -> index-equivalent contracts (see module notes). The exact converted strike is used for
+    all math; `group_strike` (the nearest listed index strike, within 0.75 x the usual spacing) only groups
+    levels, walls and max-pain candidates. An ETF option without a Cboe IV gets one solved from its own
+    bid/ask first (IV is unchanged by the scaling)."""
     strikes = sorted({c.strike for c in index_contracts})
     gaps = sorted(b - a for a, b in zip(strikes, strikes[1:]) if b > a)
     tol = 0.75 * (gaps[len(gaps) // 2] if gaps else 1.0)
-    out: dict[tuple, OptionContract] = {}
+    out: list[OptionContract] = []
     for c in etf_contracts:
+        if c.iv is None and c.mid is not None and etf_spot and asof:
+            yrs = (c.expiration - asof).total_seconds() / (365.0 * 86400)
+            if yrs > 0:
+                iv = pricing.implied_vol(c.mid, etf_spot, c.strike, yrs, risk_free_rate(), etf_q,
+                                         c.option_type == OptionType.CALL)
+                if iv and iv <= 5.0:
+                    c = replace(c, iv=iv)
         k = c.strike * ratio
         i = bisect.bisect_left(strikes, k)
         near = min((strikes[j] for j in (i - 1, i) if 0 <= j < len(strikes)), key=lambda s: abs(s - k), default=None)
-        k = near if near is not None and abs(near - k) <= tol else round(k, 2)
-        key = (c.root, c.option_type, k, c.expiration)
-        oi = None if c.open_interest is None else c.open_interest / ratio
-        vol = (c.volume or 0.0) / ratio
-        if key in out:
-            prev = out[key]
-            out[key] = replace(prev, open_interest=(prev.open_interest or 0.0) + (oi or 0.0),
-                               volume=(prev.volume or 0.0) + vol)
-            continue
-        out[key] = replace(c, symbol=f"{c.symbol}@{index_key}", strike=k, multiplier=index_multiplier,
-                           open_interest=oi, volume=vol, bid=None, ask=None, last=None, gamma=None,
-                           delta=None, greeks_quality=Quality.MISSING)
-    return list(out.values())
+        out.append(replace(c, symbol=f"{c.symbol}@{index_key}", strike=k,
+                           group_strike=near if near is not None and abs(near - k) <= tol else round(k, 2),
+                           multiplier=index_multiplier,
+                           open_interest=None if c.open_interest is None else c.open_interest / ratio,
+                           volume=None if c.volume is None else c.volume / ratio,
+                           bid=None, ask=None, last=None, gamma=None, delta=None, greeks_quality=Quality.MISSING))
+    return out

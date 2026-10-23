@@ -6,8 +6,9 @@ indicator("GEX Levels - NQ / ES", shorttitle = "GEX Levels", overlay = true,
 // =====================================================================================================
 // GEX Levels draws options levels computed by the gexsys service (open START.bat, then the website at
 // http://127.0.0.1:8765) and pasted into "Levels payload". Pine cannot download data, so the levels
-// change when you paste a new update (about every 2 hours). Index prices (NDX / SPX) are mapped live to
-// this futures chart. Levels are model estimates for the current session; nothing is back-plotted.
+// change when you paste a new update (about every 2 hours). Levels come from index + ETF options
+// (SPX + SPY for ES, NDX + QQQ for NQ), are expressed in index prices and are mapped live to this futures
+// chart. Levels are model estimates for the current session; nothing is back-plotted.
 // =====================================================================================================
 
 // ---------- 1 - Data
@@ -125,6 +126,7 @@ type Snap
     string prov = ""
     string mkt = ""
     string src = ""
+    string etf = ""
     string kind = ""
     string tv = ""
     string mapm = ""
@@ -187,7 +189,7 @@ parseOne(string txt) =>
             int p = str.pos(t, "=")
             if not na(p) and p > 0
                 map.put(m, str.substring(t, 0, p), str.substring(t, p + 1))
-        s := Snap.new(prov = strOf(m, "prov"), mkt = strOf(m, "mkt"), src = strOf(m, "src"), kind = strOf(m, "kind"),
+        s := Snap.new(prov = strOf(m, "prov"), mkt = strOf(m, "mkt"), src = strOf(m, "src"), etf = strOf(m, "etf"), kind = strOf(m, "kind"),
              tv = strOf(m, "tv"), mapm = strOf(m, "map"), fac = numOf(m, "fac"), off = nz(numOf(m, "off")),
              ts = numOf(m, "ts"), ref = numOf(m, "ref"), q = strOf(m, "q"), oi = strOf(m, "oi"), gk = strOf(m, "gk"),
              model = strOf(m, "model"), unit = strOf(m, "unit"), net = numOf(m, "netb"), reg = strOf(m, "reg"),
@@ -541,6 +543,10 @@ mpFirst(Snap s, float f, float o) =>
             out := ps(mapP(str.tonumber(array.get(parts, 1)), f, o)) + "  " + str.substring(array.get(parts, 0), 5)
     out
 
+// panel header, e.g. "CBOE SPX+SPY": provider, index options, and the ETF options folded into them
+srcTxt(Snap s) =>
+    s.prov + " " + s.src + (s.etf != "" ? "+" + s.etf : "")
+
 cell(int c, int r, string t, color col, color bg = na) =>
     table.cell(tab, c, r, t, text_color = col, text_halign = c == 0 ? text.align_left : text.align_right, text_size = tSz, bgcolor = bg)
 
@@ -638,9 +644,9 @@ if showTab and barstate.islast
         cell(0, 1, nParsed == 0 ? "Copy from 127.0.0.1:8765" : "Pasted: " + otherMkts, cDim)
     else
         cell(0, 0, syminfo.ticker, cDim, cHead)
-        cell(1, 0, sA.prov + " " + sA.src, cTxt, cHead)
+        cell(1, 0, srcTxt(sA), cTxt, cHead)
         if hasB
-            cell(2, 0, sB.prov + " " + sB.src, cTxt, cHead)
+            cell(2, 0, srcTxt(sB), cTxt, cHead)
         for [i, k] in rowKeys
             cell(0, i + 1, rowName(k), cDim)
             [t1, c1] = valOf(k, sA, facA, offA, okA, mstA)

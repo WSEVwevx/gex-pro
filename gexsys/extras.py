@@ -62,7 +62,7 @@ def _argmax_by_strike(contracts, typ: OptionType, attr: str) -> Optional[dict]:
     for c in contracts:
         v = getattr(c, attr)
         if c.option_type == typ and v is not None and v > 0:
-            tot[c.strike] += v
+            tot[c.level_strike] += v
     if not tot:
         return None
     k = max(tot, key=lambda x: (tot[x], -x))
@@ -85,7 +85,8 @@ def max_pain(contracts: list[OptionContract]) -> Optional[float]:
     """Strike minimising total intrinsic payout to holders (ties -> lower strike)."""
     calls = [(c.strike, c.open_interest) for c in contracts if c.option_type == OptionType.CALL and c.open_interest]
     puts = [(c.strike, c.open_interest) for c in contracts if c.option_type == OptionType.PUT and c.open_interest]
-    strikes = sorted({k for k, _ in calls} | {k for k, _ in puts})
+    # candidate settlement prices: the listed (level) strikes; payouts use each contract's exact strike
+    strikes = sorted({c.level_strike for c in contracts if c.open_interest})
     if not strikes:
         return None
     best, best_pay = None, math.inf
@@ -110,6 +111,8 @@ def max_pain_by_expiry(snap: ChainSnapshot, basket: list[str]) -> list[dict]:
 
 def atm_iv(contracts: list[OptionContract], expiry: str, spot: float) -> Optional[float]:
     cs = [c for c in contracts if c.expiration.date().isoformat() == expiry and c.iv]
+    own = [c for c in cs if c.group_strike is None]     # the index's own options; converted ETF ones only as fallback
+    cs = own or cs
     if not cs:
         return None
     k = min({c.strike for c in cs}, key=lambda x: abs(x - spot))

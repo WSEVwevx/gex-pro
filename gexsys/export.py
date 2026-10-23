@@ -68,6 +68,8 @@ def pine_payload(summary: dict, market: str, source_key: str, method: str,
         "ag": _n(_p(summary.get("abs_gamma"))),
         "em": _n(em), "bk": f"{basket[0]}..{basket[-1]}" if basket else "",
     }
+    if summary.get("etf"):
+        tok["etf"] = summary["etf"]              # ETF options folded into the index chain, e.g. SPY
     if delta:
         if delta.get("zero_gamma") is not None:
             tok["dzg"] = _n(delta["zero_gamma"])

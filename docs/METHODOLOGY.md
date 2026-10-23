@@ -78,14 +78,31 @@ the price (relative error < 1e-3), checks put-call parity, the IV round trip, an
 ### 4a. ETF options in index terms
 
 ES uses SPX and SPY options; NQ uses NDX and QQQ. With r = index price / ETF price, each ETF option
-becomes an index-equivalent contract: strike K·r (snapped to the nearest listed index strike), open
-interest OI/r, same IV. BSM gamma is homogeneous of degree -1 in (S, K), so
+becomes an index-equivalent contract: strike K·r (exact; it is only *grouped* with the nearest listed
+index strike when levels, walls and max-pain candidates are built), open interest OI/r, same IV. An ETF
+option without a Cboe IV gets one solved from its own bid/ask before conversion (IV is scale-invariant). BSM gamma is homogeneous of degree -1 in (S, K), so
 Γ(rS, rK) = Γ(S, K)/r and
 
   (OI/r) · Γ(rS, rK) · 100 · (rS)² = OI · Γ(S, K) · 100 · S²
 
 The converted contract carries exactly the ETF option's dollar gamma. Vanna and charm are degree 0, and
 their exposures use OI·multiplier·S, which is also unchanged.
+
+### 4b. Inputs and missing IV
+
+* Rate and dividend yield: `GEX_RISK_FREE_RATE` (default 4%) and `GEX_DIV_YIELD_<SOURCE>` (defaults
+  SPX 1.3%, NDX 0.7%, SPY 1.3%, QQQ 0.6%) are used whenever gamma is recomputed.
+* IV order: the vendor's IV; else solved from the bid/ask mid; else the nearest strike's IV in the
+  same expiration (counted in the warnings). With `recompute_greeks = "always"` the vendor's own gamma
+  is never used: Cboe rounds it to 4 decimals, which overstated deep in-the-money 0DTE gamma by ~40x.
+
+### 4c. Independent check (2026-10-23, live Cboe data)
+
+A separate script recomputed everything from the raw Cboe responses with its own OCC parsing, expiry
+times, Black-Scholes gamma, IV solver and zero-gamma search, valuing ETF options in their own prices.
+Results vs the engine: net GEX within 0.006% (ES) and 0.002% (NQ); call wall, put wall and absolute-gamma
+strike identical; zero gamma within 0.001 points (ES) and 1.2 points (NQ, from QQQ's 0.6% vs NDX's
+0.7% dividend yield); futures mapping exact; vanna, charm and max pain identical.
 
 ## 5. Aggregation
 

@@ -41,8 +41,9 @@ level as a *modeled concentration of option gamma*.
 10. **Rollover.** `front_contract` uses the conventional roll (8 days before the third Friday).
     Futures-options payloads must name the same contract month as the chart, or use `calendar_offset`.
 11. **SPY/QQQ in index terms.** ETF options are converted with the live index/ETF price ratio. Dollar
-    gamma is exact, but the ETF's own IV and its American exercise are kept, and strikes are snapped to
-    the nearest index strike (an error of at most 0.75 strike spacings, e.g. under 4 SPX points).
+    gamma is exact (exact converted strikes are used for all math), but the ETF's own IV and American
+    exercise are kept and its gamma uses the index's dividend yield (QQQ 0.6% vs NDX 0.7%: about 1 NDX
+    point of zero-gamma difference). Levels group each ETF strike with the nearest listed index strike.
 
 ## Behaviour on bad data
 
