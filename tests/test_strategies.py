@@ -65,6 +65,17 @@ class TestSwing(unittest.TestCase):
         self.assertEqual(len(tr), 1)                                                     # signals on days 2-3 ignored while in the trade
         self.assertAlmostEqual(tr[0][1], 103 - 100 - 0.5)
 
+    def test_position_kept_while_signal_stays_on(self):
+        spec = next(r for r in S.RULES if r["id"] == "contango_hold")
+        D = self.D([100, 101, 102, 103, 102, 104], [0.9, 0.9, 0.9, 1.0, 0.9, 0.9])
+        tr = S.run_swing(D, spec, 0.5)
+        # one round trip for the 3-session run; the trade still open on the last day is valued at the last close
+        self.assertEqual([round(x[1], 2) for x in tr], [103 - 100 - 0.5, 104 - 102 - 0.5])
+        self.assertEqual(tr[0][3], 3)
+        now = S.position_now(D, spec)
+        self.assertTrue(now["in"])
+        self.assertEqual((now["since"], now["entry"]), (D[4]["date"], 102))
+
     def test_overnight_exit(self):
         spec = next(r for r in S.RULES if r["id"] == "overnight_contango")
         D = self.D([100, 102], [0.9, 0.9])
@@ -109,8 +120,13 @@ class TestStudyAndGex(unittest.TestCase):
         self.assertEqual(len(out["rules"]), len(S.RULES))
         self.assertEqual(out["oos"][0], S.OOS_START)
         r = next(x for x in out["rules"] if x["id"] == "contango_hold")
-        self.assertGreater(r["results"]["SPX"]["window"]["stats"]["n"], 100)
+        w = r["results"]["SPX"]["window"]
+        self.assertEqual(w["stats"]["n"], 1)                                             # always in contango: one trade, held throughout
+        self.assertGreater(w["stats"]["sessions_held"], 100)                             # (not a round trip every day)
+        self.assertEqual(w["buy_hold"]["sessions"], w["stats"]["sessions_held"])          # in the market every session
         self.assertIn("oos", r["results"]["SPX"])
+        self.assertTrue(r["results"]["SPX"]["now"]["in"])                               # and still in at the last close
+        self.assertAlmostEqual(out["now"]["vix_vix3m"], 16 / 18, places=4)
 
     def test_gex_forward_hidden_until_30(self):
         path = [(100, 100.2, 98.9, 99.2)] + [(99.2, 100.1, 99.1, 100.0)] * 6               # dips to the put wall at 99, recovers

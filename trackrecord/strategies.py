@@ -247,7 +247,13 @@ def stats(trades: list) -> dict:
         cum += x
         peak = max(peak, cum)
         dd = max(dd, peak - cum)
-    return {"n": n, "win": round(sum(1 for x in pts if x > 0) / n, 4), "avg_r": round(mean, 4),
+    cum = peak = ddp = 0.0
+    for x in pts:
+        cum += x
+        peak = max(peak, cum)
+        ddp = max(ddp, peak - cum)
+    held = [t[3] for t in trades if len(t) > 3]
+    return {"n": n, "max_dd_pts": round(ddp, 1), "sessions_held": sum(held) if held else None, "win": round(sum(1 for x in pts if x > 0) / n, 4), "avg_r": round(mean, 4),
             "avg_pts": round(sum(pts) / n, 2), "total_r": round(sum(r), 2), "total_pts": round(sum(pts), 1),
             "pf": round(wins / losses, 3) if losses else None, "max_dd_r": round(dd, 2),
             "t": round(mean / sd * math.sqrt(n), 2) if sd else None, "worst_r": round(min(r), 2), "best_r": round(max(r), 2)}
@@ -309,7 +315,8 @@ def build_days(bars: dict, vol: dict, term: dict, until: str, hourly: Optional[d
 
 
 def run_swing(D: list, spec: dict, cost: float) -> list:
-    """One position at a time: a signal while a trade is open is ignored."""
+    """One position at a time. A close-to-close position is KEPT (no new round trip, no new cost) when the
+    signal is still on at its exit close; other signals while a trade is open are ignored."""
     out, i, hold = [], 0, spec["hold"]
     while i < len(D):
         if spec["signal"](D, i):
@@ -324,13 +331,67 @@ def run_swing(D: list, spec: dict, cost: float) -> list:
             else:
                 if i + hold >= len(D):
                     break
-                p, nxt = D[i + hold]["c"] - D[i]["c"], i + hold
+                nxt = i + hold
+                while nxt + hold < len(D) and spec["signal"](D, nxt):
+                    nxt += hold                                 # still signalled: stay in the trade
+                p = D[nxt]["c"] - D[i]["c"]
             p -= cost
-            out.append((D[i]["date"], round(p, 3), p / D[i]["em"]))
+            out.append((D[i]["date"], round(p, 3), p / D[i]["em"], max(1, nxt - i)))
             i = nxt
         else:
             i += 1
     return out
+
+
+def position_now(D: list, spec: dict) -> dict:
+    """Where the rule stands after the last close: in a trade (since when, at what price) or flat."""
+    i, hold = 0, spec["hold"]
+    while i < len(D):
+        if spec["signal"](D, i) and spec["entry"] == "close" and spec.get("exit") != "next_open":
+            nxt = i + hold
+            while nxt < len(D) and spec["signal"](D, nxt):      # still signalled at that close: stay in
+                nxt += hold
+            if nxt > len(D) - 1:                               # the exit close hasn't happened yet: still in
+                e = D[i]
+                return {"in": True, "since": e["date"], "entry": e["c"], "last": D[-1]["c"], "pts": round(D[-1]["c"] - e["c"], 2),
+                        "exit_due": f"{nxt - (len(D) - 1)} more session(s), then again only if the signal is still on"}
+            i = nxt
+        else:
+            i += 1
+    last = D[-1] if D else None
+    return {"in": False, "signal_today": bool(last and spec["signal"](D, len(D) - 1)), "date": last["date"] if last else None}
+
+
+def _benchmark(D: list) -> dict:
+    """Buy and hold over the same sessions, in index points (no costs)."""
+    if len(D) < 2:
+        return {}
+    eq = peak = dd = 0.0
+    for a, b in zip(D, D[1:]):
+        eq += b["c"] - a["c"]
+        peak = max(peak, eq)
+        dd = max(dd, peak - eq)
+    return {"pts": round(D[-1]["c"] - D[0]["c"], 1), "max_dd_pts": round(dd, 1), "sessions": len(D) - 1}
+
+
+def daily_drawdown(D: list, trades: list, cost: float) -> float:
+    """Worst peak-to-trough fall of the account marked to market at every close (index points)."""
+    at = {d["date"]: k for k, d in enumerate(D)}
+    pos = [0] * len(D)
+    entry_cost = [0.0] * len(D)
+    for tr in trades:
+        k = at.get(tr[0])
+        if k is None or len(tr) < 4:
+            continue
+        for m in range(k, min(len(D) - 1, k + tr[3])):
+            pos[m] = 1
+        entry_cost[k] += cost
+    eq = peak = dd = 0.0
+    for k in range(len(D) - 1):
+        eq += pos[k] * (D[k + 1]["c"] - D[k]["c"]) - entry_cost[k]
+        peak = max(peak, eq)
+        dd = max(dd, peak - eq)
+    return round(dd, 1)
 
 
 def run_intraday(D: list, rule: Callable, cost: float) -> list:
@@ -348,7 +409,8 @@ def run_intraday(D: list, rule: Callable, cost: float) -> list:
 def _curve(trades: list, max_points: int = 200) -> list:
     cum, out = 0.0, []
     step = max(1, len(trades) // max_points)
-    for i, (d, _, r) in enumerate(trades):
+    for i, tr in enumerate(trades):
+        d, r = tr[0], tr[2]
         cum += r
         if i % step == 0 or i == len(trades) - 1:
             out.append([d, round(cum, 2)])
@@ -367,18 +429,23 @@ def study(data: dict, until: str) -> dict:
     end = hourly_days["SPX"][-1]["date"]
     start = f"{int(end[:4]) - WINDOW_YEARS}{end[4:]}"
     start = max(start, hourly_days["SPX"][0]["date"])
-    out = {"window": [start, end], "oos": [OOS_START, start], "rules": [], "cost_pts": COST, "point_value": POINT_VALUE}
+    last = days["SPX"][-1] if days["SPX"] else None
+    out = {"window": [start, end], "oos": [OOS_START, start], "rules": [], "cost_pts": COST, "point_value": POINT_VALUE,
+           "now": {"date": last["date"], "vix_vix3m": round(last["ts"], 4), "vix9d_vix": round(last["front"], 4), "vix": last["vix"]} if last else None}
     for spec in RULES:
         res = {}
         for und in ("SPX", "NDX"):
             D = days[und]
             if spec["kind"] == "swing":
-                win = run_swing([d for d in D if d["date"] >= start], spec, COST[und])
-                oos = run_swing([d for d in D if OOS_START <= d["date"] < start], spec, COST[und])
+                Dw, Do = [d for d in D if d["date"] >= start], [d for d in D if OOS_START <= d["date"] < start]
+                win, oos = run_swing(Dw, spec, COST[und]), run_swing(Do, spec, COST[und])
                 mid_o = next((d["date"] for d in D if d["date"] >= OOS_START), start)
                 omid = sorted(t[0] for t in oos)[len(oos) // 2] if oos else mid_o
-                res[und] = {"window": {"stats": stats(win), "halves": _halves(win, _mid(start, end))},
-                            "oos": {"stats": stats(oos), "halves": _halves(oos, omid)}, "curve": _curve(oos + win)}
+                res[und] = {"window": {"stats": dict(stats(win), daily_dd_pts=daily_drawdown(Dw, win, COST[und])),
+                                       "halves": _halves(win, _mid(start, end)), "buy_hold": _benchmark(Dw)},
+                            "oos": {"stats": dict(stats(oos), daily_dd_pts=daily_drawdown(Do, oos, COST[und])),
+                                    "halves": _halves(oos, omid), "buy_hold": _benchmark(Do)},
+                            "curve": _curve(oos + win), "now": position_now(D, spec)}
             else:
                 win = run_intraday([d for d in hourly_days[und] if d["date"] >= start], spec["rule"], COST[und])
                 res[und] = {"window": {"stats": stats(win), "halves": _halves(win, _mid(start, end))}, "curve": _curve(win)}

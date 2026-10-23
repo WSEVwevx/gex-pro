@@ -109,8 +109,9 @@ your browser, and the first visit follows your system setting.
 * **Strategies:** a futures strategy lab for ES and NQ. Rules built on options data (the expected move,
   the VIX term structure, intraday VIX, GEX PRO's levels) are fixed before testing. They are walked hour by
   hour over the last 3 years on both markets, and swing rules are also checked out of sample on 2010-2023.
-  A rule is listed as a strategy only when it passes every test. Today 15 rules have been tested and none
-  passed; the research log shows each one and why. Four rules on GEX PRO's own walls, zero gamma and
+  A rule is listed as a strategy only when it passes every test. Of 15 rules tested, two pass (the VIX-curve
+  backwardation bounce and contango trend hold), each shown with today's signal and a buy-and-hold comparison;
+  the research log shows the rest and why they failed. Four rules on GEX PRO's own walls, zero gamma and
   regime are forward-tested as the track record grows.
 * **Library:** a beginner course in 19 short lessons (options basics, dealers and the Greeks, GEX levels,
   volatility, using GEX PRO), each with an example, diagrams, a link into the terminal and a quick check;

@@ -1147,6 +1147,27 @@ function renderBacktest(){
     ${B.by_vol.length > 1 && B.by_vol[0].close_in.rate > B.by_vol.at(-1).close_in.rate ? `<div class="expl">When implied vol is low the band is generous; in high-vol regimes realized moves catch up with it and breaks become more common.</div>` : ""}`;
 }
 
+// what to do, exactly, for each rule that has passed (shown only once it passes)
+const PROVEN_INFO = {
+  backwardation_bounce: {
+    rules: ["Watch the VIX curve at the close: VIX against VIX3M (the 3-month VIX). The Strategies page shows the ratio after every close",
+      "If VIX closes ABOVE VIX3M (ratio over 1.00, an inverted curve), buy 1 ES or NQ at the close",
+      "Hold 3 sessions. At the 3rd close, if VIX is still above VIX3M, hold 3 more sessions; otherwise sell at that close",
+      "No stop: as tested, the trade is only closed by the rule. One position at a time"],
+    use: ["Not tested, judgment only: an entry with price at or below the put wall in negative gamma buys where dealer hedging is most stretched",
+      "Size small: entries come during selloffs, often several in a row. Micro contracts (MES $5/pt, MNQ $2/pt) cut the dollar figures by 10x",
+      "Check the News page: a curve inversion ahead of FOMC or CPI can stay inverted longer"],
+    risk: "It buys during market stress with no stop. In a crash it can stay in a losing trade for weeks; the worst drops in the table are real. It made less in total than buy and hold, because it is in the market only about one day in ten."},
+  contango_hold: {
+    rules: ["At every close, check VIX against VIX3M (the 3-month VIX)",
+      "If the ratio is below 0.95 (steep contango, a calm market), be long 1 ES or NQ into the next close",
+      "Stay long while the ratio stays below 0.95; sell at the first close where it is 0.95 or higher",
+      "One position, no stop: the curve is the exit"],
+    use: ["Not tested, judgment only: positive gamma on the Levels page usually lines up with steep contango, and two calm signals agreeing is a stronger reason to hold",
+      "When zero gamma is close above price, a regime flip often comes before the curve does: consider being early to exit",
+      "It is mostly market exposure: compare it with simply holding before using it"],
+    risk: "It made less than holding ES/NQ the whole time, and its out-of-sample worst drop was similar to or worse than buy and hold's. Its value is stepping aside when the curve flattens, not extra profit."},
+};
 // ---------- Strategy lab: futures rules on options data; only rules that pass every test are listed
 const FUT = {SPX: "ES", NDX: "NQ"};
 function renderStrategies(){
@@ -1160,20 +1181,42 @@ function renderStrategies(){
     + kpi("3-year test", `${ym(L.window[0])} to ${ym(L.window[1])}`, "hourly bars, ES and NQ")
     + kpi("Out of sample", `${L.oos[0].slice(0, 4)} to ${ym(L.oos[1])}`, "swing rules, never used to choose them");
   $("stNote").innerHTML = passed.length
-    ? `Only strategies that passed every test are listed as strategies. The research log shows the ones that didn't, and why.`
+    ? `Only strategies that passed every test are listed. Each one shows today's signal, its exact rules, and an honest comparison with simply holding ES/NQ. The research log shows the ${rules.length - passed.length} that failed, and why.`
     : `<b>No strategy has passed every test, so none is listed.</b> Rules built on the expected move and the VIX term structure didn't show an edge after costs that was large and consistent enough on both ES and NQ. A strategy is listed here automatically if it passes, either as the 3-year window rolls forward or once the forward test on GEX PRO's own levels has enough trades. Until then, use the levels as context: the Track record page shows how they've behaved.`;
   // proven strategies
   const r2 = v => v == null ? "-" : signed(v, 3);
   const usd = (s, und) => (s.avg_pts >= 0 ? "+$" : "-$") + num(Math.abs(s.avg_pts * pv[und]), 0);
   const cell = (s, und) => s && s.n ? `<b style="color:${s.avg_pts > 0 ? "var(--good)" : "var(--bad)"}">${usd(s, und)}</b> <span class="dim">/ trade</span><div class="st-kind">${s.n.toLocaleString("en-US")} trades · ${r2(s.avg_r)} R · t ${s.t == null ? "-" : num(s.t, 1)}</div>` : "-";
-  $("stProvenSub").textContent = passed.length ? `${passed.length} of ${rules.length}` : "";
-  $("stProven").innerHTML = passed.length ? passed.map(r => {
-    const a = r.results.SPX, b = r.results.NDX;
-    const m = (label, v, sub) => `<div class="metric"><div class="eyebrow">${label}</div><div class="v">${v}</div><div class="s">${sub}</div></div>`;
-    return `<div class="st-card"><div class="head"><h2>${esc(r.name)}</h2><span class="trk-tag good">passed</span><span class="sub">${esc(r.kind === "swing" ? `swing, ${r.hold} session${r.hold === 1 ? "" : "s"}` : "intraday")} · uses ${esc(r.uses)}</span></div>
-      <div class="st-grid"><div><p class="st-idea">${esc(r.idea)}</p></div>
-      <div class="metrics">${[["SPX", a], ["NDX", b]].map(([u, x]) => m(`${FUT[u]} · 3 years`, `${x.window.stats.n} trades · ${pct(x.window.stats.win)}`, `${usd(x.window.stats, u)} per contract per trade, ${r2(x.window.stats.avg_r)} R, t ${num(x.window.stats.t, 1)}`)
-        + (x.oos ? m(`${FUT[u]} · out of sample`, `${x.oos.stats.n} trades · ${pct(x.oos.stats.win)}`, `avg ${r2(x.oos.stats.avg_r)} R, t ${num(x.oos.stats.t, 1)}`) : "")).join("")}</div></div></div>`;
+  $("stProvenSub").textContent = passed.length ? `${passed.length} of ${rules.length} · per full-size contract after costs` : "";
+  const money$ = x => (x >= 0 ? "+$" : "-$") + Math.round(Math.abs(x)).toLocaleString("en-US");
+  const minOosT = r => Math.min(...["SPX", "NDX"].map(u => (r.results[u].oos || r.results[u].window).stats.t || 0));
+  const N = L.now || {};
+  $("stProven").innerHTML = passed.length ? passed.slice().sort((x, y) => minOosT(y) - minOosT(x)).map(r => {
+    const I = PROVEN_INFO[r.id] || {rules: [r.idea], use: [], risk: ""};
+    const row = (u, k, label) => {
+      const x = r.results[u][k]; if(!x) return "";
+      const s = x.stats, b = x.buy_hold || {}, held = s.sessions_held || 0;
+      return `<tr><td>${FUT[u]} · ${label}</td><td class="m">${s.n}</td><td class="m">${pct(s.win)}</td><td class="m"><b style="color:${s.total_pts > 0 ? "var(--good)" : "var(--bad)"}">${money$(s.total_pts * pv[u])}</b></td>
+        <td class="m">${money$(-(s.daily_dd_pts || 0) * pv[u])}</td><td class="m">${b.sessions ? pct(held / b.sessions) : "-"}</td>
+        <td class="m">${b.pts != null ? money$(b.pts * pv[u]) : "-"}</td><td class="m">${b.max_dd_pts != null ? money$(-b.max_dd_pts * pv[u]) : "-"}</td>
+        <td class="m">${b.pts && held ? num((s.total_pts / held) / (b.pts / b.sessions), 1) + "×" : "-"}</td></tr>`;
+    };
+    const now = ["SPX", "NDX"].map(u => { const z = r.results[u].now || {}; return z.in
+      ? `<b>${FUT[u]}: in a trade</b> since the ${esc(z.since)} close at ${num(z.entry, 2)} (${signed(z.pts, 2)} pts by the last close). Exit: ${esc(z.exit_due)}.`
+      : `<b>${FUT[u]}: flat.</b> ${z.signal_today ? "The signal is on at the last close: enter at the close." : "No entry signal at the last close."}`; }).join("<br>");
+    const es = r.results.SPX.oos, beats = es && es.stats.total_pts > es.buy_hold.pts;
+    return `<div class="st-card"><div class="head"><h2>${esc(r.name)}</h2><span class="trk-tag good">passed</span><span class="sub">${esc(r.kind === "swing" ? `swing · holds ${r.hold} session${r.hold === 1 ? "" : "s"} at a time` : "intraday")} · uses ${esc(r.uses)}</span></div>
+      <div class="st-now"><div class="eyebrow">Today · as of the ${esc(N.date || "-")} close · VIX/VIX3M ${N.vix_vix3m == null ? "-" : num(N.vix_vix3m, 3)}</div>${now}</div>
+      <div class="st-grid"><div>
+        <p class="st-idea">${esc(r.idea)}</p>
+        <div class="eyebrow">Rules (mechanical, as tested)</div><ol class="st-list">${I.rules.map(x => `<li>${esc(x)}</li>`).join("")}</ol>
+      </div><div>
+        <div class="eyebrow">Using it with GEX PRO</div><ul class="st-list">${I.use.map(x => `<li>${esc(x)}</li>`).join("")}</ul>
+        <div class="st-risk"><b>Risk.</b> ${esc(I.risk)}</div>
+      </div></div>
+      <div class="trk-log" style="margin-top:12px"><table class="trk-table"><tr><th>Market · period</th><th>Trades</th><th>Win</th><th>Net profit</th><th>Worst drop</th><th>Time in market</th><th>Buy &amp; hold</th><th>B&amp;H worst drop</th><th>Profit per day in market vs B&amp;H</th></tr>
+        ${row("SPX", "window", "last 3 years")}${row("NDX", "window", "last 3 years")}${row("SPX", "oos", `${L.oos[0].slice(0, 4)}-${L.oos[1].slice(0, 4)}`)}${row("NDX", "oos", `${L.oos[0].slice(0, 4)}-${L.oos[1].slice(0, 4)}`)}</table></div>
+      <div class="expl"><b>Compared with simply holding:</b> ${beats ? "it made more than buy and hold out of sample on ES." : "it made less in total than holding ES/NQ the whole time. The edge is in the last column: profit for each day you actually have money in the market."} The worst drop is the account marked to market at every close. Profit factor ${num((r.results.SPX.oos || r.results.SPX.window).stats.pf, 2)} on ES out of sample; t ${num(r.results.SPX.oos.stats.t, 1)} (ES) and ${num(r.results.NDX.oos.stats.t, 1)} (NQ).</div></div>`;
   }).join("") : `<div class="st-empty"><b>None yet.</b> Every rule tested so far failed at least one test. The research log below shows each one and why.</div>`;
   // research log
   $("stLogSub").textContent = `every rule tested · average profit per trade after costs, per full-size contract · R = the same in expected moves`;

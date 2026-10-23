@@ -356,6 +356,8 @@ td.m{font-family:var(--mono)}
 .st-method p{margin:0 0 10px}.st-method b{color:var(--ink)}
 .st-card .head{flex-wrap:wrap;gap:8px}
 .st-card+.st-card{margin-top:18px;padding-top:18px;border-top:1px solid var(--line)}
+.st-now{margin:10px 0 14px;padding:10px 14px;border:1px solid rgba(34,179,94,.35);background:rgba(34,179,94,.06);border-radius:9px;font-size:13px;line-height:1.6;color:var(--ink2)}
+.st-now b{color:var(--ink)}
 .st-empty{padding:18px;border:1px dashed var(--line2);border-radius:10px;color:var(--ink2);font-size:13.5px;line-height:1.6}
 .st-empty b{color:var(--ink)}
 
