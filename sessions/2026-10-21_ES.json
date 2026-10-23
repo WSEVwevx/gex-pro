@@ -1,0 +1,62 @@
+{
+ "session": "2026-10-21",
+ "market": "ES",
+ "status": "graded",
+ "plan": {
+  "session": "2026-10-21",
+  "market": "ES",
+  "underlying": "SPX",
+  "asof": "2026-10-21T06:15:22.407516+00:00",
+  "frozen_at": "2026-10-23T17:52:16.271151+00:00",
+  "ref": 7712.57,
+  "em": 72.93,
+  "em_iv": 0.1501,
+  "regime": "NEGATIVE",
+  "net": -34799988597.0,
+  "zg": 7751.58,
+  "cw": 8000.0,
+  "pw": 7700.0,
+  "ag": null,
+  "bias": "Neutral",
+  "confidence": "Low",
+  "day_type": "Trend / expansion",
+  "side": "negative",
+  "target": 7712.57
+ },
+ "outcome": {
+  "open": 7736.43,
+  "high": 7770.4,
+  "low": 7709.34,
+  "close": 7757.17,
+  "source": "Cboe daily",
+  "move": 44.6,
+  "move_em": 0.612,
+  "range_em": 0.837,
+  "em_close": true,
+  "em_range": true,
+  "em_up_break": false,
+  "em_down_break": false,
+  "cw": {
+   "level": 8000.0,
+   "dist_em": 3.941,
+   "touched": false,
+   "closed_beyond": false,
+   "held": false
+  },
+  "pw": {
+   "level": 7700.0,
+   "dist_em": 0.172,
+   "touched": false,
+   "closed_beyond": false,
+   "held": false
+  },
+  "zg": {
+   "open_side": "below",
+   "crossed": true
+  },
+  "bias_hit": null,
+  "target_beat": null,
+  "magnet": null
+ },
+ "graded_at": "2026-10-23T17:52:16.271151+00:00"
+}

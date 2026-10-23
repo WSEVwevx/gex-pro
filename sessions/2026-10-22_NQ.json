@@ -1,0 +1,62 @@
+{
+ "session": "2026-10-22",
+ "market": "NQ",
+ "status": "graded",
+ "plan": {
+  "session": "2026-10-22",
+  "market": "NQ",
+  "underlying": "NDX",
+  "asof": "2026-10-22T05:01:07.412662+00:00",
+  "frozen_at": "2026-10-23T17:52:16.271151+00:00",
+  "ref": 29822.52,
+  "em": 433.4,
+  "em_iv": 0.2307,
+  "regime": "POSITIVE",
+  "net": 422631381.0,
+  "zg": 29712.65,
+  "cw": 31325.0,
+  "pw": 29200.0,
+  "ag": 29675.0,
+  "bias": "Bullish",
+  "confidence": "Low",
+  "day_type": "Pivot around zero gamma",
+  "side": "pivot",
+  "target": 29874.53
+ },
+ "outcome": {
+  "open": 29304.3,
+  "high": 29411.76,
+  "low": 28855.1,
+  "close": 28958.69,
+  "source": "Yahoo ^NDX daily",
+  "move": -863.83,
+  "move_em": -1.993,
+  "range_em": 1.284,
+  "em_close": false,
+  "em_range": false,
+  "em_up_break": false,
+  "em_down_break": true,
+  "cw": {
+   "level": 31325.0,
+   "dist_em": 3.467,
+   "touched": false,
+   "closed_beyond": false,
+   "held": false
+  },
+  "pw": {
+   "level": 29200.0,
+   "dist_em": 1.436,
+   "touched": true,
+   "closed_beyond": true,
+   "held": false
+  },
+  "zg": {
+   "open_side": "below",
+   "crossed": false
+  },
+  "bias_hit": false,
+  "target_beat": false,
+  "magnet": false
+ },
+ "graded_at": "2026-10-23T17:52:16.271151+00:00"
+}
