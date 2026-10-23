@@ -12,7 +12,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: write                   # only to push the track record to its own branch (track-record)
   pages: write
   id-token: write
 
@@ -38,7 +38,27 @@ jobs:
           path: .state
           key: gex-state-${{ github.run_id }}
           restore-keys: gex-state-
+      # The track record lives in the track-record branch: a public, timestamped history of every plan
+      # (frozen before the open) and every grade, which no cache eviction can lose.
+      - name: Load the track record
+        run: |
+          if git ls-remote --exit-code --heads origin track-record > /dev/null; then
+            git fetch origin track-record
+            git worktree add .track FETCH_HEAD
+            git -C .track switch -c track-record
+          else
+            git worktree add --orphan -b track-record .track
+          fi
       - run: python -m gexpro --log-level WARNING build-site --out _site --state .state
+        env:
+          GEXPRO_TRACK_DIR: .track
+      - name: Save the track record
+        run: |
+          cd .track
+          git add -A
+          if git diff --cached --quiet; then echo "track record unchanged"; exit 0; fi
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -q -m "Track record $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push -q origin track-record
       - uses: actions/cache/save@v4
         if: always()
         with:

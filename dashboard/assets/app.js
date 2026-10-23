@@ -8,8 +8,8 @@ const store = { get(k, d){ try { return localStorage.getItem(k) ?? d; } catch(e)
 // Static mode: the hosted copy (python -m gexsys build-site) reads files that a scheduled job rewrites,
 // instead of the local service's /api endpoints.
 const STATIC = !!window.GEX_STATIC;
-const API = STATIC ? {all: "data/all.json", news: "data/news.json", posts: "data/posts.json", indicator: "data/indicator.json", briefings: "data/briefings.json", timeline: "data/timeline.json"}
-                   : {all: "/api/all", news: "/api/news", posts: "/api/posts", indicator: "/api/indicator", briefings: "/api/briefings", timeline: "/api/timeline"};
+const API = STATIC ? {all: "data/all.json", news: "data/news.json", posts: "data/posts.json", indicator: "data/indicator.json", briefings: "data/briefings.json", timeline: "data/timeline.json", track: "data/trackrecord.json"}
+                   : {all: "/api/all", news: "/api/news", posts: "/api/posts", indicator: "/api/indicator", briefings: "/api/briefings", timeline: "/api/timeline", track: "/api/trackrecord"};
 const pineUrl = m => STATIC ? `data/pine-published${m ? "-" + m : ""}.txt`
                             : `/api/pine/all?which=published${m ? "&market=" + encodeURIComponent(m) : ""}`;
 const OFFLINE = STATIC ? "Can't load the latest data file. Check your connection; retrying."
@@ -49,7 +49,7 @@ try { localStorage.removeItem("gex.page"); } catch(e) {}
 let impactF = store.get("gex.impact", "med");       // high | med | all
 let curF = store.get("gex.cur", "USD");             // USD | all
 let news = null;
-const VIEW_IDS = ["levels", "gamma", "vol", "timeline", "bias", "briefings", "news", "indicator", "library"];
+const VIEW_IDS = ["levels", "gamma", "vol", "timeline", "bias", "track", "briefings", "news", "indicator", "library"];
 function setPage(p){
   if(!VIEW_IDS.includes(p)) p = "levels";
   page = p;
@@ -64,6 +64,7 @@ function setPage(p){
   if(p === "indicator") loadIndicator();
   if(p === "timeline") loadTimeline();
   if(p === "library") renderLibrary();
+  if(p === "track") loadTrack();
   if(!NO_MARKET_PAGES.includes(p) && data) render();
   $("explainTab").title = "Explain this page (X)";
 }
@@ -542,9 +543,9 @@ function renderMaxPain(X){
 // =====================================================================================================
 const PAGES = [
   ["levels", "Levels", "LVL"], ["gamma", "Gamma lab", "GEX"], ["vol", "Volatility", "VOL"], ["timeline", "Timeline", "TL"],
-  ["bias", "Bias", "BIAS"], ["briefings", "Briefings", "BRF"], ["news", "News", "NEWS"], ["indicator", "Indicator", "IND"],
+  ["bias", "Bias", "BIAS"], ["track", "Track record", "TRK"], ["briefings", "Briefings", "BRF"], ["news", "News", "NEWS"], ["indicator", "Indicator", "IND"],
   ["library", "Library", "LIB"]];
-const NO_MARKET_PAGES = ["news", "indicator", "briefings", "library"];
+const NO_MARKET_PAGES = ["news", "indicator", "briefings", "library", "track"];
 const pickP = v => v && typeof v === "object" ? v.price : v;
 const curW = () => data && (data.workers.find(x => x.market === market && x.result) || data.workers.find(x => x.market === market));
 
@@ -819,10 +820,25 @@ const HELP = {
     body: `<p>Copy the code into TradingView's Pine Editor once (and again whenever the version changes). Then paste the hourly levels payload into its settings: the indicator maps index levels to your live futures chart.</p>`},
   library: {title: "The Library", tldr: "A short course that explains everything on this site from zero.",
     body: `<p>Start with <b>What is an option?</b> and follow the lessons in order, or search for any term. Each lesson ends with a quick check; answer it correctly and the lesson is marked as read. Your progress is saved in this browser.</p><p>Every Explain panel links to the matching lesson, so you can jump from a number on the screen straight to the idea behind it.</p>`},
+  track: {title: "Live track record", tldr: "What GEX PRO said before each open, graded against what the market did.",
+    body: `<p>At every session, the levels from the <b>last calculation timestamped before 09:30 ET</b> are frozen as that day's plan: expected move, regime, walls, zero gamma, bias. Nothing can be changed afterwards. After the close, the plan is graded against the index's open, high, low and close.</p><p>Everything is in index points (NDX for NQ, SPX for ES), so the futures basis can't flatter or hurt the result. Missed sessions are listed, not hidden.</p><p>Small samples lie. Until about 20 sessions are graded, read the numbers as a diary, not as proof. The 95% range shows how uncertain each rate still is.</p>`,
+    watch: ["The 95% range narrows as sessions add up", "\"rebuilt\" = frozen later from saved snapshots, using only data from before the open"]},
+  track_scorecard: {title: "Scorecard", tldr: "Each claim the model makes, and how often it came true.",
+    body: `<p><b>Expected move:</b> a fair one-sigma band should contain the close about 68% of the time. Much more means the band is too wide; much less, too narrow.</p><p><b>Regime:</b> the model says negative-gamma sessions should range wider than positive-gamma ones, measured in expected moves.</p><p><b>Walls:</b> a wall is <i>touched</i> when price trades within 5% of an expected move of it, and <i>held</i> when the close stays on the near side.</p><p><b>Bias:</b> only Bullish and Bearish calls are graded, against the close vs the plan's price. Compare it with the baseline, which always picks the more common direction.</p>`},
+  track_log: {title: "Every session", tldr: "The plan and its grade, one row per market per day.",
+    body: `<p><b>Close</b> shows the close and how far it moved from the plan's price in expected moves (σ). <b>In band</b> means the close landed inside ± one expected move. Hover a wall result to see its price.</p><p>A plan marked <b>rebuilt</b> was frozen after the open from snapshots saved before it. Its data is still timestamped before the open, so no later information is used.</p>`},
+  backtest: {title: "Historical backtest", tldr: "Decades of data on how well implied volatility predicts the next day's range.",
+    body: `<p>Free history of option open interest doesn't exist, so the gamma levels can only be graded from the day GEX PRO started saving them. Implied volatility history does exist: <b>VIX</b> (S&P 500, since 1990) and <b>VXN</b> (Nasdaq-100, since 2009) are the 30-day implied vols of the same index options.</p><p>Each session's band is: previous close × IV × √(calendar days ÷ 365), the same convention GEX PRO uses for its daily expected move.</p><p>It's a proxy. GEX PRO's own band uses the same-day expiration's IV, which is usually different from the 30-day VIX.</p>`},
+  backtest_year: {title: "Close inside the band, by year", tldr: "How often the next close stayed within one expected move, year by year.",
+    body: `<p>The dashed line is 68.3%, what a perfectly fair one-sigma forecast would give. Bars above it are years where implied vol overstated the moves, which is the usual case. Dips mark stressed years, when realized moves caught up with implied ones. Faded bars are partial years (the first and the current one).</p>`},
+  backtest_dist: {title: "Size of the daily move", tldr: "Every day's close-to-close move measured in expected moves.",
+    body: `<p>Bars count sessions by how many expected moves (σ) the close moved. The grey curve is a normal distribution, the shape the band assumes.</p><p>Real markets have a taller middle (most days are quieter than implied) and fatter tails (the big days are bigger than a normal curve allows). That's why a band can hold most days and still be blown through on a few.</p>`},
+  backtest_vol: {title: "By volatility level", tldr: "Does the band hold better in calm or stressed markets?",
+    body: `<p>Sessions split into five equal groups by the vol index the evening before. Compare the close-inside rate and the breaks across the groups to see when the band is most and least reliable.</p>`},
   paste: {title: "The hourly paste", tldr: "One text block that carries all levels to TradingView.",
     body: `<p>Published every hour on the hour (ET). One paste holds NQ and ES; each chart draws only its own market. The indicator marks levels stale after 90 minutes.</p>`},
 };
-const PAGE_HELP = {levels: "regime", gamma: "gamma_curve", vol: "term", timeline: "timeline", bias: "bias", briefings: "briefings", news: "calendar", indicator: "indicator", library: "library"};
+const PAGE_HELP = {levels: "regime", gamma: "gamma_curve", vol: "term", timeline: "timeline", bias: "bias", briefings: "briefings", news: "calendar", indicator: "indicator", library: "library", track: "track"};
 let exKey = null;
 function openExplain(key){
   const h = HELP[key]; if(!h) return;
@@ -896,7 +912,7 @@ $("cmd").addEventListener("keydown", e => {
 });
 
 // ---------- keyboard
-const KEYS = [["/  or  Ctrl+K", "Command line"], ["1 - 9", "Pages (Levels, Gamma lab, Volatility, Timeline, Bias, Briefings, News, Indicator, Library)"],
+const KEYS = [["/  or  Ctrl+K", "Command line"], ["1 - 9, 0", "Pages (Levels, Gamma lab, Volatility, Timeline, Bias, Track record, Briefings, News, Indicator, Library)"],
   ["N  /  E", "Switch to NQ / ES"], ["X", "Explain this page"], ["C", "Copy the TradingView paste"], ["?", "This list"], ["Esc", "Close panels"]];
 function showKeys(on){ $("keys").hidden = !on; if(on) $("keysGrid").innerHTML = KEYS.map(([k, d]) => `<kbd>${esc(k)}</kbd><span>${esc(d)}</span>`).join(""); }
 $("keysBtn").onclick = () => showKeys(true);
@@ -907,7 +923,7 @@ document.addEventListener("keydown", e => {
   if((e.key === "k" && (e.ctrlKey || e.metaKey)) || (e.key === "/" && !typing)){ e.preventDefault(); $("cmd").focus(); return; }
   if(e.key === "Escape"){ showKeys(false); closeExplain(); return; }
   if(typing || e.ctrlKey || e.metaKey || e.altKey) return;
-  const n = Number(e.key);
+  const n = e.key === "0" ? 10 : Number(e.key);
   if(n >= 1 && n <= PAGES.length) setPage(PAGES[n - 1][0]);
   else if(e.key === "n" || e.key === "N") setMarket("NQ");
   else if(e.key === "e" || e.key === "E") setMarket("ES");
@@ -977,6 +993,141 @@ function renderLibrary(){
 }
 $("libSearch").addEventListener("input", renderLibrary);
 
+
+// ---------- Track record: live sessions graded against what happened, plus the historical backtest
+let trk = null, trkM = store.get("gex.trkm", "ALL"), btM = store.get("gex.btm", "ES");
+async function loadTrack(){
+  try { trk = await (await fetch(API.track, {cache: "no-store"})).json(); }
+  catch(e){ trk = trk || {error: OFFLINE}; }
+  renderTrack();
+}
+const pct = r => r == null ? "-" : num(100 * r, 0) + "%";
+const ciTxt = s => s && s.ci ? `${num(100 * s.ci[0], 0)}-${num(100 * s.ci[1], 0)}%` : "-";
+const kpi = (label, value, sub, col) => `<div class="kpi"><div class="eyebrow">${label}</div><div class="big sm"${col ? ` style="color:${col}"` : ""}>${value}</div><div class="s">${sub}</div></div>`;
+const MKT_NAME = {SPX: "S&P 500", NDX: "Nasdaq-100"};
+function trkFilters(){
+  const ms = ["ALL", ...Object.keys((trk && trk.stats) || {}).filter(k => k !== "ALL")];
+  if(!ms.includes(trkM)) trkM = "ALL";
+  $("trkMarket").innerHTML = ms.map(m => `<button role="tab" aria-selected="${trkM === m}" data-m="${m}">${m === "ALL" ? "All" : m}</button>`).join("");
+  [...$("trkMarket").children].forEach(b => b.onclick = () => { trkM = b.dataset.m; store.set("gex.trkm", trkM); renderTrack(); });
+  const bs = Object.keys(((trk && trk.backtest) || {}).markets || {});
+  if(bs.length && !bs.includes(btM)) btM = bs[0];
+  $("btMarket").innerHTML = bs.map(m => `<button role="tab" aria-selected="${btM === m}" data-m="${m}">${m} · ${esc(MKT_NAME[trk.backtest.markets[m].underlying] || m)}</button>`).join("");
+  [...$("btMarket").children].forEach(b => b.onclick = () => { btM = b.dataset.m; store.set("gex.btm", btM); renderTrack(); });
+}
+function renderTrack(){
+  if(!trk) return;
+  if(trk.error && !trk.stats){ $("trkKpis").innerHTML = `<div class="expl">${esc(trk.error)}</div>`; return; }
+  trkFilters();
+  const S = trk.stats[trkM] || trk.stats.ALL || {sessions: 0};
+  const n = S.sessions || 0;
+  const emc = S.em_close || {}, wh = S.walls_held || {}, bi = S.bias || {};
+  $("trkKpis").innerHTML =
+    kpi("Sessions graded", num(n, 0), trk.started ? `since ${esc(trk.started)} · ${S.early ? `<span class="trk-tag warn">early: ${n} of ${trk.rules.min_sample}</span>` : `<span class="trk-tag good">sample ok</span>`}` : "starts with the next session")
+    + kpi("Close inside expected move", pct(emc.rate), emc.n ? `${emc.k} of ${emc.n} · a fair band holds 68%` : "no graded sessions yet")
+    + kpi("Walls held when touched", pct(wh.rate), wh.n ? `${wh.k} of ${wh.n} touches` : "no wall touched yet")
+    + kpi("Bias direction right", pct(bi.rate), bi.n ? `${bi.k} of ${bi.n} calls · baseline ${pct(bi.baseline)}` : "no directional calls graded yet");
+  const proof = trk.proof_url ? ` Every plan and grade is committed to a public git branch as it happens: <a href="${esc(trk.proof_url)}" target="_blank" rel="noopener">see the history</a>.` : "";
+  $("trkNote").innerHTML = (S.early ? `Early days: ${n} graded session${n === 1 ? "" : "s"}. The numbers need about ${trk.rules.min_sample} sessions before they mean much, and 100+ to be convincing. ` : "")
+    + `Each plan uses the last GEX PRO calculation timestamped before the 09:30 ET open, frozen once and graded after the close against the index's open, high, low and close. Missed sessions stay in the list.` + proof;
+  // scorecard
+  const row = (name, st, meaning) => st ? `<tr><td>${name}</td><td class="m"><b>${pct(st.rate)}</b></td><td class="m">${st.n ? `${st.k}/${st.n}` : "-"}</td><td class="m">${ciTxt(st)}</td><td class="trk-mean">${meaning}</td></tr>` : "";
+  const rp = (S.range_em || {}).positive || {}, rn = (S.range_em || {}).negative || {};
+  const regimeVerdict = rp.n && rn.n ? (rn.mean > rp.mean ? `<span class="trk-tag good">as modeled</span>` : `<span class="trk-tag bad">not as modeled</span>`) : "";
+  $("trkScoreSub").textContent = n ? `${n} session${n === 1 ? "" : "s"} · ${trkM === "ALL" ? "NQ and ES together" : trkM}` : "";
+  $("trkScore").innerHTML = n ? `<table class="trk-table"><tr><th>Test</th><th>Result</th><th>Count</th><th>95% range</th><th>What it means</th></tr>
+    ${row("Close inside the expected move", S.em_close, "A fair 1σ band holds about 68%. Far above = band too wide; far below = too narrow.")}
+    ${row("Whole session inside the band", S.em_range, "Both the high and the low stayed inside the band.")}
+    ${row("Broke above the band", S.em_up_break, "The high went past the upper edge.")}
+    ${row("Broke below the band", S.em_down_break, "The low went past the lower edge.")}
+    <tr><td>Range: positive vs negative gamma</td><td class="m"><b>${rp.mean == null ? "-" : num(rp.mean, 2) + "×"}</b> vs <b>${rn.mean == null ? "-" : num(rn.mean, 2) + "×"}</b></td><td class="m">${rp.n || 0} / ${rn.n || 0}</td><td class="m">-</td>
+      <td class="trk-mean">Session range in expected moves. The model says negative gamma runs wider. ${regimeVerdict}</td></tr>
+    ${row("Call wall held when touched", S.call_wall.held, `Reached on ${S.call_wall.touched.k} of ${S.call_wall.touched.n} sessions with a wall above.`)}
+    ${row("Put wall held when touched", S.put_wall.held, `Reached on ${S.put_wall.touched.k} of ${S.put_wall.touched.n} sessions with a wall below.`)}
+    ${row("Traded through zero gamma", S.zg_crossed, "How often the flip level was crossed during the session.")}
+    ${row("Bias direction right", S.bias, `Neutral days are not graded. Baseline: always picking the more common direction = ${pct(bi.baseline)}.`)}
+    ${row("Base case beat \"no change\"", S.target_beat, "The close was nearer the base-case target than to the price the plan was made at.")}
+    ${row("Closed nearer the magnet strike", S.magnet, "Positive gamma only: the close ended nearer the absolute gamma strike than the open.")}
+  </table>` : `<div class="expl">Nothing graded yet. The first plan is graded after its session closes.</div>`;
+  // every session
+  const ss = (trk.sessions || []).filter(s => trkM === "ALL" || s.market === trkM);
+  $("trkLogSub").textContent = `${ss.length} session${ss.length === 1 ? "" : "s"} · newest first`;
+  const wall = w => !w ? `<span class="dim">-</span>` : !w.touched ? `<span class="dim" title="${num(w.level, 2)}">not reached</span>`
+    : w.held ? `<span class="good" title="${num(w.level, 2)}">held</span>` : `<span class="bad" title="${num(w.level, 2)}">broke</span>`;
+  const yes = (v, a = "yes", b = "no") => v == null ? `<span class="dim">-</span>` : v ? `<span class="good">${a}</span>` : `<span class="bad">${b}</span>`;
+  const rebuilt = s => s.plan && s.plan.frozen_at && Date.parse(s.plan.frozen_at) - Date.parse(s.session + "T13:30:00Z") > 4 * 3600e3;
+  $("trkLog").innerHTML = ss.length ? `<table class="trk-table"><tr><th>Session</th><th>Mkt</th><th>Plan</th><th>Ref</th><th>±EM</th><th>Close</th><th>In band</th><th>Call wall</th><th>Put wall</th><th>Bias</th><th></th></tr>${ss.map(s => {
+    const p = s.plan, o = s.outcome, day = new Date(s.session + "T12:00:00Z").toLocaleDateString("en-US", {weekday: "short", month: "short", day: "numeric", timeZone: "UTC"});
+    if(!p) return `<tr><td>${esc(day)}</td><td>${esc(s.market)}</td><td colspan="9" class="dim">${esc(s.why || s.status)}</td></tr>`;
+    const reg = (p.regime || "").toLowerCase(), regCol = p.regime === "POSITIVE" ? "var(--pos)" : p.regime === "NEGATIVE" ? "var(--neg)" : "var(--zg)";
+    const tail = s.status === "pending" ? `<span class="trk-tag">waiting for the close</span>` : s.status === "no_prices" ? `<span class="trk-tag bad">no price data</span>` : "";
+    const rb = rebuilt(s) ? `<span class="trk-tag" title="Frozen later from saved snapshots; the data is timestamped ${esc(new Date(p.asof).toLocaleString("en-US", {...ET, month: "short", day: "numeric", hour: "numeric", minute: "2-digit"}))} ET, before the open">rebuilt</span>` : "";
+    return `<tr><td>${esc(day)}</td><td>${esc(s.market)}</td><td><span style="color:${regCol}">${esc(reg)}</span> · ${esc(p.bias || "-")}</td><td class="m">${num(p.ref, 2)}</td><td class="m">${num(p.em, 0)}</td>
+      <td class="m">${o ? `${num(o.close, 2)} <span style="color:${o.move >= 0 ? "var(--good)" : "var(--bad)"}">${signed(o.move_em, 2)}σ</span>` : "-"}</td>
+      <td>${o ? yes(o.em_close) : "-"}</td><td>${o ? wall(o.cw) : "-"}</td><td>${o ? wall(o.pw) : "-"}</td><td>${o ? yes(o.bias_hit, "right", "wrong") : "-"}</td><td>${tail}${rb}</td></tr>`;
+  }).join("")}</table>` : `<div class="expl">No sessions yet.</div>`;
+  renderBacktest();
+}
+function renderBacktest(){
+  const B = (((trk || {}).backtest || {}).markets || {})[btM];
+  if(!B){ $("btTitle").textContent = "Backtest data not available yet"; $("btKpis").innerHTML = ""; return; }
+  const O = B.overall, R = B.recent, g1 = B.after_gap.one_day, gw = B.after_gap.weekend_or_holiday;
+  $("btTitle").textContent = `${MKT_NAME[B.underlying] || B.underlying} with ${B.vol_index}, ${B.start.slice(0, 4)} to ${B.end.slice(0, 4)}: ${O.n.toLocaleString("en-US")} sessions`;
+  $("btKpis").innerHTML = kpi("Close inside the band", pct(O.close_in.rate), `vs 68.3% for a fair band · 95% ${ciTxt(O.close_in)}`, "var(--pos)")
+    + kpi("Whole session inside", pct(O.range_in.rate), "high and low both inside")
+    + kpi("Broke above / below", `${pct(O.up_break.rate)} / ${pct(O.down_break.rate)}`, "share of sessions")
+    + kpi("Last 12 months", pct(R.close_in.rate), `close inside · ${R.n} sessions · avg ${B.vol_index} ${num(R.avg_vol, 1)}`);
+  const rich = O.close_in.rate > 0.683;
+  const side = O.down_break.rate > O.up_break.rate ? `Breaks were more often to the downside (${pct(O.down_break.rate)} vs ${pct(O.up_break.rate)} up): falls come faster than rallies.` : `Breaks were more often to the upside (${pct(O.up_break.rate)} vs ${pct(O.down_break.rate)} down).`;
+  $("btNote").innerHTML = `${rich ? `Implied volatility has usually <b>overstated</b> the next day's move: the close landed inside the band ${pct(O.close_in.rate)} of the time, more than the 68% a fair forecast would give. Option sellers are paid for taking risk, so implied moves tend to run larger than realized ones.` : `The close landed inside the band ${pct(O.close_in.rate)} of the time, close to or below the 68% a fair forecast would give.`}
+    ${side} After weekends and holidays the band held ${pct(gw.close_in.rate)} vs ${pct(g1.close_in.rate)} after one-day gaps, so counting calendar days overstates weekend risk.
+    <br><b>Proxy:</b> this uses the 30-day ${B.vol_index} because free history of GEX PRO's own same-day IV does not exist. The live track record above uses GEX PRO's actual band.`;
+  // by year
+  const ys = B.by_year, wrap = $("btYearWrap"), svg = $("btYear");
+  const W = Math.max(wrap.clientWidth, 320), H = 260, pl = 44, pr = 10, pt = 12, pb = 26, lo = 0.4, hi = 1.0;
+  const bw = (W - pl - pr) / ys.length, y = v => pt + (hi - Math.max(lo, Math.min(hi, v))) / (hi - lo) * (H - pt - pb);
+  let g = "";
+  for(let v = 0.4; v <= 1.0001; v += 0.1) g += `<line x1="${pl}" x2="${W - pr}" y1="${y(v)}" y2="${y(v)}" stroke="rgba(255,255,255,.05)"/><text x="${pl - 6}" y="${y(v) + 4}" text-anchor="end">${num(100 * v, 0)}%</text>`;
+  ys.forEach((r, i) => {
+    const v = r.close_in.rate;
+    g += `<rect x="${pl + i * bw + bw * 0.15}" y="${y(v)}" width="${Math.max(1, bw * 0.7)}" height="${y(lo) - y(v)}" rx="1.5" fill="var(--pos)" fill-opacity="${r.year === B.end.slice(0, 4) || r.year === B.start.slice(0, 4) ? 0.45 : 0.85}"/>`;
+    if(ys.length < 16 || i % Math.ceil(ys.length / 9) === 0) g += `<text x="${pl + i * bw + bw / 2}" y="${H - 8}" text-anchor="middle">${r.year}</text>`;
+  });
+  g += `<line x1="${pl}" x2="${W - pr}" y1="${y(0.6827)}" y2="${y(0.6827)}" stroke="var(--prompt)" stroke-width="1.5" stroke-dasharray="5 3"/>`;
+  svg.setAttribute("width", W); svg.setAttribute("height", H); svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.innerHTML = g;
+  const full = ys.filter(r => r.year !== B.end.slice(0, 4) && r.year !== B.start.slice(0, 4)), best = (full.length ? full : ys).reduce((a, r) => r.close_in.rate < a.close_in.rate ? r : a, (full.length ? full : ys)[0]);
+  $("btYearSub").textContent = `Lowest full year: ${best.year} (${pct(best.close_in.rate)}, avg ${B.vol_index} ${num(best.avg_vol, 1)})`;
+  const tip = $("btYearTip");
+  svg.onmousemove = e => {
+    const i = Math.max(0, Math.min(ys.length - 1, Math.floor((e.clientX - svg.getBoundingClientRect().left - pl) / bw))), r = ys[i];
+    tip.innerHTML = `<b>${r.year}</b> · ${r.n} sessions<br>Close inside <b>${pct(r.close_in.rate)}</b> · whole range ${pct(r.range_in.rate)}<br>Broke up ${pct(r.up_break.rate)} · down ${pct(r.down_break.rate)} · avg ${esc(B.vol_index)} ${num(r.avg_vol, 1)}`;
+    tip.style.opacity = 1; tip.style.left = Math.min(pl + i * bw + 12, W - 250) + "px"; tip.style.top = "14px";
+  };
+  svg.onmouseleave = () => { tip.style.opacity = 0; };
+  // distribution of moves vs the normal curve
+  const hst = B.hist, dw = $("btDistWrap"), ds = $("btDist"), DW = Math.max(dw.clientWidth, 320), DH = 260, nb = hst.counts.length;
+  const top = Math.max(...hst.counts, ...hst.normal) * 1.08, bx = i => pl + i / nb * (DW - pl - pr), by = v => pt + (1 - v / top) * (DH - pt - pb);
+  let d = `<rect x="${bx((hst.edge - 1) / hst.bin)}" y="${pt}" width="${bx((hst.edge + 1) / hst.bin) - bx((hst.edge - 1) / hst.bin)}" height="${DH - pt - pb}" fill="rgba(255,255,255,.035)"/>`;
+  hst.counts.forEach((c, i) => { d += `<rect x="${bx(i) + 1}" y="${by(c)}" width="${Math.max(1, bx(1) - bx(0) - 2)}" height="${by(0) - by(c)}" rx="1.5" fill="var(--pos)" fill-opacity=".8"/>`; });
+  d += `<polyline fill="none" stroke="var(--ink2)" stroke-width="1.6" points="${hst.normal.map((v, i) => `${(bx(i) + bx(i + 1)) / 2},${by(v)}`).join(" ")}"/>`;
+  for(let s = -hst.edge; s <= hst.edge; s += 1) d += `<text x="${bx((s + hst.edge) / hst.bin)}" y="${DH - 8}" text-anchor="middle">${s === 0 ? "0" : signed(s, 0) + "σ"}</text>`;
+  ds.setAttribute("width", DW); ds.setAttribute("height", DH); ds.setAttribute("viewBox", `0 0 ${DW} ${DH}`); ds.innerHTML = d;
+  const tails = hst.counts[0] + hst.counts[nb - 1], ntails = hst.normal[0] + hst.normal[nb - 1];
+  $("btDistSub").textContent = `Beyond ±3σ: ${tails} sessions vs ${num(ntails, 0)} on a normal curve`;
+  const dt = $("btDistTip");
+  ds.onmousemove = e => {
+    const i = Math.max(0, Math.min(nb - 1, Math.floor((e.clientX - ds.getBoundingClientRect().left - pl) / (bx(1) - bx(0))))), a = -hst.edge + i * hst.bin;
+    dt.innerHTML = `${i === 0 ? "below " + signed(a + hst.bin, 2) : i === nb - 1 ? "above " + signed(a, 2) : `${signed(a, 2)} to ${signed(a + hst.bin, 2)}`}σ<br>Actual <b>${hst.counts[i]}</b> · normal ${num(hst.normal[i], 0)}`;
+    dt.style.opacity = 1; dt.style.left = Math.min(bx(i) + 12, DW - 190) + "px"; dt.style.top = "14px";
+  };
+  ds.onmouseleave = () => { dt.style.opacity = 0; };
+  // by vol level
+  $("btVolSub").textContent = `${B.vol_index} the evening before, in five equal groups`;
+  $("btVol").innerHTML = `<table class="trk-table"><tr><th>${esc(B.vol_index)} level</th><th>Sessions</th><th>Close inside</th><th>Whole range inside</th><th>Broke above</th><th>Broke below</th><th>Avg |move|</th></tr>${B.by_vol.map(r =>
+    `<tr><td class="m">${num(r.lo, 1)} to ${num(r.hi, 1)}</td><td class="m">${r.n.toLocaleString("en-US")}</td><td class="m"><b>${pct(r.close_in.rate)}</b></td><td class="m">${pct(r.range_in.rate)}</td><td class="m">${pct(r.up_break.rate)}</td><td class="m">${pct(r.down_break.rate)}</td><td class="m">${num(r.mean_abs_move_em, 2)}σ</td></tr>`).join("")}</table>
+    <div class="expl">When implied vol is low the band is generous; in high-vol regimes realized moves catch up with it and breaks become more common.</div>`;
+}
+
 setPage(page);
 load();
 loadNews();
@@ -987,5 +1138,6 @@ setInterval(loadNews, 10 * 60 * 1000);                      // the service itsel
 setInterval(() => { if(page === "news") renderNews(); }, 60000);   // keep countdowns current
 setInterval(() => { if(page === "briefings") loadBriefings(); }, STATIC ? 5 * 60 * 1000 : 60000);
 setInterval(() => { if(page === "indicator") loadIndicator(); }, STATIC ? 5 * 60 * 1000 : 15000);   // pick up code edits
-window.addEventListener("resize", () => { if(data) render(); if(page === "timeline") renderTimeline(); });
+window.addEventListener("resize", () => { if(data) render(); if(page === "timeline") renderTimeline(); if(page === "track") renderTrack(); });
+setInterval(() => { if(page === "track") loadTrack(); }, 5 * 60 * 1000);
 setInterval(() => { if(page === "timeline") loadTimeline(); }, STATIC ? 5 * 60 * 1000 : 60000);

@@ -93,10 +93,17 @@ Full details: [METHODOLOGY](docs/METHODOLOGY.md). Caveats: [LIMITATIONS](docs/LI
 ## Website
 
 A terminal-style workspace: a command line (type `GEX`, `VOL`, `TL`, `NQ`, `ES`, `COPY`, `HELP` and press
-Enter, or press `/`), a ticker strip with both markets, a sidebar of pages (keys `1`-`8`), and an **Explain**
+Enter, or press `/`), a ticker strip with both markets, a sidebar of pages (keys `1`-`9` and `0`), and an **Explain**
 panel (the `?` on every module, or the EXPLAIN tab on the right edge, or `X`) that says in plain English
 what each module shows and what to watch, with the live numbers for the current market.
 
+* **Track record:** every session's plan (the levels from the last calculation timestamped before the
+  09:30 ET open, frozen once) graded after the close against the index's open, high, low and close:
+  expected-move hit rate, walls held when touched, zero-gamma crosses, bias calls against a baseline,
+  range by gamma regime, each with a 95% range. Missed sessions are listed. The hosted site commits every
+  plan and grade to the public `track-record` branch. Plus a **historical backtest** of the expected-move
+  band from VIX (S&P 500, since 1990) and VXN (Nasdaq-100, since 2009): by year, by vol level, and the
+  distribution of daily moves against a normal curve. Hypothetical, not trading results.
 * **Library:** a beginner course in 19 short lessons (options basics, dealers and the Greeks, GEX levels,
   volatility, using GEX PRO), each with an example, diagrams, a link into the terminal and a quick check;
   an A-Z glossary; search; progress saved in your browser. Every Explain panel links to its lesson.
@@ -158,18 +165,19 @@ puts the payload on your clipboard. See [REALTIME_SETUP](docs/REALTIME_SETUP.md)
 
 ## Layout
 
-Three independent packages; only the app shell joins them (a test enforces it). How to add a
+Four independent packages; only the app shell joins them (a test enforces it). How to add a
 feature: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ```
 gexpro/            app shell: website server, hosted-site build, `python -m gexpro serve` (START.bat),
-                   context (the data snapshot briefings read from gex + feeds)
+                   context (what briefings and the track record read from gex + feeds)
 gexsys/            GEX only: providers/{base,cboe,csvfile,synthetic}, pricing, engine, levels, extras,
                    mapping, marketcal, pipeline, storage, alerts, publish (hourly paste), export (Pine
                    payload), bias, indicator (script info), service (market workers), component
                    (its website endpoints), audit, replay, config, __main__ (GEX tools CLI)
 feeds/             market news: forexfactory (calendar), truthsocial (posts), component
 briefings/         NY AM and Asia session briefings: schedule, compose (the text), component
+trackrecord/       track record and backtest: score (plan + grading rules), prices (free history), backtest, component
 dashboard/         the website (one page; reads each component's endpoints)
 pine/              TradingView Pine v6 indicator (GEX PRO)
 configs/           NQ / ES configurations

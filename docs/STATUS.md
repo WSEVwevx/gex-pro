@@ -52,3 +52,5 @@ system. **Awaiting credentials**: needs your provider account. **Simulated**: te
 | Pine | v6 indicator: payload parser, live/snapshot mapping, levels, dashboard, alerts, safety blocks | **Unverified**: not compiled in TradingView; see the checklist in TRADINGVIEW_SETUP.md |
 | Replay | Stability metrics, sensitivity across models | Working (stored summaries / synthetic) |
 | Replay | Strategy evaluation | Not built: methodology only (METHODOLOGY.md §12) |
+| Track record | Plans frozen from the last snapshot before 09:30 ET, graded after the close (expected move, walls, zero gamma, bias, regime range, magnet) with Wilson 95% ranges; missed sessions kept; hosted copy committed to the `track-record` branch | Working: 12 tests; seeded 2026-10-23 from the snapshots saved 2026-10-21 to 10-23 (4 graded, marked "rebuilt"). The workflow's branch push has not run on GitHub yet |
+| Backtest | Expected-move band from VIX (SPX, 1990-) and VXN (NDX, 2009-), same IV x sqrt(days/365) convention | Working: checked live 2026-10-23 (SPX 9,264 sessions, close inside 78%; NDX 4,303, 75%). A proxy: 30-day vol index, not GEX PRO's same-day IV |

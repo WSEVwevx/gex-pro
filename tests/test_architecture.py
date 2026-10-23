@@ -4,9 +4,10 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-PACKAGES = {"gexsys", "feeds", "briefings", "gexpro"}
+PACKAGES = {"gexsys", "feeds", "briefings", "trackrecord", "gexpro"}
 # who may import whom (the app shell composes; features never reach into each other or into the shell)
-ALLOWED = {"gexsys": set(), "feeds": set(), "briefings": set(), "gexpro": {"gexsys", "feeds", "briefings"}}
+ALLOWED = {"gexsys": set(), "feeds": set(), "briefings": set(), "trackrecord": set(),
+           "gexpro": {"gexsys", "feeds", "briefings", "trackrecord"}}
 
 
 def imported_packages(path: Path) -> set:
@@ -37,7 +38,7 @@ class TestBoundaries(unittest.TestCase):
             for attr in ("name", "routes", "start", "stop", "build_static"):
                 self.assertTrue(hasattr(c, attr), f"{type(c).__name__} lacks {attr}")
         routes = collect_routes(comps)                     # raises if two components claim one path
-        self.assertTrue({"/api/all", "/api/indicator", "/api/news", "/api/posts", "/api/briefings"} <= set(routes))
+        self.assertTrue({"/api/all", "/api/indicator", "/api/news", "/api/posts", "/api/briefings", "/api/trackrecord"} <= set(routes))
 
 
 if __name__ == "__main__":

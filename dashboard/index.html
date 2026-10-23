@@ -36,6 +36,7 @@
     <button role="tab" data-p="timeline" aria-selected="false"><svg viewBox="0 0 20 20"><path d="M3 16V4M3 16h14"/><path d="M6 12l3-3 3 2 4-5"/></svg><span>Timeline</span><kbd>TL</kbd></button>
     <div class="side-label">Insight</div>
     <button role="tab" data-p="bias" aria-selected="false"><svg viewBox="0 0 20 20"><path d="M10 3v14M5 8l5-5 5 5"/></svg><span>Bias</span><kbd>BIAS</kbd></button>
+    <button role="tab" data-p="track" aria-selected="false"><svg viewBox="0 0 20 20"><path d="M3 16h14M5 16V9M9 16V5M13 16v-5M17 16V7"/></svg><span>Track record</span><kbd>TRK</kbd></button>
     <button role="tab" data-p="briefings" aria-selected="false"><svg viewBox="0 0 20 20"><path d="M5 3h10v14H5zM8 7h4M8 10h4M8 13h2"/></svg><span>Briefings</span><kbd>BRF</kbd></button>
     <button role="tab" data-p="news" aria-selected="false"><svg viewBox="0 0 20 20"><path d="M3 5h11v11H3zM14 8h3v8h-3M6 8h5M6 11h5"/></svg><span>News</span><kbd>NEWS</kbd></button>
     <div class="side-label">Resources</div>
@@ -141,6 +142,44 @@
         <div id="biasFactors"></div>
         <div class="expl">+0.75 or more = bullish, -0.75 or less = bearish, otherwise neutral. Gamma side sets the day type rather than the direction.</div>
       </section>
+    </div>
+
+    <!-- TRACK RECORD -->
+    <div id="trackView" hidden>
+      <section class="card trk-hero" data-help="track">
+        <div class="head" style="margin-bottom:0"><div class="eyebrow">Live track record</div><span class="spacer"></span>
+          <div class="filters" id="trkMarket" role="tablist" aria-label="Market"></div></div>
+        <div class="trk-kpis" id="trkKpis"><div class="skeleton">Loading...</div></div>
+        <div class="expl" id="trkNote"></div>
+      </section>
+      <section class="card" data-help="track_scorecard" style="margin-top:14px">
+        <div class="head"><h2>Scorecard</h2><span class="sub" id="trkScoreSub"></span></div>
+        <div id="trkScore"></div>
+      </section>
+      <section class="card" data-help="track_log" style="margin-top:14px">
+        <div class="head"><h2>Every session</h2><span class="spacer"></span><span class="sub" id="trkLogSub"></span></div>
+        <div class="trk-log" id="trkLog"></div>
+      </section>
+
+      <section class="card trk-bt" data-help="backtest" style="margin-top:22px">
+        <div class="head" style="margin-bottom:0"><div class="eyebrow">Historical backtest · expected move</div><span class="spacer"></span>
+          <div class="filters" id="btMarket" role="tablist" aria-label="Index"></div></div>
+        <h2 class="trk-title" id="btTitle">-</h2>
+        <div class="trk-kpis" id="btKpis"></div>
+        <div class="expl" id="btNote"></div>
+      </section>
+      <div class="grid2">
+        <section class="card" data-help="backtest_year"><div class="head"><h2>Close inside the band, by year</h2><span class="sub" id="btYearSub"></span></div>
+          <div class="chartwrap" id="btYearWrap"><svg id="btYear" role="img" aria-label="Share of sessions closing inside the expected move, by year"></svg><div class="tip" id="btYearTip"></div></div>
+          <div class="legend"><span><i class="sw" style="background:var(--pos)"></i>share of sessions</span><span><i class="sw" style="background:var(--prompt);height:2px"></i>68.3% (a fair 1σ band)</span></div>
+        </section>
+        <section class="card" data-help="backtest_dist"><div class="head"><h2>Size of the daily move</h2><span class="sub" id="btDistSub"></span></div>
+          <div class="chartwrap" id="btDistWrap"><svg id="btDist" role="img" aria-label="Distribution of daily moves in expected moves"></svg><div class="tip" id="btDistTip"></div></div>
+          <div class="legend"><span><i class="sw" style="background:var(--pos)"></i>actual sessions</span><span><i class="sw" style="background:var(--ink2);height:2px"></i>normal curve (what the band assumes)</span></div>
+        </section>
+      </div>
+      <section class="card" data-help="backtest_vol" style="margin-top:14px"><div class="head"><h2>By volatility level</h2><span class="sub" id="btVolSub"></span></div><div id="btVol"></div></section>
+      <div class="expl trk-disclaimer">Hypothetical, rule-based results, not trading results. No orders, fills, costs or slippage are modeled. Past behaviour of a level or a band does not guarantee future behaviour. Not investment advice.</div>
     </div>
 
     <!-- BRIEFINGS -->

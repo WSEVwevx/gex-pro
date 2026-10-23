@@ -45,6 +45,17 @@ level as a *modeled concentration of option gamma*.
     exercise are kept and its gamma uses the index's dividend yield (QQQ 0.6% vs NDX 0.7%: about 1 NDX
     point of zero-gamma difference). Levels group each ETF strike with the nearest listed index strike.
 
+## Track record and backtest
+
+- **Short history.** Free historical open interest does not exist, so gamma levels can only be graded from
+  the first saved session on (2026-10-21). Until about 20 sessions are graded the numbers mean little.
+- **Rebuilt plans.** Sessions before the track record existed were frozen later from saved snapshots. They
+  use only data timestamped before the open, and the page marks them "rebuilt".
+- **Index, not futures.** Plans are graded on SPX and NDX, so futures-only moves outside cash hours are not counted.
+- **Price sources.** NDX daily bars come from Yahoo (unofficial); SPX from Cboe; same-day bars from Cboe 1-minute data.
+- **The backtest is a proxy.** It uses the 30-day VIX / VXN, not GEX PRO's own same-day IV, and only tests
+  the expected-move band. Hypothetical results: no orders, costs or slippage.
+
 ## Behaviour on bad data
 
 | Condition | Behaviour |

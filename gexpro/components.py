@@ -15,14 +15,16 @@ endpoints (or data/*.json files on the hosted site).
 """
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Protocol
 
 from briefings.component import BriefingsComponent
 from feeds.component import FeedsComponent
 from gexsys import marketcal, publish
 from gexsys.component import GexComponent
+from trackrecord.component import TrackRecordComponent
 
-from .context import snapshot
+from .context import pre_open, snapshot
 
 
 class Component(Protocol):
@@ -35,8 +37,10 @@ class Component(Protocol):
 
 
 def default_components(gex_configs) -> list:
-    """Order matters for the hosted build: briefings read what gex and feeds just built."""
+    """Order matters for the hosted build: briefings and the track record read what gex just built."""
     gex, feeds = GexComponent(gex_configs), FeedsComponent()
     briefings = BriefingsComponent(context=lambda: snapshot(gex, feeds), is_trading_day=marketcal.is_trading_day,
                                    notify=publish.notify_desktop)
-    return [gex, feeds, briefings]
+    track = TrackRecordComponent(pre_open=lambda d: pre_open(gex, d), is_trading_day=marketcal.is_trading_day,
+                                 session_close=lambda d: datetime.combine(d, marketcal.rth_close(d), marketcal.NY))
+    return [gex, feeds, briefings, track]

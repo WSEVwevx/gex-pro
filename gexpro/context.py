@@ -1,11 +1,15 @@
-"""The data snapshot other components (today: briefings) read, built from the GEX and feeds components.
+"""What other components read from the GEX and feeds components: the briefings snapshot and the
+track record's pre-open levels.
 
 This is the only place that knows both sides, so feature packages stay independent of each other.
 Shape: see briefings/compose.py.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+import json
+from datetime import date, datetime, time, timedelta, timezone
+
+from gexsys import bias, marketcal
 
 
 def _p(v):
@@ -48,3 +52,50 @@ def snapshot(gex, feeds) -> dict:
     except Exception:
         posts = []
     return {"now": datetime.now(timezone.utc).isoformat(), "markets": markets, "events": events, "posts": posts}
+
+
+# ---------------------------------------------------------------- track record: the levels known before an open
+PRE_OPEN_WINDOW = timedelta(hours=30)          # the plan must come from the evening before or later
+
+
+def plan_input(market: str, s: dict, bias: dict | None) -> dict:
+    """A stored summary (index points) in the shape the track record freezes (see trackrecord/score.py)."""
+    X = s.get("extras") or {}
+    em = X.get("expected_move") or {}
+    return {"market": market, "underlying": s.get("underlying"), "asof": s.get("asof"), "ref": s.get("ref_price"),
+            "em": em.get("daily_points"), "em_iv": em.get("daily_iv"), "regime": s.get("regime"), "net": s.get("net"),
+            "zg": _p(s.get("zero_gamma")), "cw": _p(s.get("call_wall")), "pw": _p(s.get("put_wall")),
+            "ag": _p(s.get("abs_gamma")), "bias": bias}
+
+
+def pre_open(gex, d: date) -> dict:
+    """{market: plan input or None} from the last saved calculation timestamped before d's 09:30 ET open.
+
+    Reads the snapshot files every worker saves, so it works the same in the local app and in the hosted
+    build, and for a session that has already started. The bias is recomputed for that open."""
+    open_ = datetime.combine(d, time(9, 30), marketcal.NY)
+    lo = open_ - PRE_OPEN_WINDOW
+    out: dict = {}
+    for w in gex.workers.values():
+        m = w.cfg.market
+        if out.get(m):
+            continue
+        base = w.store.root / w.key
+        best = None
+        for day in {lo.astimezone(timezone.utc).date() + timedelta(days=i) for i in range(3)}:
+            for f in sorted((base / day.strftime("%Y%m%d")).glob("*.json")):
+                if f.name.endswith(".chain.json"):
+                    continue
+                try:
+                    s = json.loads(f.read_text(encoding="utf-8"))
+                    t = datetime.fromisoformat(s["asof"])
+                except (OSError, ValueError, KeyError):
+                    continue
+                if lo <= t < open_ and s.get("status") != "UNAVAILABLE" and (best is None or t > best[0]):
+                    best = (t, s)
+        if best:
+            s = best[1]
+            out[m] = plan_input(m, s, bias.compute(s, open_ - timedelta(minutes=1)))
+        else:
+            out.setdefault(m, None)
+    return out
