@@ -30,7 +30,7 @@ let showTable = false;
 
 const GROUPS = [["key","Key levels"],["odte","0DTE"],["flow","Volume & OI"],["mp","Max pain"],["range","Expected move"]];
 const VIEWS = [["all","All"], ...GROUPS];
-const KIND_COLOR = {ag:"#e6e6e6", zg:"var(--zg)", call:"var(--pos)", put:"var(--neg)", vol:"var(--vol)", oi:"var(--oi)", mp:"var(--mp)", em:"var(--em)"};
+const KIND_COLOR = {ag:"var(--ag)", zg:"var(--zg)", call:"var(--pos)", put:"var(--neg)", vol:"var(--vol)", oi:"var(--oi)", mp:"var(--mp)", em:"var(--em)"};
 
 function toast(msg){ const t=$("toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove("show"),3800); }
 async function copyFrom(url, what){
@@ -398,8 +398,8 @@ function renderChart(w, s, L, ref){
   const step = bars.length > 1 ? Math.min(...bars.slice(1).map((b, i) => Math.abs(b.p - bars[i].p)).filter(d => d > 0)) : win;
   const bh = Math.max(2, Math.min(12, step / (hi - lo) * (H - padT - padB) - 2));   // 2px surface gap between bars
   let g = "";
-  for(let i = 0; i <= 6; i++){ const p = lo + (hi - lo) * i / 6; g += `<line x1="${padL}" x2="${W-padR}" y1="${y(p)}" y2="${y(p)}" stroke="rgba(255,255,255,.05)"/><text x="${padL-8}" y="${y(p)+4}" text-anchor="end">${num(p,0)}</text>`; }
-  g += `<line x1="${cx}" x2="${cx}" y1="${padT}" y2="${H-padB}" stroke="rgba(255,255,255,.14)"/>`;
+  for(let i = 0; i <= 6; i++){ const p = lo + (hi - lo) * i / 6; g += `<line x1="${padL}" x2="${W-padR}" y1="${y(p)}" y2="${y(p)}" stroke="rgba(var(--fg-rgb),.05)"/><text x="${padL-8}" y="${y(p)+4}" text-anchor="end">${num(p,0)}</text>`; }
+  g += `<line x1="${cx}" x2="${cx}" y1="${padT}" y2="${H-padB}" stroke="rgba(var(--fg-rgb),.14)"/>`;
   bars.forEach((b, i) => {
     const len = Math.abs(b.net) / mx * xs, x = b.net >= 0 ? cx : cx - len;
     g += `<rect data-i="${i}" x="${x}" y="${y(b.p) - bh/2}" width="${Math.max(len, 1)}" height="${bh}" rx="${Math.min(3, bh / 2)}" fill="${b.net>=0?"var(--pos)":"var(--neg)"}" fill-opacity=".9"/>`;
@@ -407,7 +407,7 @@ function renderChart(w, s, L, ref){
   const pr = v => v && typeof v === "object" ? v.price : v;
   const marks = [[ref, "Price", "var(--ink)", ""], [pr(L.zero_gamma), "Zero gamma", "var(--zg)", "5 4"],
                  [pr(L.call_wall), "Call wall", "var(--pos)", "2 3"], [pr(L.put_wall), "Put wall", "var(--neg)", "2 3"],
-                 [pr(L.abs_gamma), "Abs gamma", "#e6e6e6", "1 3"]]
+                 [pr(L.abs_gamma), "Abs gamma", "var(--ag)", "1 3"]]
     .filter(m => m[0] != null && m[0] >= lo && m[0] <= hi);
   marks.forEach(([p, , color, dash]) => { g += `<line x1="${padL}" x2="${W-padR}" y1="${y(p)}" y2="${y(p)}" stroke="${color}" stroke-width="1.5" ${dash ? `stroke-dasharray="${dash}"` : ""}/>`; });
   // labels sorted top to bottom and pushed apart so they never overlap
@@ -494,7 +494,7 @@ function drawBias(b, col){
   g += `<rect x="${x(b.session.start_minute)}" y="${y(b.range[1])}" width="${x(T) - x(b.session.start_minute)}" height="${y(b.range[0]) - y(b.range[1])}" fill="${col}" opacity=".06"/>`;
   g += `<polygon points="${b.cone.map(c => `${x(c[0])},${y(c[2])}`).join(" ")} ${b.cone.slice().reverse().map(c => `${x(c[0])},${y(c[1])}`).join(" ")}" fill="rgba(139,149,165,.22)" stroke="rgba(139,149,165,.45)" stroke-width="1"/>`;
   // key levels with collision-free labels
-  const LC = {"Call wall": "var(--pos)", "Put wall": "var(--neg)", "Zero gamma": "var(--zg)", "Abs gamma": "#e6e6e6", "Max pain 0DTE": "var(--mp)"};
+  const LC = {"Call wall": "var(--pos)", "Put wall": "var(--neg)", "Zero gamma": "var(--zg)", "Abs gamma": "var(--ag)", "Max pain 0DTE": "var(--mp)"};
   lv.forEach(([n, p]) => { g += `<line x1="${padL}" x2="${W-padR}" y1="${y(p)}" y2="${y(p)}" stroke="${LC[n]}" stroke-width="1.3" stroke-dasharray="${n === "Zero gamma" ? "6 4" : "2 3"}"/>`; });
   const labels = [...lv.map(([n, p]) => [p, `${n} ${num(p,0)}`, LC[n]]), [b.target, `Base case ${num(b.target,0)}`, col]];
   let last = -1e9;
@@ -606,14 +606,14 @@ function renderGamma(){
     zone = [pts[a].p, pts[b].p];
   }
   let g = "";
-  for(let i = 0; i <= 4; i++){ const v = -mx + 2 * mx * i / 4; g += `<line x1="${pl}" x2="${W - pr}" y1="${y(v)}" y2="${y(v)}" stroke="rgba(255,255,255,.05)"/><text x="${pl - 8}" y="${y(v) + 4}" text-anchor="end">${i === 2 ? "0" : money(v)}</text>`; }
+  for(let i = 0; i <= 4; i++){ const v = -mx + 2 * mx * i / 4; g += `<line x1="${pl}" x2="${W - pr}" y1="${y(v)}" y2="${y(v)}" stroke="rgba(var(--fg-rgb),.05)"/><text x="${pl - 8}" y="${y(v) + 4}" text-anchor="end">${i === 2 ? "0" : money(v)}</text>`; }
   for(let i = 0; i <= 6; i++){ const p = lo + (hi - lo) * i / 6; g += `<text x="${x(p)}" y="${H - 8}" text-anchor="middle">${num(p, 0)}</text>`; }
   if(emd && ref) g += `<rect x="${x(Math.max(lo, ref - emd))}" y="${pt}" width="${Math.max(0, x(Math.min(hi, ref + emd)) - x(Math.max(lo, ref - emd)))}" height="${H - pt - pb}" fill="rgba(139,149,165,.07)"/>`;
   if(zone) g += `<rect x="${x(zone[0])}" y="${pt}" width="${Math.max(2, x(zone[1]) - x(zone[0]))}" height="${H - pt - pb}" fill="rgba(185,190,199,.13)"/>`;
   const path = pts.map((q, i) => `${i ? "L" : "M"}${x(q.p).toFixed(1)},${y(q.v).toFixed(1)}`).join("");
   const area = (sign) => `M${x(lo)},${y(0)} ` + pts.map(q => `L${x(q.p).toFixed(1)},${y(sign > 0 ? Math.max(0, q.v) : Math.min(0, q.v)).toFixed(1)}`).join(" ") + ` L${x(hi)},${y(0)} Z`;
   g += `<path d="${area(1)}" fill="rgba(57,135,229,.22)"/><path d="${area(-1)}" fill="rgba(217,89,38,.22)"/>`;
-  g += `<line x1="${pl}" x2="${W - pr}" y1="${y(0)}" y2="${y(0)}" stroke="rgba(255,255,255,.22)"/>`;
+  g += `<line x1="${pl}" x2="${W - pr}" y1="${y(0)}" y2="${y(0)}" stroke="rgba(var(--fg-rgb),.22)"/>`;
   g += `<path d="${path}" fill="none" stroke="var(--ink)" stroke-width="1.6" stroke-opacity=".85"/>`;
   const vline = (p, col, dash, label, top) => p == null || p < lo || p > hi ? "" :
     `<line x1="${x(p)}" x2="${x(p)}" y1="${pt}" y2="${H - pb}" stroke="${col}" stroke-width="1.3" ${dash ? `stroke-dasharray="${dash}"` : ""}/><text x="${x(p) + 4}" y="${pt + 11 + (top || 0)}" style="fill:${col}">${label}</text>`;
@@ -671,9 +671,9 @@ function renderVol(){
     const padv = (hi - lo) * 0.12 || 1; lo -= padv; hi += padv;
     const x = i => pl + (n === 1 ? 0.5 : i / (n - 1)) * (W - pl - pr), y = v => pt + (hi - v) / (hi - lo) * (H - pt - pb);
     let g = "";
-    for(let i = 0; i <= 4; i++){ const v = lo + (hi - lo) * i / 4; g += `<line x1="${pl}" x2="${W - pr}" y1="${y(v)}" y2="${y(v)}" stroke="rgba(255,255,255,.05)"/><text x="${pl - 8}" y="${y(v) + 4}" text-anchor="end">${yfmt(v)}</text>`; }
+    for(let i = 0; i <= 4; i++){ const v = lo + (hi - lo) * i / 4; g += `<line x1="${pl}" x2="${W - pr}" y1="${y(v)}" y2="${y(v)}" stroke="rgba(var(--fg-rgb),.05)"/><text x="${pl - 8}" y="${y(v) + 4}" text-anchor="end">${yfmt(v)}</text>`; }
     rows.forEach((r, i) => { if(n < 9 || i % Math.ceil(n / 8) === 0) g += `<text x="${x(i)}" y="${H - 9}" text-anchor="middle">${lab(r)}</text>`; });
-    if(zeroLine) g += `<line x1="${pl}" x2="${W - pr}" y1="${y(0)}" y2="${y(0)}" stroke="rgba(255,255,255,.2)"/>`;
+    if(zeroLine) g += `<line x1="${pl}" x2="${W - pr}" y1="${y(0)}" y2="${y(0)}" stroke="rgba(var(--fg-rgb),.2)"/>`;
     series.forEach(sr => {
       if(sr.bars){ const bw = Math.max(4, (W - pl - pr) / n * 0.55);
         rows.forEach((r, i) => { const v = sr.get(r); if(v == null) return; g += `<rect x="${x(i) - bw / 2}" y="${Math.min(y(v), y(0))}" width="${bw}" height="${Math.abs(y(v) - y(0))}" rx="2" fill="${v >= 0 ? "var(--neg)" : "var(--pos)"}" fill-opacity=".85"/>`; });
@@ -739,7 +739,7 @@ function renderTimeline(){
   let g = "";
   // negative-gamma periods shaded
   rows.forEach((r, i) => { if(r.regime === "NEGATIVE" && i < rows.length - 1){ const a = x(Date.parse(r.t)), b = x(Date.parse(rows[i + 1].t)); if(b - a < (W - pl) / 6) g += `<rect x="${a}" y="${pt}" width="${b - a + 0.5}" height="${H - pt - pb}" fill="rgba(217,89,38,.08)"/>`; } });
-  for(let i = 0; i <= 5; i++){ const v = lo + (hi - lo) * i / 5; g += `<line x1="${pl}" x2="${W - pr}" y1="${y(v)}" y2="${y(v)}" stroke="rgba(255,255,255,.05)"/><text x="${pl - 8}" y="${y(v) + 4}" text-anchor="end">${num(v, 0)}</text>`; }
+  for(let i = 0; i <= 5; i++){ const v = lo + (hi - lo) * i / 5; g += `<line x1="${pl}" x2="${W - pr}" y1="${y(v)}" y2="${y(v)}" stroke="rgba(var(--fg-rgb),.05)"/><text x="${pl - 8}" y="${y(v) + 4}" text-anchor="end">${num(v, 0)}</text>`; }
   for(let i = 0; i <= 4; i++){ const t = t0 + (t1 - t0) * i / 4; g += `<text x="${x(t)}" y="${H - 8}" text-anchor="middle">${new Date(t).toLocaleString("en-US", {...ET, weekday:"short", hour:"numeric"})}</text>`; }
   const line = (k, col, w, dash) => {
     const p = rows.filter(r => r[k] != null).map(r => `${x(Date.parse(r.t)).toFixed(1)},${y(r[k]).toFixed(1)}`);
@@ -758,7 +758,7 @@ function renderTimeline(){
   // net GEX
   const NW = Math.max($("tlNetWrap").clientWidth, 320), NH = 160, nmx = Math.max(1, ...rows.map(r => Math.abs(r.net || 0)));
   const nx = t => pl + (t - t0) / Math.max(1, t1 - t0) * (NW - pl - pr), ny = v => 10 + (nmx - v) / (2 * nmx) * (NH - 30);
-  let h = `<line x1="${pl}" x2="${NW - pr}" y1="${ny(0)}" y2="${ny(0)}" stroke="rgba(255,255,255,.2)"/><text x="${pl - 8}" y="${ny(nmx) + 8}" text-anchor="end">${money(nmx)}</text><text x="${pl - 8}" y="${ny(-nmx)}" text-anchor="end">${money(-nmx)}</text>`;
+  let h = `<line x1="${pl}" x2="${NW - pr}" y1="${ny(0)}" y2="${ny(0)}" stroke="rgba(var(--fg-rgb),.2)"/><text x="${pl - 8}" y="${ny(nmx) + 8}" text-anchor="end">${money(nmx)}</text><text x="${pl - 8}" y="${ny(-nmx)}" text-anchor="end">${money(-nmx)}</text>`;
   const bw = Math.max(1, (NW - pl - pr) / rows.length - 0.5);
   rows.forEach(r => { const v = r.net || 0; h += `<rect x="${nx(Date.parse(r.t)) - bw / 2}" y="${Math.min(ny(v), ny(0))}" width="${bw}" height="${Math.abs(ny(v) - ny(0))}" fill="${v >= 0 ? "var(--pos)" : "var(--neg)"}" fill-opacity=".8"/>`; });
   net.setAttribute("width", NW); net.setAttribute("height", NH); net.setAttribute("viewBox", `0 0 ${NW} ${NH}`); net.innerHTML = h;
@@ -880,6 +880,14 @@ document.querySelectorAll("[data-help]").forEach(el => {
   else (head || el).appendChild(b);
 });
 
+// ---------- light / dark mode (the page sets the saved theme before it paints; see index.html)
+function setTheme(t){
+  document.documentElement.dataset.theme = t; store.set("gex.theme", t);
+  $("themeBtn").title = `Switch to ${t === "light" ? "dark" : "light"} mode (T)`;
+}
+$("themeBtn").onclick = () => setTheme(document.documentElement.dataset.theme === "light" ? "dark" : "light");
+setTheme(document.documentElement.dataset.theme === "light" ? "light" : "dark");
+
 // ---------- command line
 const COMMANDS = [
   ...PAGES.map(([p, name, code]) => ({code, desc: `Open ${name}`, run: () => setPage(p)})),
@@ -891,6 +899,7 @@ const COMMANDS = [
   {code: "EXPLAIN", desc: "Explain this page", run: () => openExplain(PAGE_HELP[page] || "regime")},
   {code: "REFRESH", desc: "Reload all data now", run: () => { load(); loadNews(); loadPosts(); if(page === "timeline") loadTimeline(); toast("Refreshing data..."); }},
   {code: "HELP", desc: "Keyboard shortcuts", run: () => showKeys(true)},
+  {code: "LIGHT", desc: "Light mode", run: () => setTheme("light")}, {code: "DARK", desc: "Dark (night) mode", run: () => setTheme("dark")},
   {code: "LEARN", desc: "Start the beginner course", run: () => openLesson(LIB.lessons[0].id)},
   {code: "GLOSSARY", desc: "Open the A-Z glossary", run: () => { libTab = "glossary"; setPage("library"); }},
 ];
@@ -918,7 +927,7 @@ $("cmd").addEventListener("keydown", e => {
 
 // ---------- keyboard
 const KEYS = [["/  or  Ctrl+K", "Command line"], ["1 - 9, 0", "Pages (Levels, Gamma lab, Volatility, Timeline, Bias, Track record, Strategies, Briefings, News, Indicator); type LIB for the Library"],
-  ["N  /  E", "Switch to NQ / ES"], ["X", "Explain this page"], ["C", "Copy the TradingView paste"], ["?", "This list"], ["Esc", "Close panels"]];
+  ["N  /  E", "Switch to NQ / ES"], ["X", "Explain this page"], ["T", "Light / dark mode"], ["C", "Copy the TradingView paste"], ["?", "This list"], ["Esc", "Close panels"]];
 function showKeys(on){ $("keys").hidden = !on; if(on) $("keysGrid").innerHTML = KEYS.map(([k, d]) => `<kbd>${esc(k)}</kbd><span>${esc(d)}</span>`).join(""); }
 $("keysBtn").onclick = () => showKeys(true);
 $("keysClose").onclick = () => showKeys(false);
@@ -933,6 +942,7 @@ document.addEventListener("keydown", e => {
   else if(e.key === "n" || e.key === "N") setMarket("NQ");
   else if(e.key === "e" || e.key === "E") setMarket("ES");
   else if(e.key === "x" || e.key === "X") $("explainTab").click();
+  else if(e.key === "t" || e.key === "T") $("themeBtn").click();
   else if(e.key === "c" || e.key === "C") $("copyAll").click();
   else if(e.key === "?") showKeys(true);
 });
@@ -1092,7 +1102,7 @@ function renderBacktest(){
   const W = Math.max(wrap.clientWidth, 320), H = 260, pl = 44, pr = 10, pt = 12, pb = 26, lo = 0.4, hi = 1.0;
   const bw = (W - pl - pr) / ys.length, y = v => pt + (hi - Math.max(lo, Math.min(hi, v))) / (hi - lo) * (H - pt - pb);
   let g = "";
-  for(let v = 0.4; v <= 1.0001; v += 0.1) g += `<line x1="${pl}" x2="${W - pr}" y1="${y(v)}" y2="${y(v)}" stroke="rgba(255,255,255,.05)"/><text x="${pl - 6}" y="${y(v) + 4}" text-anchor="end">${num(100 * v, 0)}%</text>`;
+  for(let v = 0.4; v <= 1.0001; v += 0.1) g += `<line x1="${pl}" x2="${W - pr}" y1="${y(v)}" y2="${y(v)}" stroke="rgba(var(--fg-rgb),.05)"/><text x="${pl - 6}" y="${y(v) + 4}" text-anchor="end">${num(100 * v, 0)}%</text>`;
   ys.forEach((r, i) => {
     const v = r.close_in.rate;
     g += `<rect x="${pl + i * bw + bw * 0.15}" y="${y(v)}" width="${Math.max(1, bw * 0.7)}" height="${y(lo) - y(v)}" rx="1.5" fill="var(--pos)" fill-opacity="${r.year === B.end.slice(0, 4) || r.year === B.start.slice(0, 4) ? 0.45 : 0.85}"/>`;
@@ -1112,7 +1122,7 @@ function renderBacktest(){
   // distribution of moves vs the normal curve
   const hst = B.hist, dw = $("btDistWrap"), ds = $("btDist"), DW = Math.max(dw.clientWidth, 320), DH = 260, nb = hst.counts.length;
   const top = Math.max(...hst.counts, ...hst.normal) * 1.08, bx = i => pl + i / nb * (DW - pl - pr), by = v => pt + (1 - v / top) * (DH - pt - pb);
-  let d = `<rect x="${bx((hst.edge - 1) / hst.bin)}" y="${pt}" width="${bx((hst.edge + 1) / hst.bin) - bx((hst.edge - 1) / hst.bin)}" height="${DH - pt - pb}" fill="rgba(255,255,255,.035)"/>`;
+  let d = `<rect x="${bx((hst.edge - 1) / hst.bin)}" y="${pt}" width="${bx((hst.edge + 1) / hst.bin) - bx((hst.edge - 1) / hst.bin)}" height="${DH - pt - pb}" fill="rgba(var(--fg-rgb),.035)"/>`;
   hst.counts.forEach((c, i) => { d += `<rect x="${bx(i) + 1}" y="${by(c)}" width="${Math.max(1, bx(1) - bx(0) - 2)}" height="${by(0) - by(c)}" rx="1.5" fill="var(--pos)" fill-opacity=".8"/>`; });
   d += `<polyline fill="none" stroke="var(--ink2)" stroke-width="1.6" points="${hst.normal.map((v, i) => `${(bx(i) + bx(i + 1)) / 2},${by(v)}`).join(" ")}"/>`;
   for(let s = -hst.edge; s <= hst.edge; s += 1) d += `<text x="${bx((s + hst.edge) / hst.bin)}" y="${DH - 8}" text-anchor="middle">${s === 0 ? "0" : signed(s, 0) + "σ"}</text>`;
@@ -1260,7 +1270,7 @@ function renderStrategies(){
     const vs = c.map(p => p[1]), lo = Math.min(0, ...vs), hi = Math.max(0, ...vs), y = v => 6 + (hi - v) / ((hi - lo) || 1) * (Hh - 18);
     const pts = c.map((p, i) => `${(i / (n - 1) * (W - 4) + 2).toFixed(1)},${y(p[1]).toFixed(1)}`).join(" ");
     const col = vs[n - 1] >= 0 ? "var(--good)" : "var(--bad)";
-    el.innerHTML = `<svg width="${W}" height="${Hh}" viewBox="0 0 ${W} ${Hh}"><line x1="0" x2="${W}" y1="${y(0)}" y2="${y(0)}" stroke="rgba(255,255,255,.18)" stroke-dasharray="3 3"/>
+    el.innerHTML = `<svg width="${W}" height="${Hh}" viewBox="0 0 ${W} ${Hh}"><line x1="0" x2="${W}" y1="${y(0)}" y2="${y(0)}" stroke="rgba(var(--fg-rgb),.18)" stroke-dasharray="3 3"/>
       <polyline fill="none" stroke="${col}" stroke-width="1.6" points="${pts}"/><text x="2" y="${Hh - 2}">${esc(c[0][0].slice(0, 4))}</text><text x="${W - 2}" y="${Hh - 2}" text-anchor="end">${esc(c[n - 1][0].slice(0, 4))} · ${signed(vs[n - 1], 0)} R</text></svg>`;
   });
 }
