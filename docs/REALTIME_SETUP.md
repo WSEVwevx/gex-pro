@@ -15,8 +15,8 @@ Double-click **START.bat**. It installs or updates the dependencies, starts the 
 * This is the best free source found (checked 2026-10-21). It needs no signup and has open
   interest, IV and Greeks for SPX and NDX in one request.
 * Options quotes are **15 minutes delayed**. Open interest is **end-of-day**.
-* **Real time:** with a Schwab brokerage account, follow [SCHWAB_SETUP.md](SCHWAB_SETUP.md). START.bat
-  then uses Schwab automatically and falls back to Cboe if the weekly login lapses.
+* **Real time:** not available for free. The options for paid or brokerage-account real-time data
+  are in [DATA_PROVIDERS.md](DATA_PROVIDERS.md).
 * Cboe's Greeks are rounded to 4 decimals, so gamma is recomputed from Cboe's IV.
 * The feed is unofficial: no API contract, personal use only. If it breaks, the website shows the
   error and keeps the last good levels.

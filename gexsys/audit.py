@@ -35,10 +35,6 @@ class _Replay:
     def fetch_snapshot(self, *a, **k):
         return self._snap
 
-    def futures_basis(self, *a, **k):
-        fb = getattr(self._p, "futures_basis", None)
-        return fb(*a, **k) if fb else None
-
 
 def _p(v) -> Optional[float]:
     return v.get("price") if isinstance(v, dict) else v

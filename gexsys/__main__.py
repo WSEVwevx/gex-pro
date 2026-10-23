@@ -35,57 +35,9 @@ def _print_result(r: dict) -> None:
 
 
 def auto_configs() -> list[str]:
-    """Schwab (real time, Cboe fallback) when the app key is configured, else free Cboe."""
-    import os
-    if os.environ.get("SCHWAB_APP_KEY") and "replace" not in os.environ["SCHWAB_APP_KEY"].lower():
-        from .providers.schwab_auth import TokenStore
-        st = TokenStore().status()
-        if st["logged_in"]:
-            print(f"Data: Schwab (real time if your account is entitled), login valid {st['refresh_days_left']:.1f} more days.")
-        else:
-            print(f"Data: Schwab login needed ({st['reason']}) - using Cboe delayed data until you log in.")
-        return ["configs/schwab_nq.json", "configs/schwab_es.json"]
-    print("Data: Cboe free delayed feed (set up Schwab for real time: docs/SCHWAB_SETUP.md).")
+    """The free Cboe configs for NQ and ES."""
+    print("Data: Cboe free feed (options 15-min delayed).")
     return ["configs/free_nq_cboe.json", "configs/free_es_cboe.json"]
-
-
-def schwab_login() -> int:
-    import getpass
-    import os
-    import webbrowser
-    from .providers.base import AuthError
-    from .providers.schwab_auth import (DEFAULT_CALLBACK, TokenStore, authorize_url, code_from_redirect, credentials,
-                                        local_env_path)
-    try:
-        key, _, cb = credentials()
-    except AuthError:
-        print("First-time setup. Your App Key and Secret are on developer.schwab.com > Dashboard > your app.")
-        print(f"They are saved only on this PC ({local_env_path()}), not in the OneDrive folder.\n")
-        key = input("App Key: ").strip()
-        secret = getpass.getpass("App Secret (typing is hidden): ").strip()
-        cb = input(f"Callback URL [{DEFAULT_CALLBACK}]: ").strip() or DEFAULT_CALLBACK
-        if not key or not secret:
-            print("Both are needed.")
-            return 1
-        p = local_env_path()
-        p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(f"SCHWAB_APP_KEY={key}\nSCHWAB_APP_SECRET={secret}\nSCHWAB_CALLBACK_URL={cb}\n", encoding="utf-8")
-        os.environ.update(SCHWAB_APP_KEY=key, SCHWAB_APP_SECRET=secret, SCHWAB_CALLBACK_URL=cb)
-    url, state = authorize_url(key, cb)
-    print("\n1. Your browser is opening the Schwab login page. Log in and approve the app.")
-    print(f"2. Schwab then sends you to {cb}/?code=... The page will NOT load - that is expected.")
-    print("3. Copy the FULL address from the browser's address bar and paste it below.\n")
-    print("If the browser didn't open, go to:\n" + url + "\n")
-    webbrowser.open(url)
-    try:
-        redirected = input("Paste the address here and press Enter: ")
-        TokenStore().exchange_code(code_from_redirect(redirected, state))
-    except AuthError as e:
-        print(f"\nLogin failed: {e}")
-        return 1
-    st = TokenStore().status()
-    print(f"\nLogged in. The login stays valid for {st['refresh_days_left']:.0f} days; run SCHWAB_LOGIN.bat again after that.")
-    return 0
 
 
 def main(argv=None) -> int:
@@ -101,7 +53,7 @@ def main(argv=None) -> int:
     sv = sub.add_parser("serve")
     sv.add_argument("--config", action="append")
     sv.add_argument("--auto", action="store_true",
-                    help="Schwab configs when SCHWAB_APP_KEY is set (Cboe fallback built in), else the free Cboe configs")
+                    help="the free Cboe configs for NQ and ES")
     sv.add_argument("--host", default="127.0.0.1")
     sv.add_argument("--port", type=int, default=8765)
     bs = sub.add_parser("build-site", help="write the dashboard + fresh data as static files (for free hosting)")
@@ -110,8 +62,6 @@ def main(argv=None) -> int:
     bs.add_argument("--state", default=".state", help="folder kept between runs (last good result, history, caches)")
     au = sub.add_parser("audit", help="check live data, levels and the TradingView paste end to end")
     au.add_argument("--config", action="append", help="default: the configs START.bat would use")
-    sub.add_parser("schwab-login", help="one-time Schwab login (repeat every 7 days)")
-    sub.add_parser("schwab-status", help="show whether the Schwab login is still valid")
     rp = sub.add_parser("replay")
     rp.add_argument("--market", required=True)
     rp.add_argument("--root", default="data/snapshots")
@@ -120,8 +70,6 @@ def main(argv=None) -> int:
     a = ap.parse_args(argv)
     _setup_logging(a.log_level)
     cfgmod.load_dotenv(a.env_file)
-    from .providers.schwab_auth import local_env_path
-    cfgmod.load_dotenv(str(local_env_path()))      # secrets kept outside the (OneDrive-synced) project folder
 
     from .pipeline import run_once
     from .storage import SnapshotStore
@@ -165,12 +113,6 @@ def main(argv=None) -> int:
             c = cfgmod.load(p)
             fails += print_report(f"{c.market} from {c.source} ({p})", audit(c, cfgmod.make_provider(c)))
         return 1 if fails else 0
-    if a.cmd == "schwab-login":
-        return schwab_login()
-    if a.cmd == "schwab-status":
-        from .providers.schwab_auth import TokenStore
-        print(json.dumps(TokenStore().status(), indent=2))
-        return 0
     if a.cmd == "replay":
         from .replay import stability
         print(json.dumps(stability(SnapshotStore(a.root).iter_summaries(a.market)), indent=2))

@@ -114,19 +114,6 @@ class MarketWorker(threading.Thread):
         except OSError as e:
             log.warning("could not save last good result for %s: %s", self.key, e)
 
-    def _watch_fallback(self, r: dict) -> None:
-        """One Windows notification when the primary source (Schwab) drops out, e.g. the 7-day login expired."""
-        used = r["summary"].get("provider")
-        if used and used != self.label:
-            if not getattr(self, "_fallback_told", False):
-                self._fallback_told = True
-                why = next((w for w in r["summary"].get("warnings", []) if "unavailable" in w), "")
-                self.notify_desktop(f"{self.label} data unavailable - using {used}",
-                                    ("Run SCHWAB_LOGIN.bat, then restart START.bat. " if "login" in why.lower() or "AUTH" in why
-                                     else "") + why[:150])
-        else:
-            self._fallback_told = False
-
     def _accept(self, r: dict) -> bool:
         """Use a new result unless it is UNAVAILABLE while a usable one exists (free feeds blank out
         overnight).  The kept result's own timestamp shows its age; last_error explains why."""
@@ -173,7 +160,6 @@ class MarketWorker(threading.Thread):
         now = now or datetime.now(timezone.utc)
         try:
             r = run_once(self.cfg, self.provider, self.store, self.alerts)
-            self._watch_fallback(r)
             if self._accept(r):
                 self.last_success, self.last_error, self.failures = time.time(), None, 0
             interval = marketcal.refresh_interval(now, self.cfg.refresh)
@@ -260,11 +246,7 @@ def make_handler(workers: dict[str, MarketWorker], calendar=None, posts=None):
                                          "provider": w.label, "description": w.cfg.description}
                                         for k, w in workers.items()])
             if u.path == "/api/all":
-                auth = None
-                if any(w.cfg.provider.get("name") == "schwab" for w in workers.values()):
-                    from .providers.schwab_auth import TokenStore
-                    auth = TokenStore().status()
-                return self._json(200, {"now": datetime.now(timezone.utc).isoformat(), "schwab": auth, "workers": [
+                return self._json(200, {"now": datetime.now(timezone.utc).isoformat(), "workers": [
                     {"key": k, "market": w.cfg.market, "provider": w.label, "source": w.cfg.source,
                      "description": w.cfg.description, "health": w.health(), "published": w.published,
                      "result": w.result} for k, w in workers.items()]})

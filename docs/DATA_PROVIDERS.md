@@ -25,11 +25,9 @@
 
 ### Upgrade path: real-time for free with a brokerage account
 
-**Schwab Trader API** (free with a Schwab brokerage account): **built**. Setup in
-[SCHWAB_SETUP.md](SCHWAB_SETUP.md). It provides real-time chains plus live /ES and /NQ quotes, with
-automatic Cboe fallback. Built from the documented API and tested with sample responses; not yet run
-against a live account. Tradier's production API (with a Tradier brokerage account) is the other
-route, and its adapter also exists (`configs/*_tradier.json`).
+Tradier's production API (with a Tradier brokerage account) gives real-time chains, and its adapter
+already exists (`configs/*_tradier.json`). A Schwab adapter was built earlier and then removed
+(2026-10-23) after API access was denied.
 
 The rest of this document covers keyed and paid options.
 

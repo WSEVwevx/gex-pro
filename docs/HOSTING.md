@@ -23,7 +23,6 @@ It costs nothing and does not rely on Claude or on your terminal. The job is in
    - Open your `Options Indicator` folder in File Explorer.
    - Select everything inside it (Ctrl+A), including the `.github` folder, and drag it into the browser.
    - **Do not upload a file called `.env`**, if you have one. (`.env.example` is fine; it has no secrets.)
-     Your Schwab keys are not in this folder, so they won't be uploaded.
    - Click **Commit changes**.
 4. **Turn on Pages.** Go to **Settings > Pages**, then under "Build and deployment" set **Source** to
    **GitHub Actions**.
@@ -47,13 +46,11 @@ Upload the changed files again the same way (**Add file > Upload files**). Each 
 | | Local (START.bat) | Hosted (GitHub Pages) |
 |---|---|---|
 | Needs your PC on | Yes | No |
-| Options data | Schwab real time when logged in, else Cboe | Cboe, 15-min delayed |
+| Options data | Cboe, 15-min delayed | Cboe, 15-min delayed |
 | How often it updates | Every minute or so in market hours | About every 15 min in market hours (GitHub can start runs 5–20 min late) |
 | Windows notifications | Yes | No: check the "Next paste" time on the site |
 | Who can open it | Only you (127.0.0.1) | Anyone who has the link |
 
-- **Schwab stays local on purpose.** Hosting it would mean storing your Schwab login tokens on GitHub,
-  and Schwab makes you log in again every 7 days anyway.
 - **Public:** the web address isn't listed anywhere, but anyone who has it can open the page. The page holds
   only public market data, with no account details.
 - **Truth Social** may block GitHub's servers. If it does, the feed uses the trumpstruth.org archive

@@ -17,8 +17,7 @@ TradingView can't call external APIs, and Pine Seeds is closed to new repositori
 
 ## Everyday use
 
-**Double-click `START.bat`.** It starts the service with free Cboe data (NDX options for NQ, SPX for ES), or with real-time
-Schwab data once you've set that up ([Schwab setup](docs/SCHWAB_SETUP.md), then **SCHWAB_LOGIN.bat**), and
+**Double-click `START.bat`.** It starts the service with free Cboe data (NDX options for NQ, SPX for ES) and
 opens the website at http://127.0.0.1:8765. See [Daily use](docs/REALTIME_SETUP.md).
 
 ## Developer quick start (Windows PowerShell; macOS/Linux are the same with `python3`)

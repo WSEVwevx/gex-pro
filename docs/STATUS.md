@@ -16,7 +16,7 @@ system. **Awaiting credentials**: needs your provider account. **Simulated**: te
 | Data | HTTP retry, backoff, Retry-After, rate limiter, auth classification | Working (tested with simulated responses) |
 | Data | Tradier adapter (SPX/SPXW, NDX/NDXP, SPY, QQQ) | **Awaiting credentials / Unverified**: built from the documented schema, tested against canned responses only |
 | Data | Cboe free delayed feed (SPX, NDX, SPY, QQQ) | **Working with live data** (checked 2026-10-21 overnight; RTH behaviour not yet observed) |
-| Data | Schwab Trader API: OAuth login (SCHWAB_LOGIN.bat), token refresh, 7-day expiry, chains, /ES-/NQ + index quotes, Cboe fallback with notification | **Awaiting your account / Unverified live**: built from documented endpoints, tested with sample responses |
+| Data | Schwab Trader API | **Removed** 2026-10-23 (API access denied) |
 | Math | Vanna and charm exposure, absolute gamma strike, hedge size in contracts, zero-gamma distance in σ | Working: vanna/charm validated by finite differences; live numbers hand-checked |
 | Testing | `python -m gexsys audit`: live end-to-end checks (data, vendor Greeks vs independent recalculation, levels, accounting, payload) | Working: 36/36 checks passed on live Cboe NQ and ES data (2026-10-21) |
 | Testing | Pine static checks (define-before-use, built-in shadowing, unused inputs, brackets, panel size, payload keys) | Working: runs with the unit tests; not a substitute for TradingView's compiler |

@@ -1,6 +1,6 @@
 @echo off
 rem Starts the GEX service for NQ + ES and opens the website.
-rem Uses Schwab (real time) when it is set up in .env, otherwise Cboe's free delayed feed.
+rem Data: Cboe's free feed (options 15 minutes delayed).
 cd /d "%~dp0"
 title GEX Levels service - keep this window open
 set "PY=%LOCALAPPDATA%\Programs\Python\Python312\python.exe"

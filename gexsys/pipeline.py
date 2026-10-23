@@ -43,18 +43,6 @@ def _futures_ref(cfg: MarketConfig, snap, override: Optional[tuple], provider=No
         return float(cfg.futures_ref["price"]), datetime.fromisoformat(t) if t else st, "manual", s, st
     if mode == "synthetic_basis" and s:
         return s * float(cfg.futures_ref.get("factor", 1.0105)), st, "synthetic", s, st
-    if mode == "provider" and s and st:
-        # real quotes for the future AND the index from one request; usable only when both trade
-        fb = getattr(provider, "futures_basis", None)
-        got = fb(cfg.market, cfg.source) if fb else None
-        max_skew = float(cfg.mapping.get("max_skew_s", 60))
-        if got and abs((got[1] - got[3]).total_seconds()) <= max_skew:
-            fp, ft, sp, sti, lbl = got
-            return fp, ft, f"{lbl} (live, time-matched)", sp, sti
-        why = " - live futures quotes not time-matched (cash index closed)" if got else " - live futures quotes unavailable"
-        c = _carry(cfg, s, st, why)
-        if c:
-            return c
     if mode == "carry" and s and st:
         c = _carry(cfg, s, st)
         if c:

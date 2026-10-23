@@ -381,13 +381,9 @@ function render(){
   const built = STATIC ? (Date.now() - Date.parse(data.now)) / 60000 : 0;
   const svc = h.status === "ok" && built < 45 ? "ok" : h.status === "starting" ? "" : "warn";
   const used = (s && s.provider) || w.provider, rt = s && s.ref_quality === "RT";
-  const sw = data.schwab;
-  const swChip = !sw ? "" : sw.logged_in
-    ? `<span class="chip"><i class="dot ${sw.refresh_days_left < 1 ? "warn" : "ok"}"></i>Schwab login <b>${sw.refresh_days_left < 1 ? Math.max(0, Math.round(sw.refresh_days_left*24)) + " h" : sw.refresh_days_left.toFixed(1) + " days"}</b> left</span>`
-    : `<span class="chip"><i class="dot warn"></i>Schwab: <b>run SCHWAB_LOGIN.bat</b></span>`;
-  $("status").innerHTML = `<span class="chip"><i class="dot ${svc}"></i>Data <b>${esc(used)}</b>${used !== w.provider ? " (fallback)" : ""}</span>
+  $("status").innerHTML = `<span class="chip"><i class="dot ${svc}"></i>Data <b>${esc(used)}</b></span>
     <span class="chip">Options <b>${rt ? "real time" : "15-min delayed"}</b></span>
-    ${s ? `<span class="chip">Updated <b>${ago(s.asof)}</b></span>` : ""}${swChip}
+    ${s ? `<span class="chip">Updated <b>${ago(s.asof)}</b></span>` : ""}
     ${STATIC ? `<span class="chip" title="The hosted site is rebuilt about every 15 minutes while the market is open">Site rebuilt <b>${ago(data.now)}</b></span>` : ""}
     <span class="chip">Next paste <b>${h.next_publish_et ? esc(h.next_publish_et.slice(11)) + " ET" : "-"}</b></span>
     ${(() => { const e = nextHighUSD(); return e ? `<span class="chip" title="Next ${e.impact.toLowerCase()}-impact USD event (ForexFactory)"><i class="dot ${e.impact === "High" ? "bad" : "warn"}"></i>${esc(e.title)} <b>in ${dur(Date.parse(e.time) - Date.now())}</b></span>` : ""; })()}`;

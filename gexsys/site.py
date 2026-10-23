@@ -59,7 +59,7 @@ def build(configs: list[MarketConfig], out: str | Path, state: str | Path, keep_
 
     data = out / "data"
     now = datetime.now(timezone.utc).isoformat()
-    _write(data / "all.json", json.dumps(to_jsonable({"now": now, "static": True, "schwab": None, "workers": [
+    _write(data / "all.json", json.dumps(to_jsonable({"now": now, "static": True, "workers": [
         {"key": w.key, "market": w.cfg.market, "provider": w.label, "source": w.cfg.source,
          "description": w.cfg.description, "health": w.health(), "published": w.published, "result": w.result}
         for w in workers]})))

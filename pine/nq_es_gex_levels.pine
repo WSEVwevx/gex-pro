@@ -111,7 +111,7 @@ alCooldownMin   = input.int(15, "cooldown min", minval = 0, inline = "a3", group
 G8 = "8 - Advanced"
 extFrom     = input.string("First source", "More levels from", options = ["First source", "Both sources"], group = G8,
      tooltip = "Only matters when a paste holds two sources for this market.")
-provFilter  = input.string("", "Only this source", group = G8, tooltip = "Blank = all sources in the paste (e.g. SCHWAB, CBOE).")
+provFilter  = input.string("", "Only this source", group = G8, tooltip = "Blank = all sources in the paste (e.g. CBOE).")
 refOverride = input.string("", "Reference symbol override", group = G8, tooltip = "Blank = the symbol in the paste (NASDAQ:NDX, SP:SPX, ...).")
 staleMin    = input.int(150, "Stale after (minutes)", minval = 1, group = G8, tooltip = "Default suits the ~2-hour update schedule.")
 maxDistPct  = input.float(8.0, "Ignore levels farther than (%)", minval = 1, group = G8,

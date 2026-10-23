@@ -19,7 +19,7 @@ from .publish import PublishConfig
 
 TOP_KEYS = {"market", "source", "provider", "engine", "levels", "mapping", "futures_ref", "refresh",
             "alerts", "storage", "description", "publish"}
-PROVIDERS = {"tradier", "csv", "synthetic", "cboe", "schwab"}
+PROVIDERS = {"tradier", "csv", "synthetic", "cboe"}
 FREE_INDEX_SOURCES = {"SPX", "NDX", "SPY", "QQQ"}
 
 
@@ -70,17 +70,13 @@ class MarketConfig:
             raise ConfigError("Tradier has no CME futures options; use provider 'csv' for NQ_FOP/ES_FOP")
         if name == "csv" and not self.provider.get("path"):
             raise ConfigError("csv provider requires provider.path")
-        if name in ("cboe", "schwab") and self.source not in FREE_INDEX_SOURCES:
+        if name == "cboe" and self.source not in FREE_INDEX_SOURCES:
             raise ConfigError(f"{name} provider supports sources {sorted(FREE_INDEX_SOURCES)}")
-        if self.provider.get("fallback") not in (None, "cboe"):
-            raise ConfigError("provider.fallback can only be 'cboe'")
         mode = self.futures_ref.get("mode", "none")
-        if mode not in ("none", "manual", "synthetic_basis", "carry", "provider"):
-            raise ConfigError("futures_ref.mode must be none | manual | synthetic_basis | carry | provider")
+        if mode not in ("none", "manual", "synthetic_basis", "carry"):
+            raise ConfigError("futures_ref.mode must be none | manual | synthetic_basis | carry")
         if mode == "synthetic_basis" and name != "synthetic":
             raise ConfigError("futures_ref.mode synthetic_basis is only allowed with the synthetic provider")
-        if mode == "provider" and name != "schwab":
-            raise ConfigError("futures_ref.mode provider needs the schwab provider (it supplies live futures quotes)")
         if mode == "carry" and src.kind.value != "INDEX":
             raise ConfigError("futures_ref.mode carry needs a cash-index source (SPX or NDX)")
         self.engine.validate()
@@ -126,12 +122,6 @@ def make_provider(cfg: MarketConfig):
     if name == "cboe":
         from .providers.cboe import CboeProvider
         return CboeProvider(**p)
-    if name == "schwab":
-        from .providers.cboe import CboeProvider
-        from .providers.schwab import FallbackProvider, SchwabProvider
-        fb = p.pop("fallback", None)
-        prov = SchwabProvider(**p)
-        return FallbackProvider(prov, CboeProvider()) if fb == "cboe" else prov
     from .providers.synthetic import SyntheticProvider
     return SyntheticProvider(**p)
 
