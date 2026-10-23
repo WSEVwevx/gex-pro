@@ -81,7 +81,7 @@ class ChainSnapshot:
     spot_time: Optional[datetime]
     spot_quality: Quality
     contracts: list[OptionContract]
-    source: str                    # provider name, e.g. "tradier", "csv:file", "synthetic"
+    source: str                    # provider name, e.g. "cboe", "csv:file", "synthetic"
     fetched_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     rate: float = 0.04             # continuously compounded risk-free rate assumption
     div_yield: float = 0.0         # continuous dividend yield assumption (0 for futures options)

@@ -419,11 +419,13 @@ function renderHero(w, s, L, X, ref){
     <div class="regime"><span class="tag" style="color:${R[2]};border-color:${R[2]}">${R[1]}</span><span style="color:${R[2]}">${R[0]}</span>${changed ? '<span class="chip">changed since last update</span>' : ""}</div>
     <div class="expl">${R[3]}</div>${sigTxt}`;
   const em = X.expected_move || {};
+  const fop = /_FOP$/.test(w.source);                 // levels straight from CME options on the future
   $("priceCard").innerHTML = `<div class="eyebrow">Reference price</div>
     <div class="big">${num(ref)}</div>
-    <div class="kv"><span>${esc(w.source)} close / last</span><b>${num(s.ref_price)}</b></div>
+    <div class="kv"><span>${fop ? esc(s.underlying || market) + " future, live" : esc(w.source) + " close / last"}</span><b>${num(s.ref_price)}</b></div>
     <div class="kv"><span>Expected move today (1 sd)</span><b>±${num(em.daily_points_fut ?? em.daily_points, 0)} pts</b></div>
-    <div class="expl">${w.result.mapped ? market + " equivalent of the index price, from the carry model. Your TradingView chart uses the live price." : "Options-underlying price (no futures conversion available)."}</div>`;
+    <div class="expl">${fop ? "Levels come from CME options on the " + market + " future itself, so they are already in futures prices; no conversion needed."
+      : w.result.mapped ? market + " equivalent of the index price, from the carry model. Your TradingView chart uses the live price." : "Options-underlying price (no futures conversion available)."}</div>`;
   $("netCard").innerHTML = `<div class="eyebrow">Net gamma exposure</div>
     <div class="big sm" style="color:${s.net>=0?"var(--pos)":"var(--neg)"}">${money(s.net)}<span style="font-size:13px;color:var(--ink3)"> per 1% move</span></div>
     <div class="kv"><span>Expirations included</span><b>${s.basket.length} (to ${esc((s.basket.at(-1)||"").slice(5))})</b></div>

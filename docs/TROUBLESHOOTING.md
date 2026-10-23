@@ -4,7 +4,7 @@
 |---|---|
 | `python` opens the Microsoft Store | Python isn't installed. Run `winget install Python.Python.3.12 --scope user`, then use the full path or reopen the terminal. |
 | `ZoneInfoNotFoundError: America/New_York` | Run `pip install -r requirements.txt`. Windows has no tz database, so `tzdata` is required. |
-| `AuthError: TRADIER_TOKEN is not set` | Create `.env` from `.env.example`, or set the environment variable. |
+| `AuthError: DATABENTO_API_KEY is not set` | Run DATABENTO_SETUP.bat (see docs/DATABENTO_SETUP.md). |
 | `HTTP 401/403` | The token is wrong, it doesn't match the base URL (sandbox vs production), or the account lacks index-option entitlement. |
 | Repeated `HTTP 429` | Lower `provider.requests_per_minute` or `engine.max_dte` (fewer chain calls), or raise `refresh.rth_seconds`. |
 | `zero_gamma_status: NO CROSSING` | The modeled profile keeps one sign within ±`grid_pct`. Widen `grid_pct` (for example 0.08), or accept that no flip is modeled nearby. |

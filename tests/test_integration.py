@@ -39,8 +39,9 @@ class TestConfig(unittest.TestCase):
         base = {"market": "NQ", "source": "NDX", "provider": {"name": "synthetic"}}
         for bad in ({**base, "engin": {}}, {**base, "engine": {"max_dt": 3}}, {**base, "source": "SPX"},
                     {**base, "source": "QQQ", "mapping": {"method": "offset"}},
-                    {**base, "source": "NQ_FOP", "provider": {"name": "tradier"}},
-                    {**base, "provider": {"name": "tradier"}, "futures_ref": {"mode": "synthetic_basis"}}):
+                    {**base, "source": "NQ_FOP", "provider": {"name": "cboe"}},
+                    {**base, "provider": {"name": "cboe"}, "futures_ref": {"mode": "synthetic_basis"}},
+                    {**base, "provider": {"name": "tradier"}}):
             with self.assertRaises(eng.ConfigError):
                 cfgmod.from_dict(bad)
 

@@ -1,5 +1,7 @@
 # ADR-001: Architecture for NQ/ES options-positioning levels on TradingView
 
+> **Update 2026-10-23:** the Tradier and Schwab adapters described below were removed. Live data now comes from Cboe (free, NDX/SPX index options) or Databento (CME NQ/ES options on futures). See DATA_PROVIDERS.md. The rest of this record is kept as the original decision.
+
 Status: accepted (2026-10-20)
 
 ## Context

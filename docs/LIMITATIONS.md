@@ -10,10 +10,10 @@ level as a *modeled concentration of option gamma*.
 
 | Label | Meaning |
 |---|---|
-| RT | real-time quote from an entitled feed (user-declared for Tradier) |
+| RT | real-time quote (Databento quote less than 3 minutes old) |
 | DL / DELAYED | exchange-delayed quote |
 | EOD | end-of-day value. **Open interest is always EOD.** Intraday trading does not change today's OI until the next morning. |
-| PROV | Greek/IV computed by the vendor (ORATS for Tradier) |
+| PROV | Greek/IV computed by the vendor (Cboe) |
 | CALC | Greek/IV computed by this system from IV or from quote mids |
 | SYN / SYNTHETIC | generated test data; never market data |
 | STALE | older than the configured limit |
@@ -40,7 +40,7 @@ level as a *modeled concentration of option gamma*.
    to `EXTRA_CLOSURES`. CME's abbreviated holiday sessions are treated as `HOLIDAY`.
 10. **Rollover.** `front_contract` uses the conventional roll (8 days before the third Friday).
     Futures-options payloads must name the same contract month as the chart, or use `calendar_offset`.
-11. **Tradier `updated_at` timezone** is assumed to be ET and has not been verified.
+11. **Databento adapter** has been tested against canned responses only, not yet a live account. CME product codes for the weekly/daily option series are built in; one CME stops listing is skipped with a warning, but a NEW code would be missed until added.
 
 ## Behaviour on bad data
 
@@ -52,7 +52,7 @@ level as a *modeled concentration of option gamma*.
 | IV coverage < 80% | no zero gamma |
 | Stale spot | status DEGRADED, with a warning |
 | Duplicate contracts | the most recently updated one is kept, with a count |
-| Invalid or mismatched OCC symbols (Tradier) | dropped, with a count |
+| Invalid or mismatched OCC symbols (Cboe) | dropped, with a count |
 | Crossed quotes or negative OI | the field becomes missing, with a count |
 | Provider down | last good result is still served; health shows `degraded`, then `stale`; stale alert |
 | Bad credentials | `AUTH` error, retried hourly only |

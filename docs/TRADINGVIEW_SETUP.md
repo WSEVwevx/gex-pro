@@ -12,7 +12,7 @@
    `pine/nq_es_gex_levels.pine`.
 3. **Save**, then **Add to chart**.
 4. Get a payload, either:
-   - `python -m gexsys snapshot --config configs/nq_ndx_tradier.json` (last block of the output), or
+   - `python -m gexsys snapshot --config configs/free_nq_cboe.json` (last block of the output), or
    - `http://127.0.0.1:8765/api/pine?market=NQ` while the service runs.
 5. In the indicator settings, paste the whole `GEX1;...` line into **Levels payload**.
 

@@ -14,7 +14,8 @@ system. **Awaiting credentials**: needs your provider account. **Simulated**: te
 | Levels | Snapshot diff (level shifts, regime change, concentration shift) | Working |
 | Data | Normalization (dupes, OCC validation, bad fields, stale quotes) | Working |
 | Data | HTTP retry, backoff, Retry-After, rate limiter, auth classification | Working (tested with simulated responses) |
-| Data | Tradier adapter (SPX/SPXW, NDX/NDXP, SPY, QQQ) | **Awaiting credentials / Unverified**: built from the documented schema, tested against canned responses only |
+| Data | Databento: CME NQ/ES options on futures (all quarterly, EOM, weekly and daily series), live futures + option quotes, CME OI and settlements, Black-76 IV, calendar-spread shift | **Awaiting your key / Unverified live**: built from Databento's documented API and package source, tested against canned responses (6 tests) |
+| Data | Tradier adapter | **Removed** 2026-10-23 at your request |
 | Data | Cboe free delayed feed (SPX, NDX, SPY, QQQ) | **Working with live data** (checked 2026-10-21 overnight; RTH behaviour not yet observed) |
 | Data | Schwab Trader API | **Removed** 2026-10-23 (API access denied) |
 | Math | Vanna and charm exposure, absolute gamma strike, hedge size in contracts, zero-gamma distance in σ | Working: vanna/charm validated by finite differences; live numbers hand-checked |

@@ -8,7 +8,6 @@ from pathlib import Path
 from gexsys.providers.base import (AuthError, ProviderError, ProviderUnavailable, RateLimiter, RateLimitError,
                                    http_get_json)
 from gexsys.providers.csvfile import CsvProvider
-from gexsys.providers.tradier import TradierProvider
 
 DATA = Path(__file__).parent / "data"
 
@@ -89,53 +88,6 @@ class TestHttp(unittest.TestCase):
         rl.wait()
         rl.wait()
         self.assertEqual(slept, [0.5, 1.0])
-
-
-class TestTradier(unittest.TestCase):
-    def fake_http(self, url, headers, limiter=None):
-        self.urls.append(url)
-        self.assertEqual(headers["Authorization"], "Bearer test-token")
-        if "/markets/quotes" in url:
-            return {"quotes": {"quote": {"symbol": "SPX", "last": 5800.5, "trade_date": 1792508400000}}}
-        if "/expirations" in url:
-            return {"expirations": {"date": [self.d1.isoformat(), self.d2.isoformat(), "2099-06-18"]}}
-        if f"expiration={self.d1.isoformat()}" in url:
-            # single contract returned as a dict, not a list (Tradier does this)
-            return {"options": {"option": {
-                "symbol": f"SPXW{self.d1:%y%m%d}C05800000", "root_symbol": "SPXW", "underlying": "SPX", "option_type": "call",
-                "strike": 5800, "expiration_date": self.d1.isoformat(), "contract_size": 100, "open_interest": 1500,
-                "bid": 10.0, "ask": 10.5, "last": 10.2, "trade_date": 1792508300000,
-                "greeks": {"gamma": 0.0041, "delta": 0.5, "mid_iv": 0.13, "updated_at": "2026-10-20 10:59:00"}}}}
-        return {"options": None}
-
-    def setUp(self):
-        from datetime import datetime, timedelta, timezone
-        from gexsys.marketcal import NY
-        self.urls = []
-        self.d1 = (datetime.now(timezone.utc).astimezone(NY) + timedelta(days=1)).date()
-        self.d2 = self.d1 + timedelta(days=1)
-
-    def test_snapshot_parsing_and_quality(self):
-        p = TradierProvider(token="test-token", base_url="https://sandbox.tradier.com/v1",
-                            quote_quality="RT", http=self.fake_http)
-        s = p.fetch_snapshot("SPX", max_dte=5, include_0dte=True)
-        self.assertEqual(s.spot, 5800.5)
-        self.assertEqual(s.spot_quality.value, "DL")          # sandbox forced delayed despite RT
-        self.assertEqual(len(s.contracts), 1)
-        c = s.contracts[0]
-        self.assertEqual(c.oi_quality.value, "EOD")
-        self.assertEqual(c.greeks_quality.value, "PROV")
-        self.assertEqual(c.expiration.hour, 16)               # SPXW PM-settled
-        self.assertFalse(any("2099-06-18" in u for u in self.urls))
-
-    def test_missing_token(self):
-        os.environ.pop("TRADIER_TOKEN", None)
-        with self.assertRaises(AuthError):
-            TradierProvider(token="", http=self.fake_http).fetch_snapshot("SPX", 5, True)
-
-    def test_futures_options_rejected(self):
-        with self.assertRaises(ProviderError):
-            TradierProvider(token="t", http=self.fake_http).fetch_snapshot("ES_FOP", 5, True)
 
 
 class TestCsv(unittest.TestCase):

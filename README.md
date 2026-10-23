@@ -17,8 +17,9 @@ TradingView can't call external APIs, and Pine Seeds is closed to new repositori
 
 ## Everyday use
 
-**Double-click `START.bat`.** It starts the service with free Cboe data (NDX options for NQ, SPX for ES) and
-opens the website at http://127.0.0.1:8765. See [Daily use](docs/REALTIME_SETUP.md).
+**Double-click `START.bat`.** It starts the service with CME NQ/ES options on futures once a Databento key is saved
+([Databento setup](docs/DATABENTO_SETUP.md), then **DATABENTO_SETUP.bat**), otherwise with free Cboe data
+(NDX options for NQ, SPX for ES), and opens the website at http://127.0.0.1:8765. See [Daily use](docs/REALTIME_SETUP.md).
 
 ## Developer quick start (Windows PowerShell; macOS/Linux are the same with `python3`)
 
@@ -40,18 +41,14 @@ python -m gexsys serve --config configs/nq_demo_synthetic.json --config configs/
 
 Then open http://127.0.0.1:8765. The demo data is **SYNTHETIC** and labeled as such everywhere.
 
-With real data (Tradier, see [DATA_PROVIDERS](docs/DATA_PROVIDERS.md)):
+With real data (see [DATA_PROVIDERS](docs/DATA_PROVIDERS.md)):
 
 ```bash
-copy .env.example .env
+python -m gexsys snapshot --config configs/free_es_cboe.json
 ```
 
 ```bash
-python -m gexsys snapshot --config configs/es_spx_tradier.json
-```
-
-```bash
-python -m gexsys serve --config configs/nq_ndx_tradier.json --config configs/es_spx_tradier.json
+python -m gexsys serve --auto
 ```
 
 Other commands: `replay --market NQ` (level-stability statistics over stored snapshots) and
@@ -71,15 +68,13 @@ compiled in TradingView yet) are in [TRADINGVIEW_SETUP](docs/TRADINGVIEW_SETUP.m
 |---|---|---|---|
 | `configs/free_nq_cboe.json` | NQ/MNQ | NDX via Cboe free feed | **used by START.bat** |
 | `configs/free_es_cboe.json` | ES/MES | SPX via Cboe free feed | **used by START.bat** |
-| `configs/nq_ndx_tradier.json` | NQ/MNQ | NDX index options | proxy, ratio mapping |
-| `configs/nq_qqq_tradier.json` | NQ/MNQ | QQQ ETF options | proxy, ratio only |
-| `configs/es_spx_tradier.json` | ES/MES | SPX/SPXW index options | proxy, ratio mapping |
-| `configs/es_spy_tradier.json` | ES/MES | SPY ETF options | proxy, ratio only |
+| `configs/databento_nq.json` | NQ/MNQ | **CME NQ options on futures** (Databento) | **used by START.bat once a Databento key is saved**; identity mapping |
+| `configs/databento_es.json` | ES/MES | **CME ES options on futures** (Databento) | same |
 | `configs/es_fop_csv.json` | ES/MES | ES futures options (CSV) | identity mapping; points at the hand-made sample file |
 | `configs/*_demo_synthetic.json` | NQ / ES | synthetic | demo only |
 
 Unknown or misspelled config keys are rejected. Invalid combinations are rejected too, for example
-QQQ with `offset` mapping, Tradier for futures options, or SPX options for NQ.
+QQQ with `offset` mapping, Databento with index options, or SPX options for NQ.
 
 ## Conventions in one paragraph
 
@@ -144,7 +139,7 @@ puts the payload on your clipboard. See [REALTIME_SETUP](docs/REALTIME_SETUP.md)
 
 ```
 gexsys/            models, pricing, engine, levels, mapping, marketcal, normalize,
-                   providers/{base,tradier,csvfile,synthetic}, pipeline, storage, alerts,
+                   providers/{base,cboe,databento,csvfile,synthetic}, pipeline, storage, alerts,
                    export (Pine payload), service (HTTP), replay, config, __main__ (CLI)
 pine/              TradingView Pine v6 indicator
 dashboard/         local dashboard (no external network calls)

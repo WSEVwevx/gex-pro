@@ -1,6 +1,6 @@
 @echo off
 rem Starts the GEX service for NQ + ES and opens the website.
-rem Data: Cboe's free feed (options 15 minutes delayed).
+rem Data: CME NQ/ES options on futures via Databento once DATABENTO_SETUP.bat has saved a key, else Cboe's free feed.
 cd /d "%~dp0"
 title GEX Levels service - keep this window open
 set "PY=%LOCALAPPDATA%\Programs\Python\Python312\python.exe"

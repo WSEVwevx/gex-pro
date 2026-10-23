@@ -1,6 +1,51 @@
-# Data-provider setup guide
+# Data providers
 
-## Default: Cboe free delayed feed (verified against live responses 2026-10-21)
+START.bat picks the source automatically:
+
+| | **Databento** (CME futures options) | **Cboe** (free fallback) |
+|---|---|---|
+| Options used | **NQ and ES options on the futures themselves** (CME Globex) | NDX and SPX index options |
+| Levels are in | futures prices directly | index prices, translated to futures |
+| Price | real time (Databento CME Standard plan) | 15 min delayed |
+| Open interest | CME end-of-day | Cboe end-of-day |
+| IV / Greeks | computed here (Black-76) from each option's live mid or official settlement | Cboe IV; gamma recomputed |
+| Cost | Databento subscription (CME Standard, about $199/month in Oct 2026) | free, no key |
+| Used when | a key has been saved with DATABENTO_SETUP.bat | no Databento key |
+| Hosted website | not used (see Licensing) | yes |
+
+Setup for Databento: [DATABENTO_SETUP.md](DATABENTO_SETUP.md).
+
+## Databento details (`gexsys/providers/databento.py`)
+
+Dataset `GLBX.MDP3`, through Databento's documented HTTP API (no extra Python packages). Each
+refresh makes a few small requests; reference data is cached:
+
+| Data | Databento schema | How often |
+|---|---|---|
+| Every listed option series: quarterly (`ES`/`NQ`), end-of-month (`EW`/`QNE`), Friday weeklies (`EW1-4`/`QN1-4`), Monday-Thursday dailies (`E1A-E5D`/`Q1A-Q5D`) | `definition` (parent symbology) | once per day |
+| Open interest (stat 9) and settlement prices (stat 3) | `statistics` | every 2 hours |
+| Bid/ask of the futures and of every option with open interest | `bbo-1m`, last 10 minutes | every refresh |
+| Today's volume per option, since the 18:00 ET session open | `ohlcv-1h` | every refresh |
+
+* **Why the product list matters:** `ES.OPT` alone is only the quarterly options. Most short-dated
+  open interest is in the weeklies and dailies, which CME lists as separate products. A product code
+  that doesn't exist is skipped and named in the website's warnings.
+* **IV:** from the option's live mid when it has a fresh two-sided quote (spread no wider than 25% of
+  mid), else from CME's settlement price against the future's settlement. Gamma is then computed at
+  the live futures price.
+* **Different futures months:** options on another contract (for example ESZ6 options while the
+  chart has rolled to ESH7) are shifted by the calendar spread, so every level is in the chart
+  contract's prices.
+* **Window:** strikes within ±8% of the future and expirations within 45 days (configurable:
+  `"provider": {"name": "databento", "strike_window": 0.08, "max_contracts": 8000}`).
+* **Open-interest handling:** deleted statistics and Databento's "not set" values are ignored; the
+  newest session's figure wins.
+* **Multiplier:** $50 per point for ES options, $20 for NQ, from the contract specs (Databento's
+  `contract_multiplier` is not a dollar multiplier).
+* **Tested** against canned responses in Databento's CSV layout (`tests/test_databento.py`). **Not
+  yet run against a live Databento account.**
+
+## Cboe details (`gexsys/providers/cboe.py`, verified live 2026-10-21)
 
 | | Cboe delayed-quotes JSON |
 |---|---|
@@ -10,93 +55,27 @@
 | IV / Greeks | IV plus Greeks; gamma is rounded to 4 decimals, so it is recomputed from IV |
 | Delay | 15 min |
 | Terms | unofficial website feed, personal use |
-| Cost | free, no key, no signup |
 
-### Why Cboe (search of free sources, 2026-10-21)
+## Other sources considered (2026-10-23)
 
-| Source | SPX / NDX | Open interest | IV / Greeks | Real time | Catch |
-|---|---|---|---|---|---|
-| **Cboe delayed feed** | yes | yes | yes | no (15 min) | unofficial endpoint |
-| Yahoo Finance (removed) | yes | SPX OI missing near the money; all OI blanked overnight | IV only | no | unreliable for GEX |
-| FlashAlpha free tier | not stated (stocks/ETFs) | yes | yes | not stated | index options not confirmed |
-| Eulerpool free tier | not stated | yes | yes | paid tiers only | index options not confirmed |
-| Tradier sandbox | yes | yes | yes (ORATS) | no | needs signup; same delay as Cboe |
-| TrendSpider | yes | yes | yes | yes | needs a paid OPRA subscription |
+| Source | Futures options | Price / month | Why not built |
+|---|---|---|---|
+| ThetaData | no (US equity/index options) | $40-160 | index options only |
+| Massive (Polygon) | no | $29-199 | index options only |
+| Interactive Brokers | yes | data fees + funded account | heavy API, account needed |
+| tastytrade | yes (streaming) | free with account | real-time status for API users unconfirmed |
+| Tradier, Schwab | no / – | – | built earlier, then removed at your request |
 
-### Upgrade path: real-time for free with a brokerage account
-
-Tradier's production API (with a Tradier brokerage account) gives real-time chains, and its adapter
-already exists (`configs/*_tradier.json`). A Schwab adapter was built earlier and then removed
-(2026-10-23) after API access was denied.
-
-The rest of this document covers keyed and paid options.
-
-## Provider comparison
-
-Only the Tradier chain endpoint was checked against its current documentation for this build. The
-other rows reflect general knowledge of each vendor's published offering. **Check current
-documentation, licensing and pricing before you subscribe.** Nothing here has been checked against
-live responses.
-
-| Provider | SPX/SPY | NDX/QQQ | ES/NQ futures options | Greeks/IV | OI | Real-time | Built-in adapter |
-|---|---|---|---|---|---|---|---|
-| **Tradier** | yes (SPX/SPXW via `includeAllRoots`)¹ | yes¹ | no | yes (ORATS) | yes (EOD) | depends on account/entitlement; sandbox delayed | **yes** |
-| Polygon.io / Massive | yes | yes (indices on separate plans) | no | yes (snapshot) | yes | paid tiers | no (add a `Provider` subclass) |
-| ThetaData | yes | yes | no | yes | yes | paid tiers; local terminal process | no |
-| Databento | OPRA raw | OPRA raw | **yes (GLBX.MDP3)** | no (compute from quotes) | yes (`statistics` schema) | yes (licensed) | via **CSV adapter** |
-| CME DataMine | – | – | yes (historical/EOD) | settlement-based | yes | no | via CSV |
-| Interactive Brokers API | yes | yes | yes | model Greeks | yes | with subscriptions | no |
-
-¹ Index-option availability and entitlements on Tradier are not stated on the chain page. Confirm
-with Tradier for your account type.
-
-**Default choice: Tradier.** It provides SPX/NDX/SPY/QQQ chains with OI and vendor Greeks in one
-documented REST call, at modest cost for retail accounts. For **ES/NQ futures options**, which are
-the preferred source for futures-specific exposure, export a licensed feed (for example Databento:
-`definition` for strikes and expirations, `statistics` for OI, `mbp-1` or `bbo` for quotes) into
-the CSV schema below. The engine computes Black-76 Greeks from IV or from mid prices.
-
-## Tradier
-
-1. Open a Tradier account (production market data needs one) or a developer sandbox (15-minute
-   delayed).
-2. Create an API access token in the Tradier dashboard.
-3. Copy `.env.example` to `.env` and set:
-   ```
-   TRADIER_TOKEN=your-token
-   TRADIER_BASE_URL=https://api.tradier.com/v1      # or https://sandbox.tradier.com/v1
-   TRADIER_QUOTE_QUALITY=DL                          # set RT ONLY if your account is entitled to real-time options data
-   ```
-4. Test the connection:
-   ```
-   python -m gexsys snapshot --config configs/es_spx_tradier.json
-   ```
-
-Data labels applied:
-- Quotes get whatever `TRADIER_QUOTE_QUALITY` declares. Sandbox is always DL.
-- OI is always `EOD`.
-- Greeks are `PROV` with the ORATS `updated_at` timestamp. That timestamp has no timezone, so it is
-  interpreted as America/New_York (**unverified assumption**).
-
-Rate limiting: a client-side limiter (default 60 req/min, configurable) plus retry with
-exponential backoff, which honours `Retry-After` on HTTP 429. Each refresh makes
-1 quote + 1 expirations + N chain requests (N = expirations in the basket). Keep `max_dte` modest.
-
-## CSV adapter (futures options, any other vendor)
+## CSV adapter (any other vendor)
 
 Required columns: `root,type,strike,expiration,multiplier,open_interest`.
 Optional columns: `symbol, expiration_time (ISO with offset), bid, ask, last, quote_time, iv, gamma, delta, volume, underlying_price, underlying_time`.
-
-* `multiplier`: 50 for ES options, 20 for NQ options. Micro options (MES/MNQ options) use 5 and 2.
-* All timestamps need a timezone offset. Rows without one are rejected.
-* Declare honest quality labels in the config:
-  `"provider": {"name": "csv", "path": "...", "quote_quality": "DL", "greeks_quality": "PROV", "spot_quality": "DL"}`.
-* The sample `tests/data/es_fop_sample.csv` is **hand-made test data**, not market data.
+Multipliers: 50 for ES options, 20 for NQ, 5 and 2 for the micros. Timestamps need a timezone offset.
+`tests/data/es_fop_sample.csv` is **hand-made test data**, not market data.
 
 ## Licensing
 
-* Display of real-time OPRA and CME data is licensed per user and per device. A local, personal
-  dashboard is the use case assumed here.
-* Don't publish payloads or dashboards built from licensed real-time data without checking your
-  vendor and exchange agreements.
+* Databento's CME data is licensed for your own use. Showing it, or levels built from it, on a
+  public website can count as redistribution, so **the hosted GitHub site stays on Cboe**. Your
+  local website (START.bat, only visible on your PC) uses Databento.
 * `storage.store_raw` defaults to `false`, so only derived numbers are written to disk.

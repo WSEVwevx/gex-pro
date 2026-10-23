@@ -19,7 +19,7 @@ from .publish import PublishConfig
 
 TOP_KEYS = {"market", "source", "provider", "engine", "levels", "mapping", "futures_ref", "refresh",
             "alerts", "storage", "description", "publish"}
-PROVIDERS = {"tradier", "csv", "synthetic", "cboe"}
+PROVIDERS = {"csv", "synthetic", "cboe", "databento"}
 FREE_INDEX_SOURCES = {"SPX", "NDX", "SPY", "QQQ"}
 
 
@@ -66,10 +66,10 @@ class MarketConfig:
         name = self.provider.get("name")
         if name not in PROVIDERS:
             raise ConfigError(f"provider.name must be one of {sorted(PROVIDERS)}")
-        if name == "tradier" and src.kind.value == "FUT":
-            raise ConfigError("Tradier has no CME futures options; use provider 'csv' for NQ_FOP/ES_FOP")
         if name == "csv" and not self.provider.get("path"):
             raise ConfigError("csv provider requires provider.path")
+        if name == "databento" and src.kind.value != "FUT":
+            raise ConfigError("databento provider reads CME futures options: use source NQ_FOP or ES_FOP")
         if name == "cboe" and self.source not in FREE_INDEX_SOURCES:
             raise ConfigError(f"{name} provider supports sources {sorted(FREE_INDEX_SOURCES)}")
         mode = self.futures_ref.get("mode", "none")
@@ -113,15 +113,15 @@ def from_dict(raw: dict) -> MarketConfig:
 def make_provider(cfg: MarketConfig):
     p = dict(cfg.provider)
     name = p.pop("name")
-    if name == "tradier":
-        from .providers.tradier import TradierProvider
-        return TradierProvider(requests_per_minute=float(p.get("requests_per_minute", 60)))
     if name == "csv":
         from .providers.csvfile import CsvProvider
         return CsvProvider(**p)
     if name == "cboe":
         from .providers.cboe import CboeProvider
         return CboeProvider(**p)
+    if name == "databento":
+        from .providers.databento import DatabentoProvider
+        return DatabentoProvider(**p)
     from .providers.synthetic import SyntheticProvider
     return SyntheticProvider(**p)
 

@@ -1,0 +1,52 @@
+{
+  "engine": {
+    "positioning": "conventional",
+    "unit": "usd_per_1pct",
+    "include_0dte": true,
+    "max_dte": 45,
+    "grid_pct": 0.05,
+    "grid_steps": 201,
+    "recompute_greeks": "always",
+    "max_spot_age_s": 900
+  },
+  "levels": {
+    "top_n": 6,
+    "min_share": 0.04
+  },
+  "refresh": {
+    "rth_seconds": 120,
+    "eth_seconds": 600,
+    "closed_seconds": 3600
+  },
+  "alerts": {
+    "level_shift_ticks": 20,
+    "cooldown_s": 900,
+    "stale_after_s": 1800
+  },
+  "storage": {
+    "root": "%LOCALAPPDATA%/gexsys/snapshots",
+    "store_raw": false
+  },
+  "publish": {
+    "times_et": [
+      "09:45",
+      "11:45",
+      "13:45",
+      "15:30"
+    ],
+    "desktop_notify": true,
+    "webhook_format": "json"
+  },
+  "mapping": {
+    "method": "identity"
+  },
+  "futures_ref": {
+    "mode": "none"
+  },
+  "description": "ES levels from CME ES options on futures (Databento GLBX.MDP3): live futures price, CME end-of-day open interest",
+  "market": "ES",
+  "source": "ES_FOP",
+  "provider": {
+    "name": "databento"
+  }
+}

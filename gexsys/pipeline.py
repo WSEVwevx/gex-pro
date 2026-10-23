@@ -54,7 +54,7 @@ def run_once(cfg: MarketConfig, provider, store: Optional[SnapshotStore] = None,
              alerts: Optional[AlertEngine] = None, futures_ref: Optional[tuple] = None) -> dict:
     src = SOURCES[cfg.source]
     snap = provider.fetch_snapshot(cfg.source, cfg.engine.max_dte, cfg.engine.include_0dte)
-    snap = normalize(snap, check_occ=getattr(provider, "name", "") in ("tradier", "cboe"))
+    snap = normalize(snap, check_occ=getattr(provider, "name", "") == "cboe")
     ecfg = cfg.engine
     if src.kind.value != "FUT" and session_state(snap.fetched_at) != "RTH":
         # cash index / ETF is not trading: its last close is the correct reference, not "stale"
