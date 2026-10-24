@@ -31,6 +31,7 @@ system. **Awaiting credentials**: needs your provider account. **Simulated**: te
 | Hosted website | `build-site` writes static files; GitHub Actions rebuilds every ~15 min in market hours and deploys to Pages; state cached between runs | Working: live at https://wsevwevx.github.io/gex-pro/ (repo WSEVwevx/gex-pro). First GitHub run 2026-10-23: NQ and ES OK, calendar loaded. Truth Social blocks GitHub's servers, so the hosted feed uses the trumpstruth.org archive |
 | Briefings | NY AM (09:00 ET, trading days) and Asia (19:00 ET, evenings before trading days), catch-up when the app starts late, Windows notification, 40 kept | Working: 6 tests; a live Asia briefing written 2026-10-22 and checked on the page |
 | Single instance | Exclusive port bind (SO_EXCLUSIVEADDRUSE); a second START.bat exits with "ALREADY RUNNING" | Working: tested (unit test plus a manual second start) |
+| Website | Live table (GEX ladder): net DEX / GEX / OI / volume by strike and expiration (gexsys/ladder.py), expiry strip, level chips, side panel | Working: 2 tests; checked live on NQ and ES 2026-10-23 (expiration totals equal net GEX) |
 | Website | Market stats strip, gamma by expiration, News tab with impact/currency filters and countdown | Working: checked in a browser against live data |
 | Data | Carry-model futures fair value for website prices (F = S·e^((r−q)T)) | Working (hand-checked test); a few points from the traded price by design |
 | Data | Plausibility guard (exposure far from price, so the source is refused) | Working: caught a broken feed live |

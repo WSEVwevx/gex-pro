@@ -49,7 +49,7 @@ try { localStorage.removeItem("gex.page"); } catch(e) {}
 let impactF = store.get("gex.impact", "med");       // high | med | all
 let curF = store.get("gex.cur", "USD");             // USD | all
 let news = null;
-const VIEW_IDS = ["levels", "gamma", "vol", "timeline", "bias", "track", "briefings", "news", "indicator", "library"];
+const VIEW_IDS = ["levels", "ladder", "gamma", "vol", "timeline", "bias", "track", "briefings", "news", "indicator", "library"];
 function setPage(p){
   if(!VIEW_IDS.includes(p)) p = "levels";
   page = p;
@@ -293,6 +293,7 @@ function render(){
   renderTicker();
   if(page === "gamma") renderGamma();
   if(page === "vol") renderVol();
+  if(page === "ladder") renderLadder();
   $("foot").innerHTML = `Model estimates from ${esc(s.provider || w.provider)} ${opts} options (${s.ref_quality === "RT" ? "real-time quotes" : "15-minute-delayed quotes"}) and end-of-day open interest, assuming dealers are long calls and short puts.
     ${w.result.mapped ? "Futures prices use " + esc(w.result.mapped.mapping.futures_ref_mode) + "; TradingView re-maps with your live chart." : esc(s.mapping_note || "")}
     These are proxy levels from index and ETF options, not NQ/ES futures options, and not trading advice.`;
@@ -542,7 +543,7 @@ function renderMaxPain(X){
 // (gamma curve, gamma by expiry bucket, positioning, volatility term structure and skew, timeline)
 // =====================================================================================================
 const PAGES = [
-  ["levels", "Levels", "LVL"], ["gamma", "Gamma lab", "GEX"], ["vol", "Volatility", "VOL"], ["timeline", "Timeline", "TL"],
+  ["levels", "Levels", "LVL"], ["ladder", "Live table", "LIVE"], ["gamma", "Gamma lab", "GEX"], ["vol", "Volatility", "VOL"], ["timeline", "Timeline", "TL"],
   ["bias", "Bias", "BIAS"], ["track", "Track record", "TRK"], ["briefings", "Briefings", "BRF"], ["news", "News", "NEWS"], ["indicator", "Indicator", "IND"],
   ["library", "Library", "LIB"]];
 const NO_MARKET_PAGES = ["news", "indicator", "briefings", "library", "track"];
@@ -835,10 +836,21 @@ const HELP = {
     body: `<p>Bars count sessions by how many expected moves (σ) the close moved. The grey curve is a normal distribution, the shape the band assumes.</p><p>Real markets have a taller middle (most days are quieter than implied) and fatter tails (the big days are bigger than a normal curve allows). That's why a band can hold most days and still be blown through on a few.</p>`},
   backtest_vol: {title: "By volatility level", tldr: "Does the band hold better in calm or stressed markets?",
     body: `<p>Sessions split into five equal groups by the vol index the evening before. Compare the close-inside rate and the breaks across the groups to see when the band is most and least reliable.</p>`},
+  ladder: {title: "GEX live table", tldr: "Gamma, delta, open interest and volume at every strike near price, for the expirations you pick.",
+    body: `<p>Each row is a price band (strikes grouped every few points) in futures prices. <b>Net GEX</b> is the dealer gamma there, in $ per 1% move: right and blue = positive (hedging calms moves), left and orange = negative (hedging adds to moves). <b>Net DEX</b> is the dealers' dollar delta at that strike, <b>Net OI</b> is call minus put open interest, and <b>Net volume</b> is call minus put contracts traded today.</p><p>The highlighted row is price; the amber underline is zero gamma. Chips on the left mark the levels (C1, P1, Ab1, ZG, walls, expected move). Hover a row for its numbers.</p>`,
+    watch: ["Big orange bars just below price = support that can break fast", "Pick only today's expiration to see the 0DTE map"]},
+  ladder_strip: {title: "Expirations", tldr: "Pick which expirations the table adds up.",
+    body: `<p>Each chip is one expiration: its date, days to expiry, M for monthly (AM for morning settlement), a dot and bar for its net GEX. Click chips to add or remove them; Σ All goes back to every expiration. LATER pools everything further out in the basket.</p>`},
+  ladder_side: {title: "Net exposure", tldr: "Totals for the expirations selected.",
+    body: `<p>Net GEX and net DEX added up over the selected expirations (all strikes, not just the rows shown). The regime line always uses every expiration.</p>`},
+  ladder_levels: {title: "Key levels", tldr: "Every level on the table, highest first, with its distance from price.",
+    body: `<p>C = call walls ranked by positive net GEX, P = put walls ranked by negative net GEX, Ab = most total gamma, ZG = zero gamma, CW / PW = the main walls, EM = today's expected move.</p>`},
+  ladder_activity: {title: "Chain activity", tldr: "Who is positioned, and what is trading today.",
+    body: `<p>Put/call ratios over the selected expirations and the rows shown: above 1 means more puts. Open interest is from yesterday's close; volume is today's.</p>`},
   paste: {title: "The hourly paste", tldr: "One text block that carries all levels to TradingView.",
     body: `<p>Published every hour on the hour (ET). One paste holds NQ and ES; each chart draws only its own market. The indicator marks levels stale after 90 minutes.</p>`},
 };
-const PAGE_HELP = {levels: "regime", gamma: "gamma_curve", vol: "term", timeline: "timeline", bias: "bias", briefings: "briefings", news: "calendar", indicator: "indicator", library: "library", track: "track"};
+const PAGE_HELP = {levels: "regime", ladder: "ladder", gamma: "gamma_curve", vol: "term", timeline: "timeline", bias: "bias", briefings: "briefings", news: "calendar", indicator: "indicator", library: "library", track: "track"};
 let exKey = null;
 function openExplain(key){
   const h = HELP[key]; if(!h) return;
@@ -921,7 +933,7 @@ $("cmd").addEventListener("keydown", e => {
 });
 
 // ---------- keyboard
-const KEYS = [["/  or  Ctrl+K", "Command line"], ["1 - 9, 0", "Pages (Levels, Gamma lab, Volatility, Timeline, Bias, Track record, Briefings, News, Indicator, Library)"],
+const KEYS = [["/  or  Ctrl+K", "Command line"], ["1 - 9, 0", "Pages (Levels, Live table, Gamma lab, Volatility, Timeline, Bias, Track record, Briefings, News, Indicator); type LIB for the Library"],
   ["N  /  E", "Switch to NQ / ES"], ["X", "Explain this page"], ["T", "Light / dark mode"], ["C", "Copy the TradingView paste"], ["?", "This list"], ["Esc", "Close panels"]];
 function showKeys(on){ $("keys").hidden = !on; if(on) $("keysGrid").innerHTML = KEYS.map(([k, d]) => `<kbd>${esc(k)}</kbd><span>${esc(d)}</span>`).join(""); }
 $("keysBtn").onclick = () => showKeys(true);
@@ -1138,6 +1150,107 @@ function renderBacktest(){
     ${B.by_vol.length > 1 && B.by_vol[0].close_in.rate > B.by_vol.at(-1).close_in.rate ? `<div class="expl">When implied vol is low the band is generous; in high-vol regimes realized moves catch up with it and breaks become more common.</div>` : ""}`;
 }
 
+
+// ---------- GEX live table: net DEX / GEX / OI / volume by strike, for the expirations you pick
+let ldSel = (() => { try { return new Set(JSON.parse(store.get("gex.ldsel", "[]"))); } catch(e){ return new Set(); } })();
+let ldRowsN = Number(store.get("gex.ldrows", "51"));
+const MON = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+const ldDate = d => d === "other" ? "LATER" : `${MON[Number(d.slice(5, 7)) - 1]} ${Number(d.slice(8, 10))}`;
+const compact = x => x == null || !isFinite(x) ? "-" : (x < 0 ? "-" : "+") + (Math.abs(x) >= 1e9 ? num(Math.abs(x) / 1e9, 2) + "B" : Math.abs(x) >= 1e6 ? num(Math.abs(x) / 1e6, 1) + "M" : num(Math.abs(x) / 1e3, 0) + "K");
+const cnt = x => x == null || !isFinite(x) ? "-" : (x < 0 ? "-" : x > 0 ? "+" : "") + num(Math.abs(x), 0);
+function renderLadder(){
+  const w = curW();
+  if(!w || !w.result){ $("ldRows").innerHTML = `<div class="expl">No data yet.</div>`; return; }
+  const r = w.result, s = r.summary, L = r.mapped || s, LD = r.ladder;
+  if(!LD || !LD.rows || !LD.rows.length){ $("ldRows").innerHTML = `<div class="expl">The live table appears after the next refresh.</div>`; return; }
+  const m = r.mapped && r.mapped.mapping, fac = m ? m.factor : 1, off = m ? m.offset || 0 : 0;
+  const fut = k => Math.round((k * fac + off) * 4) / 4;
+  const ref = L.futures_equiv_of_ref || s.ref_price;
+  const E = LD.expirations;
+  [...ldSel].forEach(i => { if(!E[i]) ldSel.delete(i); });
+  const all = ldSel.size === 0, on = i => all || ldSel.has(i);
+  // expiration strip
+  const emax = Math.max(1, ...E.map(e => Math.abs(e.net)));
+  $("ldStrip").innerHTML = E.map((e, i) => {
+    const h = Math.max(3, Math.round(Math.abs(e.net) / emax * 34)), pos = e.net >= 0;
+    return `<button class="ld-exp${on(i) ? " on" : ""}" data-i="${i}" type="button" title="${esc(e.date === "other" ? "Every later expiration in the basket" : e.date)}: net GEX ${esc(money(e.net))}, net DEX ${esc(compact(e.dex))}">
+      <span class="ld-d">${ldDate(e.date)}</span><span class="ld-dte">${e.dte == null ? "rest" : num(e.dte, 1) + " DTE"}</span><span class="ld-tag">${esc(e.tag || "")}</span>
+      <i class="ld-dot" style="background:${pos ? "var(--pos)" : "var(--neg)"}"></i>
+      <span class="ld-mini"><i style="height:${h}px;background:${pos ? "var(--pos)" : "var(--neg)"}"></i></span><span class="ld-v" style="color:${pos ? "var(--pos)" : "var(--neg)"}">${compact(e.net)}</span></button>`;
+  }).join("");
+  [...$("ldStrip").children].forEach(b => b.onclick = () => { const i = Number(b.dataset.i); ldSel.has(i) ? ldSel.delete(i) : ldSel.add(i); if(ldSel.size === E.length) ldSel.clear(); store.set("gex.ldsel", JSON.stringify([...ldSel])); renderLadder(); });
+  $("ldAll").onclick = () => { ldSel.clear(); store.set("gex.ldsel", "[]"); renderLadder(); };
+  $("ldAll").classList.toggle("on", all);
+  $("ldStripSub").textContent = all ? "all expirations" : `${ldSel.size} selected · click to add or remove`;
+  // rows: sums over the selected expirations
+  const sum = row => { const t = [0, 0, 0, 0, 0, 0]; for(const [i, v] of Object.entries(row.x)) if(on(Number(i))) v.forEach((x, j) => t[j] += x); return t; };
+  let rows = LD.rows.map(row => ({k: row.k, f: fut(row.k), v: sum(row)}));
+  const near = rows.reduce((b, x, i) => Math.abs(x.f - ref) < Math.abs(rows[b].f - ref) ? i : b, 0);
+  const half = Math.floor(ldRowsN / 2);
+  rows = rows.slice(Math.max(0, near - half), Math.max(0, near - half) + ldRowsN);
+  $("ldZoom").innerHTML = [[21, "Tight"], [35, "Normal"], [51, "Wide"]].map(([n, t]) => `<button role="tab" aria-selected="${ldRowsN === n}" data-n="${n}">${t}</button>`).join("");
+  [...$("ldZoom").children].forEach(b => b.onclick = () => { ldRowsN = Number(b.dataset.n); store.set("gex.ldrows", String(ldRowsN)); renderLadder(); });
+  const col = j => Math.max(1, ...rows.map(x => Math.abs(j === 2 ? x.v[2] - x.v[3] : j === 4 ? x.v[4] - x.v[5] : x.v[j])));
+  const mx = {dex: col(1), gex: col(0), oi: col(2), vol: col(4)};
+  // levels, in futures prices, placed on the nearest row
+  const lv = [];
+  const addL = (p, code, name, cls) => { if(p != null && isFinite(p)) lv.push({p, code, name, cls}); };
+  addL(pickP(L.zero_gamma), "ZG", "Zero gamma", "zg"); addL(pickP(L.call_wall), "CW", "Call wall", "pos"); addL(pickP(L.put_wall), "PW", "Put wall", "neg");
+  const rk = s.ranked || {};
+  (rk.call || []).forEach((x, i) => addL(fut(x.price), "C" + (i + 1), `Call wall #${i + 1}: ${num(100 * x.share, 1)}% of gamma`, "pos"));
+  (rk.put || []).forEach((x, i) => addL(fut(x.price), "P" + (i + 1), `Put wall #${i + 1}: ${num(100 * x.share, 1)}% of gamma`, "neg"));
+  (rk.abs || []).forEach((x, i) => addL(fut(x.price), "Ab" + (i + 1), `Absolute gamma #${i + 1}: ${num(100 * x.share, 1)}% of gamma`, "ag"));
+  const X = (L.extras || {}).expected_move || {};
+  const emd = X.daily_points_fut || X.daily_points, ema = X.anchor_fut || X.anchor;
+  if(emd && ema){ addL(ema + emd, "EM+", "Expected high today", "em"); addL(ema - emd, "EM-", "Expected low today", "em"); }
+  const at = new Map();
+  lv.forEach(l => { const i = rows.reduce((b, x, j) => Math.abs(x.f - l.p) < Math.abs(rows[b].f - l.p) ? j : b, 0);
+    if(Math.abs(rows[i].f - l.p) <= LD.width * fac * 0.75) (at.get(i) || at.set(i, []).get(i)).push(l); });
+  const zgRow = [...at.entries()].find(([, ls]) => ls.some(l => l.code === "ZG"));
+  const priceRow = rows.reduce((b, x, i) => Math.abs(x.f - ref) < Math.abs(rows[b].f - ref) ? i : b, 0);
+  const bar = (v, max) => { const p = Math.min(50, Math.abs(v) / max * 50); return `<i class="${v >= 0 ? "p" : "n"}" style="${v >= 0 ? "left:50%" : `left:${50 - p}%`};width:${p}%"></i>`; };
+  $("ldRows").innerHTML = rows.map((x, i) => {
+    const ls = at.get(i) || [], v = x.v;
+    return `<div class="ld-row${i === priceRow ? " px" : ""}${zgRow && zgRow[0] === i ? " zgr" : ""}" data-i="${i}">
+      <span class="ld-lv">${ls.map(l => `<b class="ld-chip ${l.cls}">${esc(l.code)}</b>`).join("")}${i === priceRow ? `<b class="ld-chip now">${num(ref, 2)}</b>` : ""}</span>
+      <span class="ld-bar">${bar(v[1], mx.dex)}</span>
+      <span class="ld-bar ld-gex">${bar(v[0], mx.gex)}<em class="${v[0] >= 0 ? "p" : "n"}">${Math.abs(v[0]) >= mx.gex * 0.08 ? compact(v[0]) : ""}</em></span>
+      <span class="ld-bar">${bar(v[2] - v[3], mx.oi)}</span>
+      <span class="ld-k">${num(x.f, 0)}</span>
+      <span class="ld-bar">${bar(v[4] - v[5], mx.vol)}</span></div>`;
+  }).join("");
+  const tip = $("ldTip");
+  [...$("ldRows").children].forEach(el => {
+    el.onmouseenter = () => {
+      const x = rows[Number(el.dataset.i)], v = x.v, ls = at.get(Number(el.dataset.i)) || [];
+      tip.innerHTML = `<b>${num(x.f, 2)}</b> <span style="color:var(--ink3)">(${esc(s.options_source || w.source)} ${num(x.k, 0)})</span>
+        <br>Net GEX <b style="color:${v[0] >= 0 ? "var(--pos)" : "var(--neg)"}">${money(v[0])}</b> per 1% · net DEX ${compact(v[1])}
+        <br>OI calls ${num(v[2], 0)} / puts ${num(v[3], 0)} · volume calls ${num(v[4], 0)} / puts ${num(v[5], 0)}${ls.length ? `<br>${ls.map(l => esc(l.code + " " + l.name)).join("<br>")}` : ""}`;
+      tip.style.opacity = 1; tip.style.left = "170px"; tip.style.top = (el.offsetTop + el.offsetHeight + 40) + "px";
+    };
+    el.onmouseleave = () => { tip.style.opacity = 0; };
+  });
+  $("ldSub").textContent = `${num(LD.width * fac, 1)}-pt rows in ${w.market} prices · ${all ? "all expirations" : `${ldSel.size} expiration${ldSel.size === 1 ? "" : "s"}`} · Cboe 15-min delayed`;
+  // side panel
+  const T = LD.rows.reduce((t, row) => { sum(row).forEach((x, j) => t[j] += x); return t; }, [0, 0, 0, 0, 0, 0]);
+  const gT = E.reduce((a, e, i) => a + (on(i) ? e.net : 0), 0), dT = E.reduce((a, e, i) => a + (on(i) ? e.dex : 0), 0);
+  $("ldPrice").innerHTML = `<div class="eyebrow">${esc(w.market)} · ${esc((s.options_source || w.source) + (s.etf ? "+" + s.etf : ""))}</div>
+    <div class="big">${num(ref, 2)}</div>
+    <div class="ld-cards"><div><div class="eyebrow">Net GEX</div><b style="color:${gT >= 0 ? "var(--pos)" : "var(--neg)"}">${money(gT)}</b><span>per 1% move</span></div>
+      <div><div class="eyebrow">Net DEX</div><b style="color:${dT >= 0 ? "var(--pos)" : "var(--neg)"}">${compact(dT)}</b><span>dealer delta, $</span></div></div>
+    <div class="expl" style="margin-top:8px">${all ? "All expirations" : "Selected expirations only"}. Regime (all expirations): <b>${esc((s.regime || "").toLowerCase())}</b>.</div>`;
+  const lvs = lv.filter((l, i, a) => a.findIndex(z => z.code === l.code) === i).sort((a, b) => b.p - a.p);
+  $("ldLevels").innerHTML = `<div class="ld-list">${lvs.map(l => `<div><b class="ld-chip ${l.cls}">${esc(l.code)}</b><span>${esc(l.name)}</span><em>${num(l.p, 2)}</em><i style="color:${l.p >= ref ? "var(--pos)" : "var(--neg)"}">${signed((l.p / ref - 1) * 100, 2)}%</i></div>`).join("")}
+    <div class="now"><b class="ld-chip now">PX</b><span>${esc(w.market)} price</span><em>${num(ref, 2)}</em><i></i></div></div>`;
+  const pcOI = T[2] ? T[3] / T[2] : null, pcV = T[4] ? T[5] / T[4] : null;
+  const act = rows.reduce((b, x) => x.v[4] + x.v[5] > b.v[4] + b.v[5] ? x : b, rows[0]);
+  $("ldActivity").innerHTML = `<div class="metrics">
+    <div class="metric"><div class="eyebrow">Put/call OI</div><div class="v">${pcOI == null ? "-" : num(pcOI, 2)}</div><div class="s">${pcOI == null ? "" : pcOI > 1 ? "more puts open" : "more calls open"}</div></div>
+    <div class="metric"><div class="eyebrow">Put/call volume</div><div class="v">${pcV == null ? "-" : num(pcV, 2)}</div><div class="s">${pcV == null ? "" : pcV > 1 ? "puts trading more today" : "calls trading more today"}</div></div>
+    <div class="metric"><div class="eyebrow">Most traded strike</div><div class="v">${num(act.f, 0)}</div><div class="s">${num(act.v[4] + act.v[5], 0)} contracts today</div></div>
+    <div class="metric"><div class="eyebrow">Biggest GEX strike</div><div class="v">${num(rows.reduce((b, x) => Math.abs(x.v[0]) > Math.abs(b.v[0]) ? x : b, rows[0]).f, 0)}</div><div class="s">in the rows shown</div></div></div>
+    <div class="expl">Open interest is as of yesterday's close; volume is today's, 15-min delayed.</div>`;
+}
 
 setPage(page);
 load();

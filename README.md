@@ -99,6 +99,11 @@ what each module shows and what to watch, with the live numbers for the current 
 bar (or `T`, or the `LIGHT` / `DARK` commands) switches between night and light mode; the choice is saved in
 your browser, and the first visit follows your system setting.
 
+* **Live table:** a strike ladder like a trader's GEX matrix: net DEX, net GEX, net OI and net volume
+  for every strike near price, in futures prices, with level chips (C1-C3, P1-P5, Ab1-Ab3, zero gamma,
+  walls, expected move), the price row highlighted and a hover readout. An expiry strip on top picks
+  which expirations it adds up (the nearest, every Friday, every monthly, then the rest pooled); a side
+  panel shows net GEX and DEX for that pick, the key levels with distances, and put/call activity.
 * **Track record:** every session's plan (the levels from the last calculation timestamped before the
   09:30 ET open, frozen once) graded after the close against the index's open, high, low and close:
   expected-move hit rate, walls held when touched, zero-gamma crosses, bias calls against a baseline,

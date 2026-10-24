@@ -11,6 +11,7 @@ from . import engine as eng
 from .alerts import AlertEngine
 from .config import MarketConfig
 from .export import pine_payload
+from .ladder import build_ladder
 from .bias import compute as compute_bias
 from .extras import compute_extras
 from .levels import summarize
@@ -109,6 +110,7 @@ def run_once(cfg: MarketConfig, provider, store: Optional[SnapshotStore] = None,
         "profile": [{"price": p, "net": v} for p, v in res.profile],
         "by_strike": [{"strike": k, "call": v["call"], "put": v["put"], "net": v["net"]}
                       for k, v in res.by_strike.items()],
+        "ladder": build_ladder(res, snap) if res.status != "UNAVAILABLE" else None,
         "computed_at": datetime.now(timezone.utc).isoformat(),
     }
 

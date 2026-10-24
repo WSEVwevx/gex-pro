@@ -36,6 +36,7 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
   <nav class="side" id="pages" role="tablist" aria-label="Pages">
     <div class="side-label">Market</div>
     <button role="tab" data-p="levels" aria-selected="true"><svg viewBox="0 0 20 20"><path d="M3 5h14M3 10h9M3 15h12"/></svg><span>Levels</span><kbd>LVL</kbd></button>
+    <button role="tab" data-p="ladder" aria-selected="false"><svg viewBox="0 0 20 20"><path d="M3 4h14M3 8h14M3 12h14M3 16h14"/><path d="M10 2v16" opacity=".45"/></svg><span>Live table</span><kbd>LIVE</kbd></button>
     <button role="tab" data-p="gamma" aria-selected="false"><svg viewBox="0 0 20 20"><path d="M2 14c3 0 4-8 8-8s5 8 8 8"/><path d="M2 10h16" opacity=".4"/></svg><span>Gamma lab</span><kbd>GEX</kbd></button>
     <button role="tab" data-p="vol" aria-selected="false"><svg viewBox="0 0 20 20"><path d="M2 15l4-6 4 3 4-7 4 4"/></svg><span>Volatility</span><kbd>VOL</kbd></button>
     <button role="tab" data-p="timeline" aria-selected="false"><svg viewBox="0 0 20 20"><path d="M3 16V4M3 16h14"/><path d="M6 12l3-3 3 2 4-5"/></svg><span>Timeline</span><kbd>TL</kbd></button>
@@ -113,6 +114,30 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
         </section>
       </div>
       <section class="card" data-help="term_table" style="margin-top:14px"><div class="head"><h2>By expiration</h2></div><div id="termTable"></div></section>
+    </div>
+
+    <!-- LIVE TABLE -->
+    <div id="ladderView" hidden>
+      <section class="card ld-strip-card" data-help="ladder_strip">
+        <div class="head" style="margin-bottom:6px"><h2>Expirations</h2><span class="sub" id="ldStripSub"></span><span class="spacer"></span>
+          <button class="btn ghost sm" id="ldAll" type="button">Σ All</button></div>
+        <div class="ld-strip" id="ldStrip"></div>
+      </section>
+      <div class="ld-wrap">
+        <section class="card ld-table-card" data-help="ladder">
+          <div class="head"><h2>GEX live table</h2><span class="sub" id="ldSub"></span><span class="spacer"></span>
+            <div class="filters" id="ldZoom" role="tablist" aria-label="Rows"></div></div>
+          <div class="ld-head"><span>Levels</span><span>Net DEX</span><span>Net GEX</span><span>Net OI</span><span class="ld-k">Strike</span><span>Net volume</span></div>
+          <div class="ld-rows" id="ldRows"></div>
+          <div class="tip ld-tip" id="ldTip"></div>
+          <div class="legend"><span><i class="sw" style="background:var(--pos)"></i>positive (calls / dealers long gamma)</span><span><i class="sw" style="background:var(--neg)"></i>negative</span><span><i class="sw" style="background:var(--ink);height:2px"></i>price</span><span><i class="sw" style="background:var(--zg);height:2px"></i>zero gamma row</span></div>
+        </section>
+        <aside class="ld-side">
+          <section class="card" data-help="ladder_side"><div id="ldPrice"></div></section>
+          <section class="card" data-help="ladder_levels"><div class="head"><h2>Key levels</h2></div><div id="ldLevels"></div></section>
+          <section class="card" data-help="ladder_activity"><div class="head"><h2>Chain activity</h2></div><div id="ldActivity"></div></section>
+        </aside>
+      </div>
     </div>
 
     <!-- TIMELINE -->
