@@ -47,6 +47,14 @@ level as a *modeled concentration of option gamma*.
 
 ## Track record and backtest
 
+- **Kept forever.** Every session is its own file plus a row in `history.csv`, in
+  `%LOCALAPPDATA%\gexsys\trackrecord` and in the public `track-record` branch on GitHub. Neither is ever
+  pruned (only the snapshots are, after 12 days). The local app copies in, every hour, any session the
+  public record has that it is missing, so days the PC was off are filled from GitHub.
+- **GitHub pauses scheduled workflows after 60 days without repository activity.** The workflow's own
+  track-record commits may not count; push any change (or press "Run workflow") at least every couple
+  of months so the public record keeps growing.
+
 - **Short history.** Free historical open interest does not exist, so gamma levels can only be graded from
   the first saved session on (2026-10-21). Until about 20 sessions are graded the numbers mean little.
 - **Rebuilt plans.** Sessions before the track record existed were frozen later from saved snapshots. They

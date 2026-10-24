@@ -205,6 +205,30 @@ class TestSchedule(unittest.TestCase):
             self.assertIn("ALL", p["stats"])
 
 
+    def test_history_csv_and_public_mirror(self):
+        import csv
+        inp = {"market": "NQ", "underlying": "NDX", "ref": 100.0, "em": 10.0, "regime": "POSITIVE", "cw": 108.0}
+        with tempfile.TemporaryDirectory() as tmp:
+            c = self.make(tmp, datetime(2026, 10, 22, 16, 25, tzinfo=NY), lambda d: {"NQ": dict(inp)} if d == date(2026, 10, 22) else {"NQ": None})
+            self.src.intra = {"date": "2026-10-22", "open": 100, "high": 104, "low": 98, "close": 103, "last": "15:59", "source": "i"}
+            c.tick()
+            rows = list(csv.DictReader((Path(tmp) / "history.csv").read_text(encoding="utf-8").splitlines()))
+            self.assertEqual(len(rows), 1)
+            self.assertEqual((rows[0]["session"], rows[0]["status"], rows[0]["close"], rows[0]["close_in_band"], rows[0]["call_wall_result"]),
+                             ("2026-10-22", "graded", "103.0", "yes", "not reached"))
+            # the public record has the same day graded differently plus a day this PC never saw
+            remote = {"sessions": [
+                {"session": "2026-10-22", "market": "NQ", "status": "graded", "plan": {"ref": 1.0}, "outcome": {"close": 1.0}},
+                {"session": "2026-10-21", "market": "NQ", "status": "graded", "plan": dict(inp, session="2026-10-21"), "outcome": {"close": 99.0}},
+                {"session": "2026-10-20", "market": "NQ", "status": "missed", "plan": None, "outcome": None}]}
+            got = c.mirror("https://example.test/tr.json", fetch=lambda u: json.dumps(remote).encode())
+            self.assertEqual(got, ["2026-10-21_NQ graded", "2026-10-20_NQ missed"])
+            self.assertEqual(c._read(c._path(date(2026, 10, 22), "NQ"))["outcome"]["close"], 103.0)   # own grade kept
+            self.assertEqual(c.mirror("x", fetch=lambda u: json.dumps(remote).encode()), [])          # nothing new the second time
+            self.assertEqual(len(list(csv.DictReader((Path(tmp) / "history.csv").read_text(encoding="utf-8").splitlines()))), 3)
+            self.assertEqual(c.mirror("x", fetch=lambda u: (_ for _ in ()).throw(OSError("offline"))), [])   # offline: no harm
+
+
 class TestPreOpen(unittest.TestCase):
     def test_last_snapshot_before_the_open(self):
         from gexpro.context import pre_open

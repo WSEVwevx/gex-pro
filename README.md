@@ -108,7 +108,8 @@ your browser, and the first visit follows your system setting.
   09:30 ET open, frozen once) graded after the close against the index's open, high, low and close:
   expected-move hit rate, walls held when touched, zero-gamma crosses, bias calls against a baseline,
   range by gamma regime, each with a 95% range. Missed sessions are listed. The hosted site commits every
-  plan and grade to the public `track-record` branch. Plus a **historical backtest** of the expected-move
+  plan and grade to the public `track-record` branch,
+  where `history.csv` holds every session ever graded (kept forever; the local app syncs its copy from it). Plus a **historical backtest** of the expected-move
   band from VIX (S&P 500, since 1990) and VXN (Nasdaq-100, since 2009): by year, by vol level, and the
   distribution of daily moves against a normal curve. Hypothetical, not trading results.
 * **Library:** a beginner course in 19 short lessons (options basics, dealers and the Greeks, GEX levels,

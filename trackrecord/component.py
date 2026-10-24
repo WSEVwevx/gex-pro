@@ -16,13 +16,23 @@ Each session is one file, sessions/YYYY-MM-DD_MARKET.json. A plan is written onc
 the open (Cboe data is 15 minutes delayed, so every pre-open snapshot exists by then), and never changed.
 It is graded when that session's final bar is available. Sessions the app could not see are kept as
 "missed" from the first recorded day on, so gaps are visible rather than quietly skipped.
+
+The record is kept forever, apart from the snapshots (which are pruned after 12 days):
+  sessions/*.json   one file per session, never deleted
+  history.csv       every session in one permanent table, rewritten whenever a session changes
+  public copy       the hosted site commits the folder to the repository's track-record branch, so it
+                    keeps growing on GitHub while this PC is off; the local app copies in every session
+                    it is missing from that public record (mirror(), hourly)
 """
 from __future__ import annotations
 
+import csv
+import io
 import json
 import logging
 import os
 import threading
+import urllib.request
 from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from typing import Callable, Optional
@@ -38,6 +48,10 @@ FREEZE_AFTER = timedelta(minutes=30)
 GIVE_UP = timedelta(days=7)          # no final bar after a week: graded as "no prices"
 LOOKBACK_DAYS = 10
 BACKTEST_MAX_AGE = timedelta(hours=20)
+MIRROR_URL = "https://wsevwevx.github.io/gex-pro/data/trackrecord.json"      # the public record ($GEXPRO_TRACK_MIRROR)
+HISTORY_COLUMNS = ["session", "market", "status", "data_asof", "frozen_at", "ref", "em", "regime", "zero_gamma", "call_wall",
+                   "put_wall", "abs_gamma", "bias", "target", "open", "high", "low", "close", "move_em", "close_in_band",
+                   "range_in_band", "call_wall_result", "put_wall_result", "bias_right", "graded_at", "note"]
 
 
 def _default_dir() -> Path:
@@ -80,6 +94,75 @@ class TrackRecordComponent:
     def sessions(self) -> list[dict]:
         out = [s for s in map(self._read, sorted((self.dir / "sessions").glob("*.json"))) if s]
         return sorted(out, key=lambda s: (s["session"], s["market"]), reverse=True)
+
+    # ---------------------------------------------------------------- the permanent table
+    @staticmethod
+    def _wall(w) -> str:
+        return "" if not w else "held" if w.get("held") else "broke" if w.get("touched") else "not reached"
+
+    def history_rows(self) -> list[list]:
+        rows = []
+        for s in sorted(self.sessions(), key=lambda s: (s["session"], s["market"])):
+            p, o = s.get("plan") or {}, s.get("outcome") or {}
+            yn = lambda v: "" if v is None else ("yes" if v else "no")
+            rows.append([s["session"], s["market"], s.get("status", ""), p.get("asof", ""), p.get("frozen_at", ""), p.get("ref", ""),
+                         p.get("em", ""), p.get("regime", ""), p.get("zg", ""), p.get("cw", ""), p.get("pw", ""), p.get("ag", ""),
+                         p.get("bias", ""), p.get("target", ""), o.get("open", ""), o.get("high", ""), o.get("low", ""), o.get("close", ""),
+                         o.get("move_em", ""), yn(o.get("em_close")), yn(o.get("em_range")), self._wall(o.get("cw")), self._wall(o.get("pw")),
+                         yn(o.get("bias_hit")), s.get("graded_at", ""), s.get("why", "")])
+        return rows
+
+    def write_history(self) -> Path:
+        """history.csv: every session ever recorded, oldest first (opens in Excel / Google Sheets)."""
+        buf = io.StringIO()
+        w = csv.writer(buf, lineterminator="\n")
+        w.writerow(HISTORY_COLUMNS)
+        w.writerows(self.history_rows())
+        path = self.dir / "history.csv"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if not path.exists() or path.read_text(encoding="utf-8") != buf.getvalue():
+            tmp = path.with_suffix(".tmp")
+            tmp.write_text(buf.getvalue(), encoding="utf-8")
+            tmp.replace(path)
+        return path
+
+    # ---------------------------------------------------------------- copy in what the public record has
+    def mirror(self, url: Optional[str] = None, fetch: Optional[Callable[[str], bytes]] = None) -> list[str]:
+        """Copy sessions from the public record (the hosted site, which runs on GitHub while this PC is
+        off). A session this app already graded is never replaced; a missing, missed, pending or
+        no-prices one takes the public version. Returns what was copied."""
+        url = url or os.environ.get("GEXPRO_TRACK_MIRROR") or MIRROR_URL
+        if not url or url == "off":
+            return []
+        def get(u):
+            req = urllib.request.Request(u, headers={"User-Agent": "GEX PRO track record"})
+            with urllib.request.urlopen(req, timeout=25) as r:
+                return r.read()
+        try:
+            remote = json.loads((fetch or get)(url)).get("sessions") or []
+        except Exception as e:
+            log.warning("track record mirror %s failed: %s", url, e)
+            return []
+        copied = []
+        with self._lock:
+            for s in remote:
+                try:
+                    d, m = date.fromisoformat(s["session"]), s["market"]
+                except (KeyError, ValueError, TypeError):
+                    continue
+                path = self._path(d, m)
+                mine = self._read(path) if path.exists() else None
+                if mine and mine.get("status") == "graded":
+                    continue
+                if mine and s.get("status") not in ("graded", "pending"):
+                    continue                                    # a public miss never replaces anything here
+                if mine and mine.get("status") == s.get("status") and mine.get("plan") == s.get("plan"):
+                    continue
+                self._write(path, dict(s, mirrored_from=url))
+                copied.append(f"{d}_{m} {s.get('status')}")
+        if copied:
+            self.write_history()
+        return copied
 
     def _started(self) -> Optional[str]:
         firsts = [s["session"] for s in self.sessions() if s.get("plan")]
@@ -142,6 +225,8 @@ class TrackRecordComponent:
                     continue
                 self._write(self._path(d, s["market"]), s)
                 changed.append(f"{d}_{s['market']} {s['status']}")
+            if changed or not (self.dir / "history.csv").exists():
+                self.write_history()
         return changed
 
     def _pre_open(self, d: date) -> dict:
@@ -196,8 +281,12 @@ class TrackRecordComponent:
 
     def start(self) -> None:
         def loop():
+            last_mirror = 0.0
             while not self._stop.is_set():
                 try:
+                    if datetime.now(timezone.utc).timestamp() - last_mirror > 3600:
+                        last_mirror = datetime.now(timezone.utc).timestamp()
+                        self.mirror()
                     self.tick()
                     self.backtest()
                 except Exception:
