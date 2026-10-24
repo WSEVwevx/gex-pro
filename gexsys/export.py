@@ -13,7 +13,10 @@ Format (v1), semicolon-separated key=value tokens, ASCII only, plain decimals
   ts=1760972400000;ref=20000.00;q=DL;oi=EOD;gk=PROV;model=conventional;unit=USD1PCT;
   netb=1.234;reg=POS;st=OK;zg=19850.00;zgs=E;cw=20200;pw=19500;mp=20200;mn=19800;
   em=180.5;bk=2026-10-20..2026-11-19;dzg=-12.5;preg=POS;
-  L=20200:+:0.180,19800:-:0.120
+  L=20200:+:0.180,19800:-:0.120;R=C20200.00:18.0,P19500.00:12.0,A20000.00:9.5
+
+R = ranked levels near price for the chart's tags: C (most positive net GEX first), P (most negative
+net GEX first), A (most total gamma first), each "price:share %" in rank order.
 
 Level prices are in the OPTIONS-UNDERLYING space (e.g. NDX points).  The Pine
 script maps them to the chart with either a live TradingView reference symbol
@@ -79,6 +82,9 @@ def pine_payload(summary: dict, market: str, source_key: str, method: str,
     for c in (summary.get("concentrations") or [])[:max_levels]:
         levels.append(f"{_p(c):.2f}:{c['sign']}:{c['share']:.3f}")
     tok["L"] = ",".join(levels)
+    rk = summary.get("ranked") or {}
+    tok["R"] = ",".join(f"{code}{_p(x):.2f}:{100 * x['share']:.1f}" for side, code in (("call", "C"), ("put", "P"), ("abs", "A"))
+                        for x in rk.get(side) or [])
     tok.update(extras_tokens(summary.get("extras") or {}))
     out = "GEX1;" + ";".join(f"{k}={v}" for k, v in tok.items()) + ";END"
     if any(ch in out for ch in "\n\r\"|") or len(out) > MAX_LEN:

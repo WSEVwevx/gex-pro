@@ -84,6 +84,8 @@ def summarize(res: GexResult, cfg: Optional[LevelConfig] = None) -> dict:
         k, n = min(neg, key=lambda kv: kv[1])
         out["max_negative"] = {"price": k, "metric": "min net exposure", "value": n}
 
+    out["ranked"] = ranked_levels(bs, s)
+
     tot_abs_net = sum(abs(v["net"]) for v in bs.values())
     if tot_abs_net > 0:
         ranked = sorted(bs.items(), key=lambda kv: abs(kv[1]["net"]), reverse=True)
@@ -112,3 +114,23 @@ def summarize(res: GexResult, cfg: Optional[LevelConfig] = None) -> dict:
             net = sum(bs[k]["net"] for k in run)
             out["clusters"].append({"price": centre, "strikes": run, "net": net, "share": w / tot_abs_net})
     return out
+
+
+RANK_WINDOW = 0.06          # ranked levels: strikes within 6% of the reference price
+RANK_N = {"call": 3, "put": 5, "abs": 3}
+
+
+def ranked_levels(bs: dict, spot: float, window: float = RANK_WINDOW) -> dict:
+    """The strongest strikes near price, for the chart's level tags (C1.., P1.., Ab1..).
+
+    call: most positive net GEX first; put: most negative net GEX first; abs: most total gamma (calls and
+    puts, sign ignored) first. share = that strike's |net| (or total) over the sum across all strikes."""
+    near = {k: v for k, v in bs.items() if spot and abs(k - spot) <= window * spot}
+    tot_net = sum(abs(v["net"]) for v in bs.values()) or 1.0
+    tot_abs = sum(v["abs"] for v in bs.values()) or 1.0
+    pos = sorted(((k, v["net"]) for k, v in near.items() if v["net"] > 0), key=lambda kv: -kv[1])
+    neg = sorted(((k, v["net"]) for k, v in near.items() if v["net"] < 0), key=lambda kv: kv[1])
+    ab = sorted(((k, v["abs"]) for k, v in near.items() if v["abs"] > 0), key=lambda kv: -kv[1])
+    return {"call": [{"price": k, "value": n, "share": abs(n) / tot_net} for k, n in pos[:RANK_N["call"]]],
+            "put": [{"price": k, "value": n, "share": abs(n) / tot_net} for k, n in neg[:RANK_N["put"]]],
+            "abs": [{"price": k, "value": n, "share": n / tot_abs} for k, n in ab[:RANK_N["abs"]]]}

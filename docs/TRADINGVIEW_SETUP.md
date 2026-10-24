@@ -58,7 +58,14 @@ The dialog's separate Style tab has nothing to change.
 
 * **Lines** start at the session open by default and extend right. Key levels and max pain are 2 px,
   others 1 px.
-* **Labels** sit right of the GEX profile on a dark pill: short code plus price with separators,
+* **Tags + hover info** (the default label style): each level gets a short tag right of price with a
+  strength bar, e.g. `▬▬▬▬▬▬ P1`. Ranked walls: `C1`-`C3` (most positive net GEX), `P1`-`P5` (most
+  negative net GEX), `Ab1`-`Ab3` (most total gamma); the bar's length is the level's share of all gamma,
+  relative to the strongest. A `●` marks confluence (another level within 0.10%, set in "Confluence
+  within"). **Hover the tag** for the level's analysis: what it is and its rank, its distance from
+  price, which levels stack with it, the zone it sits in (above or below zero gamma, between the walls),
+  the regime and net GEX, and how old the paste is.
+* **Labels** ("Short" / "Full") sit right of the GEX profile on a dark pill: short code plus price with separators,
   e.g. `CW  29,883.25`. Codes: `ZG`, `CW`, `PW`, `+GEX`, `-GEX`, `+G 12%`, `0D ZG` / `0D CW` / `0D PW`,
   `VOL C` / `VOL P`, `OI C` / `OI P`, `MP 10-21`, `EM day +` / `EM day -`, `EM wk +` / `EM wk -`.
   "Full" spells them out.

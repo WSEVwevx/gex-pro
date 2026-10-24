@@ -78,6 +78,7 @@ class TestPineStatic(unittest.TestCase):
                    "basket": ["2026-10-20"], "concentrations": [{"price": 1.0, "sign": "+", "share": 0.1}],
                    "zero_gamma": {"price": 1.0}, "call_wall": {"price": 1.0}, "put_wall": {"price": 1.0},
                    "max_positive": {"price": 1.0}, "max_negative": {"price": 1.0}, "abs_gamma": {"price": 1.0},
+                   "ranked": {"call": [{"price": 1.0, "share": 0.1}], "put": [], "abs": []},
                    "expected_move": {"one_sigma_points": 1.0},
                    "extras": {"nearest": {"label": "0DTE", "zero_gamma": {"price": 1.0}, "call_wall": {"price": 1.0}, "put_wall": {"price": 1.0}},
                               "vol_call": {"price": 1.0}, "vol_put": {"price": 1.0}, "oi_call": {"price": 1.0}, "oi_put": {"price": 1.0},

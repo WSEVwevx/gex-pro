@@ -28,6 +28,8 @@ showPW   = input.bool(true, "Put wall", inline = "pw", group = G2)
 cNeg     = input.color(#d95926, "", inline = "pw", group = G2, tooltip = "Strike below price with the most put gamma. Also the colour of negative-gamma levels and profile bars.")
 showAG   = input.bool(true, "Absolute gamma", inline = "ag", group = G2)
 cAG      = input.color(#e6e6e6, "", inline = "ag", group = G2, tooltip = "Strike with the most TOTAL gamma (calls + puts). Often acts like a magnet. Doesn't depend on any dealer-positioning assumption. Dotted.")
+showRank = input.bool(true, "Ranked walls (C1-C3, P1-P5, Ab1-Ab3)", group = G2,
+     tooltip = "The strongest strikes near price: C = most positive net GEX, P = most negative net GEX, Ab = most total gamma. 1 = strongest; the bar next to the tag shows its share of all gamma.")
 showMax  = input.bool(true, "Largest +/- GEX and concentrations", group = G2, tooltip = "Strikes with the most positive / negative gamma, plus the extra concentrations below. Dotted, in the call / put colours.")
 nConc    = input.int(3, "Other concentrations", minval = 0, maxval = 6, inline = "cc", group = G2)
 minShare = input.float(5.0, "min %", minval = 0, step = 0.5, inline = "cc", group = G2,
@@ -73,11 +75,13 @@ wEM = 1
 // ---------- 4 - Lines & labels (shared by every level)
 G4 = "4 - Lines & labels"
 extent   = input.string("From session open", "Lines start", options = ["From session open", "Full chart", "Right of price"], group = G4)
-lblMode  = input.string("Short", "Labels", options = ["Short", "Full", "Off"], inline = "lb", group = G4,
-     tooltip = "Short: ZG, CW, PW, +GEX, -GEX, 0D ZG, VOL C, MP 10-21, EM day +...\nFull: Zero gamma, Call wall, ...")
+lblMode  = input.string("Tags + hover info", "Labels", options = ["Tags + hover info", "Short", "Full", "Off"], inline = "lb", group = G4,
+     tooltip = "Tags + hover info: a short tag right of price (C1, P1, Ab1, ZG...) with a strength bar; hover the tag for that level's analysis.\nShort: ZG, CW, PW, +GEX, -GEX, 0D ZG, VOL C, MP 10-21, EM day +...\nFull: Zero gamma, Call wall, ...")
 lblSize  = input.string("Small", "", options = ["Tiny", "Small", "Normal"], inline = "lb", group = G4)
 lblBg    = input.bool(true, "Label background", inline = "lb2", group = G4)
 lblOff   = input.int(6, "offset (bars)", minval = 0, maxval = 200, inline = "lb2", group = G4, tooltip = "Used when the GEX profile is off; with the profile on, labels sit just right of it.")
+confPct  = input.float(0.10, "Confluence within (%)", minval = 0.01, step = 0.01, group = G4,
+     tooltip = "Tags + hover info: levels closer than this (% of price) count as one confluence zone in the hover text.")
 emFill   = input.bool(false, "Shade daily expected-move band", group = G4, tooltip = "Faint fill between today's expected high and low (uses the expected-move colour).")
 regimeBg = input.bool(false, "Tint today's session by gamma side", group = G4,
      tooltip = "Faint blue while price is above zero gamma (modeled positive gamma: calmer, mean-reverting), faint orange below it (negative gamma: bigger, trending moves). Today's session only.")
@@ -170,6 +174,7 @@ type Snap
     float  ag = na
     float  vxm = na
     float  chm = na
+    string rk = ""
     bool   complete = false
 
 strOf(map<string, string> m, string k) =>
@@ -199,7 +204,7 @@ parseOne(string txt) =>
              x0 = strOf(m, "x0"), z0 = numOf(m, "z0"), c0 = numOf(m, "c0"), p0 = numOf(m, "p0"),
              vc = numOf(m, "vc"), vp = numOf(m, "vp"), oc = numOf(m, "oc"), op = numOf(m, "op"), xp = strOf(m, "xp"),
              ema = numOf(m, "ema"), emd = numOf(m, "emd"), emw = numOf(m, "emw"), emx = strOf(m, "emx"),
-             prof = strOf(m, "P"), ag = numOf(m, "ag"), vxm = numOf(m, "vxm"), chm = numOf(m, "chm"), complete = str.trim(array.get(toks, array.size(toks) - 1)) == "END")
+             prof = strOf(m, "P"), ag = numOf(m, "ag"), vxm = numOf(m, "vxm"), chm = numOf(m, "chm"), rk = strOf(m, "R"), complete = str.trim(array.get(toks, array.size(toks) - 1)) == "END")
     s
 
 fam(string s) =>
@@ -335,6 +340,13 @@ var array<label>  gLabels = array.new<label>()
 var array<float>  gPrices = array.new<float>()
 var array<string> gBodies = array.new<string>()
 var array<box>    gBoxes  = array.new<box>()
+// "Tags + hover info": one tag per price, filled while drawing and rendered at the end (confluence needs every level)
+var array<float>  tgP    = array.new<float>()
+var array<string> tgName = array.new<string>()
+var array<string> tgFull = array.new<string>()
+var array<color>  tgCol  = array.new<color>()
+var array<float>  tgStr  = array.new<float>()
+tagMode = lblMode == "Tags + hover info"
 
 // Time of the current session's first bar (exchange day), where "From session open" lines start.
 // Lines are placed by TIME (xloc.bar_time): a bar-index start hundreds of bars back makes Pine look up
@@ -350,9 +362,9 @@ lblX = showProf ? profOffset + profWidth + 2 : lblOff
 lblBgCol = lblBg ? color.new(#0b0e13, 25) : color.new(#0b0e13, 100)
 twoSrc = okA and okB
 
-// Short or full level name, e.g. nm("CW", "Call wall")
+// A level's short and full name, packed as "CW|Call wall"; drawLevel picks what it shows
 nm(string short, string full) =>
-    lblMode == "Short" ? short : full
+    short + "|" + full
 
 fmtPx(float p) =>
     str.tostring(p, "#,##0.00")
@@ -369,11 +381,21 @@ clearAll() =>
     array.clear(gPrices)
     array.clear(gBodies)
     array.clear(gBoxes)
+    array.clear(tgP)
+    array.clear(tgName)
+    array.clear(tgFull)
+    array.clear(tgCol)
+    array.clear(tgStr)
 
 // One line per price; another level at the same price joins the label: "CW · +GEX  29,883.25".
-drawLevel(float p, string name, string tag, color col, int width, string style) =>
+// name is "short|full" (from nm) or plain text; strength 0-1 sizes the tag's bar, info adds a hover line.
+drawLevel(float p, string name, string tag, color col, int width, string style, float strength = na, string info = "") =>
     if not na(p) and sane(p)
-        string item = name + tag
+        array<string> nf = str.split(name, "|")
+        string short = array.get(nf, 0)
+        string full = array.size(nf) > 1 ? array.get(nf, 1) : short
+        string item = (lblMode == "Full" ? full : short) + tag
+        string fullItem = full + tag + (info != "" ? ": " + info : "")
         int idx = -1
         for [i, q] in gPrices
             if math.abs(q - p) < syminfo.mintick / 2
@@ -386,6 +408,11 @@ drawLevel(float p, string name, string tag, color col, int width, string style) 
                 label lb = array.get(gLabels, idx)
                 if not na(lb)
                     label.set_text(lb, body + "  " + fmtPx(p))
+                if tagMode
+                    array.set(tgName, idx, array.get(tgName, idx) + "·" + short)
+                    array.set(tgFull, idx, array.get(tgFull, idx) + "\n• " + fullItem)
+                    if not na(strength)
+                        array.set(tgStr, idx, math.max(nz(array.get(tgStr, idx)), strength))
         else
             int t1 = extent == "Right of price" ? time : extent == "Full chart" ? time - 1 : math.min(sessStartTime, time - 1)
             int t2 = extent == "Right of price" ? time + 1 : time      // t2 > t1 gives the line a direction to extend
@@ -393,9 +420,17 @@ drawLevel(float p, string name, string tag, color col, int width, string style) 
             array.push(gBodies, item)
             array.push(gLines, line.new(t1, p, t2, p, xloc = xloc.bar_time, extend = extent == "Full chart" ? extend.both : extend.right,
                  color = col, width = width, style = style))
-            array.push(gLabels, lblMode != "Off" ? label.new(bar_index + lblX, p, item + "  " + fmtPx(p), style = label.style_label_left,
+            array.push(gLabels, lblMode != "Off" and not tagMode ? label.new(bar_index + lblX, p, item + "  " + fmtPx(p), style = label.style_label_left,
                  color = lblBgCol, textcolor = col, size = lSz, textalign = text.align_left) : label(na))
+            array.push(tgP, p)
+            array.push(tgName, short)
+            array.push(tgFull, "• " + fullItem)
+            array.push(tgCol, col)
+            array.push(tgStr, strength)
     p
+
+ordinal(int k) =>
+    k == 1 ? "1st" : k == 2 ? "2nd" : k == 3 ? "3rd" : str.tostring(k) + "th"
 
 tagOf(Snap s) =>
     (twoSrc ? " " + s.prov : "") + (staleOf(s) ? " STALE" : "")
@@ -414,6 +449,35 @@ drawKey(Snap s, float f, float o, bool isSecond) =>
     if showMax
         drawLevel(mapP(s.mp, f, o), nm("+GEX", "Largest +GEX"), tag, color.new(cPos, tr), wMax, lnStyle(styMax))
         drawLevel(mapP(s.mn, f, o), nm("-GEX", "Largest -GEX"), tag, color.new(cNeg, tr), wMax, lnStyle(styMax))
+    if showRank and s.rk != ""
+        float top = 0.0
+        for item in str.split(s.rk, ",")
+            array<string> pr = str.split(str.substring(item, 1), ":")
+            if array.size(pr) == 2
+                top := math.max(top, nz(str.tonumber(array.get(pr, 1))))
+        int nC = 0
+        int nP = 0
+        int nA = 0
+        for item in str.split(s.rk, ",")
+            string kind = str.substring(item, 0, 1)
+            array<string> pr = str.split(str.substring(item, 1), ":")
+            if array.size(pr) == 2
+                float rp = str.tonumber(array.get(pr, 0))
+                float sh = str.tonumber(array.get(pr, 1))
+                float stren = top > 0 and not na(sh) ? sh / top : na
+                string shTxt = str.tostring(sh, "0.0") + "% of all gamma"
+                if kind == "C"
+                    nC += 1
+                    drawLevel(mapP(rp, f, o), "C" + str.tostring(nC) + "|Call wall #" + str.tostring(nC), tag, color.new(cPos, tr), 1, line.style_solid,
+                         stren, ordinal(nC) + " most positive net GEX, " + shTxt)
+                else if kind == "P"
+                    nP += 1
+                    drawLevel(mapP(rp, f, o), "P" + str.tostring(nP) + "|Put wall #" + str.tostring(nP), tag, color.new(cNeg, tr), 1, line.style_solid,
+                         stren, ordinal(nP) + " most negative net GEX, " + shTxt)
+                else if kind == "A"
+                    nA += 1
+                    drawLevel(mapP(rp, f, o), "Ab" + str.tostring(nA) + "|Absolute gamma #" + str.tostring(nA), tag, color.new(cAG, tr + 20), 1, line.style_dotted,
+                         stren, ordinal(nA) + " most total gamma (calls + puts), " + shTxt)
     if nConc > 0 and s.lv != ""
         int shown = 0
         for item in str.split(s.lv, ",")
@@ -490,6 +554,45 @@ drawProfile(Snap s, float f, float o) =>
                          border_color = color.new(color.black, 100), bgcolor = color.new(val > 0 ? cPos : cNeg, tr)))
     true
 
+// Hover text for one tag: what the level is, where it is, what sits next to it, and the zone it is in
+zoneTxt(float p) =>
+    string z = ""
+    if not na(zgF)
+        z := p >= zgF ? "Above zero gamma (" + fmtPx(zgF) + "): the modeled positive-gamma side, where dealer hedging tends to slow moves and favour mean reversion."
+             : "Below zero gamma (" + fmtPx(zgF) + "): the modeled negative-gamma side, where dealer hedging tends to add to moves, so breaks can extend."
+    if not na(cwF) and not na(pwF)
+        z += p > cwF ? " Beyond the call wall (" + fmtPx(cwF) + ")." : p < pwF ? " Beyond the put wall (" + fmtPx(pwF) + ")." : " Between the put wall (" + fmtPx(pwF) + ") and the call wall (" + fmtPx(cwF) + ")."
+    z
+
+renderTags() =>
+    Snap s = okA ? sA : sB
+    float tol = close * confPct / 100.0
+    string ctx = ""
+    if not na(s)
+        float a = ageOf(s)
+        string ageS = na(a) ? "?" : a < 60 ? str.tostring(math.round(a)) + "m" : str.tostring(math.floor(a / 60)) + "h " + str.tostring(math.round(a % 60)) + "m"
+        ctx := "Regime: " + (s.reg == "POS" ? "positive" : s.reg == "NEG" ? "negative" : "mixed") + " gamma, net " + (s.net >= 0 ? "+$" : "-$") + str.tostring(math.abs(s.net), "0.00") + "B per 1% move."
+             + "\nData: " + s.prov + " " + s.src + (s.etf != "" ? "+" + s.etf : "") + " options, 15-min delayed; updated " + ageS + " ago" + (staleOf(s) ? " (STALE: paste a fresh update)" : "") + "."
+    for [i, p] in tgP
+        string conf = ""
+        int nConf = 0
+        for [j, q] in tgP
+            if j != i and math.abs(q - p) <= tol
+                nConf += 1
+                conf += (conf == "" ? "" : ", ") + array.get(tgName, j) + " " + fmtPx(q)
+        float d = p - close
+        string where = fmtPx(p) + " · " + str.tostring(math.abs(d) / close * 100, "0.00") + "% " + (d >= 0 ? "above" : "below") + " price (" + (d >= 0 ? "+" : "-") + str.tostring(math.abs(d), "#,##0.00") + " pts)"
+        string tip = array.get(tgFull, i) + "\n" + where
+             + (nConf > 0 ? "\n\nConfluence (" + str.tostring(nConf + 1) + " levels within " + str.tostring(confPct, "0.00") + "%): " + conf + ". Stacked levels make a stronger reaction zone." : "")
+             + "\n\nZone: " + zoneTxt(p)
+             + (ctx != "" ? "\n\n" + ctx : "")
+        float st = array.get(tgStr, i)
+        int nBars = na(st) ? 1 : math.max(1, math.round(st * 8))
+        array.push(gLabels, label.new(bar_index + lblX, p, str.repeat("▬", nBars) + " " + array.get(tgName, i) + (nConf > 0 ? " ●" : ""),
+             style = label.style_label_left, color = color.new(#0b0e13, 100), textcolor = array.get(tgCol, i), size = lSz,
+             textalign = text.align_left, tooltip = tip))
+    true
+
 bool extB = extFrom == "Both sources"
 if barstate.islast
     clearAll()
@@ -513,6 +616,8 @@ if barstate.islast
             float mpx = array.size(parts) >= 1 ? str.tonumber(array.get(parts, 0)) : na
             string mname = array.size(parts) >= 2 ? str.trim(array.get(parts, 1)) : "Manual"
             drawLevel(mpx, mname, " (MAN)", color.new(color.silver, 0), 1, line.style_dashed)
+    if tagMode
+        renderTags()
 
 // =====================================================================================================
 // Info panel: a row per item, a column per source. Hidden entirely when "Show panel" is off.

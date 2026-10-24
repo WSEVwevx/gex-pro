@@ -38,6 +38,7 @@ system. **Awaiting credentials**: needs your provider account. **Simulated**: te
 | Levels | 0DTE/next-expiration ZG and walls, volume walls, OI walls, max pain per expiration, daily/weekly expected-move bands, GEX profile bins | Working (unit tests with hand-checked values; live Cboe check 2026-10-21) |
 | Service | Keeps the last good result when a refresh is unusable (free feeds can blank out overnight); restores it after a restart | Working (tested) |
 | Pine | New level groups, on-chart GEX profile, cut-off paste detection, info panel (Minimal/Compact/Full, hideable) | **Unverified**: not compiled in TradingView |
+| Pine | Level tags with strength bars and hover analysis (ranked C1-C3 / P1-P5 / Ab1-Ab3, confluence, zone, regime, data age); paste token `R` | Static tests pass; **not compiled in TradingView by me** |
 | Data | CSV adapter (ES/NQ futures options, any vendor export) | Working (sample file is hand-made) |
 | Data | Synthetic provider | Simulated: labeled SYNTHETIC everywhere |
 | Data | Paid feeds (Databento, IBKR, Polygon/Massive) | Not built: free data only. Use CSV or add a `Provider` subclass |
