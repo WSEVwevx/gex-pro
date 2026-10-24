@@ -1061,11 +1061,11 @@ function renderTape(){
   const qs = (quotes && quotes.quotes) || [];
   if(!qs.length){ $("mqTrack").innerHTML = ""; return; }
   const one = qs.map(q => {
-    const up = q.pct > 0, dn = q.pct < 0, cls = up ? "up" : dn ? "dn" : "";
-    const usd = q.kind === "stock" || q.kind === "crypto" || q.label === "GOLD" || q.label === "OIL";
-    const px = (usd ? "$" : "") + num(q.price, q.dp) + (q.kind === "yield" ? "%" : "");
+    const pc = Math.round(q.pct * 100) / 100, up = pc > 0, dn = pc < 0, cls = up ? "up" : dn ? "dn" : "";
+    // like a trading desk tape: $ on every price, whole dollars from 1,000 up, cents below
+    const px = q.kind === "yield" ? num(q.price, 2) + "%" : "$" + num(q.price, q.price >= 1000 ? 0 : 2);
     const when = new Date(q.time).toLocaleString("en-US", {...ET, month: "short", day: "numeric", hour: "numeric", minute: "2-digit"});
-    return `<span class="mq-i${q.stale ? " stale" : ""}" title="${esc(q.symbol)} · last ${esc(when)} ET${q.stale ? " (could not refresh)" : ""}"><b>${esc(q.label)}</b><em>${px}</em><i class="${cls}">${up ? "▲" : dn ? "▼" : "•"} ${signed(q.pct, 2)}%</i></span>`;
+    return `<span class="mq-i${q.stale ? " stale" : ""}" title="${esc(q.symbol)} · last ${esc(when)} ET${q.stale ? " (could not refresh)" : ""}"><b>${esc(q.label)}</b><em>${px}</em><i class="${cls}">${up ? "▲ " : dn ? "▼ " : ""}${pc === 0 ? "+0.00" : signed(pc, 2)}%</i></span>`;
   }).join("");
   $("mqTrack").innerHTML = `<div class="mq-run">${one}</div><div class="mq-run" aria-hidden="true">${one}</div>`;
   $("mqTrack").style.setProperty("--mq-dur", Math.max(40, qs.length * 4.5) + "s");

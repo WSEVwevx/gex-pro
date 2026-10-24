@@ -25,7 +25,7 @@ URL = "https://query1.finance.yahoo.com/v8/finance/chart/{sym}?range=1d&interval
 SYMBOLS = [
     ("ES", "ES=F", 2, "future"), ("NQ", "NQ=F", 2, "future"), ("SPX", "^GSPC", 2, "index"), ("NDX", "^NDX", 2, "index"),
     ("DOW", "^DJI", 2, "index"), ("RUT", "^RUT", 2, "index"), ("VIX", "^VIX", 2, "index"), ("DXY", "DX-Y.NYB", 3, "index"),
-    ("10Y", "^TNX", 3, "yield"), ("GOLD", "GC=F", 1, "future"), ("OIL", "CL=F", 2, "future"),
+    ("10Y", "^TNX", 3, "yield"), ("Gold", "GC=F", 1, "future"), ("OIL", "CL=F", 2, "future"),
     ("BTC", "BTC-USD", 0, "crypto"), ("ETH", "ETH-USD", 2, "crypto"), ("SOL", "SOL-USD", 2, "crypto"),
     ("NVDA", "NVDA", 2, "stock"), ("AAPL", "AAPL", 2, "stock"), ("MSFT", "MSFT", 2, "stock"), ("TSLA", "TSLA", 2, "stock"),
 ]
