@@ -14,6 +14,9 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
 <body>
 <div class="term">
 
+  <!-- market tape: real quotes for the big tickers, scrolling (hover to pause) -->
+  <div class="mq" id="mq" aria-label="Market quotes"><div class="mq-track" id="mqTrack"></div></div>
+
   <!-- top bar: brand, command line, clock, the TradingView paste -->
   <header class="topbar">
     <div class="brand"><svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><rect width="22" height="22" rx="6" fill="#121821" stroke="rgba(255,255,255,.14)"/><rect x="5" y="6" width="12" height="2" rx="1" fill="#3987e5"/><rect x="5" y="10" width="8" height="2" rx="1" fill="#b9bec7"/><rect x="5" y="14" width="10" height="2" rx="1" fill="#d95926"/></svg>GEX <b class="pro">PRO</b></div>

@@ -99,6 +99,10 @@ what each module shows and what to watch, with the live numbers for the current 
 bar (or `T`, or the `LIGHT` / `DARK` commands) switches between night and light mode; the choice is saved in
 your browser, and the first visit follows your system setting.
 
+* **Market tape:** a scrolling strip across the top with real quotes for ES, NQ, SPX, NDX, Dow, Russell,
+  VIX, the dollar index, the 10-year yield, gold, oil, BTC, ETH, SOL, NVDA, AAPL, MSFT and TSLA: price
+  and change from the previous close (Yahoo Finance's public data; exchange prices delayed). Hover to
+  pause; hover a quote for its time.
 * **Live table:** a strike ladder like a trader's GEX matrix: net DEX, net GEX, net OI and net volume
   for every strike near price, in futures prices, with level chips (C1-C3, P1-P5, Ab1-Ab3, zero gamma,
   walls, expected move), the price row highlighted and a hover readout. An expiry strip on top picks

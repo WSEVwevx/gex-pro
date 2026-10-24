@@ -8,8 +8,8 @@ const store = { get(k, d){ try { return localStorage.getItem(k) ?? d; } catch(e)
 // Static mode: the hosted copy (python -m gexsys build-site) reads files that a scheduled job rewrites,
 // instead of the local service's /api endpoints.
 const STATIC = !!window.GEX_STATIC;
-const API = STATIC ? {all: "data/all.json", news: "data/news.json", posts: "data/posts.json", indicator: "data/indicator.json", briefings: "data/briefings.json", track: "data/trackrecord.json"}
-                   : {all: "/api/all", news: "/api/news", posts: "/api/posts", indicator: "/api/indicator", briefings: "/api/briefings", track: "/api/trackrecord"};
+const API = STATIC ? {all: "data/all.json", news: "data/news.json", posts: "data/posts.json", indicator: "data/indicator.json", briefings: "data/briefings.json", track: "data/trackrecord.json", quotes: "data/quotes.json"}
+                   : {all: "/api/all", news: "/api/news", posts: "/api/posts", indicator: "/api/indicator", briefings: "/api/briefings", track: "/api/trackrecord", quotes: "/api/quotes"};
 const pineUrl = m => STATIC ? `data/pine-published${m ? "-" + m : ""}.txt`
                             : `/api/pine/all?which=published${m ? "&market=" + encodeURIComponent(m) : ""}`;
 const OFFLINE = STATIC ? "Can't load the latest data file. Check your connection; retrying."
@@ -1051,10 +1051,32 @@ function renderLadder(){
     <div class="expl">Open interest is as of yesterday's close; volume is today's, 15-min delayed.</div>`;
 }
 
+// ---------- market tape: real quotes (Yahoo, exchange data delayed), scrolling across the top
+let quotes = null;
+async function loadQuotes(){
+  try { quotes = await (await fetch(API.quotes, {cache: "no-store"})).json(); } catch(e){ return; }
+  renderTape();
+}
+function renderTape(){
+  const qs = (quotes && quotes.quotes) || [];
+  if(!qs.length){ $("mqTrack").innerHTML = ""; return; }
+  const one = qs.map(q => {
+    const up = q.pct > 0, dn = q.pct < 0, cls = up ? "up" : dn ? "dn" : "";
+    const usd = q.kind === "stock" || q.kind === "crypto" || q.label === "GOLD" || q.label === "OIL";
+    const px = (usd ? "$" : "") + num(q.price, q.dp) + (q.kind === "yield" ? "%" : "");
+    const when = new Date(q.time).toLocaleString("en-US", {...ET, month: "short", day: "numeric", hour: "numeric", minute: "2-digit"});
+    return `<span class="mq-i${q.stale ? " stale" : ""}" title="${esc(q.symbol)} · last ${esc(when)} ET${q.stale ? " (could not refresh)" : ""}"><b>${esc(q.label)}</b><em>${px}</em><i class="${cls}">${up ? "▲" : dn ? "▼" : "•"} ${signed(q.pct, 2)}%</i></span>`;
+  }).join("");
+  $("mqTrack").innerHTML = `<div class="mq-run">${one}</div><div class="mq-run" aria-hidden="true">${one}</div>`;
+  $("mqTrack").style.setProperty("--mq-dur", Math.max(40, qs.length * 4.5) + "s");
+}
+
 setPage(page);
 load();
 loadNews();
 loadPosts();
+loadQuotes();
+setInterval(loadQuotes, STATIC ? 5 * 60 * 1000 : 60 * 1000);   // the hosted copy refreshes with each site build
 setInterval(load, STATIC ? 60000 : 20000);
 setInterval(loadPosts, 2 * 60 * 1000);                     // the service itself re-fetches at most every 5 min
 setInterval(loadNews, 10 * 60 * 1000);                      // the service itself re-fetches at most every 30 min
