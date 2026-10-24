@@ -11,7 +11,7 @@ from . import engine as eng
 from .alerts import AlertEngine
 from .config import MarketConfig
 from .export import pine_payload
-from .ladder import build_ladder
+from .ladder import build_ladder, heat_profile
 from .bias import compute as compute_bias
 from .extras import compute_extras
 from .levels import summarize
@@ -64,6 +64,7 @@ def run_once(cfg: MarketConfig, provider, store: Optional[SnapshotStore] = None,
     res = eng.compute(snap, ecfg, asof=snap.fetched_at)
     summary = summarize(res, cfg.levels)
     summary["extras"] = compute_extras(snap, ecfg, res)
+    summary["heat"] = heat_profile(res)                    # net GEX by price band, for the heatmap history
     summary["market"] = cfg.market
     summary["options_source"] = cfg.source
     summary["tv_ref_symbol"] = src.tv_symbol

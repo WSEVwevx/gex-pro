@@ -104,6 +104,11 @@ your browser, and the first visit follows your system setting.
   VIX, the dollar index, the 10-year yield, gold, oil, BTC, ETH, SOL, NVDA, AAPL, MSFT and TSLA: price
   and change from the previous close (Yahoo Finance's public data; exchange prices delayed). Hover to
   pause; hover a quote for its time.
+* **Heatmap:** NQ or ES futures candles (1, 5 or 15 minutes; Yahoo Finance, delayed) drawn with
+  TradingView's free Lightweight Charts library, with GEX history painted underneath: one column per
+  saved snapshot, each cell the net dealer gamma in that price band (blue positive, orange negative,
+  brighter = more), plus zero gamma and the walls as step lines. Hover for the numbers; a slider sets
+  the heat strength. History grows as snapshots are saved (about 12 days in the app, 5 hosted).
 * **Live table:** a strike ladder like a trader's GEX matrix: net DEX, net GEX, net OI and net volume
   for every strike near price, in futures prices, with level chips (C1-C3, P1-P5, Ab1-Ab3, zero gamma,
   walls, expected move), the price row highlighted and a hover readout. An expiry strip on top picks

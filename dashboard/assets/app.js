@@ -49,7 +49,7 @@ try { localStorage.removeItem("gex.page"); } catch(e) {}
 let impactF = store.get("gex.impact", "med");       // high | med | all
 let curF = store.get("gex.cur", "USD");             // USD | all
 let news = null;
-const VIEW_IDS = ["levels", "ladder", "bias", "track", "briefings", "news", "indicator", "library"];
+const VIEW_IDS = ["levels", "ladder", "heatmap", "bias", "track", "briefings", "news", "indicator", "library"];
 function setPage(p){
   if(!VIEW_IDS.includes(p)) p = "levels";
   page = p;
@@ -291,6 +291,7 @@ function render(){
   if(page === "bias") renderBias(w);
   renderTicker();
   if(page === "ladder") renderLiveTable();
+  if(page === "heatmap" && hmMarket !== market + hmTf) loadHeatmap();
   $("foot").innerHTML = `Model estimates from ${esc(s.provider || w.provider)} ${opts} options (${s.ref_quality === "RT" ? "real-time quotes" : "15-minute-delayed quotes"}) and end-of-day open interest, assuming dealers are long calls and short puts.
     ${w.result.mapped ? "Futures prices use " + esc(w.result.mapped.mapping.futures_ref_mode) + "; TradingView re-maps with your live chart." : esc(s.mapping_note || "")}
     These are proxy levels from index and ETF options, not NQ/ES futures options, and not trading advice.`;
@@ -540,7 +541,7 @@ function renderMaxPain(X){
 // (live table, track record, library)
 // =====================================================================================================
 const PAGES = [
-  ["levels", "Levels", "LVL"], ["ladder", "Live table", "LIVE"],
+  ["levels", "Levels", "LVL"], ["ladder", "Live table", "LIVE"], ["heatmap", "Heatmap", "HEAT"],
   ["bias", "Bias", "BIAS"], ["track", "Track record", "TRK"], ["briefings", "Briefings", "BRF"], ["news", "News", "NEWS"], ["indicator", "Indicator", "IND"],
   ["library", "Library", "LIB"]];
 const NO_MARKET_PAGES = ["news", "indicator", "briefings", "library", "track"];
@@ -647,10 +648,13 @@ const HELP = {
     body: `<p>C = call walls ranked by positive net GEX, P = put walls ranked by negative net GEX, Ab = most total gamma, ZG = zero gamma, CW / PW = the main walls, EM = today's expected move.</p>`},
   ladder_activity: {title: "Chain activity", tldr: "Who is positioned, and what is trading today.",
     body: `<p>Put/call ratios over the selected expirations and the rows shown: above 1 means more puts. Open interest is from yesterday's close; volume is today's.</p>`},
+  heatmap: {title: "GEX heatmap", tldr: "Futures candles with dealer gamma painted behind them, snapshot by snapshot.",
+    body: `<p>Each column behind the candles is one GEX PRO snapshot; each cell is the net dealer gamma in that price band at that time. <b>Blue</b> = positive gamma (hedging leans against moves, so price tends to stall or pin there); <b>orange</b> = negative gamma (hedging adds to moves). Brighter = more gamma.</p><p>The step lines are zero gamma and the call and put walls at each snapshot. Watch how price reacts when it reaches a bright band, and how the bands move during the day. Hover anywhere for the numbers.</p><p>Candles: Yahoo Finance, delayed. Gamma: Cboe options, 15-min delayed, mapped to futures with today's basis. History builds up as snapshots are saved (about 12 days in the app, 5 on the hosted site).</p>`,
+    watch: ["Price stalling at a bright blue band = positive-gamma support or resistance", "Price slicing through orange = negative gamma, moves can extend"]},
   paste: {title: "The hourly paste", tldr: "One text block that carries all levels to TradingView.",
     body: `<p>Published every hour on the hour (ET). One paste holds NQ and ES; each chart draws only its own market. The indicator marks levels stale after 90 minutes.</p>`},
 };
-const PAGE_HELP = {levels: "regime", ladder: "livetable", bias: "bias", briefings: "briefings", news: "calendar", indicator: "indicator", library: "library", track: "track"};
+const PAGE_HELP = {levels: "regime", ladder: "livetable", heatmap: "heatmap", bias: "bias", briefings: "briefings", news: "calendar", indicator: "indicator", library: "library", track: "track"};
 let exKey = null;
 function openExplain(key){
   const h = HELP[key]; if(!h) return;
@@ -691,6 +695,7 @@ document.querySelectorAll("[data-help]").forEach(el => {
 function setTheme(t){
   document.documentElement.dataset.theme = t; store.set("gex.theme", t);
   $("themeBtn").title = `Switch to ${t === "light" ? "dark" : "light"} mode (T)`;
+  if(window.__hmTheme) window.__hmTheme();          // the heatmap chart takes its colours from the theme
 }
 $("themeBtn").onclick = () => setTheme(document.documentElement.dataset.theme === "light" ? "dark" : "light");
 setTheme(document.documentElement.dataset.theme === "light" ? "light" : "dark");
@@ -734,7 +739,7 @@ $("cmd").addEventListener("keydown", e => {
 });
 
 // ---------- keyboard
-const KEYS = [["/  or  Ctrl+K", "Command line"], ["1 - 8", "Pages (Levels, Live table, Bias, Track record, Briefings, News, Indicator, Library)"],
+const KEYS = [["/  or  Ctrl+K", "Command line"], ["1 - 9", "Pages (Levels, Live table, Heatmap, Bias, Track record, Briefings, News, Indicator, Library)"],
   ["N  /  E", "Switch to NQ / ES"], ["X", "Explain this page"], ["T", "Light / dark mode"], ["D", "Notes under numbers on / off"], ["C", "Copy the TradingView paste"], ["?", "This list"], ["Esc", "Close panels"]];
 function showKeys(on){ $("keys").hidden = !on; if(on) $("keysGrid").innerHTML = KEYS.map(([k, d]) => `<kbd>${esc(k)}</kbd><span>${esc(d)}</span>`).join(""); }
 $("keysBtn").onclick = () => showKeys(true);
@@ -1077,6 +1082,109 @@ function renderTape(){
   $("mqTrack").style.setProperty("--mq-dur", Math.max(40, qs.length * 4.5) + "s");
 }
 
+// ---------- GEX heatmap: futures candles (Lightweight Charts) with the gamma history painted underneath
+let hm = null, hmChart = null, hmCandles = null, hmLines = {}, hmPrim = null, hmMarket = null;
+let hmTf = store.get("gex.hmtf", "5m"), hmOpacity = Number(store.get("gex.hmop", "60")), hmShowLv = store.get("gex.hmlv", "1") === "1";
+const hmUrl = () => STATIC ? `data/heatmap-${market}-${hmTf}.json` : `/api/heatmap?market=${encodeURIComponent(market)}&tf=${hmTf}`;
+const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function rgbOf(c){ const d = document.createElement("i"); d.style.color = c; document.body.appendChild(d); const v = getComputedStyle(d).color; d.remove(); return (v.match(/[\d.]+/g) || [0, 0, 0]).slice(0, 3).map(Number); }
+async function loadHeatmap(){
+  if(!window.LightweightCharts){ $("hmMsg").textContent = "The chart library could not load (it comes from unpkg.com). Check your connection and refresh."; $("hmMsg").hidden = false; return; }
+  try { hm = await (await fetch(hmUrl(), {cache: "no-store"})).json(); }
+  catch(e){ $("hmMsg").textContent = OFFLINE; $("hmMsg").hidden = false; return; }
+  renderHeatmap();
+}
+// bar time at or before t (columns snap to the candle they fall in)
+function hmSnap(times, t){ let lo = 0, hi = times.length - 1; if(hi < 0 || t < times[0]) return null; while(lo < hi){ const m = (lo + hi + 1) >> 1; times[m] <= t ? lo = m : hi = m - 1; } return times[lo]; }
+class HeatPrimitive {
+  constructor(){ this._view = {zOrder: () => "bottom", renderer: () => ({draw: target => this.draw(target)})}; }
+  attached(p){ this.chart = p.chart; this.series = p.series; this.requestUpdate = p.requestUpdate; }
+  detached(){ this.chart = null; }
+  updateAllViews(){}
+  paneViews(){ return [this._view]; }
+  draw(target){
+    if(!this.chart || !hm || !hm.columns.length) return;
+    const ts = this.chart.timeScale(), times = hm._times, fac = hm.factor, off = hm.offset;
+    const pos = rgbOf(cssVar("--pos")), neg = rgbOf(cssVar("--neg")), maxA = hmOpacity / 100;
+    target.useBitmapCoordinateSpace(sc => {
+      const ctx = sc.context, hr = sc.horizontalPixelRatio, vr = sc.verticalPixelRatio, W = sc.bitmapSize.width;
+      hm.columns.forEach((c, i) => {
+        const bt = hmSnap(times, c.t), x0 = bt == null ? 0 : ts.timeToCoordinate(bt);
+        const nx = hm.columns[i + 1], bt1 = nx ? hmSnap(times, nx.t) : null;
+        let x1 = nx ? ts.timeToCoordinate(bt1) : null;
+        if(x0 == null) return;
+        if(x1 == null || x1 <= x0) x1 = nx ? x0 + 2 : W / hr;
+        const scale = c.rel ? 99 : hm._scale;
+        c.v.forEach((v, j) => {
+          if(!v) return;
+          const p = (c.base + j * c.w) * fac + off, ya = this.series.priceToCoordinate(p + c.w * fac / 2), yb = this.series.priceToCoordinate(p - c.w * fac / 2);
+          if(ya == null || yb == null) return;
+          const a = Math.min(1, Math.pow(Math.abs(v) / scale, 0.65)) * maxA, rgb = v > 0 ? pos : neg;
+          ctx.fillStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${a.toFixed(3)})`;
+          ctx.fillRect(Math.round(x0 * hr), Math.round(ya * vr), Math.max(1, Math.round((x1 - x0) * hr)), Math.max(1, Math.round((yb - ya) * vr)));
+        });
+      });
+    });
+  }
+}
+function hmColors(){
+  return {layout: {background: {type: "solid", color: cssVar("--panel")}, textColor: cssVar("--ink3"), fontFamily: cssVar("--mono"), fontSize: 11},
+    grid: {vertLines: {color: `rgba(${cssVar("--fg-rgb")},.04)`}, horzLines: {color: `rgba(${cssVar("--fg-rgb")},.04)`}},
+    rightPriceScale: {borderColor: `rgba(${cssVar("--fg-rgb")},.1)`}, timeScale: {borderColor: `rgba(${cssVar("--fg-rgb")},.1)`, timeVisible: true, secondsVisible: false},
+    crosshair: {mode: 0, vertLine: {color: `rgba(${cssVar("--fg-rgb")},.3)`}, horzLine: {color: `rgba(${cssVar("--fg-rgb")},.3)`}}};
+}
+function renderHeatmap(){
+  $("hmTf").innerHTML = [["1m", "1m"], ["5m", "5m"], ["15m", "15m"]].map(([k, t]) => `<button role="tab" aria-selected="${hmTf === k}" data-k="${k}">${t}</button>`).join("");
+  [...$("hmTf").children].forEach(b => b.onclick = () => { hmTf = b.dataset.k; store.set("gex.hmtf", hmTf); hmMarket = null; loadHeatmap(); });
+  $("hmOpacity").value = hmOpacity; $("hmLevels").checked = hmShowLv;
+  if(!hm || !window.LightweightCharts) return;
+  const LC = window.LightweightCharts;
+  if(!hm.candles.length && !hm.columns.length){ $("hmMsg").textContent = "No candles or GEX history yet. They appear after the next refresh."; $("hmMsg").hidden = false; return; }
+  $("hmMsg").hidden = true;
+  hm._times = hm.candles.map(c => c[0]);
+  const vals = hm.columns.filter(c => !c.rel).flatMap(c => c.v.map(Math.abs)).filter(v => v > 0).sort((a, b) => a - b);
+  hm._scale = vals.length ? vals[Math.floor(vals.length * 0.97)] || 1 : 1;
+  const fresh = !hmChart;
+  if(fresh){
+    hmChart = LC.createChart($("hmChart"), Object.assign({autoSize: true, handleScale: {axisPressedMouseMove: true}}, hmColors()));
+    hmCandles = hmChart.addCandlestickSeries({upColor: cssVar("--good"), downColor: cssVar("--bad"), borderVisible: false, wickUpColor: cssVar("--good"), wickDownColor: cssVar("--bad"), priceLineVisible: true});
+    hmPrim = new HeatPrimitive(); hmCandles.attachPrimitive(hmPrim);
+    const mk = (col, style) => hmChart.addLineSeries({color: col, lineWidth: 1, lineStyle: style, lineType: LC.LineType.WithSteps, priceLineVisible: false, lastValueVisible: true, crosshairMarkerVisible: false});
+    hmLines = {zg: mk(cssVar("--zg"), LC.LineStyle.Dashed), cw: mk(cssVar("--pos"), LC.LineStyle.Solid), pw: mk(cssVar("--neg"), LC.LineStyle.Solid)};
+    hmChart.subscribeCrosshairMove(hmHover);
+    $("hmChart").appendChild($("hmTip")); $("hmChart").appendChild($("hmMsg"));   // keep them above the chart's canvases
+  } else hmChart.applyOptions(hmColors());
+  const keep = hmMarket === market + hmTf ? hmChart.timeScale().getVisibleLogicalRange() : null;
+  hmCandles.setData(hm.candles.map(c => ({time: c[0], open: c[1], high: c[2], low: c[3], close: c[4]})));
+  for(const k of ["zg", "cw", "pw"]){
+    const pts = new Map();
+    hm.columns.forEach(c => { const bt = hmSnap(hm._times, c.t); if(bt != null && c[k] != null) pts.set(bt, Math.round((c[k] * hm.factor + hm.offset) * 4) / 4); });
+    hmLines[k].setData(hmShowLv ? [...pts].sort((a, b) => a[0] - b[0]).map(([time, value]) => ({time, value})) : []);
+  }
+  if(keep) hmChart.timeScale().setVisibleLogicalRange(keep);
+  else { const n = hm.candles.length; hmChart.timeScale().setVisibleLogicalRange({from: Math.max(0, n - (hmTf === "1m" ? 390 : hmTf === "5m" ? 230 : 160)), to: n + 8}); }
+  hmMarket = market + hmTf;
+  const rel = hm.columns.filter(c => c.rel).length;
+  $("hmSub").textContent = `${market} futures · ${hm.columns.length} GEX snapshot${hm.columns.length === 1 ? "" : "s"} · candles ${hmTf}, delayed`;
+  $("hmNote").textContent = rel ? `${rel} older snapshot${rel === 1 ? "" : "s"} shown at relative strength` : "";
+  hmPrim.requestUpdate && hmPrim.requestUpdate();
+}
+function hmHover(p){
+  const tip = $("hmTip");
+  if(!p || !p.time || !p.point || !hm){ tip.style.opacity = 0; return; }
+  const price = hmCandles.coordinateToPrice(p.point.y);
+  let col = null; for(const c of hm.columns){ if(hmSnap(hm._times, c.t) <= p.time) col = c; else break; }
+  if(price == null || !col){ tip.style.opacity = 0; return; }
+  const j = Math.round(((price - hm.offset) / hm.factor - col.base) / col.w), v = col.v[j];
+  const when = new Date(col.t * 1000).toLocaleString("en-US", {...ET, weekday: "short", hour: "numeric", minute: "2-digit"});
+  tip.innerHTML = `<b>${num(price, 2)}</b> · snapshot ${esc(when)} ET<br>${v == null ? "outside the saved range" : col.rel ? `relative gamma ${signed(v, 0)} (older snapshot)` : `net GEX <b style="color:${v >= 0 ? "var(--pos)" : "var(--neg)"}">${money(v * 1e6)}</b> per 1%`}`
+    + `<br><span style="color:var(--ink3)">ZG ${num(col.zg * hm.factor + hm.offset, 0)} · CW ${num(col.cw * hm.factor + hm.offset, 0)} · PW ${num(col.pw * hm.factor + hm.offset, 0)}</span>`;
+  tip.style.opacity = 1; tip.style.left = Math.min(p.point.x + 16, $("hmChart").clientWidth - 260) + "px"; tip.style.top = Math.max(8, p.point.y - 60) + "px";
+}
+window.__hmTheme = () => { if(hmChart) renderHeatmap(); };
+$("hmOpacity").addEventListener("input", e => { hmOpacity = Number(e.target.value); store.set("gex.hmop", String(hmOpacity)); hmPrim && hmPrim.requestUpdate && hmPrim.requestUpdate(); });
+$("hmLevels").addEventListener("change", e => { hmShowLv = e.target.checked; store.set("gex.hmlv", hmShowLv ? "1" : "0"); renderHeatmap(); });
+
 setPage(page);
 load();
 loadNews();
@@ -1091,3 +1199,4 @@ setInterval(() => { if(page === "briefings") loadBriefings(); }, STATIC ? 5 * 60
 setInterval(() => { if(page === "indicator") loadIndicator(); }, STATIC ? 5 * 60 * 1000 : 15000);   // pick up code edits
 window.addEventListener("resize", () => { if(data) render(); if(page === "track") renderTrack(); });
 setInterval(() => { if(page === "track") loadTrack(); }, 5 * 60 * 1000);
+setInterval(() => { if(page === "heatmap") loadHeatmap(); }, STATIC ? 5 * 60 * 1000 : 60 * 1000);

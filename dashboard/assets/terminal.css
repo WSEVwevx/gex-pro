@@ -394,6 +394,17 @@ td.m{font-family:var(--mono)}
 .mq-i.stale{opacity:.5}
 @media(prefers-reduced-motion:reduce){.mq-track{animation:none}.mq{overflow-x:auto}}
 
+/* ---------------------------------------------------------------- GEX heatmap */
+.hm-card .head{flex-wrap:wrap;gap:10px}
+.hm-ctl{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink3)}
+.hm-ctl input[type=range]{width:90px;accent-color:var(--pos)}
+.hm-ctl input[type=checkbox]{accent-color:var(--pos)}
+.hm-chart{position:relative;height:calc(100vh - 290px);min-height:460px;border:1px solid var(--line);border-radius:3px;overflow:hidden}
+.hm-msg{position:absolute;inset:0;display:grid;place-items:center;color:var(--ink3);font-size:13px;z-index:10}
+.hm-msg[hidden]{display:none}
+.hm-tip{z-index:10;white-space:normal;max-width:300px}
+.hm-note{color:var(--ink4)}
+
 /* ---------------------------------------------------------------- explain drawer */
 .explain-tab{display:inline-grid;place-items:center;height:30px;padding:0 10px;border:1px solid var(--line2);border-radius:3px;background:var(--panel2);color:var(--ink2);font:600 11.5px var(--sans);flex:none}
 .explain-tab:hover{color:var(--prompt);background:var(--raise)}

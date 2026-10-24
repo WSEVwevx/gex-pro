@@ -91,3 +91,24 @@ def build_ladder(res, snap) -> Optional[dict]:
             for k, by in sorted(cells.items(), reverse=True)]
     return {"width": w, "spot": s, "unit": res.unit, "expirations": expirations, "rows": rows,
             "fields": ["gex", "dex", "call_oi", "put_oi", "call_vol", "put_vol"]}
+
+
+HEAT_WINDOW = 0.04            # the heatmap keeps price +/- 4% per snapshot
+
+
+def heat_profile(res) -> Optional[dict]:
+    """Net GEX by price band for the heatmap, saved with every snapshot so history can be drawn later.
+
+    {"base": first band centre, "w": band width, "v": [net $M per band, ...]} in index points; the bands are
+    the same as the live table's rows (40 points on NDX, 10 on SPX)."""
+    s = res.spot
+    if not res.by_strike or not s or not math.isfinite(s):
+        return None
+    w = _width(s)
+    lo, hi = math.floor(s * (1 - HEAT_WINDOW) / w), math.ceil(s * (1 + HEAT_WINDOW) / w)
+    v = [0.0] * (hi - lo + 1)
+    for k, d in res.by_strike.items():
+        i = round(k / w) - lo
+        if 0 <= i < len(v):
+            v[i] += d["net"]
+    return {"base": lo * w, "w": w, "v": [round(x / 1e6, 1) for x in v]}

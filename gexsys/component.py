@@ -4,7 +4,8 @@ Same shape as every GEX PRO component (see gexpro/components.py):
   routes()                    /health, /api/markets, /api/all, /api/levels, /api/pine, /api/pine/all,
                               /api/indicator (the TradingView script, read from disk on every request),
   start() / stop()            one background refresh thread per market
-  build_static(data, state)   all.json, pine-*.txt and indicator.json for the hosted site
+                              /api/heatmap?market=NQ&tf=5m (candles + GEX history for the heatmap page)
+  build_static(data, state)   all.json, pine-*.txt, indicator.json and heatmap-{NQ,ES}-{1m,5m,15m}.json for the hosted site
 
 Endpoints, by example:
   /api/levels?key=NQ-CBOE                    one worker's latest result (market=NQ picks the first NQ worker)
@@ -14,6 +15,7 @@ Endpoints, by example:
 from __future__ import annotations
 
 import json
+import logging
 import shutil
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
@@ -22,9 +24,12 @@ from typing import Iterable, Optional
 
 from .config import MarketConfig
 from .export import combine
+from .heatmap import RANGE, HeatmapCache, build as build_heatmap
 from .indicator import info as indicator_info
 from .models import to_jsonable
 from .service import MarketWorker, NotifyGate
+
+log = logging.getLogger("gexsys.component")
 
 
 def _write(path: Path, text: str) -> None:
@@ -56,6 +61,7 @@ class GexComponent:
         self.configs = list(configs)
         self.gate = gate or NotifyGate()
         self.workers: dict[str, MarketWorker] = {}
+        self.heat = HeatmapCache()
 
     @classmethod
     def from_workers(cls, workers: dict[str, MarketWorker]) -> "GexComponent":
@@ -82,7 +88,14 @@ class GexComponent:
     def routes(self) -> dict:
         return {"/health": self._health, "/api/markets": self._markets, "/api/all": lambda q: (200, _all(self.workers.values())),
                 "/api/pine/all": self._pine_all, "/api/levels": self._levels, "/api/pine": self._pine,
-                "/api/indicator": lambda q: (200, indicator_info())}
+                "/api/indicator": lambda q: (200, indicator_info()), "/api/heatmap": self._heatmap}
+
+    def _heatmap(self, q):
+        w = self._worker(q)
+        tf = (q.get("tf") or ["5m"])[0]
+        if not w or tf not in RANGE:
+            return 404, {"error": "unknown market or timeframe"}
+        return 200, self.heat.get(w, tf)
 
     def _worker(self, q) -> Optional[MarketWorker]:
         if q.get("key"):
@@ -142,6 +155,14 @@ class GexComponent:
         self.workers = {w.key: w for w in workers}          # so the app can read this build's results
         _write(data / "all.json", json.dumps(_all(workers, static=True)))
         _write(data / "indicator.json", json.dumps(indicator_info()))
+        for w in workers:
+            for tf in RANGE:
+                try:
+                    hm = build_heatmap(w, tf)
+                except Exception as e:                        # candles unavailable: the GEX history alone
+                    log.warning("heatmap %s %s: %s", w.key, tf, e)
+                    hm = build_heatmap(w, tf, candles=[])
+                _write(data / f"heatmap-{w.cfg.market}-{tf}.json", json.dumps(hm, separators=(",", ":")))
         for which, pick in (("latest", lambda w: w.result and w.result.get("pine")),
                             ("published", lambda w: w.published and w.published.get("payload"))):
             _write(data / f"pine-{which}.txt", combine([p for p in map(pick, workers) if p]))

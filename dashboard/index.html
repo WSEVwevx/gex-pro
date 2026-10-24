@@ -41,6 +41,7 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
     <div class="side-label">Market</div>
     <button role="tab" data-p="levels" aria-selected="true"><svg viewBox="0 0 20 20"><path d="M3 5h14M3 10h9M3 15h12"/></svg><span>Levels</span><kbd>LVL</kbd></button>
     <button role="tab" data-p="ladder" aria-selected="false"><svg viewBox="0 0 20 20"><path d="M3 4h14M3 8h14M3 12h14M3 16h14"/><path d="M10 2v16" opacity=".45"/></svg><span>Live table</span><kbd>LIVE</kbd></button>
+    <button role="tab" data-p="heatmap" aria-selected="false"><svg viewBox="0 0 20 20"><path d="M3 4h4v4H3zM8 4h4v4H8zM13 4h4v4h-4zM3 9h4v4H3zM8 9h4v4H8zM13 9h4v4h-4zM3 14h4v3H3zM8 14h4v3H8zM13 14h4v3h-4z"/></svg><span>Heatmap</span><kbd>HEAT</kbd></button>
     <div class="side-label">Insight</div>
     <button role="tab" data-p="bias" aria-selected="false"><svg viewBox="0 0 20 20"><path d="M10 3v14M5 8l5-5 5 5"/></svg><span>Bias</span><kbd>BIAS</kbd></button>
     <button role="tab" data-p="track" aria-selected="false"><svg viewBox="0 0 20 20"><path d="M3 16h14M5 16V9M9 16V5M13 16v-5M17 16V7"/></svg><span>Track record</span><kbd>TRK</kbd></button>
@@ -89,6 +90,20 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
         </div>
       </section>
       <p class="foot" id="foot"></p>
+    </div>
+
+    <!-- HEATMAP -->
+    <div id="heatmapView" hidden>
+      <section class="card hm-card" data-help="heatmap">
+        <div class="head"><h2>GEX heatmap</h2><span class="sub" id="hmSub"></span><span class="spacer"></span>
+          <div class="filters" id="hmTf" role="tablist" aria-label="Timeframe"></div>
+          <label class="hm-ctl" title="Heatmap strength">Heat <input type="range" id="hmOpacity" min="10" max="100" step="5" value="60"></label>
+          <label class="hm-ctl"><input type="checkbox" id="hmLevels" checked> Levels</label></div>
+        <div class="hm-chart" id="hmChart"><div class="hm-msg" id="hmMsg">Loading the chart...</div><div class="tip hm-tip" id="hmTip"></div></div>
+        <div class="legend"><span><i class="sw" style="background:var(--pos)"></i>positive gamma (hedging calms moves)</span><span><i class="sw" style="background:var(--neg)"></i>negative gamma (hedging adds to moves)</span>
+          <span><i class="sw" style="background:var(--zg);height:2px"></i>zero gamma</span><span><i class="sw" style="background:var(--pos);height:2px"></i>call wall</span><span><i class="sw" style="background:var(--neg);height:2px"></i>put wall</span>
+          <span class="hm-note" id="hmNote"></span></div>
+      </section>
     </div>
 
     <!-- LIVE TABLE -->
@@ -291,6 +306,7 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
   </div>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
 <script src="assets/library.js"></script>
 <script src="assets/app.js"></script>
 </body>
