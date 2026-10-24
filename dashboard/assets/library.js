@@ -111,7 +111,7 @@ window.GEX_LIBRARY = (() => {
       oneLiner: "Delta is how many dollars the option gains when the stock rises $1, and how much stock hedges it.",
       body: `<p>Delta runs from <b>0 to 1</b> for calls and <b>0 to −1</b> for puts. A call with delta 0.50 gains about $0.50 when the stock rises $1.</p>{{d:delta_curve}}
         <p>Delta is also the <b>hedge ratio</b>: a dealer short one call with delta 0.50 buys 50 shares (half of 100) to be neutral.</p>
-        <p>As a rough guide, delta also reads like the <b>chance the option finishes in the money</b>: a 0.25-delta option is roughly a 1-in-4 shot. The Volatility page uses these 25-delta options to measure skew.</p>`,
+        <p>As a rough guide, delta also reads like the <b>chance the option finishes in the money</b>: a 0.25-delta option is roughly a 1-in-4 shot.</p>`,
       example: `NQ options: a call with delta 0.40 on one NQ futures contract moves about 0.40 points for each 1-point move in NQ.`,
       quiz: {q: "A call has delta 0.80. The stock rises $1. About how much does the call gain?", choices: ["$0.08", "$0.80", "$8.00"], answer: 1, why: "Delta 0.80 means about $0.80 of option value per $1 move in the stock (per share)."}}),
     L({id: "gamma", chapter: "dealers", title: "Gamma: how fast delta changes", minutes: 4,
@@ -120,7 +120,7 @@ window.GEX_LIBRARY = (() => {
         <p>Three things to remember:</p><ul><li>Gamma is <b>highest at the money</b>, near the strike.</li><li>Gamma gets <b>taller and narrower as expiration approaches</b>. Same-day (0DTE) options have enormous gamma near the strike, which is why the last hours of a session can be wild.</li><li>Calls and puts at the same strike have the <b>same gamma</b>.</li></ul>
         <p>For dealers, high gamma means <b>lots of re-hedging</b> every time price moves. That re-hedging is the force GEX PRO maps.</p>`,
       example: `An at-the-money option with gamma 0.05: delta rises from 0.50 to about 0.55 if the stock rises $1, so a dealer hedging 100 options must trade 500 more shares for that $1 move.`,
-      gex: ["gamma", "See the shape of gamma on the Gamma lab"],
+      gex: ["ladder", "See gamma strike by strike on the Live table"],
       quiz: {q: "Where is gamma highest?", choices: ["Deep in the money", "At the money, near expiration", "Far out of the money, far out in time"], answer: 1, why: "Gamma peaks at the strike, and the peak gets sharper as expiration nears."}}),
     L({id: "positive-negative-gamma", chapter: "dealers", title: "Positive vs negative gamma", minutes: 4,
       oneLiner: "Long gamma makes dealers trade against moves (calm); short gamma makes them trade with moves (fast).",
@@ -152,7 +152,7 @@ window.GEX_LIBRARY = (() => {
         <p><b>Above</b> zero gamma, dealers tend to calm moves. <b>Below</b> it, they tend to amplify them. Price near zero gamma is in the <b>flip zone</b>: little hedging support either way, often choppy until it picks a side.</p>
         <p>The "σ" number beside it tells you how many expected moves away price is. Under 0.3σ: the regime can flip with a small move.</p>`,
       example: `NQ 29,000 with zero gamma at 29,800: price is below the flip, so negative gamma, and a rally back above 29,800 would likely calm the market.`,
-      gex: ["gamma", "See the flip and the flip zone on the Gamma curve"],
+      gex: ["levels", "See zero gamma and the regime on the Levels page"],
       quiz: {q: "Price breaks below zero gamma. What usually changes?", choices: ["Moves tend to get faster", "Moves tend to get slower", "Nothing"], answer: 0, why: "Below zero gamma, dealers are net short gamma and their hedging adds to moves."}}),
     L({id: "walls", chapter: "gex", title: "Call wall, put wall and absolute gamma", minutes: 4,
       oneLiner: "The strikes holding the most call gamma, put gamma and total gamma.",
@@ -189,14 +189,12 @@ window.GEX_LIBRARY = (() => {
         <p>When near-term IV rises <b>above</b> longer-term IV, the curve is <b>inverted</b>: traders are paying up for protection right now. Inversion plus negative gamma is a classic setup for big moves.</p>
         <p>Single-date bumps usually mark scheduled events: CPI, the Fed, big tech earnings.</p>`,
       example: `ATM IV 14% for next week and 17% for next month: normal. If next week jumps to 22% while next month stays 17%: inverted, stress building.`,
-      gex: ["vol", "See the live curve on the Volatility page"],
       quiz: {q: "Near-term IV is above long-term IV. The curve is...", choices: ["Normal", "Inverted", "Flat"], answer: 1, why: "An inverted curve has the front higher than the back, usually because of near-term fear."}}),
     L({id: "skew", chapter: "vol", title: "Skew", minutes: 3,
       oneLiner: "Downside puts usually cost more volatility than upside calls; how much more is the skew.",
       body: `{{d:skew}}<p>Investors pay for crash protection, so out-of-the-money <b>puts</b> trade at higher IV than equally distant <b>calls</b>. GEX PRO measures skew as <b>25-delta put IV minus 25-delta call IV</b>, in volatility points.</p>
         <p><b>Rising skew</b>: demand for protection is growing. <b>Falling skew</b>: complacency, or a market squeezing higher as protection is sold.</p>`,
       example: `25-delta put IV 20%, 25-delta call IV 15%: skew = 5 points. If it climbs to 8 while the market is flat, someone is quietly buying protection.`,
-      gex: ["vol", "Skew by expiration is on the Volatility page"],
       quiz: {q: "Skew jumps while price is flat. What might it mean?", choices: ["Traders are buying downside protection", "Calls are getting expensive", "Nothing at all"], answer: 0, why: "Higher skew means puts are getting relatively more expensive: rising demand for protection."}}),
     // ---------------------------------------------------------------- 5. using GEX PRO
     L({id: "daily-routine", chapter: "use", title: "A GEX PRO trading day", minutes: 4,
@@ -204,7 +202,7 @@ window.GEX_LIBRARY = (() => {
       body: `<ol><li><b>Before the open (9:00 ET)</b>: read the <b>NY AM briefing</b>. Note the regime, zero gamma, the walls and the expected range. Check the <b>calendar</b> for data releases.</li>
         <li><b>Paste the levels</b> into TradingView: Copy for TradingView → indicator settings → Levels payload. A new paste comes every hour.</li>
         <li><b>Set your expectations by regime.</b> Positive gamma: expect fades toward the walls. Negative gamma: respect breakouts; a lost put wall can accelerate.</li>
-        <li><b>Intraday</b>: watch the <b>0DTE levels</b> and the <b>volume walls</b>. Check the Gamma lab if price nears zero gamma.</li>
+        <li><b>Intraday</b>: watch the <b>0DTE levels</b> and the <b>volume walls</b>. Watch the Live table if price nears zero gamma.</li>
         <li><b>Into the close</b>: charm flow and max pain matter most in the last two hours.</li>
         <li><b>Evening (7:00 ET)</b>: the <b>Asia briefing</b> sets up the overnight session.</li></ol>`,
       example: `Briefing: "ES negative gamma, put wall 7,600, zero gamma 7,750." Plan: don't fade a break of 7,600; a reclaim of 7,750 would flip the day to calmer conditions.`,
@@ -253,9 +251,8 @@ window.GEX_LIBRARY = (() => {
 
   // which lesson to suggest from each Explain panel
   const forHelp = {regime: "positive-negative-gamma", reference: "index-etf-futures", net_gex: "what-is-gex", stats: "vanna-charm",
-    ladder: "walls", by_strike: "walls", max_pain: "max-pain", by_expiry: "zero-dte", gamma_curve: "zero-gamma",
-    dte_buckets: "zero-dte", positioning: "what-is-gex", term: "term-structure", skew: "skew", term_table: "term-structure",
-    timeline: "zero-gamma", timeline_net: "what-is-gex", bias: "daily-routine", base_case: "daily-routine", bias_range: "implied-volatility",
+    ladder: "walls", livetable: "walls", by_strike: "walls", max_pain: "max-pain", by_expiry: "zero-dte",
+    bias: "daily-routine", base_case: "daily-routine", bias_range: "implied-volatility",
     bias_chart: "implied-volatility", factors: "vanna-charm", briefings: "daily-routine", calendar: "limits", posts: "limits",
     indicator: "daily-routine", paste: "daily-routine"};
 

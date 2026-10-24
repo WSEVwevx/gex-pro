@@ -8,8 +8,8 @@ const store = { get(k, d){ try { return localStorage.getItem(k) ?? d; } catch(e)
 // Static mode: the hosted copy (python -m gexsys build-site) reads files that a scheduled job rewrites,
 // instead of the local service's /api endpoints.
 const STATIC = !!window.GEX_STATIC;
-const API = STATIC ? {all: "data/all.json", news: "data/news.json", posts: "data/posts.json", indicator: "data/indicator.json", briefings: "data/briefings.json", timeline: "data/timeline.json", track: "data/trackrecord.json"}
-                   : {all: "/api/all", news: "/api/news", posts: "/api/posts", indicator: "/api/indicator", briefings: "/api/briefings", timeline: "/api/timeline", track: "/api/trackrecord"};
+const API = STATIC ? {all: "data/all.json", news: "data/news.json", posts: "data/posts.json", indicator: "data/indicator.json", briefings: "data/briefings.json", track: "data/trackrecord.json"}
+                   : {all: "/api/all", news: "/api/news", posts: "/api/posts", indicator: "/api/indicator", briefings: "/api/briefings", track: "/api/trackrecord"};
 const pineUrl = m => STATIC ? `data/pine-published${m ? "-" + m : ""}.txt`
                             : `/api/pine/all?which=published${m ? "&market=" + encodeURIComponent(m) : ""}`;
 const OFFLINE = STATIC ? "Can't load the latest data file. Check your connection; retrying."
@@ -49,7 +49,7 @@ try { localStorage.removeItem("gex.page"); } catch(e) {}
 let impactF = store.get("gex.impact", "med");       // high | med | all
 let curF = store.get("gex.cur", "USD");             // USD | all
 let news = null;
-const VIEW_IDS = ["levels", "ladder", "gamma", "vol", "timeline", "bias", "track", "briefings", "news", "indicator", "library"];
+const VIEW_IDS = ["levels", "ladder", "bias", "track", "briefings", "news", "indicator", "library"];
 function setPage(p){
   if(!VIEW_IDS.includes(p)) p = "levels";
   page = p;
@@ -62,7 +62,6 @@ function setPage(p){
   if(p === "briefings") loadBriefings();
   if(p === "news") renderNews();
   if(p === "indicator") loadIndicator();
-  if(p === "timeline") loadTimeline();
   if(p === "library") renderLibrary();
   if(p === "track") loadTrack();
   if(!NO_MARKET_PAGES.includes(p) && data) render();
@@ -291,8 +290,6 @@ function render(){
   renderExpiry(s);
   if(page === "bias") renderBias(w);
   renderTicker();
-  if(page === "gamma") renderGamma();
-  if(page === "vol") renderVol();
   if(page === "ladder") renderLadder();
   $("foot").innerHTML = `Model estimates from ${esc(s.provider || w.provider)} ${opts} options (${s.ref_quality === "RT" ? "real-time quotes" : "15-minute-delayed quotes"}) and end-of-day open interest, assuming dealers are long calls and short puts.
     ${w.result.mapped ? "Futures prices use " + esc(w.result.mapped.mapping.futures_ref_mode) + "; TradingView re-maps with your live chart." : esc(s.mapping_note || "")}
@@ -540,10 +537,10 @@ function renderMaxPain(X){
 
 // =====================================================================================================
 // Terminal: pages, ticker, clock, command line, keyboard, explain drawer, and the pro modules
-// (gamma curve, gamma by expiry bucket, positioning, volatility term structure and skew, timeline)
+// (live table, track record, library)
 // =====================================================================================================
 const PAGES = [
-  ["levels", "Levels", "LVL"], ["ladder", "Live table", "LIVE"], ["gamma", "Gamma lab", "GEX"], ["vol", "Volatility", "VOL"], ["timeline", "Timeline", "TL"],
+  ["levels", "Levels", "LVL"], ["ladder", "Live table", "LIVE"],
   ["bias", "Bias", "BIAS"], ["track", "Track record", "TRK"], ["briefings", "Briefings", "BRF"], ["news", "News", "NEWS"], ["indicator", "Indicator", "IND"],
   ["library", "Library", "LIB"]];
 const NO_MARKET_PAGES = ["news", "indicator", "briefings", "library", "track"];
@@ -583,187 +580,7 @@ function renderTicker(){
   $("ticker").innerHTML = cells + info;
   [...$("ticker").querySelectorAll(".tk[data-m]")].forEach(el => el.onclick = () => setMarket(el.dataset.m));
 }
-function setMarket(m){ market = m; store.set("gex.market", m); render(); if(page === "timeline") renderTimeline(); }
-
-// ---------- gamma curve (net dealer gamma if price moved), with flip zone and expected-move band
-function renderGamma(){
-  const w = curW();
-  if(!w || !w.result) return;
-  const s = w.result.summary, L = w.result.mapped || s, X = L.extras || {}, m = w.result.mapped;
-  const f = m ? (p => p * m.mapping.factor + m.mapping.offset) : (p => p);
-  const pts = (w.result.profile || []).map(r => ({p: f(r.price), v: r.net}));
-  const ref = L.futures_equiv_of_ref ?? s.ref_price, zg = pickP(L.zero_gamma), em = X.expected_move || {}, emd = em.daily_points_fut ?? em.daily_points;
-  const svg = $("curve"), W = Math.max($("curveWrap").clientWidth, 320), H = 360, pl = 70, pr = 16, pt = 14, pb = 28;
-  if(!pts.length){ svg.innerHTML = ""; $("curveSub").textContent = "No profile available"; return; }
-  const lo = pts[0].p, hi = pts.at(-1).p, mx = Math.max(1, ...pts.map(q => Math.abs(q.v)));
-  const x = p => pl + (p - lo) / (hi - lo) * (W - pl - pr), y = v => pt + (mx - v) / (2 * mx) * (H - pt - pb);
-  // flip zone: contiguous prices around zero gamma where |net| is within 10% of the curve's peak
-  let zone = null;
-  if(zg != null){
-    let i = pts.findIndex(q => q.p >= zg); i = Math.max(0, Math.min(pts.length - 1, i));
-    let a = i, b = i;
-    while(a > 0 && Math.abs(pts[a - 1].v) <= 0.1 * mx) a--;
-    while(b < pts.length - 1 && Math.abs(pts[b + 1].v) <= 0.1 * mx) b++;
-    zone = [pts[a].p, pts[b].p];
-  }
-  let g = "";
-  for(let i = 0; i <= 4; i++){ const v = -mx + 2 * mx * i / 4; g += `<line x1="${pl}" x2="${W - pr}" y1="${y(v)}" y2="${y(v)}" stroke="rgba(var(--fg-rgb),.05)"/><text x="${pl - 8}" y="${y(v) + 4}" text-anchor="end">${i === 2 ? "0" : money(v)}</text>`; }
-  for(let i = 0; i <= 6; i++){ const p = lo + (hi - lo) * i / 6; g += `<text x="${x(p)}" y="${H - 8}" text-anchor="middle">${num(p, 0)}</text>`; }
-  if(emd && ref) g += `<rect x="${x(Math.max(lo, ref - emd))}" y="${pt}" width="${Math.max(0, x(Math.min(hi, ref + emd)) - x(Math.max(lo, ref - emd)))}" height="${H - pt - pb}" fill="rgba(139,149,165,.07)"/>`;
-  if(zone) g += `<rect x="${x(zone[0])}" y="${pt}" width="${Math.max(2, x(zone[1]) - x(zone[0]))}" height="${H - pt - pb}" fill="rgba(185,190,199,.13)"/>`;
-  const path = pts.map((q, i) => `${i ? "L" : "M"}${x(q.p).toFixed(1)},${y(q.v).toFixed(1)}`).join("");
-  const area = (sign) => `M${x(lo)},${y(0)} ` + pts.map(q => `L${x(q.p).toFixed(1)},${y(sign > 0 ? Math.max(0, q.v) : Math.min(0, q.v)).toFixed(1)}`).join(" ") + ` L${x(hi)},${y(0)} Z`;
-  g += `<path d="${area(1)}" fill="rgba(57,135,229,.22)"/><path d="${area(-1)}" fill="rgba(217,89,38,.22)"/>`;
-  g += `<line x1="${pl}" x2="${W - pr}" y1="${y(0)}" y2="${y(0)}" stroke="rgba(var(--fg-rgb),.22)"/>`;
-  g += `<path d="${path}" fill="none" stroke="var(--ink)" stroke-width="1.6" stroke-opacity=".85"/>`;
-  const vline = (p, col, dash, label, top) => p == null || p < lo || p > hi ? "" :
-    `<line x1="${x(p)}" x2="${x(p)}" y1="${pt}" y2="${H - pb}" stroke="${col}" stroke-width="1.3" ${dash ? `stroke-dasharray="${dash}"` : ""}/><text x="${x(p) + 4}" y="${pt + 11 + (top || 0)}" style="fill:${col}">${label}</text>`;
-  g += vline(pickP(L.put_wall), "var(--neg)", "2 3", "PW", 14) + vline(pickP(L.call_wall), "var(--pos)", "2 3", "CW", 14) + vline(zg, "var(--zg)", "5 4", "ZG", 28) + vline(ref, "var(--ink)", "", "PRICE", 0);
-  if(emd && ref){ g += vline(ref - emd, "var(--em)", "1 3", "-1σ", 42) + vline(ref + emd, "var(--em)", "1 3", "+1σ", 42); }
-  svg.setAttribute("width", W); svg.setAttribute("height", H); svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.innerHTML = g;
-  const here = pts.reduce((b, q) => Math.abs(q.p - ref) < Math.abs(b.p - ref) ? q : b, pts[0]);
-  $("curveSub").textContent = `At price: ${money(here.v)} per 1% · ` + (zone ? `flip zone ${num(zone[0], 0)}-${num(zone[1], 0)} (${num(zone[1] - zone[0], 0)} pts wide)` : "no flip inside ±5%");
-  const tip = $("curveTip");
-  svg.onmousemove = e => {
-    const r = svg.getBoundingClientRect(), px = lo + (e.clientX - r.left - pl) / (W - pl - pr) * (hi - lo);
-    const q = pts.reduce((b, c) => Math.abs(c.p - px) < Math.abs(b.p - px) ? c : b, pts[0]);
-    tip.innerHTML = `If price were <b>${num(q.p)}</b><br><span style="color:${q.v >= 0 ? "var(--pos)" : "var(--neg)"}">${money(q.v)}</span> per 1% · ${signed(q.p - ref, 0)} pts`;
-    tip.style.opacity = 1; tip.style.left = Math.min(x(q.p) + 12, W - 200) + "px"; tip.style.top = (y(q.v) - 34) + "px";
-  };
-  svg.onmouseleave = () => { tip.style.opacity = 0; };
-  // gamma by time-to-expiry bucket
-  const order = ["0DTE", "1D", "2-7D", "8-30D", "31D+"], bk = s.by_dte_bucket || {};
-  const rows = order.filter(k => bk[k]), amax = Math.max(1, ...rows.map(k => Math.abs(bk[k].net)));
-  $("dteBars").innerHTML = rows.length ? `<div class="bars">${rows.map(k => {
-    const v = bk[k].net, wpc = Math.abs(v) / amax * 50;
-    return `<div class="bar-row"><span class="lab">${k}</span><span class="track"><span class="mid"></span><i style="${v >= 0 ? "left:50%" : `left:${50 - wpc}%`};width:${wpc}%;background:${v >= 0 ? "var(--pos)" : "var(--neg)"}"></i></span>
-      <span class="val" style="color:${v >= 0 ? "var(--pos)" : "var(--neg)"}">${money(v)} <span style="color:var(--ink3)">${s.gross ? num(100 * bk[k].abs / s.gross, 0) : "-"}%</span></span></div>`; }).join("")}</div>
-    <div class="expl">Bars: net gamma per bucket (left = negative, right = positive). Percent: share of all gamma. Short-dated buckets move levels fastest.</div>` : `<div class="expl">No data.</div>`;
-  // positioning metrics
-  const fac = m ? m.mapping.factor : 1, ctr = ref * (POINT_VALUE[market] || 1);
-  const cp = s.call_total && s.put_total ? Math.abs(s.call_total) / (Math.abs(s.call_total) + Math.abs(s.put_total)) : null;
-  const sig = zg != null && emd ? (ref - zg) / emd : null;
-  const met = (k, v, sub, col) => `<div class="metric"><div class="eyebrow">${k}</div><div class="v"${col ? ` style="color:${col}"` : ""}>${v}</div><div class="s">${sub}</div></div>`;
-  $("posMetrics").innerHTML = `<div class="metrics">
-    ${met("Call gamma", money(s.call_total), "dealers modeled long: hedging calms moves", "var(--pos)")}
-    ${met("Put gamma", money(s.put_total), "dealers modeled short: hedging adds to moves", "var(--neg)")}
-    ${met("Call share of gross", cp == null ? "-" : num(100 * cp, 0) + "%", "above 50% leans calm, below leans volatile")}
-    ${met("Gross gamma", money(s.gross), "all gamma, sign ignored: total hedging firepower")}
-    ${met("Near-price concentration", s.near_spot_concentration == null ? "-" : num(100 * s.near_spot_concentration, 0) + "%", "share of gamma within 1% of price: high = strong pinning")}
-    ${met("Gamma-weighted distance", s.gamma_weighted_distance == null ? "-" : num(s.gamma_weighted_distance * fac, 0) + " pts", "average distance of gamma from price")}
-    ${met("Distance to zero gamma", zg == null ? "-" : `${signed(ref - zg, 0)} pts`, sig == null ? "" : `${num(Math.abs(sig), 1)}σ ${sig >= 0 ? "above" : "below"}: ${Math.abs(sig) < 0.3 ? "at the flip" : Math.abs(sig) < 1 ? "near the flip" : "regime well set"}`)}
-    ${met("Hedge per 1% move", num(Math.abs(s.net / ctr), 0) + " " + market, s.net >= 0 ? "contracts dealers trade against a 1% move" : "contracts dealers trade with a 1% move")}
-  </div>`;
-}
-
-// ---------- volatility: term structure and skew
-function renderVol(){
-  const w = curW();
-  if(!w || !w.result) return;
-  const s = w.result.summary, L = w.result.mapped || s, rows = ((L.extras || {}).term || []).filter(r => r.atm_iv);
-  const tbl = $("termTable");
-  if(!rows.length){ tbl.innerHTML = `<div class="expl">No term-structure data.</div>`; $("termChart").innerHTML = ""; $("skewChart").innerHTML = ""; return; }
-  const lab = r => `${r.expiration.slice(5)}${r.settle !== "16:00" ? " AM" : ""}`;
-  // term chart: categorical x (each expiration), IV % on y
-  const draw = (svg, wrap, series, yfmt, zeroLine) => {
-    const W = Math.max(wrap.clientWidth, 320), H = 280, pl = 52, pr = 12, pt = 12, pb = 30, n = rows.length;
-    const vals = series.flatMap(sr => rows.map(sr.get)).filter(v => v != null);
-    let lo = Math.min(...vals), hi = Math.max(...vals); if(zeroLine){ lo = Math.min(0, lo); hi = Math.max(0, hi); }
-    const padv = (hi - lo) * 0.12 || 1; lo -= padv; hi += padv;
-    const x = i => pl + (n === 1 ? 0.5 : i / (n - 1)) * (W - pl - pr), y = v => pt + (hi - v) / (hi - lo) * (H - pt - pb);
-    let g = "";
-    for(let i = 0; i <= 4; i++){ const v = lo + (hi - lo) * i / 4; g += `<line x1="${pl}" x2="${W - pr}" y1="${y(v)}" y2="${y(v)}" stroke="rgba(var(--fg-rgb),.05)"/><text x="${pl - 8}" y="${y(v) + 4}" text-anchor="end">${yfmt(v)}</text>`; }
-    rows.forEach((r, i) => { if(n < 9 || i % Math.ceil(n / 8) === 0) g += `<text x="${x(i)}" y="${H - 9}" text-anchor="middle">${lab(r)}</text>`; });
-    if(zeroLine) g += `<line x1="${pl}" x2="${W - pr}" y1="${y(0)}" y2="${y(0)}" stroke="rgba(var(--fg-rgb),.2)"/>`;
-    series.forEach(sr => {
-      if(sr.bars){ const bw = Math.max(4, (W - pl - pr) / n * 0.55);
-        rows.forEach((r, i) => { const v = sr.get(r); if(v == null) return; g += `<rect x="${x(i) - bw / 2}" y="${Math.min(y(v), y(0))}" width="${bw}" height="${Math.abs(y(v) - y(0))}" rx="2" fill="${v >= 0 ? "var(--neg)" : "var(--pos)"}" fill-opacity=".85"/>`; });
-        return; }
-      const p = rows.map((r, i) => sr.get(r) == null ? null : `${x(i).toFixed(1)},${y(sr.get(r)).toFixed(1)}`).filter(Boolean);
-      g += `<polyline fill="none" stroke="${sr.col}" stroke-width="${sr.w || 1.8}" points="${p.join(" ")}"/>`;
-      rows.forEach((r, i) => { const v = sr.get(r); if(v != null) g += `<circle cx="${x(i)}" cy="${y(v)}" r="2.6" fill="${sr.col}"/>`; });
-    });
-    svg.setAttribute("width", W); svg.setAttribute("height", H); svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.innerHTML = g;
-    return {x, y, W};
-  };
-  const pc = v => v == null ? null : v * 100;
-  const geo = draw($("termChart"), $("termWrap"), [
-    {get: r => pc(r.put25_iv), col: "var(--neg)", w: 1.4}, {get: r => pc(r.call25_iv), col: "var(--pos)", w: 1.4}, {get: r => pc(r.atm_iv), col: "var(--ink)", w: 2.2}],
-    v => num(v, 0) + "%");
-  draw($("skewChart"), $("skewWrap"), [{get: r => r.skew_pts, bars: true}], v => num(v, 1), true);
-  const tip = $("termTip"), svg = $("termChart");
-  svg.onmousemove = e => {
-    const r = svg.getBoundingClientRect(), mx = e.clientX - r.left;
-    let i = 0; rows.forEach((_, k) => { if(Math.abs(geo.x(k) - mx) < Math.abs(geo.x(i) - mx)) i = k; });
-    const q = rows[i];
-    tip.innerHTML = `${esc(q.expiration)} · ${num(q.dte, 1)} days<br>ATM <b>${num(q.atm_iv * 100, 1)}%</b> · 25Δ put ${q.put25_iv ? num(q.put25_iv * 100, 1) + "%" : "-"} · 25Δ call ${q.call25_iv ? num(q.call25_iv * 100, 1) + "%" : "-"}`;
-    tip.style.opacity = 1; tip.style.left = Math.min(geo.x(i) + 12, geo.W - 260) + "px"; tip.style.top = "20px";
-  };
-  svg.onmouseleave = () => { tip.style.opacity = 0; };
-  // shape of the curve: front (1+ day) vs about a month out
-  const front = rows.find(r => r.dte >= 1) || rows[0], month = rows.reduce((b, r) => Math.abs(r.dte - 30) < Math.abs(b.dte - 30) ? r : b, rows[0]);
-  const slope = (month.atm_iv - front.atm_iv) * 100;
-  $("termSub").textContent = front === month ? "" : `${slope >= 0 ? "Upward sloping (normal, calm)" : "Inverted (near-term stress)"}: ${num(front.atm_iv * 100, 1)}% (${lab(front)}) → ${num(month.atm_iv * 100, 1)}% (${lab(month)})`;
-  const sk = rows.filter(r => r.skew_pts != null);
-  $("skewSub").textContent = sk.length ? `Average ${num(sk.reduce((a, r) => a + r.skew_pts, 0) / sk.length, 1)} vol pts: puts ${sk[0].skew_pts >= 0 ? "richer" : "cheaper"} than calls` : "";
-  const src = (s.options_source || w.source);
-  tbl.innerHTML = `<table><tr><th>Expiration</th><th>Days</th><th>ATM IV</th><th>25Δ put IV</th><th>Put strike (${esc(src)})</th><th>25Δ call IV</th><th>Call strike (${esc(src)})</th><th>Skew</th></tr>${rows.map(r =>
-    `<tr><td>${esc(r.expiration)} <span style="color:var(--ink3)">${esc(r.settle)}</span></td><td class="m">${num(r.dte, 1)}</td><td class="m">${num(r.atm_iv * 100, 1)}%</td>
-     <td class="m" style="color:var(--neg)">${r.put25_iv ? num(r.put25_iv * 100, 1) + "%" : "-"}</td><td class="m">${r.put25_strike ? num(r.put25_strike, 0) : "-"}</td>
-     <td class="m" style="color:var(--pos)">${r.call25_iv ? num(r.call25_iv * 100, 1) + "%" : "-"}</td><td class="m">${r.call25_strike ? num(r.call25_strike, 0) : "-"}</td>
-     <td class="m">${r.skew_pts == null ? "-" : signed(r.skew_pts, 1)}</td></tr>`).join("")}</table>`;
-}
-
-// ---------- timeline: zero gamma and walls over time
-let tl = null, tlHours = Number(store.get("gex.tlh", "72"));
-async function loadTimeline(){
-  try { tl = await (await fetch(STATIC ? API.timeline : API.timeline + "?hours=120", {cache:"no-store"})).json(); }
-  catch(e){ tl = tl || {}; }
-  renderTimeline();
-}
-function renderTimeline(){
-  $("tlRange").innerHTML = [[24, "1D"], [72, "3D"], [120, "5D"]].map(([h, t]) => `<button role="tab" aria-selected="${tlHours === h}" data-h="${h}">${t}</button>`).join("");
-  [...$("tlRange").children].forEach(b => b.onclick = () => { tlHours = Number(b.dataset.h); store.set("gex.tlh", String(tlHours)); renderTimeline(); });
-  const all = (tl || {})[market] || [], cut = Date.now() - tlHours * 3600e3;
-  const rows = all.filter(r => Date.parse(r.t) >= cut && r.ref);
-  const svg = $("tlChart"), net = $("tlNet");
-  if(rows.length < 2){
-    svg.innerHTML = `<text x="16" y="30">History builds up as the app runs (one point per refresh). ${rows.length} point${rows.length === 1 ? "" : "s"} so far.</text>`;
-    svg.setAttribute("width", Math.max($("tlWrap").clientWidth, 320)); svg.setAttribute("height", 60); svg.removeAttribute("viewBox");
-    net.innerHTML = ""; net.setAttribute("height", 0); return;
-  }
-  const W = Math.max($("tlWrap").clientWidth, 320), H = 380, pl = 66, pr = 14, pt = 12, pb = 28;
-  const t0 = Date.parse(rows[0].t), t1 = Date.parse(rows.at(-1).t);
-  const vals = rows.flatMap(r => [r.ref, r.zg, r.cw, r.pw]).filter(v => v != null);
-  let lo = Math.min(...vals), hi = Math.max(...vals); const pad = (hi - lo) * 0.06 || 10; lo -= pad; hi += pad;
-  const x = t => pl + (t - t0) / Math.max(1, t1 - t0) * (W - pl - pr), y = v => pt + (hi - v) / (hi - lo) * (H - pt - pb);
-  let g = "";
-  // negative-gamma periods shaded
-  rows.forEach((r, i) => { if(r.regime === "NEGATIVE" && i < rows.length - 1){ const a = x(Date.parse(r.t)), b = x(Date.parse(rows[i + 1].t)); if(b - a < (W - pl) / 6) g += `<rect x="${a}" y="${pt}" width="${b - a + 0.5}" height="${H - pt - pb}" fill="rgba(217,89,38,.08)"/>`; } });
-  for(let i = 0; i <= 5; i++){ const v = lo + (hi - lo) * i / 5; g += `<line x1="${pl}" x2="${W - pr}" y1="${y(v)}" y2="${y(v)}" stroke="rgba(var(--fg-rgb),.05)"/><text x="${pl - 8}" y="${y(v) + 4}" text-anchor="end">${num(v, 0)}</text>`; }
-  for(let i = 0; i <= 4; i++){ const t = t0 + (t1 - t0) * i / 4; g += `<text x="${x(t)}" y="${H - 8}" text-anchor="middle">${new Date(t).toLocaleString("en-US", {...ET, weekday:"short", hour:"numeric"})}</text>`; }
-  const line = (k, col, w, dash) => {
-    const p = rows.filter(r => r[k] != null).map(r => `${x(Date.parse(r.t)).toFixed(1)},${y(r[k]).toFixed(1)}`);
-    return p.length ? `<polyline fill="none" stroke="${col}" stroke-width="${w}" ${dash ? `stroke-dasharray="${dash}"` : ""} stroke-linejoin="round" points="${p.join(" ")}"/>` : "";
-  };
-  g += line("cw", "var(--pos)", 1.4, "") + line("pw", "var(--neg)", 1.4, "") + line("zg", "var(--zg)", 1.6, "5 3") + line("ref", "var(--ink)", 2, "");
-  svg.setAttribute("width", W); svg.setAttribute("height", H); svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.innerHTML = g;
-  const tip = $("tlTip");
-  svg.onmousemove = e => {
-    const r = svg.getBoundingClientRect(), tt = t0 + (e.clientX - r.left - pl) / (W - pl - pr) * (t1 - t0);
-    const q = rows.reduce((b, c) => Math.abs(Date.parse(c.t) - tt) < Math.abs(Date.parse(b.t) - tt) ? c : b, rows[0]);
-    tip.innerHTML = `${new Date(q.t).toLocaleString("en-US", {...ET, weekday:"short", hour:"numeric", minute:"2-digit"})} ET<br>Price <b>${num(q.ref)}</b> · ZG ${num(q.zg, 0)}<br><span style="color:var(--pos)">CW ${num(q.cw, 0)}</span> · <span style="color:var(--neg)">PW ${num(q.pw, 0)}</span> · ${esc((q.regime || "").toLowerCase())}`;
-    tip.style.opacity = 1; tip.style.left = Math.min(x(Date.parse(q.t)) + 12, W - 220) + "px"; tip.style.top = "16px";
-  };
-  svg.onmouseleave = () => { tip.style.opacity = 0; };
-  // net GEX
-  const NW = Math.max($("tlNetWrap").clientWidth, 320), NH = 160, nmx = Math.max(1, ...rows.map(r => Math.abs(r.net || 0)));
-  const nx = t => pl + (t - t0) / Math.max(1, t1 - t0) * (NW - pl - pr), ny = v => 10 + (nmx - v) / (2 * nmx) * (NH - 30);
-  let h = `<line x1="${pl}" x2="${NW - pr}" y1="${ny(0)}" y2="${ny(0)}" stroke="rgba(var(--fg-rgb),.2)"/><text x="${pl - 8}" y="${ny(nmx) + 8}" text-anchor="end">${money(nmx)}</text><text x="${pl - 8}" y="${ny(-nmx)}" text-anchor="end">${money(-nmx)}</text>`;
-  const bw = Math.max(1, (NW - pl - pr) / rows.length - 0.5);
-  rows.forEach(r => { const v = r.net || 0; h += `<rect x="${nx(Date.parse(r.t)) - bw / 2}" y="${Math.min(ny(v), ny(0))}" width="${bw}" height="${Math.abs(ny(v) - ny(0))}" fill="${v >= 0 ? "var(--pos)" : "var(--neg)"}" fill-opacity=".8"/>`; });
-  net.setAttribute("width", NW); net.setAttribute("height", NH); net.setAttribute("viewBox", `0 0 ${NW} ${NH}`); net.innerHTML = h;
-}
+function setMarket(m){ market = m; store.set("gex.market", m); render(); }
 
 // ---------- explain drawer: plain-English help for every module
 const HELP = {
@@ -785,23 +602,6 @@ const HELP = {
     body: `<p>For each expiration, the settlement price that makes the most options expire worthless. Some traders watch for a drift toward it into expiry, especially for 0DTE. It's a statistic, not a target: strong trends ignore it.</p>`},
   by_expiry: {title: "Gamma by expiration", tldr: "Which expirations hold the gamma.",
     body: `<p>A big share in today's or this week's expirations means the levels are driven by short-dated options and can shift quickly, often around the open, after data releases and into the close.</p>`},
-  gamma_curve: {title: "Gamma curve", tldr: "How dealer gamma would change if price moved, the clearest picture of the flip.",
-    body: `<p>The engine re-prices every option at hypothetical prices (±5%) and sums dealer gamma at each. Where the curve is <b>above zero (blue)</b>, hedging calms moves; <b>below (orange)</b>, it amplifies them.</p><p>The <b>flip zone</b> is the band around zero gamma where gamma is near zero: the market there has little hedging support either way, so expect choppy, two-sided trade until it picks a side.</p><p>The shaded grey band is today's <b>1σ expected move</b>: the part of the curve price is likely to visit.</p>`,
-    watch: ["A steep curve near price = regime can change fast", "Price inside the flip zone = no strong hedging bias"]},
-  dte_buckets: {title: "Gamma by time to expiry", tldr: "Splits gamma into same-day, this-week, this-month and longer options.",
-    body: `<p><b>0DTE</b> gamma is huge but short-lived: it controls intraday swings and disappears at 4 pm. <b>2-7 day</b> gamma shapes the week. <b>8-30 day</b> and longer gamma is the slower structural backdrop.</p><p>If 0DTE dominates, expect sharp intraday reactions at levels; if longer-dated gamma dominates, levels are sturdier day to day.</p>`},
-  positioning: {title: "Positioning metrics", tldr: "The shape of dealer positioning in eight numbers.",
-    body: `<p><b>Call vs put gamma</b>: the two sides of the book. <b>Call share</b> above 50% leans calm. <b>Gross gamma</b> is total hedging firepower. <b>Near-price concentration</b>: how much gamma sits within 1% of price (high = pinning). <b>Gamma-weighted distance</b>: how far, on average, the gamma sits from price. <b>Distance to zero gamma</b> in points and expected moves.</p>`},
-  term: {title: "IV term structure", tldr: "The market's volatility forecast for each expiration.",
-    body: `<p>Each point is the implied volatility of options expiring on that date. Normally the curve <b>slopes up</b> (more uncertainty further out): calm market. When near-term IV is <b>above</b> longer-term IV, the curve is <b>inverted</b>: the market is paying up for protection right now, a stress signal that pairs badly with negative gamma.</p><p>Bumps on single dates usually mark scheduled events (CPI, Fed, big earnings). The red and blue lines are the 25-delta put and call IVs: the gap between them is the skew.</p>`},
-  skew: {title: "Put skew", tldr: "How much more downside protection costs than upside.",
-    body: `<p>Skew = 25-delta put IV minus 25-delta call IV, in volatility points. Index options almost always have positive skew (puts richer). <b>Rising skew</b> = traders are buying crash protection; <b>falling or flat skew</b> = complacency or a squeeze higher.</p>`},
-  term_table: {title: "By expiration", tldr: "The numbers behind the volatility charts.",
-    body: `<p>For every expiration: days left, at-the-money IV, and the strike and IV of the roughly 25-delta put and call (strikes in index points). Skew is put IV minus call IV.</p>`},
-  timeline: {title: "Levels over time", tldr: "How zero gamma and the walls moved, refresh by refresh.",
-    body: `<p>Each point is one refresh of the model. Walls that <b>hold still</b> for days are sturdier; walls that <b>migrate</b> with price follow new positioning. Zero gamma rising toward price is a sign the market is moving into positive gamma (calmer); falling away below it is the opposite.</p><p>Orange shading marks periods of negative gamma.</p>`},
-  timeline_net: {title: "Net GEX over time", tldr: "Whether total dealer gamma is building or draining.",
-    body: `<p>Bars above zero are positive-gamma periods, below zero negative. A steady slide toward negative often precedes larger moves; a jump back to positive often follows a volatility event as positions reset.</p>`},
   bias: {title: "Daily bias", tldr: "A transparent, rule-based read of direction and day type.",
     body: `<p>Adds up a few positioning factors (magnet strike, charm flow, walls, vanna, 0DTE max pain) into a score. The gamma side decides the <b>day type</b> (range, trend or pivot), not the direction. It's a starting scenario, not a forecast.</p>`},
   base_case: {title: "Base case", tldr: "Where the factors point by the close if nothing else intervenes.",
@@ -836,7 +636,7 @@ const HELP = {
     body: `<p>Bars count sessions by how many expected moves (σ) the close moved. The grey curve is a normal distribution, the shape the band assumes.</p><p>Real markets have a taller middle (most days are quieter than implied) and fatter tails (the big days are bigger than a normal curve allows). That's why a band can hold most days and still be blown through on a few.</p>`},
   backtest_vol: {title: "By volatility level", tldr: "Does the band hold better in calm or stressed markets?",
     body: `<p>Sessions split into five equal groups by the vol index the evening before. Compare the close-inside rate and the breaks across the groups to see when the band is most and least reliable.</p>`},
-  ladder: {title: "GEX live table", tldr: "Gamma, delta, open interest and volume at every strike near price, for the expirations you pick.",
+  livetable: {title: "GEX live table", tldr: "Gamma, delta, open interest and volume at every strike near price, for the expirations you pick.",
     body: `<p>Each row is a price band (strikes grouped every few points) in futures prices. <b>Net GEX</b> is the dealer gamma there, in $ per 1% move: right and blue = positive (hedging calms moves), left and orange = negative (hedging adds to moves). <b>Net DEX</b> is the dealers' dollar delta at that strike, <b>Net OI</b> is call minus put open interest, and <b>Net volume</b> is call minus put contracts traded today.</p><p>The highlighted row is price; the amber underline is zero gamma. Chips on the left mark the levels (C1, P1, Ab1, ZG, walls, expected move). Hover a row for its numbers.</p>`,
     watch: ["Big orange bars just below price = support that can break fast", "Pick only today's expiration to see the 0DTE map"]},
   ladder_strip: {title: "Expirations", tldr: "Pick which expirations the table adds up.",
@@ -850,7 +650,7 @@ const HELP = {
   paste: {title: "The hourly paste", tldr: "One text block that carries all levels to TradingView.",
     body: `<p>Published every hour on the hour (ET). One paste holds NQ and ES; each chart draws only its own market. The indicator marks levels stale after 90 minutes.</p>`},
 };
-const PAGE_HELP = {levels: "regime", ladder: "ladder", gamma: "gamma_curve", vol: "term", timeline: "timeline", bias: "bias", briefings: "briefings", news: "calendar", indicator: "indicator", library: "library", track: "track"};
+const PAGE_HELP = {levels: "regime", ladder: "livetable", bias: "bias", briefings: "briefings", news: "calendar", indicator: "indicator", library: "library", track: "track"};
 let exKey = null;
 function openExplain(key){
   const h = HELP[key]; if(!h) return;
@@ -904,7 +704,7 @@ const COMMANDS = [
   {code: "COPYES", desc: "Copy the ES paste only", run: () => copyFrom(pineUrl("ES"), "the scheduled update for ES")},
   {code: "CODE", desc: "Copy the indicator's source code", run: async () => { if(!ind) await loadIndicator(); copyCode(); }},
   {code: "EXPLAIN", desc: "Explain this page", run: () => openExplain(PAGE_HELP[page] || "regime")},
-  {code: "REFRESH", desc: "Reload all data now", run: () => { load(); loadNews(); loadPosts(); if(page === "timeline") loadTimeline(); toast("Refreshing data..."); }},
+  {code: "REFRESH", desc: "Reload all data now", run: () => { load(); loadNews(); loadPosts(); toast("Refreshing data..."); }},
   {code: "HELP", desc: "Keyboard shortcuts", run: () => showKeys(true)},
   {code: "LIGHT", desc: "Light mode", run: () => setTheme("light")}, {code: "DARK", desc: "Dark (night) mode", run: () => setTheme("dark")},
   {code: "LEARN", desc: "Start the beginner course", run: () => openLesson(LIB.lessons[0].id)},
@@ -933,7 +733,7 @@ $("cmd").addEventListener("keydown", e => {
 });
 
 // ---------- keyboard
-const KEYS = [["/  or  Ctrl+K", "Command line"], ["1 - 9, 0", "Pages (Levels, Live table, Gamma lab, Volatility, Timeline, Bias, Track record, Briefings, News, Indicator); type LIB for the Library"],
+const KEYS = [["/  or  Ctrl+K", "Command line"], ["1 - 8", "Pages (Levels, Live table, Bias, Track record, Briefings, News, Indicator, Library)"],
   ["N  /  E", "Switch to NQ / ES"], ["X", "Explain this page"], ["T", "Light / dark mode"], ["C", "Copy the TradingView paste"], ["?", "This list"], ["Esc", "Close panels"]];
 function showKeys(on){ $("keys").hidden = !on; if(on) $("keysGrid").innerHTML = KEYS.map(([k, d]) => `<kbd>${esc(k)}</kbd><span>${esc(d)}</span>`).join(""); }
 $("keysBtn").onclick = () => showKeys(true);
@@ -1262,6 +1062,5 @@ setInterval(loadNews, 10 * 60 * 1000);                      // the service itsel
 setInterval(() => { if(page === "news") renderNews(); }, 60000);   // keep countdowns current
 setInterval(() => { if(page === "briefings") loadBriefings(); }, STATIC ? 5 * 60 * 1000 : 60000);
 setInterval(() => { if(page === "indicator") loadIndicator(); }, STATIC ? 5 * 60 * 1000 : 15000);   // pick up code edits
-window.addEventListener("resize", () => { if(data) render(); if(page === "timeline") renderTimeline(); if(page === "track") renderTrack(); });
+window.addEventListener("resize", () => { if(data) render(); if(page === "track") renderTrack(); });
 setInterval(() => { if(page === "track") loadTrack(); }, 5 * 60 * 1000);
-setInterval(() => { if(page === "timeline") loadTimeline(); }, STATIC ? 5 * 60 * 1000 : 60000);

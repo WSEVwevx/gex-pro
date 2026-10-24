@@ -69,7 +69,7 @@ The Library's lessons, glossary and diagrams are content only, in `dashboard/ass
    and a `"flows": set()` row in `tests/test_architecture.py`, plus `"flows*"` in `pyproject.toml`.
 4. Add its page: a sidebar button and a view `<div>` (with `data-help` on each module) in `dashboard/index.html`,
    an `API` entry, a `PAGES` row, a `HELP` entry and a
-   load/render function in `dashboard/assets/app.js`. Copy the Volatility or Timeline page as a template.
+   load/render function in `dashboard/assets/app.js`. Copy the Live table or Track record page as a template.
 5. Add `tests/test_flows_*.py` with the network replaced by canned responses.
 
 ## Commands

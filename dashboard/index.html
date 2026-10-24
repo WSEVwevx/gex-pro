@@ -37,9 +37,6 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
     <div class="side-label">Market</div>
     <button role="tab" data-p="levels" aria-selected="true"><svg viewBox="0 0 20 20"><path d="M3 5h14M3 10h9M3 15h12"/></svg><span>Levels</span><kbd>LVL</kbd></button>
     <button role="tab" data-p="ladder" aria-selected="false"><svg viewBox="0 0 20 20"><path d="M3 4h14M3 8h14M3 12h14M3 16h14"/><path d="M10 2v16" opacity=".45"/></svg><span>Live table</span><kbd>LIVE</kbd></button>
-    <button role="tab" data-p="gamma" aria-selected="false"><svg viewBox="0 0 20 20"><path d="M2 14c3 0 4-8 8-8s5 8 8 8"/><path d="M2 10h16" opacity=".4"/></svg><span>Gamma lab</span><kbd>GEX</kbd></button>
-    <button role="tab" data-p="vol" aria-selected="false"><svg viewBox="0 0 20 20"><path d="M2 15l4-6 4 3 4-7 4 4"/></svg><span>Volatility</span><kbd>VOL</kbd></button>
-    <button role="tab" data-p="timeline" aria-selected="false"><svg viewBox="0 0 20 20"><path d="M3 16V4M3 16h14"/><path d="M6 12l3-3 3 2 4-5"/></svg><span>Timeline</span><kbd>TL</kbd></button>
     <div class="side-label">Insight</div>
     <button role="tab" data-p="bias" aria-selected="false"><svg viewBox="0 0 20 20"><path d="M10 3v14M5 8l5-5 5 5"/></svg><span>Bias</span><kbd>BIAS</kbd></button>
     <button role="tab" data-p="track" aria-selected="false"><svg viewBox="0 0 20 20"><path d="M3 16h14M5 16V9M9 16V5M13 16v-5M17 16V7"/></svg><span>Track record</span><kbd>TRK</kbd></button>
@@ -89,33 +86,6 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
       <p class="foot" id="foot"></p>
     </div>
 
-    <!-- GAMMA LAB -->
-    <div id="gammaView" hidden>
-      <section class="card" data-help="gamma_curve">
-        <div class="head"><h2>Gamma curve</h2><span class="sub" id="curveSub"></span></div>
-        <div class="chartwrap" id="curveWrap"><svg id="curve" role="img" aria-label="Net dealer gamma as price moves"></svg><div class="tip" id="curveTip"></div></div>
-        <div class="legend"><span><i class="sw" style="background:var(--pos)"></i>Positive gamma (calming)</span><span><i class="sw" style="background:var(--neg)"></i>Negative gamma (amplifying)</span><span><i class="sw" style="background:rgba(185,190,199,.22);height:10px"></i>Flip zone</span><span><i class="sw" style="background:var(--ink);height:2px"></i>Price now</span><span><i class="sw" style="background:var(--em);height:2px"></i>1σ expected move</span></div>
-      </section>
-      <div class="grid2">
-        <section class="card" data-help="dte_buckets"><div class="head"><h2>Gamma by time to expiry</h2></div><div id="dteBars"></div></section>
-        <section class="card" data-help="positioning"><div class="head"><h2>Positioning metrics</h2></div><div id="posMetrics"></div></section>
-      </div>
-    </div>
-
-    <!-- VOLATILITY -->
-    <div id="volView" hidden>
-      <div class="grid2">
-        <section class="card" data-help="term"><div class="head"><h2>Implied volatility term structure</h2><span class="sub" id="termSub"></span></div>
-          <div class="chartwrap" id="termWrap"><svg id="termChart" role="img" aria-label="IV by expiration"></svg><div class="tip" id="termTip"></div></div>
-          <div class="legend"><span><i class="sw" style="background:var(--ink);height:2px"></i>ATM IV</span><span><i class="sw" style="background:var(--neg);height:2px"></i>25Δ put IV</span><span><i class="sw" style="background:var(--pos);height:2px"></i>25Δ call IV</span></div>
-        </section>
-        <section class="card" data-help="skew"><div class="head"><h2>Put skew by expiration</h2><span class="sub" id="skewSub"></span></div>
-          <div class="chartwrap" id="skewWrap"><svg id="skewChart" role="img" aria-label="Put minus call IV by expiration"></svg></div>
-        </section>
-      </div>
-      <section class="card" data-help="term_table" style="margin-top:14px"><div class="head"><h2>By expiration</h2></div><div id="termTable"></div></section>
-    </div>
-
     <!-- LIVE TABLE -->
     <div id="ladderView" hidden>
       <section class="card ld-strip-card" data-help="ladder_strip">
@@ -124,7 +94,7 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
         <div class="ld-strip" id="ldStrip"></div>
       </section>
       <div class="ld-wrap">
-        <section class="card ld-table-card" data-help="ladder">
+        <section class="card ld-table-card" data-help="livetable">
           <div class="head"><h2>GEX live table</h2><span class="sub" id="ldSub"></span><span class="spacer"></span>
             <div class="filters" id="ldZoom" role="tablist" aria-label="Rows"></div></div>
           <div class="ld-head"><span>Levels</span><span>Net DEX</span><span>Net GEX</span><span>Net OI</span><span class="ld-k">Strike</span><span>Net volume</span></div>
@@ -138,19 +108,6 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
           <section class="card" data-help="ladder_activity"><div class="head"><h2>Chain activity</h2></div><div id="ldActivity"></div></section>
         </aside>
       </div>
-    </div>
-
-    <!-- TIMELINE -->
-    <div id="timelineView" hidden>
-      <section class="card" data-help="timeline">
-        <div class="head"><h2>Zero gamma and walls over time</h2><span class="spacer"></span>
-          <div class="filters" id="tlRange" role="tablist" aria-label="Range"></div></div>
-        <div class="chartwrap" id="tlWrap"><svg id="tlChart" role="img" aria-label="Price, zero gamma and walls over time"></svg><div class="tip" id="tlTip"></div></div>
-        <div class="legend"><span><i class="sw" style="background:var(--ink);height:2px"></i>Price</span><span><i class="sw" style="background:var(--zg);height:2px"></i>Zero gamma</span><span><i class="sw" style="background:var(--pos);height:2px"></i>Call wall</span><span><i class="sw" style="background:var(--neg);height:2px"></i>Put wall</span><span><i class="sw" style="background:rgba(217,89,38,.16);height:10px"></i>Negative-gamma periods</span></div>
-      </section>
-      <section class="card" data-help="timeline_net" style="margin-top:14px"><div class="head"><h2>Net GEX over time</h2></div>
-        <div class="chartwrap" id="tlNetWrap"><svg id="tlNet" role="img" aria-label="Net gamma exposure over time"></svg></div>
-      </section>
     </div>
 
     <!-- BIAS -->

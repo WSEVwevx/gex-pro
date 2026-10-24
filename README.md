@@ -114,12 +114,6 @@ your browser, and the first visit follows your system setting.
 * **Library:** a beginner course in 19 short lessons (options basics, dealers and the Greeks, GEX levels,
   volatility, using GEX PRO), each with an example, diagrams, a link into the terminal and a quick check;
   an A-Z glossary; search; progress saved in your browser. Every Explain panel links to its lesson.
-* **Gamma lab:** the gamma curve (net dealer gamma if price moved ±5%) with the flip zone and the 1σ band,
-  gamma by time to expiry (0DTE, week, month, longer), and eight positioning metrics.
-* **Volatility:** IV term structure (ATM, 25-delta put and call) with its slope, put skew by expiration, and
-  the table behind them.
-* **Timeline:** price, zero gamma and both walls over the last 1-5 days (one point per refresh), with
-  negative-gamma periods shaded, and net GEX over time.
 * **Levels:**
   - regime, price and net-GEX cards;
   - market stats: put/call OI and volume, ATM IV, nearest-expiration share, changes since the last update;
