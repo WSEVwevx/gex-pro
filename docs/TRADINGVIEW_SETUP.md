@@ -56,8 +56,10 @@ The dialog's separate Style tab has nothing to change.
 
 ### On the chart
 
-* **Lines** start at the session open by default and extend right. Key levels and max pain are 2 px,
-  others 1 px.
+* **Lines** run across the chart's history and end at the current bar by default ("Across the chart,
+  end at price"), with the level's price in small text at the line's end; nothing is drawn over the
+  space right of price except the tags. Other choices: from the session open, the full chart, or right
+  of price only. Key levels and max pain are 2 px, others 1 px. The GEX profile is off by default.
 * **Tags + hover info** (the default label style): each level gets a short tag right of price with a
   strength bar, e.g. `▬▬▬▬▬▬ P1`. Ranked walls: `C1`-`C3` (most positive net GEX), `P1`-`P5` (most
   negative net GEX), `Ab1`-`Ab3` (most total gamma); the bar's length is the level's share of all gamma,

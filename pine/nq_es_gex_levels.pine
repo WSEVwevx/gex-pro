@@ -74,7 +74,8 @@ wEM = 1
 
 // ---------- 4 - Lines & labels (shared by every level)
 G4 = "4 - Lines & labels"
-extent   = input.string("From session open", "Lines start", options = ["From session open", "Full chart", "Right of price"], group = G4)
+extent   = input.string("Across the chart, end at price", "Lines", options = ["Across the chart, end at price", "From session open", "Full chart", "Right of price"], group = G4,
+     tooltip = "Across the chart, end at price: each level runs across the chart's history and stops at the current bar, so nothing is drawn over the space right of price except the tags.")
 lblMode  = input.string("Tags + hover info", "Labels", options = ["Tags + hover info", "Short", "Full", "Off"], inline = "lb", group = G4,
      tooltip = "Tags + hover info: a short tag right of price (C1, P1, Ab1, ZG...) with a strength bar; hover the tag for that level's analysis.\nShort: ZG, CW, PW, +GEX, -GEX, 0D ZG, VOL C, MP 10-21, EM day +...\nFull: Zero gamma, Call wall, ...")
 lblSize  = input.string("Small", "", options = ["Tiny", "Small", "Normal"], inline = "lb", group = G4)
@@ -88,7 +89,7 @@ regimeBg = input.bool(false, "Tint today's session by gamma side", group = G4,
 
 // ---------- 5 - GEX profile
 G5 = "5 - GEX profile"
-showProf   = input.bool(true, "Show profile", inline = "pf", group = G5,
+showProf   = input.bool(false, "Show profile", inline = "pf", group = G5,
      tooltip = "Gamma exposure by price, drawn right of the last bar. Blue extends right (positive), orange extends left (negative).")
 profSrc    = input.string("First source", "", options = ["First source", "Second source"], inline = "pf", group = G5)
 profWidth  = input.int(40, "Width", minval = 10, maxval = 200, inline = "pw", group = G5)
@@ -414,11 +415,12 @@ drawLevel(float p, string name, string tag, color col, int width, string style, 
                     if not na(strength)
                         array.set(tgStr, idx, math.max(nz(array.get(tgStr, idx)), strength))
         else
-            int t1 = extent == "Right of price" ? time : extent == "Full chart" ? time - 1 : math.min(sessStartTime, time - 1)
+            bool toPrice = extent == "Across the chart, end at price"
+            int t1 = extent == "Right of price" ? time : extent == "Full chart" or toPrice ? time - 1 : math.min(sessStartTime, time - 1)
             int t2 = extent == "Right of price" ? time + 1 : time      // t2 > t1 gives the line a direction to extend
             array.push(gPrices, p)
             array.push(gBodies, item)
-            array.push(gLines, line.new(t1, p, t2, p, xloc = xloc.bar_time, extend = extent == "Full chart" ? extend.both : extend.right,
+            array.push(gLines, line.new(t1, p, t2, p, xloc = xloc.bar_time, extend = extent == "Full chart" ? extend.both : toPrice ? extend.left : extend.right,
                  color = col, width = width, style = style))
             array.push(gLabels, lblMode != "Off" and not tagMode ? label.new(bar_index + lblX, p, item + "  " + fmtPx(p), style = label.style_label_left,
                  color = lblBgCol, textcolor = col, size = lSz, textalign = text.align_left) : label(na))
@@ -586,6 +588,9 @@ renderTags() =>
              + (nConf > 0 ? "\n\nConfluence (" + str.tostring(nConf + 1) + " levels within " + str.tostring(confPct, "0.00") + "%): " + conf + ". Stacked levels make a stronger reaction zone." : "")
              + "\n\nZone: " + zoneTxt(p)
              + (ctx != "" ? "\n\n" + ctx : "")
+        if extent == "Across the chart, end at price"            // the price at the line's end, like a price-scale mark
+            array.push(gLabels, label.new(bar_index, p, fmtPx(p), style = label.style_label_right, color = color.new(#0b0e13, 100),
+                 textcolor = color.new(array.get(tgCol, i), 25), size = size.tiny, textalign = text.align_right, tooltip = tip))
         float st = array.get(tgStr, i)
         int nBars = na(st) ? 1 : math.max(1, math.round(st * 8))
         array.push(gLabels, label.new(bar_index + lblX, p, str.repeat("▬", nBars) + " " + array.get(tgName, i) + (nConf > 0 ? " ●" : ""),
