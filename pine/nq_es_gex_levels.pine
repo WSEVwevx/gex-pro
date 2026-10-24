@@ -77,7 +77,7 @@ G4 = "4 - Lines & labels"
 extent   = input.string("Across the chart, end at price", "Lines", options = ["Across the chart, end at price", "From session open", "Full chart", "Right of price"], group = G4,
      tooltip = "Across the chart, end at price: each level runs across the chart's history and stops at the current bar, so nothing is drawn over the space right of price except the tags.")
 lblMode  = input.string("Tags + hover info", "Labels", options = ["Tags + hover info", "Short", "Full", "Off"], inline = "lb", group = G4,
-     tooltip = "Tags + hover info: a short tag right of price (C1, P1, Ab1, ZG...) with a strength bar; hover the tag for that level's analysis.\nShort: ZG, CW, PW, +GEX, -GEX, 0D ZG, VOL C, MP 10-21, EM day +...\nFull: Zero gamma, Call wall, ...")
+     tooltip = "Tags + hover info: a short tag right of price (C1, P1, Ab1, ZG...) with a strength bar; hover the tag for that level's analysis.\nShort: ZG, CW, PW, +GEX, -GEX, 0D ZG, VOL C, MP 10-21, EM+...\nFull: Zero gamma, Call wall, ...")
 lblSize  = input.string("Small", "", options = ["Tiny", "Small", "Normal"], inline = "lb", group = G4)
 lblBg    = input.bool(true, "Label background", inline = "lb2", group = G4)
 lblOff   = input.int(6, "offset (bars)", minval = 0, maxval = 200, inline = "lb2", group = G4, tooltip = "Used when the GEX profile is off; with the profile on, labels sit just right of it.")
