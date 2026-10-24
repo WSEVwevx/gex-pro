@@ -43,6 +43,7 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
     <button role="tab" data-p="levels" aria-selected="true"><svg viewBox="0 0 20 20"><path d="M3 5h14M3 10h9M3 15h12"/></svg><span>Levels</span><kbd>LVL</kbd></button>
     <button role="tab" data-p="ladder" aria-selected="false"><svg viewBox="0 0 20 20"><path d="M3 4h14M3 8h14M3 12h14M3 16h14"/><path d="M10 2v16" opacity=".45"/></svg><span>Live table</span><kbd>LIVE</kbd></button>
     <button role="tab" data-p="heatmap" aria-selected="false"><svg viewBox="0 0 20 20"><path d="M3 4h4v4H3zM8 4h4v4H8zM13 4h4v4h-4zM3 9h4v4H3zM8 9h4v4H8zM13 9h4v4h-4zM3 14h4v3H3zM8 14h4v3H8zM13 14h4v3h-4z"/></svg><span>Heatmap</span><kbd>HEAT</kbd></button>
+    <button role="tab" data-p="screener" aria-selected="false"><svg viewBox="0 0 20 20"><path d="M3 4h14l-5 6v6l-4-2v-4z"/></svg><span>Screener</span><kbd>SCRN</kbd></button>
     <div class="side-label">Insight</div>
     <button role="tab" data-p="bias" aria-selected="false"><svg viewBox="0 0 20 20"><path d="M10 3v14M5 8l5-5 5 5"/></svg><span>Bias</span><kbd>BIAS</kbd></button>
     <button role="tab" data-p="track" aria-selected="false"><svg viewBox="0 0 20 20"><path d="M3 16h14M5 16V9M9 16V5M13 16v-5M17 16V7"/></svg><span>Track record</span><kbd>TRK</kbd></button>
@@ -104,6 +105,22 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
         <div class="legend"><span><i class="sw" style="background:var(--pos)"></i>positive gamma (hedging calms moves)</span><span><i class="sw" style="background:var(--neg)"></i>negative gamma (hedging adds to moves)</span>
           <span><i class="sw" style="background:var(--zg);height:2px"></i>zero gamma</span><span><i class="sw" style="background:var(--pos);height:2px"></i>call wall</span><span><i class="sw" style="background:var(--neg);height:2px"></i>put wall</span>
           <span class="hm-note" id="hmNote"></span></div>
+      </section>
+    </div>
+
+    <!-- SCREENER -->
+    <div id="screenerView" hidden>
+      <section class="card scr-card" data-help="screener">
+        <div class="head"><h2>Stock screener</h2><span class="sub" id="scrSub"></span></div>
+        <div class="filters scr-tabs" id="scrTabs" role="tablist" aria-label="Screen"></div>
+        <div class="scr-tools">
+          <input id="scrQ" class="lib-search" type="search" placeholder="Filter by symbol or name..." aria-label="Filter stocks">
+          <label class="hm-ctl">Price over <select id="scrPrice"><option value="0">Any</option><option value="1">$1</option><option value="5">$5</option><option value="10">$10</option><option value="50">$50</option></select></label>
+          <label class="hm-ctl">Market cap <select id="scrCap"><option value="0">Any</option><option value="3e8">Over $300M</option><option value="2e9">Over $2B</option><option value="1e10">Over $10B</option><option value="2e11">Over $200B</option></select></label>
+          <label class="hm-ctl">Rel volume <select id="scrRv"><option value="0">Any</option><option value="1.5">1.5× +</option><option value="2">2× +</option><option value="3">3× +</option></select></label>
+        </div>
+        <div class="scr-wrap"><table class="scr-table"><thead><tr id="scrHead"></tr></thead><tbody id="scrRows"><tr><td colspan="10"><div class="skeleton">Loading screens...</div></td></tr></tbody></table></div>
+        <div class="expl">US stocks from Yahoo Finance's free screens, exchange data delayed about 15 minutes. Rel vol = today's volume vs the 3-month average. Click a column to sort, a symbol to open its chart on TradingView. Not trading advice.</div>
       </section>
     </div>
 

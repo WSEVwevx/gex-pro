@@ -394,6 +394,24 @@ td.m{font-family:var(--mono)}
 .mq-i.stale{opacity:.5}
 @media(prefers-reduced-motion:reduce){.mq-track{animation:none}.mq{overflow-x:auto}}
 
+/* ---------------------------------------------------------------- stock screener */
+.scr-tabs{display:inline-flex;margin-bottom:10px}
+.scr-tools{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;margin-bottom:10px}
+.scr-tools .lib-search{flex:1 1 220px;max-width:320px;padding:6px 10px}
+.scr-tools select{background:var(--page);border:1px solid var(--line2);border-radius:3px;color:var(--ink);font:inherit;font-size:12px;padding:3px 6px}
+.scr-wrap{overflow:auto;max-height:calc(100vh - 300px);min-height:300px;border:1px solid var(--line);border-radius:3px}
+.scr-table{min-width:900px}
+.scr-table th{position:sticky;top:0;background:var(--panel);cursor:pointer;user-select:none;white-space:nowrap;z-index:1}
+.scr-table th:hover,.scr-table th.on{color:var(--ink)}
+.scr-table td{white-space:nowrap}
+.scr-table tbody tr:hover td{background:rgba(var(--fg-rgb),.03)}
+.scr-table td.good{color:var(--good)}.scr-table td.bad{color:var(--bad)}.scr-table td.hot{color:var(--prompt);font-weight:650}
+.scr-sym{font:700 12.5px var(--mono);color:var(--ink);text-decoration:none;margin-right:8px}
+.scr-sym:hover{text-decoration:underline}
+.scr-name{color:var(--ink3);font-size:11.5px;display:inline-block;max-width:190px;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}
+.scr-rng{position:relative;display:inline-block;width:90px;height:4px;border-radius:2px;background:rgba(var(--fg-rgb),.12);vertical-align:middle}
+.scr-rng i{position:absolute;top:-3px;width:2px;height:10px;margin-left:-1px;background:var(--ink)}
+
 /* ---------------------------------------------------------------- GEX heatmap */
 .hm-card .head{flex-wrap:wrap;gap:10px}
 .hm-ctl{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink3)}

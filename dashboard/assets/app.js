@@ -49,7 +49,7 @@ try { localStorage.removeItem("gex.page"); } catch(e) {}
 let impactF = store.get("gex.impact", "med");       // high | med | all
 let curF = store.get("gex.cur", "USD");             // USD | all
 let news = null;
-const VIEW_IDS = ["levels", "ladder", "heatmap", "bias", "track", "briefings", "news", "indicator", "library"];
+const VIEW_IDS = ["levels", "ladder", "heatmap", "screener", "bias", "track", "briefings", "news", "indicator", "library"];
 function setPage(p){
   if(!VIEW_IDS.includes(p)) p = "levels";
   page = p;
@@ -64,6 +64,7 @@ function setPage(p){
   if(p === "indicator") loadIndicator();
   if(p === "library") renderLibrary();
   if(p === "track") loadTrack();
+  if(p === "screener") loadScreener();
   if(p === "heatmap" && window.__hmOpen) window.__hmOpen();
   if(!NO_MARKET_PAGES.includes(p) && data) render();
   $("explainTab").title = "Explain this page (X)";
@@ -542,10 +543,10 @@ function renderMaxPain(X){
 // (live table, track record, library)
 // =====================================================================================================
 const PAGES = [
-  ["levels", "Levels", "LVL"], ["ladder", "Live table", "LIVE"], ["heatmap", "Heatmap", "HEAT"],
+  ["levels", "Levels", "LVL"], ["ladder", "Live table", "LIVE"], ["heatmap", "Heatmap", "HEAT"], ["screener", "Screener", "SCRN"],
   ["bias", "Bias", "BIAS"], ["track", "Track record", "TRK"], ["briefings", "Briefings", "BRF"], ["news", "News", "NEWS"], ["indicator", "Indicator", "IND"],
   ["library", "Library", "LIB"]];
-const NO_MARKET_PAGES = ["news", "indicator", "briefings", "library", "track"];
+const NO_MARKET_PAGES = ["screener", "news", "indicator", "briefings", "library", "track"];
 const pickP = v => v && typeof v === "object" ? v.price : v;
 const curW = () => data && (data.workers.find(x => x.market === market && x.result) || data.workers.find(x => x.market === market));
 
@@ -621,6 +622,9 @@ const HELP = {
     body: `<p>Yellow tags flag market words (tariffs, the Fed, China, oil). Bullish/bearish is a keyword guess, shown only when clear: read the post before acting.</p>`},
   indicator: {title: "GEX PRO indicator", tldr: "The TradingView script that draws these levels on your chart.",
     body: `<p>Copy the code into TradingView's Pine Editor once (and again whenever the version changes). Then paste the hourly levels payload into its settings: the indicator maps index levels to your live futures chart.</p>`},
+  screener: {title: "Stock screener", tldr: "Today's movers and lists of US stocks, filtered and sorted your way.",
+    body: `<p>Pick a screen at the top: most active, gainers, losers, small-cap momentum, most shorted, tech growth or value large caps. Narrow it with the filters (price, market cap, relative volume) or type a symbol. Click any column header to sort.</p><p><b>Rel vol</b> is today's volume divided by the 3-month average: 2× or more (highlighted) means unusual interest. The <b>52-week range</b> bar shows where the price sits between its yearly low and high. A highlighted earnings date is within a week.</p><p>Data: Yahoo Finance's free screens, delayed about 15 minutes. Big-cap movers (NVDA, AAPL, MSFT...) often drive NQ and ES.</p>`,
+    watch: ["Mega caps with 2×+ relative volume can move NQ and ES", "Earnings within a week = gap risk for that stock"]},
   library: {title: "The Library", tldr: "A short course that explains everything on this site from zero.",
     body: `<p>Start with <b>What is an option?</b> and follow the lessons in order, or search for any term. Each lesson ends with a quick check; answer it correctly and the lesson is marked as read. Your progress is saved in this browser.</p><p>Every Explain panel links to the matching lesson, so you can jump from a number on the screen straight to the idea behind it.</p>`},
   track: {title: "Live track record", tldr: "What GEX PRO said before each open, graded against what the market did.",
@@ -655,7 +659,7 @@ const HELP = {
   paste: {title: "The hourly paste", tldr: "One text block that carries all levels to TradingView.",
     body: `<p>Published every hour on the hour (ET). One paste holds NQ and ES; each chart draws only its own market. The indicator marks levels stale after 90 minutes.</p>`},
 };
-const PAGE_HELP = {levels: "regime", ladder: "livetable", heatmap: "heatmap", bias: "bias", briefings: "briefings", news: "calendar", indicator: "indicator", library: "library", track: "track"};
+const PAGE_HELP = {levels: "regime", ladder: "livetable", heatmap: "heatmap", screener: "screener", bias: "bias", briefings: "briefings", news: "calendar", indicator: "indicator", library: "library", track: "track"};
 let exKey = null;
 function openExplain(key){
   const h = HELP[key]; if(!h) return;
@@ -740,7 +744,7 @@ $("cmd").addEventListener("keydown", e => {
 });
 
 // ---------- keyboard
-const KEYS = [["/  or  Ctrl+K", "Command line"], ["1 - 9", "Pages (Levels, Live table, Heatmap, Bias, Track record, Briefings, News, Indicator, Library)"],
+const KEYS = [["/  or  Ctrl+K", "Command line"], ["1 - 9, 0", "Pages (Levels, Live table, Heatmap, Screener, Bias, Track record, Briefings, News, Indicator, Library)"],
   ["N  /  E", "Switch to NQ / ES"], ["X", "Explain this page"], ["T", "Light / dark mode"], ["D", "Notes under numbers on / off"], ["C", "Copy the TradingView paste"], ["?", "This list"], ["Esc", "Close panels"]];
 function showKeys(on){ $("keys").hidden = !on; if(on) $("keysGrid").innerHTML = KEYS.map(([k, d]) => `<kbd>${esc(k)}</kbd><span>${esc(d)}</span>`).join(""); }
 $("keysBtn").onclick = () => showKeys(true);
@@ -1192,6 +1196,59 @@ window.__hmOpen = () => { hmReset = true; if(data) loadHeatmap(); };
 $("hmOpacity").addEventListener("input", e => { hmOpacity = Number(e.target.value); store.set("gex.hmop", String(hmOpacity)); hmPrim && hmPrim.requestUpdate && hmPrim.requestUpdate(); });
 $("hmLevels").addEventListener("change", e => { hmShowLv = e.target.checked; store.set("gex.hmlv", hmShowLv ? "1" : "0"); renderHeatmap(); });
 
+// ---------- stock screener: Yahoo's free predefined screens, filtered and sorted here
+let scr = null, scrId = store.get("gex.scr", "most_actives"), scrSort = store.get("gex.scrsort", ""), scrDir = Number(store.get("gex.scrdir", "-1")) || -1;
+const SCR_COLS = [["symbol", "Symbol"], ["price", "Price"], ["pct", "Chg %"], ["volume", "Volume"], ["rel_volume", "Rel vol"],
+  ["mcap", "Mkt cap"], ["pe", "P/E"], ["range", "52-week range"], ["from_high", "From high"], ["earnings", "Earnings"]];
+const big = x => x == null || !isFinite(x) ? "-" : x >= 1e12 ? num(x / 1e12, 2) + "T" : x >= 1e9 ? num(x / 1e9, 1) + "B" : x >= 1e6 ? num(x / 1e6, 1) + "M" : x >= 1e3 ? num(x / 1e3, 0) + "K" : num(x, 0);
+async function loadScreener(){
+  try { scr = await (await fetch(STATIC ? "data/screener.json" : "/api/screener", {cache: "no-store"})).json(); }
+  catch(e){ if(!scr) $("scrRows").innerHTML = `<tr><td colspan="10" class="expl">${esc(OFFLINE)}</td></tr>`; return; }
+  renderScreener();
+}
+function renderScreener(){
+  const S = (scr && scr.screens) || [];
+  if(!S.length){ $("scrRows").innerHTML = `<tr><td colspan="10" class="expl">No screener data yet. It appears after the next refresh.</td></tr>`; return; }
+  if(!S.find(s => s.id === scrId)) scrId = S[0].id;
+  $("scrTabs").innerHTML = S.map(s => `<button role="tab" aria-selected="${s.id === scrId}" data-k="${esc(s.id)}">${esc(s.label)}</button>`).join("");
+  [...$("scrTabs").children].forEach(b => b.onclick = () => { scrId = b.dataset.k; scrSort = ""; store.set("gex.scr", scrId); store.set("gex.scrsort", ""); renderScreener(); });   // each screen opens in its own order
+  const cur = S.find(s => s.id === scrId), q = $("scrQ").value.trim().toLowerCase();
+  const minP = Number($("scrPrice").value) || 0, minCap = Number($("scrCap").value) || 0, minRv = Number($("scrRv").value) || 0;
+  let rows = cur.rows.filter(r => (!q || r.symbol.toLowerCase().includes(q) || r.name.toLowerCase().includes(q))
+    && r.price >= minP && (!minCap || (r.mcap || 0) >= minCap) && (!minRv || (r.rel_volume || 0) >= minRv));
+  if(scrSort){
+    const key = scrSort === "range" ? r => r.high52 > r.low52 ? (r.price - r.low52) / (r.high52 - r.low52) : null : r => r[scrSort];
+    rows = rows.slice().sort((a, b) => { const x = key(a), y = key(b);
+      if(x == null) return 1; if(y == null) return -1;
+      return (typeof x === "string" ? x.localeCompare(y) : x - y) * scrDir; });
+  }
+  $("scrHead").innerHTML = SCR_COLS.map(([k, t]) => `<th data-k="${k}" class="${scrSort === k ? "on" : ""}" aria-sort="${scrSort === k ? (scrDir > 0 ? "ascending" : "descending") : "none"}">${t}${scrSort === k ? (scrDir > 0 ? " ▲" : " ▼") : ""}</th>`).join("");
+  [...$("scrHead").children].forEach(th => th.onclick = () => {
+    const k = th.dataset.k;
+    if(scrSort === k) scrDir = -scrDir; else { scrSort = k; scrDir = k === "symbol" ? 1 : -1; }
+    store.set("gex.scrsort", scrSort); store.set("gex.scrdir", String(scrDir)); renderScreener(); });
+  const now = Date.now() / 1000;
+  $("scrRows").innerHTML = rows.length ? rows.map(r => {
+    const cls = r.pct > 0 ? "good" : r.pct < 0 ? "bad" : "";
+    const pos = r.high52 > r.low52 ? Math.max(0, Math.min(1, (r.price - r.low52) / (r.high52 - r.low52))) : null;
+    const soon = r.earnings && r.earnings > now - 86400 && r.earnings < now + 7 * 86400;
+    const ed = r.earnings ? new Date(r.earnings * 1000).toLocaleDateString("en-US", {month: "short", day: "numeric", timeZone: "America/New_York"}) : "-";
+    return `<tr><td><a class="scr-sym" href="https://www.tradingview.com/chart/?symbol=${encodeURIComponent(r.symbol)}" target="_blank" rel="noopener" title="Open ${esc(r.symbol)} on TradingView">${esc(r.symbol)}</a><span class="scr-name">${esc(r.name)}</span></td>
+      <td class="m">${num(r.price, r.price < 1 ? 4 : 2)}</td>
+      <td class="m ${cls}">${r.pct == null ? "-" : signed(r.pct, 2) + "%"}</td>
+      <td class="m">${big(r.volume)}</td>
+      <td class="m${r.rel_volume >= 2 ? " hot" : ""}">${r.rel_volume == null ? "-" : num(r.rel_volume, 1) + "×"}</td>
+      <td class="m">${big(r.mcap)}</td>
+      <td class="m">${r.pe == null || r.pe <= 0 ? "-" : num(r.pe, 1)}</td>
+      <td>${pos == null ? "-" : `<span class="scr-rng" title="Low ${num(r.low52)} · high ${num(r.high52)}"><i style="left:${(pos * 100).toFixed(1)}%"></i></span>`}</td>
+      <td class="m">${r.from_high == null ? "-" : num(r.from_high, 1) + "%"}</td>
+      <td class="m${soon ? " hot" : ""}"${soon ? ' title="Earnings within a week"' : ""}>${esc(ed)}</td></tr>`;
+  }).join("") : `<tr><td colspan="10" class="expl">No stocks match these filters.</td></tr>`;
+  const when = new Date(cur.time).toLocaleString("en-US", {...ET, hour: "numeric", minute: "2-digit"});
+  $("scrSub").textContent = `${rows.length} of ${cur.rows.length} stocks · updated ${when} ET${cur.stale ? " (could not refresh)" : ""}`;
+}
+["scrQ", "scrPrice", "scrCap", "scrRv"].forEach(id => $(id).addEventListener("input", renderScreener));
+
 setPage(page);
 load();
 loadNews();
@@ -1206,4 +1263,5 @@ setInterval(() => { if(page === "briefings") loadBriefings(); }, STATIC ? 5 * 60
 setInterval(() => { if(page === "indicator") loadIndicator(); }, STATIC ? 5 * 60 * 1000 : 15000);   // pick up code edits
 window.addEventListener("resize", () => { if(data) render(); if(page === "track") renderTrack(); });
 setInterval(() => { if(page === "track") loadTrack(); }, 5 * 60 * 1000);
+setInterval(() => { if(page === "screener") loadScreener(); }, STATIC ? 5 * 60 * 1000 : 2 * 60 * 1000);
 setInterval(() => { if(page === "heatmap") loadHeatmap(); }, STATIC ? 5 * 60 * 1000 : 60 * 1000);
