@@ -166,6 +166,15 @@ class TestZeroGamma(unittest.TestCase):
         self.assertEqual(eng.find_crossings([(0, 0.0), (1, 2.0)]), [0])
 
 
+class TestExpectedMove(unittest.TestCase):
+    def test_atm_strike_needs_both_sides(self):
+        # the nearest strike has only a (skewed) call; the next one has a call and a put -> that pair sets the IV
+        snap = chain([contract(100, "C", iv=0.30), contract(101, "C", iv=0.20), contract(101, "P", iv=0.20)], spot=100.0)
+        em = eng.compute(snap, asof=ASOF).expected_move
+        self.assertEqual(em["atm_strike"], 101.0)
+        self.assertAlmostEqual(em["atm_iv"], 0.20)
+
+
 class TestRegimeAndDiff(unittest.TestCase):
     def test_regime(self):
         c = eng.EngineConfig()

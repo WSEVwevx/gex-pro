@@ -410,7 +410,10 @@ def expected_move(rows: list[ContractExposure], snap: ChainSnapshot, s: float, a
         return None
     nearest = min(r.contract.expiration for r in rows)
     sub = [r for r in rows if r.contract.expiration == nearest]
-    atm_k = min({r.contract.strike for r in sub}, key=lambda k: abs(k - s))
+    # nearest strike with both a call and a put: one side alone can carry a skewed vendor IV
+    both = ({r.contract.strike for r in sub if r.contract.option_type == OptionType.CALL and r.iv}
+            & {r.contract.strike for r in sub if r.contract.option_type == OptionType.PUT and r.iv})
+    atm_k = min(both or {r.contract.strike for r in sub}, key=lambda k: abs(k - s))
     atm = [r for r in sub if r.contract.strike == atm_k]
     ivs = [r.iv for r in atm if r.iv]
     t = atm[0].t_years
