@@ -120,14 +120,14 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
         <div class="card" data-help="base_case"><div id="targetCard"><div class="eyebrow">Base case by the close</div><div class="skeleton">Loading...</div></div></div>
         <div class="card" data-help="bias_range"><div id="rangeCard"><div class="eyebrow">Expected range</div><div class="skeleton">Loading...</div></div></div>
       </section>
-      <section class="card" data-help="bias_chart" style="margin-top:14px">
+      <section class="card" data-help="bias_chart" style="margin-top:12px">
         <div class="head"><h2>How the session could unfold</h2><span class="spacer"></span><span class="sub" id="biasWhen"></span></div>
         <div class="expl" id="biasSummary" style="max-width:none;margin:0 0 10px;color:var(--ink)"></div>
         <div class="chartwrap" id="biasWrap"><svg id="biasChart" role="img" aria-label="Illustrative path for the session with expected-move cone and key levels"></svg><div class="tip" id="biasTip"></div></div>
         <div class="legend"><span><i class="sw" id="pathSw" style="background:var(--ink);height:3px"></i>Base-case path</span><span><i class="sw" style="background:rgba(139,149,165,.35);height:10px"></i>±1σ expected-move cone</span><span><i class="sw" style="background:var(--pos);height:2px"></i>Call wall</span><span><i class="sw" style="background:var(--neg);height:2px"></i>Put wall</span><span><i class="sw" style="background:var(--zg);height:2px"></i>Zero gamma</span><span><i class="sw" style="background:var(--ag);height:2px"></i>Abs gamma</span><span><i class="sw" style="background:var(--mp);height:2px"></i>0DTE max pain</span></div>
         <div class="expl">A scenario built from options positioning (15-min delayed, end-of-day open interest), not a prediction. About 1 day in 3, price leaves the cone.</div>
       </section>
-      <section class="card" data-help="factors" style="margin-top:14px">
+      <section class="card" data-help="factors" style="margin-top:12px">
         <div class="head"><h2>Why: factor by factor</h2></div>
         <div id="biasFactors"></div>
         <div class="expl">+0.75 or more = bullish, -0.75 or less = bearish, otherwise neutral. Gamma side sets the day type rather than the direction.</div>
@@ -142,16 +142,16 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
         <div class="trk-kpis" id="trkKpis"><div class="skeleton">Loading...</div></div>
         <div class="expl" id="trkNote"></div>
       </section>
-      <section class="card" data-help="track_scorecard" style="margin-top:14px">
+      <section class="card" data-help="track_scorecard" style="margin-top:12px">
         <div class="head"><h2>Scorecard</h2><span class="sub" id="trkScoreSub"></span></div>
         <div id="trkScore"></div>
       </section>
-      <section class="card" data-help="track_log" style="margin-top:14px">
+      <section class="card" data-help="track_log" style="margin-top:12px">
         <div class="head"><h2>Every session</h2><span class="spacer"></span><span class="sub" id="trkLogSub"></span></div>
         <div class="trk-log" id="trkLog"></div>
       </section>
 
-      <section class="card trk-bt" data-help="backtest" style="margin-top:22px">
+      <section class="card trk-bt" data-help="backtest" style="margin-top:12px">
         <div class="head" style="margin-bottom:0"><div class="eyebrow">Historical backtest · expected move</div><span class="spacer"></span>
           <div class="filters" id="btMarket" role="tablist" aria-label="Index"></div></div>
         <h2 class="trk-title" id="btTitle">-</h2>
@@ -168,7 +168,7 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
           <div class="legend"><span><i class="sw" style="background:var(--pos)"></i>actual sessions</span><span><i class="sw" style="background:var(--ink2);height:2px"></i>normal curve (what the band assumes)</span></div>
         </section>
       </div>
-      <section class="card" data-help="backtest_vol" style="margin-top:14px"><div class="head"><h2>By volatility level</h2><span class="sub" id="btVolSub"></span></div><div id="btVol"></div></section>
+      <section class="card" data-help="backtest_vol" style="margin-top:12px"><div class="head"><h2>By volatility level</h2><span class="sub" id="btVolSub"></span></div><div id="btVol"></div></section>
       <div class="expl trk-disclaimer">Hypothetical, rule-based results, not trading results. No orders, fills, costs or slippage are modeled. Past behaviour of a level or a band does not guarantee future behaviour. Not investment advice.</div>
     </div>
 
@@ -260,12 +260,12 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
           <div class="actions"><button class="btn" id="indPaste">Copy levels for TradingView</button></div>
         </div>
       </section>
-      <section class="card" style="margin-top:14px">
+      <section class="card" style="margin-top:12px">
         <div class="codehead"><h2>Source code</h2><span class="fname" id="indFile">GEX_PRO.pine</span><span class="spacer"></span>
           <button class="linkbtn" id="indCopy2">Copy</button></div>
         <div class="code" id="indCode" role="region" aria-label="Indicator source code" tabindex="0"><div class="skeleton" style="padding:0 16px">Loading code...</div></div>
       </section>
-      <section class="card" style="margin-top:14px">
+      <section class="card" style="margin-top:12px">
         <div class="head"><h2>Recent changes</h2></div>
         <div class="changes" id="indChanges"></div>
       </section>
