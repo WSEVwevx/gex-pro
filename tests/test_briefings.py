@@ -105,6 +105,23 @@ class TestComponent(unittest.TestCase):
             status, body = c.routes()["/api/briefings"]({})
             self.assertEqual((status, body["latest"]["nyam"]["session"]), (200, "2026-10-20"))
 
+    def test_mirror_fills_gaps_and_never_overwrites(self):
+        import json
+        with tempfile.TemporaryDirectory() as tmp:
+            now = [et(2026, 10, 20, 9, 1)]
+            c = BriefingsComponent(context=lambda: ctx(now[0]), is_trading_day=is_trading_day, store_dir=tmp, clock=lambda: now[0])
+            c.tick()                                                         # writes 2026-10-20-nyam here
+            mine = c._load("2026-10-20-nyam")
+            remote = {"by_id": {
+                "2026-10-20-nyam": dict(mine, headline="someone else's"),
+                "2026-10-19-asia": dict(mine, kind="asia", slot=et(2026, 10, 19, 19).isoformat(), headline="from the site"),
+                "2026-10-18-asia": {"kind": "asia", "slot": et(2026, 10, 17, 19).isoformat()},   # id and slot disagree: skipped
+                "junk": "x"}}
+            got = c.mirror("https://example.test/b.json", fetch=lambda u: json.dumps(remote).encode())
+            self.assertEqual(got, ["2026-10-19-asia"])
+            self.assertEqual(c._load("2026-10-20-nyam")["headline"], mine["headline"])   # the local one wins
+            self.assertEqual(c.mirror("x", fetch=lambda u: (_ for _ in ()).throw(OSError("offline"))), [])
+
     def test_catch_up_is_marked_late(self):
         with tempfile.TemporaryDirectory() as tmp:
             now = et(2026, 10, 20, 13, 0)

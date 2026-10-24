@@ -7,6 +7,9 @@ Same shape as every GEX PRO component (see gexpro/components.py):
 
 Inputs come from the app shell: context() -> data snapshot (see compose.py), is_trading_day(date),
 and an optional notify(title, body) for a Windows notification when a briefing is written.
+
+The local app also copies in, hourly, every briefing the public site has that it is missing (mirror()),
+so the page has history even when this PC was off at briefing time. Briefings written here win.
 """
 from __future__ import annotations
 
@@ -14,6 +17,7 @@ import json
 import logging
 import os
 import threading
+import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Optional
@@ -23,6 +27,7 @@ from .compose import compose
 
 log = logging.getLogger("briefings")
 KEEP = 40
+MIRROR_URL = "https://wsevwevx.github.io/gex-pro/data/briefings.json"      # the public copy ($GEXPRO_BRIEFINGS_MIRROR)
 
 
 def _default_dir() -> Path:
@@ -66,6 +71,34 @@ class BriefingsComponent:
             except (OSError, ValueError):
                 continue
         return sorted(out, key=lambda b: b.get("slot", ""), reverse=True)      # newest first, by slot time
+
+    def mirror(self, url: Optional[str] = None, fetch: Optional[Callable[[str], bytes]] = None) -> list[str]:
+        """Copy briefings from the public site that this app does not have. Returns the ids copied."""
+        url = url or os.environ.get("GEXPRO_BRIEFINGS_MIRROR") or MIRROR_URL
+        if not url or url == "off":
+            return []
+        def get(u):
+            req = urllib.request.Request(u, headers={"User-Agent": "GEX PRO briefings"})
+            with urllib.request.urlopen(req, timeout=25) as r:
+                return r.read()
+        try:
+            remote = json.loads((fetch or get)(url)).get("by_id") or {}
+        except Exception as e:
+            log.warning("briefings mirror %s failed: %s", url, e)
+            return []
+        copied = []
+        with self._lock:
+            for sid, b in sorted(remote.items()):
+                if not isinstance(b, dict) or not b.get("kind") or not b.get("slot") or self._path(sid).exists():
+                    continue
+                try:
+                    if schedule.slot_id(b["kind"], datetime.fromisoformat(b["slot"])) != sid:
+                        continue                                   # only well-formed briefings
+                except (ValueError, TypeError):
+                    continue
+                self._save(sid, b)
+                copied.append(sid)
+        return copied
 
     # ---------------------------------------------------------------- writing
     def tick(self) -> list[str]:
@@ -119,8 +152,12 @@ class BriefingsComponent:
 
     def start(self) -> None:
         def loop():
+            last_mirror = 0.0
             while not self._stop.is_set():
                 try:
+                    if datetime.now(timezone.utc).timestamp() - last_mirror > 3600:
+                        last_mirror = datetime.now(timezone.utc).timestamp()
+                        self.mirror()
                     self.tick()
                 except Exception:
                     log.exception("briefing check failed")

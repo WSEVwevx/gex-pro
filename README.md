@@ -92,8 +92,8 @@ Full details: [METHODOLOGY](docs/METHODOLOGY.md). Caveats: [LIMITATIONS](docs/LI
 
 ## Website
 
-A terminal-style workspace: a command line (type `GEX`, `VOL`, `TL`, `NQ`, `ES`, `COPY`, `HELP` and press
-Enter, or press `/`), a ticker strip with both markets, a sidebar of pages (keys `1`-`9` and `0`; type `LIB` for the Library), and an **Explain**
+A terminal-style workspace: a command line (type `LIVE`, `TRK`, `NQ`, `ES`, `COPY`, `LIGHT`, `HELP` and press
+Enter, or press `/`), a ticker strip with both markets, a sidebar of pages (keys `1`-`8`), and an **Explain**
 panel (the `?` on every module, or the EXPLAIN tab on the right edge, or `X`) that says in plain English
 what each module shows and what to watch, with the live numbers for the current market. A sun/moon button in the top
 bar (or `T`, or the `LIGHT` / `DARK` commands) switches between night and light mode; the choice is saved in
@@ -125,7 +125,7 @@ your browser, and the first visit follows your system setting.
   - a level ladder with explanations;
   - a GEX-by-price chart;
   - max pain and gamma by expiration.
-* **Briefings:** a NY AM briefing at 9:00 AM ET on trading days and an Asia session briefing at 7:00 PM ET
+* **Briefings** (the local app also copies in the ones the hosted site wrote while your PC was off): a NY AM briefing at 9:00 AM ET on trading days and an Asia session briefing at 7:00 PM ET
   the evening before each trading day: both markets' regime, levels, expected range, bias and game plan, the
   relevant calendar (overnight Asia/Europe events for the Asia one) and market-moving posts. A Windows
   notification when each is written; a missed one is written late when the app starts.
