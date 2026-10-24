@@ -10,6 +10,7 @@ from gexsys.export import extras_tokens, parse_payload, pine_payload
 from gexsys.levels import summarize
 from gexsys.mapping import MappingContext, map_extras
 from gexsys.marketcal import NY
+from gexsys.models import OptionType
 from tests.util import ASOF, chain, contract
 
 TUE_CLOSE = datetime(2026, 10, 20, 20, 0, tzinfo=timezone.utc)   # 16:00 ET
@@ -137,6 +138,15 @@ class TestExpectedMove(unittest.TestCase):
         em = ex.expected_moves(snap, basket, ASOF, snap.contracts + etf)
         self.assertAlmostEqual(em["daily_iv"], 0.20)
         self.assertAlmostEqual(ex.atm_iv(etf, "2026-10-21", 100.4), 0.15)      # ETF-only chain still works
+
+    def test_atm_iv_uses_a_strike_quoted_on_both_sides(self):
+        # nearest strike has only a (skewed) call left; the next one has both sides -> use the pair
+        snap, _ = self.mk(spot=100.0)
+        c0 = snap.contracts[0]
+        mk = lambda k, typ, iv: replace(c0, strike=k, option_type=typ, iv=iv, symbol=f"{typ.value}{k}")
+        cs = [mk(100.0, OptionType.CALL, 0.21), mk(101.0, OptionType.CALL, 0.19), mk(101.0, OptionType.PUT, 0.19)]
+        self.assertAlmostEqual(ex.atm_iv(cs, c0.expiration.date().isoformat(), 100.0), 0.19)
+        self.assertAlmostEqual(ex.atm_iv(cs[:1], c0.expiration.date().isoformat(), 100.0), 0.21)   # one side only: still a value
 
     def test_after_close_anchor_is_last_price(self):
         snap, basket = self.mk()

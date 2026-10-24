@@ -30,6 +30,12 @@ pip install -r requirements.txt
 python -m unittest discover -s tests -t .
 ```
 
+Every check at once (tests, lint, pricing, independent math, live audit, hosted data; `--quick` skips the live ones):
+
+```bash
+python tools/check.py
+```
+
 ```bash
 python -m gexsys demo --market NQ
 ```
@@ -194,6 +200,7 @@ dashboard/         the website (one page; reads each component's endpoints)
 pine/              TradingView Pine v6 indicator (GEX PRO)
 configs/           NQ / ES configurations
 tests/             unit + integration tests, tests/data synthetic fixtures
+tools/             check.py (all checks), verify_math.py (independent re-derivation), pricing_stress.py
 docs/              documentation
 ```
 

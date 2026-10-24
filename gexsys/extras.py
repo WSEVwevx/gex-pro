@@ -118,7 +118,10 @@ def atm_iv(contracts: list[OptionContract], expiry: str, spot: float) -> Optiona
     cs = own or cs
     if not cs:
         return None
-    k = min({c.strike for c in cs}, key=lambda x: abs(x - spot))
+    # nearest strike quoted on both sides: a lone call or put IV is skewed whenever the vendor prices
+    # off spot instead of the forward (seen on NDX: 20.9% call vs 17.2% put at the same strike)
+    both = {c.strike for c in cs if c.option_type == OptionType.CALL} & {c.strike for c in cs if c.option_type == OptionType.PUT}
+    k = min(both or {c.strike for c in cs}, key=lambda x: abs(x - spot))
     ivs = [c.iv for c in cs if c.strike == k]
     return sum(ivs) / len(ivs)
 
