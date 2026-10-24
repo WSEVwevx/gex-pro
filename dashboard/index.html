@@ -9,6 +9,7 @@
 <script>/* theme before first paint: saved choice, else the system setting */
 try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"); document.documentElement.dataset.theme = t; } catch(e) { document.documentElement.dataset.theme = "dark"; }
 </script>
+<link rel="icon" type="image/svg+xml" href="assets/icon.svg">
 <link rel="stylesheet" href="assets/terminal.css">
 </head>
 <body>
