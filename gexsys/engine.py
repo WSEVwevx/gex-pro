@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional
 
 from .models import ChainSnapshot, OptionContract, OptionType, Quality, SourceKind
@@ -462,7 +462,3 @@ def _lvl(d: dict, key: str) -> Optional[float]:
     if isinstance(v, dict):
         return v.get("price")
     return v
-
-
-def now_utc() -> datetime:
-    return datetime.now(timezone.utc)

@@ -957,7 +957,6 @@ let ldRowsN = Number(store.get("gex.ldrows", "51"));
 const MON = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 const ldDate = d => d === "other" ? "LATER" : `${MON[Number(d.slice(5, 7)) - 1]} ${Number(d.slice(8, 10))}`;
 const compact = x => x == null || !isFinite(x) ? "-" : (x < 0 ? "-" : "+") + (Math.abs(x) >= 1e9 ? num(Math.abs(x) / 1e9, 2) + "B" : Math.abs(x) >= 1e6 ? num(Math.abs(x) / 1e6, 1) + "M" : num(Math.abs(x) / 1e3, 0) + "K");
-const cnt = x => x == null || !isFinite(x) ? "-" : (x < 0 ? "-" : x > 0 ? "+" : "") + num(Math.abs(x), 0);
 function renderLadder(){
   const w = curW();
   if(!w || !w.result){ $("ldRows").innerHTML = `<div class="expl">No data yet.</div>`; return; }

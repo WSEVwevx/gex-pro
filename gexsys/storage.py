@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import datetime
+import shutil
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterator, Optional
 
@@ -48,6 +49,17 @@ class SnapshotStore:
                 yield json.loads(p.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError):
                 continue
+
+    def prune(self, market: str, keep_days: int = 12) -> int:
+        """Delete this market's day folders older than keep_days (the track record needs the last 10
+        days of pre-open snapshots). Returns how many folders went."""
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=keep_days)).strftime("%Y%m%d")
+        gone = 0
+        for day in (self.root / market).glob("????????"):
+            if day.is_dir() and day.name.isdigit() and day.name < cutoff:
+                shutil.rmtree(day, ignore_errors=True)
+                gone += 1
+        return gone
 
     def latest(self, market: str) -> Optional[dict]:
         last = None

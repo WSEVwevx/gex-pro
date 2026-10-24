@@ -86,10 +86,6 @@ def black76_gamma(f, k, t, r, vol) -> float:
     return bsm_gamma(f, k, t, r, r, vol)
 
 
-def black76_delta(f, k, t, r, vol, is_call: bool) -> float:
-    return bsm_delta(f, k, t, r, r, vol, is_call)
-
-
 def model_gamma(s, k, t, r, q, vol, futures: bool) -> float:
     return black76_gamma(s, k, t, r, vol) if futures else bsm_gamma(s, k, t, r, q, vol)
 

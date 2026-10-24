@@ -37,7 +37,7 @@ Today's components:
 
 | Component | Routes | Hosted files |
 |---|---|---|
-| `gexsys.component.GexComponent` | `/health`, `/api/markets`, `/api/all`, `/api/levels`, `/api/pine`, `/api/pine/all`, `/api/indicator`, `/api/timeline` | `all.json`, `pine-*.txt`, `indicator.json`, `timeline.json` |
+| `gexsys.component.GexComponent` | `/health`, `/api/markets`, `/api/all`, `/api/levels`, `/api/pine`, `/api/pine/all`, `/api/indicator` | `all.json`, `pine-*.txt`, `indicator.json` |
 | `feeds.component.FeedsComponent` | `/api/news`, `/api/posts` | `news.json`, `posts.json` |
 | `briefings.component.BriefingsComponent` | `/api/briefings` | `briefings.json` |
 | `trackrecord.component.TrackRecordComponent` | `/api/trackrecord` | `trackrecord.json` (sessions kept in `$GEXPRO_TRACK_DIR`, which the workflow keeps in the `track-record` branch) |

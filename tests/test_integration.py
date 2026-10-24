@@ -288,3 +288,21 @@ class TestSensitivity(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestSnapshotPrune(unittest.TestCase):
+    def test_old_day_folders_go_recent_stay(self):
+        import tempfile
+        from datetime import datetime, timedelta, timezone
+        from pathlib import Path
+        from gexsys.storage import SnapshotStore
+        with tempfile.TemporaryDirectory() as tmp:
+            st = SnapshotStore(tmp)
+            now = datetime.now(timezone.utc)
+            for back in (0, 5, 11, 13, 40):
+                (Path(tmp) / "NQ-CBOE" / (now - timedelta(days=back)).strftime("%Y%m%d")).mkdir(parents=True)
+            (Path(tmp) / "NQ-CBOE" / "notes").mkdir()
+            self.assertEqual(st.prune("NQ-CBOE", keep_days=12), 2)
+            left = sorted(p.name for p in (Path(tmp) / "NQ-CBOE").iterdir())
+            self.assertEqual(len(left), 4)
+            self.assertIn("notes", left)

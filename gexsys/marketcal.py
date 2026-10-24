@@ -20,7 +20,6 @@ from typing import Optional
 from zoneinfo import ZoneInfo
 
 NY = ZoneInfo("America/New_York")
-UTC = ZoneInfo("UTC")
 
 EXTRA_CLOSURES: dict[date, str] = {
     date(2025, 1, 9): "National Day of Mourning (President Carter)",

@@ -20,7 +20,6 @@ from typing import Optional
 from .schedule import NY, TITLES
 
 REGIME = {"POSITIVE": "positive gamma", "NEGATIVE": "negative gamma", "INDETERMINATE": "balanced gamma"}
-ASIA_CCY = {"JPY", "CNY", "AUD", "NZD"}
 
 
 def _f(p) -> str:
