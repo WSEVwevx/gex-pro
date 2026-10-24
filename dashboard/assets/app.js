@@ -64,6 +64,7 @@ function setPage(p){
   if(p === "indicator") loadIndicator();
   if(p === "library") renderLibrary();
   if(p === "track") loadTrack();
+  if(p === "heatmap" && window.__hmOpen) window.__hmOpen();
   if(!NO_MARKET_PAGES.includes(p) && data) render();
   $("explainTab").title = "Explain this page (X)";
 }
@@ -291,7 +292,7 @@ function render(){
   if(page === "bias") renderBias(w);
   renderTicker();
   if(page === "ladder") renderLiveTable();
-  if(page === "heatmap" && hmMarket !== market + hmTf) loadHeatmap();
+  if(page === "heatmap" && hmMarket !== market + hmTf){ hmReset = true; loadHeatmap(); }
   $("foot").innerHTML = `Model estimates from ${esc(s.provider || w.provider)} ${opts} options (${s.ref_quality === "RT" ? "real-time quotes" : "15-minute-delayed quotes"}) and end-of-day open interest, assuming dealers are long calls and short puts.
     ${w.result.mapped ? "Futures prices use " + esc(w.result.mapped.mapping.futures_ref_mode) + "; TradingView re-maps with your live chart." : esc(s.mapping_note || "")}
     These are proxy levels from index and ETF options, not NQ/ES futures options, and not trading advice.`;
@@ -1084,14 +1085,19 @@ function renderTape(){
 
 // ---------- GEX heatmap: futures candles (Lightweight Charts) with the gamma history painted underneath
 let hm = null, hmChart = null, hmCandles = null, hmLines = {}, hmPrim = null, hmMarket = null;
+let hmReset = true;          // next draw starts at the latest candles with auto-scaled prices (open, market or timeframe change)
 let hmTf = store.get("gex.hmtf", "5m"), hmOpacity = Number(store.get("gex.hmop", "60")), hmShowLv = store.get("gex.hmlv", "1") === "1";
 const hmUrl = () => STATIC ? `data/heatmap-${market}-${hmTf}.json` : `/api/heatmap?market=${encodeURIComponent(market)}&tf=${hmTf}`;
 const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 function rgbOf(c){ const d = document.createElement("i"); d.style.color = c; document.body.appendChild(d); const v = getComputedStyle(d).color; d.remove(); return (v.match(/[\d.]+/g) || [0, 0, 0]).slice(0, 3).map(Number); }
 async function loadHeatmap(){
   if(!window.LightweightCharts){ $("hmMsg").textContent = "The chart library could not load (it comes from unpkg.com). Check your connection and refresh."; $("hmMsg").hidden = false; return; }
-  try { hm = await (await fetch(hmUrl(), {cache: "no-store"})).json(); }
+  const want = market + hmTf;
+  let got;
+  try { got = await (await fetch(hmUrl(), {cache: "no-store"})).json(); }
   catch(e){ $("hmMsg").textContent = OFFLINE; $("hmMsg").hidden = false; return; }
+  if(want !== market + hmTf) return;                       // the market or timeframe changed while loading
+  hm = got;
   renderHeatmap();
 }
 // bar time at or before t (columns snap to the candle they fall in)
@@ -1154,7 +1160,7 @@ function renderHeatmap(){
     hmChart.subscribeCrosshairMove(hmHover);
     $("hmChart").appendChild($("hmTip")); $("hmChart").appendChild($("hmMsg"));   // keep them above the chart's canvases
   } else hmChart.applyOptions(hmColors());
-  const keep = hmMarket === market + hmTf ? hmChart.timeScale().getVisibleLogicalRange() : null;
+  const keep = !hmReset && hmMarket === market + hmTf ? hmChart.timeScale().getVisibleLogicalRange() : null;
   hmCandles.setData(hm.candles.map(c => ({time: c[0], open: c[1], high: c[2], low: c[3], close: c[4]})));
   for(const k of ["zg", "cw", "pw"]){
     const pts = new Map();
@@ -1162,7 +1168,7 @@ function renderHeatmap(){
     hmLines[k].setData(hmShowLv ? [...pts].sort((a, b) => a[0] - b[0]).map(([time, value]) => ({time, value})) : []);
   }
   if(keep) hmChart.timeScale().setVisibleLogicalRange(keep);
-  else { const n = hm.candles.length; hmChart.timeScale().setVisibleLogicalRange({from: Math.max(0, n - (hmTf === "1m" ? 390 : hmTf === "5m" ? 230 : 160)), to: n + 8}); }
+  else { hmCandles.priceScale().applyOptions({autoScale: true}); hmReset = false; const n = hm.candles.length; hmChart.timeScale().setVisibleLogicalRange({from: Math.max(0, n - (hmTf === "1m" ? 390 : hmTf === "5m" ? 230 : 160)), to: n + 8}); }
   hmMarket = market + hmTf;
   const rel = hm.columns.filter(c => c.rel).length;
   $("hmSub").textContent = `${market} futures · ${hm.columns.length} GEX snapshot${hm.columns.length === 1 ? "" : "s"} · candles ${hmTf}, delayed`;
@@ -1182,6 +1188,7 @@ function hmHover(p){
   tip.style.opacity = 1; tip.style.left = Math.min(p.point.x + 16, $("hmChart").clientWidth - 260) + "px"; tip.style.top = Math.max(8, p.point.y - 60) + "px";
 }
 window.__hmTheme = () => { if(hmChart) renderHeatmap(); };
+window.__hmOpen = () => { hmReset = true; if(data) loadHeatmap(); };
 $("hmOpacity").addEventListener("input", e => { hmOpacity = Number(e.target.value); store.set("gex.hmop", String(hmOpacity)); hmPrim && hmPrim.requestUpdate && hmPrim.requestUpdate(); });
 $("hmLevels").addEventListener("change", e => { hmShowLv = e.target.checked; store.set("gex.hmlv", hmShowLv ? "1" : "0"); renderHeatmap(); });
 
