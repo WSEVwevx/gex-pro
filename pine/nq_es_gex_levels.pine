@@ -18,31 +18,41 @@ payload = input.text_area("", "Levels payload", group = G1,
 mapMode = input.string("Live reference", "Price mapping", options = ["Live reference", "Snapshot factor", "None"], group = G1,
      tooltip = "Live reference (recommended): converts index prices with this chart vs. the live index (NASDAQ:NDX / SP:SPX); held from the last bar when the index is closed.\nSnapshot factor: the service's conversion factor.\nNone: draw the index prices unconverted.")
 
+// Line style and thickness are picked from drawn previews in settings (──── ╌╌╌╌ ┈┈┈┈, ─── ━━━ ▬▬▬ ███)
+pxOf(string pick) =>
+    pick == "███" ? 4 : pick == "▬▬▬" ? 3 : pick == "━━━" ? 2 : 1
+
 // ---------- 2 - Key levels: one clean row each, on/off + colour swatch
 G2 = "2 - Key levels"
 showZG   = input.bool(true, "Zero gamma", inline = "zg", group = G2)
 cZG      = input.color(#f0b429, "", inline = "zg", group = G2, tooltip = "Estimated price where modeled dealer gamma flips sign. Line style and width next to the colour.")
-styZG = input.string("Dashed", "", options = ["Solid", "Dashed", "Dotted"], inline = "zg", group = G2)
-wZG = input.int(1, "", minval = 1, maxval = 4, inline = "zg", group = G2)
+styZG = input.string("╌╌╌╌", "", options = ["────", "╌╌╌╌", "┈┈┈┈"], inline = "zg", group = G2)
+wZGPick = input.string("───", "", options = ["───", "━━━", "▬▬▬", "███"], inline = "zg", group = G2)
+wZG = pxOf(wZGPick)
 showCW   = input.bool(true, "Call wall", inline = "cw", group = G2)
 cPos     = input.color(#22c55e, "", inline = "cw", group = G2, tooltip = "Strike above price with the most call gamma. Also the colour of positive-gamma levels and profile bars.")
-styCW = input.string("Solid", "", options = ["Solid", "Dashed", "Dotted"], inline = "cw", group = G2)
-wCW = input.int(1, "", minval = 1, maxval = 4, inline = "cw", group = G2)
+styCW = input.string("────", "", options = ["────", "╌╌╌╌", "┈┈┈┈"], inline = "cw", group = G2)
+wCWPick = input.string("───", "", options = ["───", "━━━", "▬▬▬", "███"], inline = "cw", group = G2)
+wCW = pxOf(wCWPick)
 showPW   = input.bool(true, "Put wall", inline = "pw", group = G2)
 cNeg     = input.color(#ef4444, "", inline = "pw", group = G2, tooltip = "Strike below price with the most put gamma. Also the colour of negative-gamma levels and profile bars.")
-styPW = input.string("Solid", "", options = ["Solid", "Dashed", "Dotted"], inline = "pw", group = G2)
-wPW = input.int(1, "", minval = 1, maxval = 4, inline = "pw", group = G2)
+styPW = input.string("────", "", options = ["────", "╌╌╌╌", "┈┈┈┈"], inline = "pw", group = G2)
+wPWPick = input.string("───", "", options = ["───", "━━━", "▬▬▬", "███"], inline = "pw", group = G2)
+wPW = pxOf(wPWPick)
 showAG   = input.bool(true, "Absolute gamma", inline = "ag", group = G2)
 cAG      = input.color(#a78bfa, "", inline = "ag", group = G2, tooltip = "Strike with the most TOTAL gamma (calls + puts). Often acts like a magnet. Doesn't depend on any dealer-positioning assumption.")
-styAG = input.string("Dotted", "", options = ["Solid", "Dashed", "Dotted"], inline = "ag", group = G2)
-wAG = input.int(1, "", minval = 1, maxval = 4, inline = "ag", group = G2)
+styAG = input.string("┈┈┈┈", "", options = ["────", "╌╌╌╌", "┈┈┈┈"], inline = "ag", group = G2)
+wAGPick = input.string("───", "", options = ["───", "━━━", "▬▬▬", "███"], inline = "ag", group = G2)
+wAG = pxOf(wAGPick)
 showRank = input.bool(true, "Ranked walls (C1-C3, P1-P5, Ab1-Ab3)", inline = "rk", group = G2,
      tooltip = "The strongest strikes near price: C = most positive net GEX, P = most negative net GEX, Ab = most total gamma (call / put / absolute-gamma colours). 1 = strongest. Each line's opacity and its tag's bar show its share of gamma: strong levels solid, weak ones faint.")
-styRank = input.string("Solid", "", options = ["Solid", "Dashed", "Dotted"], inline = "rk", group = G2)
-wRank = input.int(1, "", minval = 1, maxval = 4, inline = "rk", group = G2)
+styRank = input.string("────", "", options = ["────", "╌╌╌╌", "┈┈┈┈"], inline = "rk", group = G2)
+wRankPick = input.string("───", "", options = ["───", "━━━", "▬▬▬", "███"], inline = "rk", group = G2)
+wRank = pxOf(wRankPick)
 showMax  = input.bool(false, "Largest +/- GEX and concentrations", inline = "mx", group = G2, tooltip = "Strikes with the most positive / negative gamma, plus the extra concentrations below, in the call / put colours.")
-styMax = input.string("Dotted", "", options = ["Solid", "Dashed", "Dotted"], inline = "mx", group = G2)
-wMax = input.int(1, "", minval = 1, maxval = 4, inline = "mx", group = G2)
+styMax = input.string("┈┈┈┈", "", options = ["────", "╌╌╌╌", "┈┈┈┈"], inline = "mx", group = G2)
+wMaxPick = input.string("───", "", options = ["───", "━━━", "▬▬▬", "███"], inline = "mx", group = G2)
+wMax = pxOf(wMaxPick)
 nConc    = input.int(0, "Other concentrations", minval = 0, maxval = 6, inline = "cc", group = G2)
 minShare = input.float(5.0, "min %", minval = 0, step = 0.5, inline = "cc", group = G2,
      tooltip = "Extra big-gamma strikes, labeled +G / -G with their share of total exposure. 0 = off.")
@@ -51,25 +61,30 @@ minShare = input.float(5.0, "min %", minval = 0, step = 0.5, inline = "cc", grou
 G3 = "3 - More levels"
 show0   = input.bool(true, "0DTE zero gamma and walls", inline = "z0", group = G3,
      tooltip = "The same levels from today's expiring options only (\"next MM-DD\" when nothing expires today), in lighter key-level colours.")
-sty0 = input.string("Solid", "", options = ["Solid", "Dashed", "Dotted"], inline = "z0", group = G3)
-w0 = input.int(1, "", minval = 1, maxval = 4, inline = "z0", group = G3)
+sty0 = input.string("────", "", options = ["────", "╌╌╌╌", "┈┈┈┈"], inline = "z0", group = G3)
+w0Pick = input.string("───", "", options = ["───", "━━━", "▬▬▬", "███"], inline = "z0", group = G3)
+w0 = pxOf(w0Pick)
 showVol = input.bool(false, "Volume walls", inline = "vo", group = G3)
 cVol    = input.color(#2dd4bf, "", inline = "vo", group = G3, tooltip = "Strikes with the most calls / puts traded today. Moves during the session.")
-styVol = input.string("Dashed", "", options = ["Solid", "Dashed", "Dotted"], inline = "vo", group = G3)
-wVol = input.int(1, "", minval = 1, maxval = 4, inline = "vo", group = G3)
+styVol = input.string("╌╌╌╌", "", options = ["────", "╌╌╌╌", "┈┈┈┈"], inline = "vo", group = G3)
+wVolPick = input.string("───", "", options = ["───", "━━━", "▬▬▬", "███"], inline = "vo", group = G3)
+wVol = pxOf(wVolPick)
 showOI  = input.bool(false, "OI walls", inline = "oi", group = G3)
 cOI     = input.color(#9085e9, "", inline = "oi", group = G3, tooltip = "Strikes with the most open calls / puts as of yesterday's close.")
-styOI = input.string("Dotted", "", options = ["Solid", "Dashed", "Dotted"], inline = "oi", group = G3)
-wOI = input.int(1, "", minval = 1, maxval = 4, inline = "oi", group = G3)
+styOI = input.string("┈┈┈┈", "", options = ["────", "╌╌╌╌", "┈┈┈┈"], inline = "oi", group = G3)
+wOIPick = input.string("───", "", options = ["───", "━━━", "▬▬▬", "███"], inline = "oi", group = G3)
+wOI = pxOf(wOIPick)
 showMP  = input.bool(false, "Max pain", inline = "mp", group = G3)
 cMP     = input.color(#c98500, "", inline = "mp", group = G3, tooltip = "Price where option holders lose the most at expiration.")
-styMP = input.string("Dotted", "", options = ["Solid", "Dashed", "Dotted"], inline = "mp", group = G3)
-wMP = input.int(1, "", minval = 1, maxval = 4, inline = "mp", group = G3)
+styMP = input.string("┈┈┈┈", "", options = ["────", "╌╌╌╌", "┈┈┈┈"], inline = "mp", group = G3)
+wMPPick = input.string("───", "", options = ["───", "━━━", "▬▬▬", "███"], inline = "mp", group = G3)
+wMP = pxOf(wMPPick)
 mpCount = input.string("Nearest", "Max pain expirations", options = ["Nearest", "Nearest + next"], group = G3)
 showEM  = input.bool(true, "Expected move", inline = "em", group = G3)
 cEM     = input.color(#8b95a5, "", inline = "em", group = G3, tooltip = "1 standard-deviation range implied by options, from the previous close (weekly: lighter).")
-styEM = input.string("Dashed", "", options = ["Solid", "Dashed", "Dotted"], inline = "em", group = G3)
-wEM = input.int(1, "", minval = 1, maxval = 4, inline = "em", group = G3)
+styEM = input.string("╌╌╌╌", "", options = ["────", "╌╌╌╌", "┈┈┈┈"], inline = "em", group = G3)
+wEMPick = input.string("───", "", options = ["───", "━━━", "▬▬▬", "███"], inline = "em", group = G3)
+wEM = pxOf(wEMPick)
 emMode  = input.string("Daily", "Expected move range", options = ["Daily", "Weekly", "Daily + weekly"], group = G3)
 
 // ---------- 4 - Lines & labels (shared by every level)
@@ -358,7 +373,7 @@ if timeframe.change("D")
     sessStartTime := time
 
 lnStyle(string s) =>
-    s == "Dashed" ? line.style_dashed : s == "Dotted" ? line.style_dotted : line.style_solid
+    s == "╌╌╌╌" or s == "Dashed" ? line.style_dashed : s == "┈┈┈┈" or s == "Dotted" ? line.style_dotted : line.style_solid
 lSz = lblSize == "Tiny" ? size.tiny : lblSize == "Small" ? size.small : size.normal
 lblX = showProf ? profOffset + profWidth + 2 : lblOff
 lblBgCol = lblBg ? color.new(#0b0e13, 25) : color.new(#0b0e13, 100)

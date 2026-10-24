@@ -60,8 +60,8 @@ The dialog's separate Style tab has nothing to change.
   end at price"), with the level's price in small text at the line's end; nothing is drawn over the
   space right of price except the tags. Other choices: from the session open, the full chart, or right
   of price only. Key levels and max pain are 2 px, others 1 px. The GEX profile is off by default.
-* **Colours, style and width**: each level type has its colour, line style (solid / dashed / dotted)
-  and width side by side in settings. Defaults: calls green, puts red, absolute gamma violet, zero gamma
+* **Colours, style and width**: each level type has its colour, line style and thickness side by side in
+  settings, picked from drawn previews: `────` solid, `╌╌╌╌` dashed, `┈┈┈┈` dotted; `───` 1 px up to `███` 4 px. Defaults: calls green, puts red, absolute gamma violet, zero gamma
   amber (dashed), expected move grey, every line 1 px. Ranked walls fade with strength: the strongest
   level is fully opaque and the weakest about 75% transparent, line and tag alike. Largest +/- GEX,
   concentrations, volume walls and max pain are off by default (the ranked walls cover them).
