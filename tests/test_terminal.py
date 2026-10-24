@@ -54,5 +54,15 @@ class TestAssets(unittest.TestCase):
             self.assertTrue((out / "assets" / "app.js").exists() and (out / "data" / "all.json").exists())
 
 
+
+class TestScriptNames(unittest.TestCase):
+    def test_no_two_functions_share_a_name(self):
+        """A second `function x()` silently replaces the first in the browser (it blanked the Levels list once)."""
+        import re
+        js = (Path(__file__).resolve().parent.parent / "dashboard" / "assets" / "app.js").read_text(encoding="utf-8")
+        names = re.findall(r"(?:^|\n)\s*(?:async\s+)?function\s+(\w+)\s*\(", js)
+        self.assertEqual(sorted({n for n in names if names.count(n) > 1}), [])
+
+
 if __name__ == "__main__":
     unittest.main()

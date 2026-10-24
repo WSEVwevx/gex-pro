@@ -290,7 +290,7 @@ function render(){
   renderExpiry(s);
   if(page === "bias") renderBias(w);
   renderTicker();
-  if(page === "ladder") renderLadder();
+  if(page === "ladder") renderLiveTable();
   $("foot").innerHTML = `Model estimates from ${esc(s.provider || w.provider)} ${opts} options (${s.ref_quality === "RT" ? "real-time quotes" : "15-minute-delayed quotes"}) and end-of-day open interest, assuming dealers are long calls and short puts.
     ${w.result.mapped ? "Futures prices use " + esc(w.result.mapped.mapping.futures_ref_mode) + "; TradingView re-maps with your live chart." : esc(s.mapping_note || "")}
     These are proxy levels from index and ETF options, not NQ/ES futures options, and not trading advice.`;
@@ -957,7 +957,7 @@ let ldRowsN = Number(store.get("gex.ldrows", "51"));
 const MON = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 const ldDate = d => d === "other" ? "LATER" : `${MON[Number(d.slice(5, 7)) - 1]} ${Number(d.slice(8, 10))}`;
 const compact = x => x == null || !isFinite(x) ? "-" : (x < 0 ? "-" : "+") + (Math.abs(x) >= 1e9 ? num(Math.abs(x) / 1e9, 2) + "B" : Math.abs(x) >= 1e6 ? num(Math.abs(x) / 1e6, 1) + "M" : num(Math.abs(x) / 1e3, 0) + "K");
-function renderLadder(){
+function renderLiveTable(){
   const w = curW();
   if(!w || !w.result){ $("ldRows").innerHTML = `<div class="expl">No data yet.</div>`; return; }
   const r = w.result, s = r.summary, L = r.mapped || s, LD = r.ladder;
@@ -977,8 +977,8 @@ function renderLadder(){
       <i class="ld-dot" style="background:${pos ? "var(--pos)" : "var(--neg)"}"></i>
       <span class="ld-mini"><i style="height:${h}px;background:${pos ? "var(--pos)" : "var(--neg)"}"></i></span><span class="ld-v" style="color:${pos ? "var(--pos)" : "var(--neg)"}">${compact(e.net)}</span></button>`;
   }).join("");
-  [...$("ldStrip").children].forEach(b => b.onclick = () => { const i = Number(b.dataset.i); ldSel.has(i) ? ldSel.delete(i) : ldSel.add(i); if(ldSel.size === E.length) ldSel.clear(); store.set("gex.ldsel", JSON.stringify([...ldSel])); renderLadder(); });
-  $("ldAll").onclick = () => { ldSel.clear(); store.set("gex.ldsel", "[]"); renderLadder(); };
+  [...$("ldStrip").children].forEach(b => b.onclick = () => { const i = Number(b.dataset.i); ldSel.has(i) ? ldSel.delete(i) : ldSel.add(i); if(ldSel.size === E.length) ldSel.clear(); store.set("gex.ldsel", JSON.stringify([...ldSel])); renderLiveTable(); });
+  $("ldAll").onclick = () => { ldSel.clear(); store.set("gex.ldsel", "[]"); renderLiveTable(); };
   $("ldAll").classList.toggle("on", all);
   $("ldStripSub").textContent = all ? "all expirations" : `${ldSel.size} selected · click to add or remove`;
   // rows: sums over the selected expirations
@@ -988,7 +988,7 @@ function renderLadder(){
   const half = Math.floor(ldRowsN / 2);
   rows = rows.slice(Math.max(0, near - half), Math.max(0, near - half) + ldRowsN);
   $("ldZoom").innerHTML = [[21, "Tight"], [35, "Normal"], [51, "Wide"]].map(([n, t]) => `<button role="tab" aria-selected="${ldRowsN === n}" data-n="${n}">${t}</button>`).join("");
-  [...$("ldZoom").children].forEach(b => b.onclick = () => { ldRowsN = Number(b.dataset.n); store.set("gex.ldrows", String(ldRowsN)); renderLadder(); });
+  [...$("ldZoom").children].forEach(b => b.onclick = () => { ldRowsN = Number(b.dataset.n); store.set("gex.ldrows", String(ldRowsN)); renderLiveTable(); });
   const col = j => Math.max(1, ...rows.map(x => Math.abs(j === 2 ? x.v[2] - x.v[3] : j === 4 ? x.v[4] - x.v[5] : x.v[j])));
   const mx = {dex: col(1), gex: col(0), oi: col(2), vol: col(4)};
   // levels, in futures prices, placed on the nearest row
