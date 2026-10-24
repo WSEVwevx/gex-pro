@@ -94,8 +94,9 @@ Full details: [METHODOLOGY](docs/METHODOLOGY.md). Caveats: [LIMITATIONS](docs/LI
 
 A terminal-style workspace: a command line (type `LIVE`, `TRK`, `NQ`, `ES`, `COPY`, `LIGHT`, `HELP` and press
 Enter, or press `/`), a ticker strip with both markets, a sidebar of pages (keys `1`-`8`), and an **Explain**
-panel (the `?` on every module, or the EXPLAIN tab on the right edge, or `X`) that says in plain English
-what each module shows and what to watch, with the live numbers for the current market. A sun/moon button in the top
+panel (the `?` on every module, the Explain button in the top bar, or `X`) that says in plain English
+what each module shows and what to watch, with the live numbers for the current market. The screen stays
+clean by default; **Notes** in the sidebar (or `D`) adds a one-line note under each number. A sun/moon button in the top
 bar (or `T`, or the `LIGHT` / `DARK` commands) switches between night and light mode; the choice is saved in
 your browser, and the first visit follows your system setting.
 

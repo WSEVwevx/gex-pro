@@ -706,6 +706,7 @@ const COMMANDS = [
   {code: "EXPLAIN", desc: "Explain this page", run: () => openExplain(PAGE_HELP[page] || "regime")},
   {code: "REFRESH", desc: "Reload all data now", run: () => { load(); loadNews(); loadPosts(); toast("Refreshing data..."); }},
   {code: "HELP", desc: "Keyboard shortcuts", run: () => showKeys(true)},
+  {code: "NOTES", desc: "Show or hide the notes under numbers", run: () => $("notesBtn").click()},
   {code: "LIGHT", desc: "Light mode", run: () => setTheme("light")}, {code: "DARK", desc: "Dark (night) mode", run: () => setTheme("dark")},
   {code: "LEARN", desc: "Start the beginner course", run: () => openLesson(LIB.lessons[0].id)},
   {code: "GLOSSARY", desc: "Open the A-Z glossary", run: () => { libTab = "glossary"; setPage("library"); }},
@@ -734,9 +735,13 @@ $("cmd").addEventListener("keydown", e => {
 
 // ---------- keyboard
 const KEYS = [["/  or  Ctrl+K", "Command line"], ["1 - 8", "Pages (Levels, Live table, Bias, Track record, Briefings, News, Indicator, Library)"],
-  ["N  /  E", "Switch to NQ / ES"], ["X", "Explain this page"], ["T", "Light / dark mode"], ["C", "Copy the TradingView paste"], ["?", "This list"], ["Esc", "Close panels"]];
+  ["N  /  E", "Switch to NQ / ES"], ["X", "Explain this page"], ["T", "Light / dark mode"], ["D", "Notes under numbers on / off"], ["C", "Copy the TradingView paste"], ["?", "This list"], ["Esc", "Close panels"]];
 function showKeys(on){ $("keys").hidden = !on; if(on) $("keysGrid").innerHTML = KEYS.map(([k, d]) => `<kbd>${esc(k)}</kbd><span>${esc(d)}</span>`).join(""); }
 $("keysBtn").onclick = () => showKeys(true);
+// one-line notes under the numbers: off by default for a clean screen; the Explain panel has the full text
+function setNotes(on){ document.body.classList.toggle("notes", on); $("notesBtn").setAttribute("aria-pressed", String(on)); store.set("gex.notes", on ? "1" : "0"); }
+$("notesBtn").onclick = () => setNotes(!document.body.classList.contains("notes"));
+setNotes(store.get("gex.notes", "0") === "1");
 $("keysClose").onclick = () => showKeys(false);
 $("keys").onclick = e => { if(e.target === $("keys")) showKeys(false); };
 document.addEventListener("keydown", e => {
@@ -750,6 +755,7 @@ document.addEventListener("keydown", e => {
   else if(e.key === "e" || e.key === "E") setMarket("ES");
   else if(e.key === "x" || e.key === "X") $("explainTab").click();
   else if(e.key === "t" || e.key === "T") $("themeBtn").click();
+  else if(e.key === "d" || e.key === "D") $("notesBtn").click();
   else if(e.key === "c" || e.key === "C") $("copyAll").click();
   else if(e.key === "?") showKeys(true);
 });
