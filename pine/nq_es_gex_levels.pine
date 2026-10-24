@@ -21,56 +21,56 @@ mapMode = input.string("Live reference", "Price mapping", options = ["Live refer
 // ---------- 2 - Key levels: one clean row each, on/off + colour swatch
 G2 = "2 - Key levels"
 showZG   = input.bool(true, "Zero gamma", inline = "zg", group = G2)
-cZG      = input.color(#f0b429, "", inline = "zg", group = G2, tooltip = "Estimated price where modeled dealer gamma flips sign. Dashed line.")
+cZG      = input.color(#f0b429, "", inline = "zg", group = G2, tooltip = "Estimated price where modeled dealer gamma flips sign. Line style and width next to the colour.")
+styZG = input.string("Dashed", "", options = ["Solid", "Dashed", "Dotted"], inline = "zg", group = G2)
+wZG = input.int(1, "", minval = 1, maxval = 4, inline = "zg", group = G2)
 showCW   = input.bool(true, "Call wall", inline = "cw", group = G2)
 cPos     = input.color(#22c55e, "", inline = "cw", group = G2, tooltip = "Strike above price with the most call gamma. Also the colour of positive-gamma levels and profile bars.")
+styCW = input.string("Solid", "", options = ["Solid", "Dashed", "Dotted"], inline = "cw", group = G2)
+wCW = input.int(1, "", minval = 1, maxval = 4, inline = "cw", group = G2)
 showPW   = input.bool(true, "Put wall", inline = "pw", group = G2)
 cNeg     = input.color(#ef4444, "", inline = "pw", group = G2, tooltip = "Strike below price with the most put gamma. Also the colour of negative-gamma levels and profile bars.")
+styPW = input.string("Solid", "", options = ["Solid", "Dashed", "Dotted"], inline = "pw", group = G2)
+wPW = input.int(1, "", minval = 1, maxval = 4, inline = "pw", group = G2)
 showAG   = input.bool(true, "Absolute gamma", inline = "ag", group = G2)
-cAG      = input.color(#a78bfa, "", inline = "ag", group = G2, tooltip = "Strike with the most TOTAL gamma (calls + puts). Often acts like a magnet. Doesn't depend on any dealer-positioning assumption. Dotted.")
-showRank = input.bool(true, "Ranked walls (C1-C3, P1-P5, Ab1-Ab3)", group = G2,
-     tooltip = "The strongest strikes near price: C = most positive net GEX, P = most negative net GEX, Ab = most total gamma. 1 = strongest; the bar next to the tag shows its share of all gamma.")
-showMax  = input.bool(false, "Largest +/- GEX and concentrations", group = G2, tooltip = "Strikes with the most positive / negative gamma, plus the extra concentrations below. Dotted, in the call / put colours.")
+cAG      = input.color(#a78bfa, "", inline = "ag", group = G2, tooltip = "Strike with the most TOTAL gamma (calls + puts). Often acts like a magnet. Doesn't depend on any dealer-positioning assumption.")
+styAG = input.string("Dotted", "", options = ["Solid", "Dashed", "Dotted"], inline = "ag", group = G2)
+wAG = input.int(1, "", minval = 1, maxval = 4, inline = "ag", group = G2)
+showRank = input.bool(true, "Ranked walls (C1-C3, P1-P5, Ab1-Ab3)", inline = "rk", group = G2,
+     tooltip = "The strongest strikes near price: C = most positive net GEX, P = most negative net GEX, Ab = most total gamma (call / put / absolute-gamma colours). 1 = strongest. Each line's opacity and its tag's bar show its share of gamma: strong levels solid, weak ones faint.")
+styRank = input.string("Solid", "", options = ["Solid", "Dashed", "Dotted"], inline = "rk", group = G2)
+wRank = input.int(1, "", minval = 1, maxval = 4, inline = "rk", group = G2)
+showMax  = input.bool(false, "Largest +/- GEX and concentrations", inline = "mx", group = G2, tooltip = "Strikes with the most positive / negative gamma, plus the extra concentrations below, in the call / put colours.")
+styMax = input.string("Dotted", "", options = ["Solid", "Dashed", "Dotted"], inline = "mx", group = G2)
+wMax = input.int(1, "", minval = 1, maxval = 4, inline = "mx", group = G2)
 nConc    = input.int(0, "Other concentrations", minval = 0, maxval = 6, inline = "cc", group = G2)
 minShare = input.float(5.0, "min %", minval = 0, step = 0.5, inline = "cc", group = G2,
      tooltip = "Extra big-gamma strikes, labeled +G / -G with their share of total exposure. 0 = off.")
 
 // ---------- 3 - More levels: same clean rows
 G3 = "3 - More levels"
-show0   = input.bool(true, "0DTE zero gamma and walls", group = G3,
-     tooltip = "The same levels from today's expiring options only (\"next MM-DD\" when nothing expires today). Thin lines in lighter key-level colours.")
+show0   = input.bool(true, "0DTE zero gamma and walls", inline = "z0", group = G3,
+     tooltip = "The same levels from today's expiring options only (\"next MM-DD\" when nothing expires today), in lighter key-level colours.")
+sty0 = input.string("Solid", "", options = ["Solid", "Dashed", "Dotted"], inline = "z0", group = G3)
+w0 = input.int(1, "", minval = 1, maxval = 4, inline = "z0", group = G3)
 showVol = input.bool(false, "Volume walls", inline = "vo", group = G3)
-cVol    = input.color(#2dd4bf, "", inline = "vo", group = G3, tooltip = "Strikes with the most calls / puts traded today. Moves during the session. Dashed.")
+cVol    = input.color(#2dd4bf, "", inline = "vo", group = G3, tooltip = "Strikes with the most calls / puts traded today. Moves during the session.")
+styVol = input.string("Dashed", "", options = ["Solid", "Dashed", "Dotted"], inline = "vo", group = G3)
+wVol = input.int(1, "", minval = 1, maxval = 4, inline = "vo", group = G3)
 showOI  = input.bool(false, "OI walls", inline = "oi", group = G3)
-cOI     = input.color(#9085e9, "", inline = "oi", group = G3, tooltip = "Strikes with the most open calls / puts as of yesterday's close. Dotted.")
+cOI     = input.color(#9085e9, "", inline = "oi", group = G3, tooltip = "Strikes with the most open calls / puts as of yesterday's close.")
+styOI = input.string("Dotted", "", options = ["Solid", "Dashed", "Dotted"], inline = "oi", group = G3)
+wOI = input.int(1, "", minval = 1, maxval = 4, inline = "oi", group = G3)
 showMP  = input.bool(false, "Max pain", inline = "mp", group = G3)
-cMP     = input.color(#c98500, "", inline = "mp", group = G3, tooltip = "Price where option holders lose the most at expiration. Dotted.")
+cMP     = input.color(#c98500, "", inline = "mp", group = G3, tooltip = "Price where option holders lose the most at expiration.")
+styMP = input.string("Dotted", "", options = ["Solid", "Dashed", "Dotted"], inline = "mp", group = G3)
+wMP = input.int(1, "", minval = 1, maxval = 4, inline = "mp", group = G3)
 mpCount = input.string("Nearest", "Max pain expirations", options = ["Nearest", "Nearest + next"], group = G3)
 showEM  = input.bool(true, "Expected move", inline = "em", group = G3)
-cEM     = input.color(#8b95a5, "", inline = "em", group = G3, tooltip = "1 standard-deviation range implied by options, from the previous close. Dashed (weekly: lighter).")
+cEM     = input.color(#8b95a5, "", inline = "em", group = G3, tooltip = "1 standard-deviation range implied by options, from the previous close (weekly: lighter).")
+styEM = input.string("Dashed", "", options = ["Solid", "Dashed", "Dotted"], inline = "em", group = G3)
+wEM = input.int(1, "", minval = 1, maxval = 4, inline = "em", group = G3)
 emMode  = input.string("Daily", "Expected move range", options = ["Daily", "Weekly", "Daily + weekly"], group = G3)
-
-// Fixed line looks: key levels 2 px, everything else 1 px; dash styles chosen per level type.
-styZG = "Dashed"
-styAG = "Dotted"
-wAG = 1
-styCW = "Solid"
-styPW = "Solid"
-styMax = "Dotted"
-sty0 = "Solid"
-styVol = "Dashed"
-styOI = "Dotted"
-styMP = "Dotted"
-styEM = "Dashed"
-wZG = 1
-wCW = 1
-wPW = 1
-wMax = 1
-w0 = 1
-wVol = 1
-wOI = 1
-wMP = 1
-wEM = 1
 
 // ---------- 4 - Lines & labels (shared by every level)
 G4 = "4 - Lines & labels"
@@ -353,6 +353,7 @@ tagMode = lblMode == "Tags + hover info"
 // Lines are placed by TIME (xloc.bar_time): a bar-index start hundreds of bars back makes Pine look up
 // that bar's history, which overflows the history buffer on low timeframes (e.g. 1-minute charts).
 var int sessStartTime = time
+var int firstTime = time                    // the chart's first loaded bar: where "across the chart" lines start
 if timeframe.change("D")
     sessStartTime := time
 
@@ -416,11 +417,11 @@ drawLevel(float p, string name, string tag, color col, int width, string style, 
                         array.set(tgStr, idx, math.max(nz(array.get(tgStr, idx)), strength))
         else
             bool toPrice = extent == "Across the chart, end at price"
-            int t1 = extent == "Right of price" ? time : extent == "Full chart" or toPrice ? time - 1 : math.min(sessStartTime, time - 1)
+            int t1 = extent == "Right of price" ? time : extent == "Full chart" or toPrice ? math.min(firstTime, time - 1) : math.min(sessStartTime, time - 1)
             int t2 = extent == "Right of price" ? time + 1 : time      // t2 > t1 gives the line a direction to extend
             array.push(gPrices, p)
             array.push(gBodies, item)
-            array.push(gLines, line.new(t1, p, t2, p, xloc = xloc.bar_time, extend = extent == "Full chart" ? extend.both : toPrice ? extend.left : extend.right,
+            array.push(gLines, line.new(t1, p, t2, p, xloc = xloc.bar_time, extend = extent == "Full chart" ? extend.both : toPrice ? extend.none : extend.right,
                  color = col, width = width, style = style))
             array.push(gLabels, lblMode != "Off" and not tagMode ? label.new(bar_index + lblX, p, item + "  " + fmtPx(p), style = label.style_label_left,
                  color = lblBgCol, textcolor = col, size = lSz, textalign = text.align_left) : label(na))
@@ -470,16 +471,13 @@ drawKey(Snap s, float f, float o, bool isSecond) =>
                 string shTxt = str.tostring(sh, "0.0") + "% of all gamma"
                 if kind == "C"
                     nC += 1
-                    drawLevel(mapP(rp, f, o), "C" + str.tostring(nC) + "|Call wall #" + str.tostring(nC), tag, color.new(cPos, tr + (nC == 1 ? 0 : 45)),
-                         nC == 1 ? 2 : 1, nC == 1 ? line.style_solid : line.style_dotted, stren, ordinal(nC) + " most positive net GEX, " + shTxt)
+                    drawLevel(mapP(rp, f, o), "C" + str.tostring(nC) + "|Call wall #" + str.tostring(nC), tag, color.new(cPos, tr), wRank, lnStyle(styRank), stren, ordinal(nC) + " most positive net GEX, " + shTxt)
                 else if kind == "P"
                     nP += 1
-                    drawLevel(mapP(rp, f, o), "P" + str.tostring(nP) + "|Put wall #" + str.tostring(nP), tag, color.new(cNeg, tr + (nP == 1 ? 0 : 45)),
-                         nP == 1 ? 2 : 1, nP == 1 ? line.style_solid : line.style_dotted, stren, ordinal(nP) + " most negative net GEX, " + shTxt)
+                    drawLevel(mapP(rp, f, o), "P" + str.tostring(nP) + "|Put wall #" + str.tostring(nP), tag, color.new(cNeg, tr), wRank, lnStyle(styRank), stren, ordinal(nP) + " most negative net GEX, " + shTxt)
                 else if kind == "A"
                     nA += 1
-                    drawLevel(mapP(rp, f, o), "Ab" + str.tostring(nA) + "|Absolute gamma #" + str.tostring(nA), tag, color.new(cAG, tr + (nA == 1 ? 10 : 50)),
-                         1, line.style_dotted, stren, ordinal(nA) + " most total gamma (calls + puts), " + shTxt)
+                    drawLevel(mapP(rp, f, o), "Ab" + str.tostring(nA) + "|Absolute gamma #" + str.tostring(nA), tag, color.new(cAG, tr), wRank, lnStyle(styRank), stren, ordinal(nA) + " most total gamma (calls + puts), " + shTxt)
     if nConc > 0 and s.lv != ""
         int shown = 0
         for item in str.split(s.lv, ",")
@@ -592,9 +590,14 @@ renderTags() =>
             array.push(gLabels, label.new(bar_index, p, fmtPx(p), style = label.style_label_right, color = color.new(#0b0e13, 100),
                  textcolor = color.new(array.get(tgCol, i), 25), size = size.tiny, textalign = text.align_right, tooltip = tip))
         float st = array.get(tgStr, i)
+        color lc = array.get(tgCol, i)
+        if not na(st)
+            int tp = math.round((1 - math.min(1.0, st)) * 75)
+            line.set_color(array.get(gLines, i), color.new(lc, tp))
+            lc := color.new(lc, math.min(tp, 40))
         string blk = na(st) ? "" : str.repeat("■", math.max(1, math.round(st * 12))) + "  "
         array.push(gLabels, label.new(bar_index + lblX, p, blk + str.replace_all(array.get(tgName, i), "·", "  ") + (nConf > 0 ? "  ●" : ""),
-             style = label.style_label_left, color = color.new(#0b0e13, 100), textcolor = array.get(tgCol, i), size = lSz,
+             style = label.style_label_left, color = color.new(#0b0e13, 100), textcolor = lc, size = lSz,
              textalign = text.align_left, tooltip = tip))
     true
 
