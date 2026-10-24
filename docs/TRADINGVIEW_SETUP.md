@@ -60,6 +60,10 @@ The dialog's separate Style tab has nothing to change.
   end at price"), with the level's price in small text at the line's end; nothing is drawn over the
   space right of price except the tags. Other choices: from the session open, the full chart, or right
   of price only. Key levels and max pain are 2 px, others 1 px. The GEX profile is off by default.
+* **Colours** (defaults, all editable): calls green, puts red, absolute gamma violet, zero gamma amber
+  (dashed), expected move grey. The #1 call and put walls are solid 2 px; lower ranks are faint dotted
+  lines, so the strongest levels stand out. Largest +/- GEX, concentrations, volume walls and max pain
+  are off by default (the ranked walls cover them); switch them on in settings.
 * **Tags + hover info** (the default label style): each level gets a short tag right of price with a
   strength bar, e.g. `▬▬▬▬▬▬ P1`. Ranked walls: `C1`-`C3` (most positive net GEX), `P1`-`P5` (most
   negative net GEX), `Ab1`-`Ab3` (most total gamma); the bar's length is the level's share of all gamma,
@@ -69,7 +73,7 @@ The dialog's separate Style tab has nothing to change.
   the regime and net GEX, and how old the paste is.
 * **Labels** ("Short" / "Full") sit right of the GEX profile on a dark pill: short code plus price with separators,
   e.g. `CW  29,883.25`. Codes: `ZG`, `CW`, `PW`, `+GEX`, `-GEX`, `+G 12%`, `0D ZG` / `0D CW` / `0D PW`,
-  `VOL C` / `VOL P`, `OI C` / `OI P`, `MP 10-21`, `EM day +` / `EM day -`, `EM wk +` / `EM wk -`.
+  `VOL C` / `VOL P`, `OI C` / `OI P`, `MP 10-21`, `EM+` / `EM-`, `EMw+` / `EMw-`.
   "Full" spells them out.
 * **Shared prices:** levels at the same price share one line, e.g. `CW · +GEX  29,883.25`.
 * **Source names** appear in labels only when two sources are drawn. `STALE` is added once the update
