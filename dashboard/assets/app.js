@@ -300,6 +300,7 @@ function render(){
   if(page === "bias") renderBias(w);
   renderTicker();
   if(page === "ladder") renderLiveTable();
+  if(page === "screener") renderScreener();
   if(page === "heatmap" && hmMarket !== market + hmTf){ hmReset = true; loadHeatmap(); }
   $("foot").innerHTML = `Model estimates from ${esc(s.provider || w.provider)} ${opts} options (${s.ref_quality === "RT" ? "real-time quotes" : "15-minute-delayed quotes"}) and end-of-day open interest, assuming dealers are long calls and short puts.
     ${w.result.mapped ? "Futures prices use " + esc(w.result.mapped.mapping.futures_ref_mode) + "; TradingView re-maps with your live chart." : esc(s.mapping_note || "")}
@@ -553,7 +554,7 @@ const PAGES = [
   ["levels", "Levels", "LVL"], ["ladder", "Live table", "LIVE"], ["heatmap", "Heatmap", "HEAT"], ["screener", "Screener", "SCRN"],
   ["bias", "Bias", "BIAS"], ["track", "Track record", "TRK"], ["briefings", "Briefings", "BRF"], ["news", "News", "NEWS"], ["indicator", "Indicator", "IND"],
   ["library", "Library", "LIB"]];
-const NO_MARKET_PAGES = ["screener", "news", "indicator", "briefings", "library", "track"];
+const NO_MARKET_PAGES = ["news", "indicator", "briefings", "library", "track"];
 const pickP = v => v && typeof v === "object" ? v.price : v;
 const curW = () => data && (data.workers.find(x => x.market === market && x.result) || data.workers.find(x => x.market === market));
 
@@ -629,9 +630,9 @@ const HELP = {
     body: `<p>Yellow tags flag market words (tariffs, the Fed, China, oil). Bullish/bearish is a keyword guess, shown only when clear: read the post before acting.</p>`},
   indicator: {title: "GEX PRO indicator", tldr: "The TradingView script that draws these levels on your chart.",
     body: `<p>Copy the code into TradingView's Pine Editor once (and again whenever the version changes). Then paste the hourly levels payload into its settings: the indicator maps index levels to your live futures chart.</p>`},
-  screener: {title: "Stock screener", tldr: "Today's movers and lists of US stocks, filtered and sorted your way.",
-    body: `<p>Pick a screen at the top: most active, gainers, losers, small-cap momentum, most shorted, tech growth or value large caps. Narrow it with the filters (price, market cap, relative volume) or type a symbol. Click any column header to sort.</p><p><b>Rel vol</b> is today's volume divided by the 3-month average: 2× or more (highlighted) means unusual interest. The <b>52-week range</b> bar shows where the price sits between its yearly low and high. A highlighted earnings date is within a week.</p><p>Data: Yahoo Finance's free screens, delayed about 15 minutes. Big-cap movers (NVDA, AAPL, MSFT...) often drive NQ and ES.</p>`,
-    watch: ["Mega caps with 2×+ relative volume can move NQ and ES", "Earnings within a week = gap risk for that stock"]},
+  screener: {title: "Index drivers", tldr: "The handful of stocks that move NQ and ES, and how many points each is worth today.",
+    body: `<p>A few giant companies make up most of the Nasdaq-100 and a big share of the S&P 500, so their moves <b>are</b> the futures' moves. This page shows the biggest weights in the index for the market you pick (NQ or ES at the top).</p><p><b>Index pts</b> = the stock's weight × its % move today × the futures price: roughly how many points of NQ or ES that stock explains. The bars show who is lifting and who is dragging. <b>Pre / after</b> is the latest pre-market or after-hours move, and the line above it says what those moves imply for the future before the cash open. <b>Rel vol</b> is today's volume against the 3-month average (1.5× or more is highlighted).</p><p>Watch the <b>earnings</b> dates: when a top-five name reports after the close, NQ and ES often gap on it overnight.</p>`,
+    watch: ["Top names all red but the future green = narrow, fragile move", "A mega cap reporting AMC = overnight gap risk for NQ / ES"]},
   library: {title: "The Library", tldr: "A short course that explains everything on this site from zero.",
     body: `<p>Start with <b>What is an option?</b> and follow the lessons in order, or search for any term. Each lesson ends with a quick check; answer it correctly and the lesson is marked as read. Your progress is saved in this browser.</p><p>Every Explain panel links to the matching lesson, so you can jump from a number on the screen straight to the idea behind it.</p>`},
   track: {title: "Live track record", tldr: "What GEX PRO said before each open, graded against what the market did.",
@@ -1203,58 +1204,74 @@ window.__hmOpen = () => { hmReset = true; if(data) loadHeatmap(); };
 $("hmOpacity").addEventListener("input", e => { hmOpacity = Number(e.target.value); store.set("gex.hmop", String(hmOpacity)); hmPrim && hmPrim.requestUpdate && hmPrim.requestUpdate(); });
 $("hmLevels").addEventListener("change", e => { hmShowLv = e.target.checked; store.set("gex.hmlv", hmShowLv ? "1" : "0"); renderHeatmap(); });
 
-// ---------- stock screener: Yahoo's free predefined screens, filtered and sorted here
-let scr = null, scrId = store.get("gex.scr", "most_actives"), scrSort = store.get("gex.scrsort", ""), scrDir = Number(store.get("gex.scrdir", "-1")) || -1;
-const SCR_COLS = [["symbol", "Symbol"], ["price", "Price"], ["pct", "Chg %"], ["volume", "Volume"], ["rel_volume", "Rel vol"],
-  ["mcap", "Mkt cap"], ["pe", "P/E"], ["range", "52-week range"], ["from_high", "From high"], ["earnings", "Earnings"]];
-const big = x => x == null || !isFinite(x) ? "-" : x >= 1e12 ? num(x / 1e12, 2) + "T" : x >= 1e9 ? num(x / 1e9, 1) + "B" : x >= 1e6 ? num(x / 1e6, 1) + "M" : x >= 1e3 ? num(x / 1e3, 0) + "K" : num(x, 0);
+// ---------- screener: the stocks that move NQ and ES (index weights x today's move, in futures points)
+let scr = null, scrSort = store.get("gex.drvsort", "impact"), scrDir = Number(store.get("gex.drvdir", "-1")) || -1;
+const SCR_COLS = [["symbol", "Stock"], ["spark", "20 days"], ["price", "Price"], ["pct", "Today"], ["ext", "Pre / after"],
+  ["weight", "Weight"], ["impact", "Index pts"], ["rel_volume", "Rel vol"], ["earnings", "Earnings"]];
 async function loadScreener(){
   try { scr = await (await fetch(STATIC ? "data/screener.json" : "/api/screener", {cache: "no-store"})).json(); }
-  catch(e){ if(!scr) $("scrRows").innerHTML = `<tr><td colspan="10" class="expl">${esc(OFFLINE)}</td></tr>`; return; }
+  catch(e){ if(!scr) $("drvRows").innerHTML = `<tr><td colspan="9" class="expl">${esc(OFFLINE)}</td></tr>`; return; }
   renderScreener();
 }
-function renderScreener(){
-  const S = (scr && scr.screens) || [];
-  if(!S.length){ $("scrRows").innerHTML = `<tr><td colspan="10" class="expl">No screener data yet. It appears after the next refresh.</td></tr>`; return; }
-  if(!S.find(s => s.id === scrId)) scrId = S[0].id;
-  $("scrTabs").innerHTML = S.map(s => `<button role="tab" aria-selected="${s.id === scrId}" data-k="${esc(s.id)}">${esc(s.label)}</button>`).join("");
-  [...$("scrTabs").children].forEach(b => b.onclick = () => { scrId = b.dataset.k; scrSort = ""; store.set("gex.scr", scrId); store.set("gex.scrsort", ""); renderScreener(); });   // each screen opens in its own order
-  const cur = S.find(s => s.id === scrId), q = $("scrQ").value.trim().toLowerCase();
-  const minP = Number($("scrPrice").value) || 0, minCap = Number($("scrCap").value) || 0, minRv = Number($("scrRv").value) || 0;
-  let rows = cur.rows.filter(r => (!q || r.symbol.toLowerCase().includes(q) || r.name.toLowerCase().includes(q))
-    && r.price >= minP && (!minCap || (r.mcap || 0) >= minCap) && (!minRv || (r.rel_volume || 0) >= minRv));
-  if(scrSort){
-    const key = scrSort === "range" ? r => r.high52 > r.low52 ? (r.price - r.low52) / (r.high52 - r.low52) : null : r => r[scrSort];
-    rows = rows.slice().sort((a, b) => { const x = key(a), y = key(b);
-      if(x == null) return 1; if(y == null) return -1;
-      return (typeof x === "string" ? x.localeCompare(y) : x - y) * scrDir; });
-  }
-  $("scrHead").innerHTML = SCR_COLS.map(([k, t]) => `<th data-k="${k}" class="${scrSort === k ? "on" : ""}" aria-sort="${scrSort === k ? (scrDir > 0 ? "ascending" : "descending") : "none"}">${t}${scrSort === k ? (scrDir > 0 ? " ▲" : " ▼") : ""}</th>`).join("");
-  [...$("scrHead").children].forEach(th => th.onclick = () => {
-    const k = th.dataset.k;
-    if(scrSort === k) scrDir = -scrDir; else { scrSort = k; scrDir = k === "symbol" ? 1 : -1; }
-    store.set("gex.scrsort", scrSort); store.set("gex.scrdir", String(scrDir)); renderScreener(); });
-  const now = Date.now() / 1000;
-  $("scrRows").innerHTML = rows.length ? rows.map(r => {
-    const cls = r.pct > 0 ? "good" : r.pct < 0 ? "bad" : "";
-    const pos = r.high52 > r.low52 ? Math.max(0, Math.min(1, (r.price - r.low52) / (r.high52 - r.low52))) : null;
-    const soon = r.earnings && r.earnings > now - 86400 && r.earnings < now + 7 * 86400;
-    const ed = r.earnings ? new Date(r.earnings * 1000).toLocaleDateString("en-US", {month: "short", day: "numeric", timeZone: "America/New_York"}) : "-";
-    return `<tr><td><a class="scr-sym" href="https://www.tradingview.com/chart/?symbol=${encodeURIComponent(r.symbol)}" target="_blank" rel="noopener" title="Open ${esc(r.symbol)} on TradingView">${esc(r.symbol)}</a><span class="scr-name">${esc(r.name)}</span></td>
-      <td class="m">${num(r.price, r.price < 1 ? 4 : 2)}</td>
-      <td class="m ${cls}">${r.pct == null ? "-" : signed(r.pct, 2) + "%"}</td>
-      <td class="m">${big(r.volume)}</td>
-      <td class="m${r.rel_volume >= 2 ? " hot" : ""}">${r.rel_volume == null ? "-" : num(r.rel_volume, 1) + "×"}</td>
-      <td class="m">${big(r.mcap)}</td>
-      <td class="m">${r.pe == null || r.pe <= 0 ? "-" : num(r.pe, 1)}</td>
-      <td>${pos == null ? "-" : `<span class="scr-rng" title="Low ${num(r.low52)} · high ${num(r.high52)}"><i style="left:${(pos * 100).toFixed(1)}%"></i></span>`}</td>
-      <td class="m">${r.from_high == null ? "-" : num(r.from_high, 1) + "%"}</td>
-      <td class="m${soon ? " hot" : ""}"${soon ? ' title="Earnings within a week"' : ""}>${esc(ed)}</td></tr>`;
-  }).join("") : `<tr><td colspan="10" class="expl">No stocks match these filters.</td></tr>`;
-  const when = new Date(cur.time).toLocaleString("en-US", {...ET, hour: "numeric", minute: "2-digit"});
-  $("scrSub").textContent = `${rows.length} of ${cur.rows.length} stocks · updated ${when} ET${cur.stale ? " (could not refresh)" : ""}`;
+function spark(v){
+  if(!v || v.length < 2) return "";
+  const lo = Math.min(...v), hi = Math.max(...v), W = 64, H = 18, x = i => (i / (v.length - 1) * W).toFixed(1), y = p => (H - 1 - (hi > lo ? (p - lo) / (hi - lo) : .5) * (H - 2)).toFixed(1);
+  return `<svg class="drv-spark" viewBox="0 0 ${W} ${H}" aria-hidden="true"><polyline fill="none" stroke="var(${v[v.length - 1] >= v[0] ? "--good" : "--bad"})" stroke-width="1.2" points="${v.map((p, i) => x(i) + "," + y(p)).join(" ")}"/></svg>`;
 }
-["scrQ", "scrPrice", "scrCap", "scrRv"].forEach(id => $(id).addEventListener("input", renderScreener));
+const earnSoon = e => e && (Date.parse(e.date + "T12:00:00Z") - Date.now()) / 864e5 <= 7;
+const earnTxt = e => e ? new Date(e.date + "T12:00:00Z").toLocaleDateString("en-US", {weekday: "short", month: "short", day: "numeric", timeZone: "UTC"}) + (e.when ? " · " + (e.when === "before open" ? "BMO" : "AMC") : "") : "-";
+function renderScreener(){
+  if(!scr || !scr.stocks){ return; }
+  const k = market === "ES" ? "es" : "nq", T = (scr.totals || {})[market] || {}, F = T.futures;
+  let rows = scr.stocks.filter(r => r["w_" + k]);
+  if(!rows.length){ $("drvRows").innerHTML = `<tr><td colspan="9" class="expl">No ${market} drivers yet. They appear after the next refresh.</td></tr>`; return; }
+  const key = {impact: r => r["pts_" + k], weight: r => r["w_" + k], ext: r => r.ext && r.ext.pct, spark: r => r.spark && r.spark.length > 1 ? r.spark[r.spark.length - 1] / r.spark[0] : null,
+               earnings: r => r.earnings ? Date.parse(r.earnings.date) : null}[scrSort] || (r => r[scrSort]);
+  rows = rows.slice().sort((a, b) => { let x = key(a), y = key(b);
+    if(scrSort === "impact"){ x = x == null ? null : Math.abs(x); y = y == null ? null : Math.abs(y); }
+    if(x == null) return 1; if(y == null) return -1;
+    return (typeof x === "string" ? x.localeCompare(y) : x - y) * (scrSort === "earnings" ? -scrDir : scrDir); });
+  // summary: what the biggest names are doing to the future right now
+  const pts = T.pts || 0, ext = T.ext_pts || 0, by = scr.stocks.filter(r => r["pts_" + k] != null).sort((a, b) => b["pts_" + k] - a["pts_" + k]);
+  const top = by[0], bot = by[by.length - 1], up = T.up || 0, dn = T.down || 0;
+  const sg = (x, d = 1) => `<b class="${x > 0 ? "good" : x < 0 ? "bad" : ""}">${signed(x, d)}</b>`;
+  $("drvSum").innerHTML = `
+    <div class="drv-fut"><div class="eyebrow">${market} future</div><div class="big">${F ? num(F.price, 2) : "-"}</div>
+      <div class="drv-chg">${F ? sg(F.change, 2) + ` pts · ${signed(F.pct, 2)}%` : ""}</div></div>
+    <div class="drv-kv"><span>Top ${T.names || 0} stocks' move</span>${sg(pts)} <em>pts of ${market}</em></div>
+    <div class="drv-kv"><span>They make up</span><b>${num(T.weight, 1)}%</b> <em>of the ${market === "ES" ? "S&P 500" : "Nasdaq-100"}</em></div>
+    ${ext ? `<div class="drv-kv"><span>Pre / after-hours moves imply</span>${sg(ext)} <em>pts</em></div>` : ""}
+    <div class="drv-breadth" title="${up} up, ${dn} down"><i class="good" style="flex:${up}"></i><i class="bad" style="flex:${dn}"></i></div>
+    <div class="drv-kv sm"><span>${up} up · ${dn} down</span>${top && top["pts_" + k] > 0 ? `<em>lifting most: <b>${esc(top.symbol)}</b> ${signed(top["pts_" + k], 1)}</em>` : ""}${bot && bot["pts_" + k] < 0 ? `<em>dragging most: <b>${esc(bot.symbol)}</b> ${signed(bot["pts_" + k], 1)}</em>` : ""}</div>`;
+  // contribution bars, biggest push at the top
+  const mx = Math.max(1e-9, ...by.map(r => Math.abs(r["pts_" + k])));
+  $("drvBars").innerHTML = by.map(r => { const v = r["pts_" + k], w = (Math.abs(v) / mx * 50).toFixed(1);
+    return `<div class="drv-bar" title="${esc(r.name)}: ${signed(r.pct, 2)}% × ${num(r["w_" + k], 2)}% weight"><span class="s">${esc(r.symbol)}</span>
+      <span class="t"><i class="${v >= 0 ? "good" : "bad"}" style="${v >= 0 ? "left:50%" : "right:50%"};width:${w}%"></i></span><span class="v ${v >= 0 ? "good" : "bad"}">${signed(v, 1)}</span></div>`; }).join("");
+  // earnings coming up among the drivers
+  const soon = scr.stocks.filter(r => r["w_" + k] && r.earnings && Date.parse(r.earnings.date + "T23:59:00Z") >= Date.now() - 864e5)
+    .sort((a, b) => a.earnings.date.localeCompare(b.earnings.date)).slice(0, 8);
+  $("drvEarn").innerHTML = soon.length ? soon.map(r => `<span class="drv-e${earnSoon(r.earnings) ? " hot" : ""}"><b>${esc(r.symbol)}</b>${esc(earnTxt(r.earnings))}</span>`).join("")
+    : `<span class="expl">No driver reports in the next 30 days.</span>`;
+  // table
+  $("drvHead").innerHTML = SCR_COLS.map(([c, t]) => `<th data-k="${c}" class="${scrSort === c ? "on" : ""}" aria-sort="${scrSort === c ? (scrDir > 0 ? "ascending" : "descending") : "none"}">${t}${scrSort === c ? (scrDir > 0 ? " ▲" : " ▼") : ""}</th>`).join("");
+  [...$("drvHead").children].forEach(th => th.onclick = () => { const c = th.dataset.k;
+    if(scrSort === c) scrDir = -scrDir; else { scrSort = c; scrDir = c === "symbol" ? 1 : -1; }
+    store.set("gex.drvsort", scrSort); store.set("gex.drvdir", String(scrDir)); renderScreener(); });
+  $("drvRows").innerHTML = rows.map(r => { const v = r["pts_" + k], cls = x => x > 0 ? "good" : x < 0 ? "bad" : "";
+    return `<tr${r.stale ? ' class="stale" title="Could not refresh: last known price"' : ""}><td><a class="scr-sym" href="https://www.tradingview.com/chart/?symbol=${encodeURIComponent(r.symbol.replace("-", "."))}" target="_blank" rel="noopener" title="Open ${esc(r.symbol)} on TradingView">${esc(r.symbol)}</a><span class="scr-name">${esc(r.name)}</span></td>
+      <td>${spark(r.spark)}</td>
+      <td class="m">${num(r.price, 2)}</td>
+      <td class="m ${cls(r.pct)}">${signed(r.pct, 2)}%</td>
+      <td class="m ${r.ext ? cls(r.ext.pct) : ""}">${r.ext ? `<span class="drv-tag">${r.ext.session === "pre" ? "PRE" : "AH"}</span>${signed(r.ext.pct, 2)}%` : "-"}</td>
+      <td class="m">${num(r["w_" + k], 2)}%</td>
+      <td class="m drv-imp ${cls(v)}">${v == null ? "-" : signed(v, 1)}</td>
+      <td class="m${r.rel_volume >= 1.5 ? " hot" : ""}">${r.rel_volume == null ? "-" : num(r.rel_volume, 1) + "×"}</td>
+      <td class="m${earnSoon(r.earnings) ? " hot" : ""}">${esc(earnTxt(r.earnings))}</td></tr>`; }).join("");
+  const when = new Date(scr.fetched).toLocaleString("en-US", {...ET, hour: "numeric", minute: "2-digit"});
+  const wd = scr.weights_asof ? new Date(scr.weights_asof).toLocaleDateString("en-US", {...ET, month: "short", day: "numeric"}) : "?";
+  $("scrSub").textContent = `${rows.length} biggest ${market === "ES" ? "S&P 500" : "Nasdaq-100"} weights · prices ${when} ET · weights ${wd}`;
+}
 
 setPage(page);
 load();

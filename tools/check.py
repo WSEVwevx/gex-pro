@@ -47,7 +47,7 @@ def site() -> tuple[bool, str]:
             good = age_h < 3
             ok &= good
             lines.append(f"{'OK  ' if good else 'FAIL'} levels {w['market']}: {age_h:.1f} h old")
-        checks = {"quotes.json": lambda d: len(d["quotes"]), "screener.json": lambda d: sum(len(s["rows"]) for s in d["screens"]),
+        checks = {"quotes.json": lambda d: len(d["quotes"]), "screener.json": lambda d: len(d["stocks"]),
                   "news.json": lambda d: len(d.get("events") or d.get("items") or d) if d else 0,
                   "trackrecord.json": lambda d: 1 if d else 0}
         for m in ("NQ", "ES"):

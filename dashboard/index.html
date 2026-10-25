@@ -108,19 +108,17 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
       </section>
     </div>
 
-    <!-- SCREENER -->
+    <!-- SCREENER: the stocks that move NQ / ES -->
     <div id="screenerView" hidden>
-      <section class="card scr-card" data-help="screener">
-        <div class="head"><h2>Stock screener</h2><span class="sub" id="scrSub"></span></div>
-        <div class="filters scr-tabs" id="scrTabs" role="tablist" aria-label="Screen"></div>
-        <div class="scr-tools">
-          <input id="scrQ" class="lib-search" type="search" placeholder="Filter by symbol or name..." aria-label="Filter stocks">
-          <label class="hm-ctl">Price over <select id="scrPrice"><option value="0">Any</option><option value="1">$1</option><option value="5">$5</option><option value="10">$10</option><option value="50">$50</option></select></label>
-          <label class="hm-ctl">Market cap <select id="scrCap"><option value="0">Any</option><option value="3e8">Over $300M</option><option value="2e9">Over $2B</option><option value="1e10">Over $10B</option><option value="2e11">Over $200B</option></select></label>
-          <label class="hm-ctl">Rel volume <select id="scrRv"><option value="0">Any</option><option value="1.5">1.5× +</option><option value="2">2× +</option><option value="3">3× +</option></select></label>
-        </div>
-        <div class="scr-wrap"><table class="scr-table"><thead><tr id="scrHead"></tr></thead><tbody id="scrRows"><tr><td colspan="10"><div class="skeleton">Loading screens...</div></td></tr></tbody></table></div>
-        <div class="expl">US stocks from Yahoo Finance's free screens, exchange data delayed about 15 minutes. Rel vol = today's volume vs the 3-month average. Click a column to sort, a symbol to open its chart on TradingView. Not trading advice.</div>
+      <div class="grid2 drv-top">
+        <section class="card" data-help="screener"><div class="head"><h2>Index drivers</h2></div><div id="drvSum"><div class="skeleton">Loading...</div></div></section>
+        <section class="card" data-help="screener"><div class="head"><h2>Points contribution today</h2><span class="sub">weight × move, in futures points</span></div><div class="drv-bars" id="drvBars"></div></section>
+      </div>
+      <section class="card drv-earn-card" data-help="screener"><div class="head"><h2>Earnings ahead</h2><span class="sub">BMO before the open · AMC after the close</span></div><div class="drv-earn" id="drvEarn"></div></section>
+      <section class="card" data-help="screener">
+        <div class="head"><h2>Drivers</h2><span class="sub" id="scrSub"></span></div>
+        <div class="scr-wrap"><table class="scr-table drv-table"><thead><tr id="drvHead"></tr></thead><tbody id="drvRows"><tr><td colspan="9"><div class="skeleton">Loading...</div></td></tr></tbody></table></div>
+        <div class="expl">Index pts = the stock's index weight × its move today × the futures price: roughly how much of NQ / ES's move it explains. Weights from slickcharts.com, prices from Yahoo Finance (delayed), earnings from Nasdaq.com. Not trading advice.</div>
       </section>
     </div>
 

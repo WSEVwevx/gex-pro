@@ -45,7 +45,7 @@ class TestAssets(unittest.TestCase):
         from feeds.component import FeedsComponent
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / "site"
-            site.build([GexComponent([synth_cfg(tmp)]), FeedsComponent(_Empty(), _Empty())], out, Path(tmp) / "state")
+            site.build([GexComponent([synth_cfg(tmp)]), FeedsComponent(_Empty(), _Empty(), _Empty(), _Empty())], out, Path(tmp) / "state")
             html = (out / "index.html").read_text(encoding="utf-8")
             self.assertRegex(html, r'"assets/app\.js\?v=[0-9a-f]{10}"')
             self.assertRegex(html, r'"assets/terminal\.css\?v=[0-9a-f]{10}"')

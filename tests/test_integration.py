@@ -124,13 +124,13 @@ class TestAlerts(unittest.TestCase):
 
 
 class _Empty:
-    """Stand-in for the calendar and posts feeds (no network in tests)."""
+    """Stand-in for every feed: calendar, posts, ticker quotes, screener (no network in tests)."""
     def get(self):
-        return {"events": [], "posts": [], "fetched_at": None}
+        return {"events": [], "posts": [], "quotes": [], "stocks": [], "totals": {}, "fetched_at": None}
 
 
 def app(workers):
-    return [GexComponent.from_workers(workers), FeedsComponent(_Empty(), _Empty())]
+    return [GexComponent.from_workers(workers), FeedsComponent(_Empty(), _Empty(), _Empty(), _Empty())]
 
 
 class TestService(unittest.TestCase):
@@ -258,7 +258,7 @@ class TestStaticSite(unittest.TestCase):
         from gexpro import site
         with tempfile.TemporaryDirectory() as tmp:
             out, state = Path(tmp) / "site", Path(tmp) / "state"
-            build = lambda: site.build([GexComponent([synth_cfg(tmp)]), FeedsComponent(_Empty(), _Empty())], out, state)
+            build = lambda: site.build([GexComponent([synth_cfg(tmp)]), FeedsComponent(_Empty(), _Empty(), _Empty(), _Empty())], out, state)
             res = build()
             self.assertEqual(res["NQ-SYNTHETIC"][1], "OK")
             html = (out / "index.html").read_text(encoding="utf-8")
