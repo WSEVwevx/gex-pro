@@ -323,6 +323,14 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
     <div class="keys-grid" id="keysGrid"></div>
   </div>
 </div>
+<!-- copy fallback: shown only when the browser blocks clipboard access -->
+<div class="overlay" id="copyBox" hidden>
+  <div class="keys-card">
+    <div class="ex-head"><h3>Copy this</h3><button class="ex-close" id="copyClose" aria-label="Close">×</button></div>
+    <div class="copy-body"><div class="expl" id="copyHint">Your browser blocked automatic copying. The text below is selected: press Ctrl+C (Cmd+C on a Mac).</div>
+      <textarea id="copyText" readonly spellcheck="false" aria-label="Text to copy"></textarea></div>
+  </div>
+</div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
 <script src="assets/library.js"></script>

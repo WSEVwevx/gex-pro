@@ -5,9 +5,10 @@
   pricing    every pricing formula against finite differences and identities
   math       live levels re-derived from the raw Cboe data with independent code
   audit      live data, levels and the TradingView paste end to end, NQ and ES
+  track      every track-record plan and grade re-derived by hand; the backtest recounted from raw files
   site       the hosted website's data files: present, filled in, and recent
 
---quick skips the live checks (math, audit, site). Exits 1 if anything failed.
+--quick skips the live checks (math, audit, track, site). Exits 1 if anything failed.
 """
 from __future__ import annotations
 
@@ -69,6 +70,7 @@ def main() -> int:
     if not quick:
         steps += [("math", lambda: run(["tools/verify_math.py"], "ALL MATCH")),
                   ("audit", lambda: run(["-m", "gexsys", "audit"], "0 failed")),
+                  ("track", lambda: run(["tools/verify_track.py"], "ALL MATCH")),
                   ("site", site)]
     failed = []
     for name, fn in steps:

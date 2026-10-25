@@ -33,11 +33,19 @@ const VIEWS = [["all","All"], ...GROUPS];
 const KIND_COLOR = {ag:"var(--ag)", zg:"var(--zg)", call:"var(--pos)", put:"var(--neg)", vol:"var(--vol)", oi:"var(--oi)", mp:"var(--mp)", em:"var(--em)"};
 
 function toast(msg){ const t=$("toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove("show"),3800); }
+// clipboard, else the old copy command, else a box with the text selected (long code never goes through prompt())
+async function copyText(text, done){
+  try { await navigator.clipboard.writeText(text); toast(done); return; } catch(e) {}
+  const ta = $("copyText"); ta.value = text; $("copyBox").hidden = false; ta.focus(); ta.select(); ta.scrollTop = 0;
+  try { if(document.execCommand("copy")){ $("copyBox").hidden = true; toast(done); } } catch(e) {}
+}
+$("copyClose").onclick = () => { $("copyBox").hidden = true; };
+$("copyBox").onclick = e => { if(e.target === $("copyBox")) $("copyBox").hidden = true; };
 async function copyFrom(url, what){
-  const text = (await (await fetch(url, {cache:"no-store"})).text()).trim();
+  let text;
+  try { text = (await (await fetch(url, {cache:"no-store"})).text()).trim(); } catch(e){ toast(OFFLINE); return; }
   if(!text){ toast("Nothing to copy yet - the first scheduled update hasn't happened."); return; }
-  try{ await navigator.clipboard.writeText(text); toast(`Copied ${what}. In TradingView: indicator settings > Levels payload > Ctrl+A, Ctrl+V > OK.`); }
-  catch(e){ window.prompt("Copy this (Ctrl+C):", text); }
+  await copyText(text, `Copied ${what}. In TradingView: indicator settings > Levels payload > Ctrl+A, Ctrl+V > OK.`);
 }
 $("copyAll").onclick = () => copyFrom(pineUrl(""), "the scheduled update for NQ and ES");
 $("copyMarket").onclick = () => copyFrom(pineUrl(market), `the scheduled update for ${market}`);
@@ -204,8 +212,7 @@ function renderIndicator(){
 }
 async function copyCode(){
   if(!ind) return;
-  try { await navigator.clipboard.writeText(ind.code); toast(`Copied ${num(ind.lines, 0)} lines of ${ind.name} (version ${ind.version}). Paste it into TradingView's Pine Editor and click Save.`); }
-  catch(e){ window.prompt("Copy the code (Ctrl+C):", ind.code); }
+  await copyText(ind.code, `Copied ${num(ind.lines, 0)} lines of ${ind.name} (version ${ind.version}). Paste it into TradingView's Pine Editor and click Save.`);
 }
 $("indCopy").onclick = copyCode;
 $("indCopy2").onclick = copyCode;
@@ -757,7 +764,7 @@ $("keys").onclick = e => { if(e.target === $("keys")) showKeys(false); };
 document.addEventListener("keydown", e => {
   const typing = /INPUT|TEXTAREA|SELECT/.test((document.activeElement || {}).tagName || "");
   if((e.key === "k" && (e.ctrlKey || e.metaKey)) || (e.key === "/" && !typing)){ e.preventDefault(); $("cmd").focus(); return; }
-  if(e.key === "Escape"){ showKeys(false); closeExplain(); return; }
+  if(e.key === "Escape"){ showKeys(false); closeExplain(); $("copyBox").hidden = true; return; }
   if(typing || e.ctrlKey || e.metaKey || e.altKey) return;
   const n = e.key === "0" ? 10 : Number(e.key);
   if(n >= 1 && n <= PAGES.length) setPage(PAGES[n - 1][0]);

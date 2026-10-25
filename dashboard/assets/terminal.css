@@ -448,6 +448,8 @@ td.m{font-family:var(--mono)}
 .overlay{position:fixed;inset:0;z-index:70;background:var(--overlay);backdrop-filter:blur(3px);display:grid;place-items:center}
 .overlay[hidden]{display:none}
 .keys-card{width:min(560px,92vw);background:var(--panel);border:1px solid var(--line2);border-radius:3px;box-shadow:0 30px 80px -20px var(--shadow)}
+.copy-body{padding:4px 20px 20px;display:grid;gap:10px}
+.copy-body textarea{width:100%;height:min(320px,50vh);resize:vertical;background:var(--page);color:var(--ink);border:1px solid var(--line2);border-radius:3px;padding:10px;font:12px/1.5 var(--mono)}
 .keys-grid{display:grid;grid-template-columns:auto 1fr;gap:8px 16px;padding:16px 20px 20px;font-size:13px;color:var(--ink2)}
 .keys-grid kbd{font:700 11.5px var(--mono);color:var(--prompt);background:var(--page);border:1px solid var(--line2);border-radius:3px;padding:2px 8px;justify-self:start}
 
