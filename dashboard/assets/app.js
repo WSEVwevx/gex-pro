@@ -12,6 +12,9 @@ const API = STATIC ? {all: "data/all.json", news: "data/news.json", posts: "data
                    : {all: "/api/all", news: "/api/news", posts: "/api/posts", indicator: "/api/indicator", briefings: "/api/briefings", track: "/api/trackrecord", quotes: "/api/quotes"};
 const pineUrl = m => STATIC ? `data/pine-published${m ? "-" + m : ""}.txt`
                             : `/api/pine/all?which=published${m ? "&market=" + encodeURIComponent(m) : ""}`;
+// every data request skips the browser cache; on the hosted copy a unique query also skips GitHub's
+// 10-minute CDN cache, so opening the page always gets the newest build
+const fetchFresh = url => fetch(STATIC ? url + (url.includes("?") ? "&" : "?") + "t=" + Date.now() : url, {cache: "no-store"});
 const OFFLINE = STATIC ? "Can't load the latest data file. Check your connection; retrying."
                        : "Can't reach the GEX PRO service. Is START.bat still running? Retrying every 20 seconds.";
 
@@ -43,7 +46,7 @@ $("copyClose").onclick = () => { $("copyBox").hidden = true; };
 $("copyBox").onclick = e => { if(e.target === $("copyBox")) $("copyBox").hidden = true; };
 async function copyFrom(url, what){
   let text;
-  try { text = (await (await fetch(url, {cache:"no-store"})).text()).trim(); } catch(e){ toast(OFFLINE); return; }
+  try { text = (await (await fetchFresh(url)).text()).trim(); } catch(e){ toast(OFFLINE); return; }
   if(!text){ toast("Nothing to copy yet - the first scheduled update hasn't happened."); return; }
   await copyText(text, `Copied ${what}. In TradingView: indicator settings > Levels payload > Ctrl+A, Ctrl+V > OK.`);
 }
@@ -79,7 +82,7 @@ function setPage(p){
 }
 document.querySelectorAll("#pages button[data-p]").forEach(b => b.onclick = () => setPage(b.dataset.p));
 async function loadNews(){
-  try { news = await (await fetch(API.news, {cache:"no-store"})).json(); }
+  try { news = await (await fetchFresh(API.news)).json(); }
   catch(e) { news = news || {events: [], error: OFFLINE}; }
   renderNews(); if(data) render();
 }
@@ -94,7 +97,7 @@ function newsFilter(e){
 // ---------- Trump posts (Truth Social)
 let posts = null, postF = store.get("gex.postf", "all");      // all | market
 async function loadPosts(){
-  try { posts = await (await fetch(API.posts, {cache:"no-store"})).json(); }
+  try { posts = await (await fetchFresh(API.posts)).json(); }
   catch(e) { posts = posts || {posts: [], error: OFFLINE}; }
   renderPosts();
 }
@@ -122,7 +125,7 @@ function renderPosts(){
 // ---------- Briefings page: NY AM and Asia session write-ups
 let brief = null, briefPick = "";                          // "" = the newest briefing
 async function loadBriefings(){
-  try { brief = await (await fetch(API.briefings, {cache:"no-store"})).json(); }
+  try { brief = await (await fetchFresh(API.briefings)).json(); }
   catch(e){ $("briefTitle").textContent = "Briefings unavailable"; $("briefLead").textContent = OFFLINE; return; }
   renderBriefings();
 }
@@ -186,7 +189,7 @@ function pineHtml(line){
 let ind = null, indShown = null;
 async function loadIndicator(){
   let d;
-  try { d = await (await fetch(API.indicator, {cache:"no-store"})).json(); }
+  try { d = await (await fetchFresh(API.indicator)).json(); }
   catch(e){ $("indMeta").innerHTML = `<span class="chip"><i class="dot warn"></i>${OFFLINE}</span>`; return; }
   const changed = ind && ind.version !== d.version;
   ind = d;
@@ -256,7 +259,7 @@ function renderNews(){
 }
 
 async function load(){
-  try{ data = await (await fetch(API.all, {cache:"no-store"})).json(); render(); if(page === "indicator") renderIndicator(); }
+  try{ data = await (await fetchFresh(API.all)).json(); render(); if(page === "indicator") renderIndicator(); }
   catch(e){ $("banner").innerHTML = `<div class="banner bad">${OFFLINE}</div>`; }
 }
 
@@ -277,17 +280,19 @@ function render(){
   const s = w.result && w.result.summary;
   // hosted copy: health was taken when the site was built, so also judge how old the build is
   const built = STATIC ? (Date.now() - Date.parse(data.now)) / 60000 : 0;
-  const svc = h.status === "ok" && built < 45 ? "ok" : h.status === "starting" ? "" : "warn";
+  const svc = h.status === "ok" && built < 30 ? "ok" : h.status === "starting" ? "" : "warn";
+  const lag = STATIC && built > 30 && sessionLabel(new Date())[0] !== "Futures closed";
   const used = (s && s.provider) || w.provider, rt = s && s.ref_quality === "RT";
   const opts = s ? esc(s.options_source || w.source) + (s.etf ? "+" + esc(s.etf) : "") : esc(w.source);
   $("status").innerHTML = `<span class="chip"><i class="dot ${svc}"></i>Data <b>${esc(used)}</b> · ${opts}</span>
     <span class="chip">Options <b>${rt ? "real time" : "15-min delayed"}</b></span>
     ${s ? `<span class="chip">Updated <b>${ago(s.asof)}</b></span>` : ""}
-    ${STATIC ? `<span class="chip" title="The hosted site is rebuilt about every 15 minutes in market hours and every hour otherwise">Site rebuilt <b>${ago(data.now)}</b></span>` : ""}
+    ${STATIC ? `<span class="chip" title="The hosted site is rebuilt about every 10 minutes while futures trade and every hour otherwise">${lag ? '<i class="dot warn"></i>' : ""}Site rebuilt <b>${ago(data.now)}</b></span>` : ""}
     <span class="chip">Next paste <b>${h.next_publish_et ? esc(h.next_publish_et.slice(11)) + " ET" : "-"}</b></span>
     ${(() => { const e = nextHighUSD(); return e ? `<span class="chip" title="Next ${e.impact.toLowerCase()}-impact USD event (ForexFactory)"><i class="dot ${e.impact === "High" ? "bad" : "warn"}"></i>${esc(e.title)} <b>in ${dur(Date.parse(e.time) - Date.now())}</b></span>` : ""; })()}`;
   $("banner").innerHTML = !w.result ? `<div class="banner">${h.last_error ? "Data error: " + esc(h.last_error) : "First calculation in progress..."}</div>`
-    : h.last_error ? `<div class="banner">${esc(h.last_error)}</div>` : "";
+    : h.last_error ? `<div class="banner">${esc(h.last_error)}</div>`
+    : lag ? `<div class="banner">The hosted data was built ${ago(data.now)}. GitHub runs the refresh on a schedule that sometimes runs late; this page picks up the next build by itself.</div>` : "";
   if(!w.result) return;
   const L = w.result.mapped || s, X = L.extras || {};
   const ref = L.futures_equiv_of_ref ?? s.ref_price;
@@ -843,7 +848,7 @@ $("libSearch").addEventListener("input", renderLibrary);
 // ---------- Track record: live sessions graded against what happened, plus the historical backtest
 let trk = null, trkM = store.get("gex.trkm", "ALL"), btM = store.get("gex.btm", "ES");
 async function loadTrack(){
-  try { trk = await (await fetch(API.track, {cache: "no-store"})).json(); }
+  try { trk = await (await fetchFresh(API.track)).json(); }
   catch(e){ trk = trk || {error: OFFLINE}; }
   renderTrack();
 }
@@ -1078,7 +1083,7 @@ function renderLiveTable(){
 // ---------- market tape: real quotes (Yahoo, exchange data delayed), scrolling across the top
 let quotes = null;
 async function loadQuotes(){
-  try { quotes = await (await fetch(API.quotes, {cache: "no-store"})).json(); } catch(e){ return; }
+  try { quotes = await (await fetchFresh(API.quotes)).json(); } catch(e){ return; }
   renderTape();
 }
 function renderTape(){
@@ -1106,7 +1111,7 @@ async function loadHeatmap(){
   if(!window.LightweightCharts){ $("hmMsg").textContent = "The chart library could not load (it comes from unpkg.com). Check your connection and refresh."; $("hmMsg").hidden = false; return; }
   const want = market + hmTf;
   let got;
-  try { got = await (await fetch(hmUrl(), {cache: "no-store"})).json(); }
+  try { got = await (await fetchFresh(hmUrl())).json(); }
   catch(e){ $("hmMsg").textContent = OFFLINE; $("hmMsg").hidden = false; return; }
   if(want !== market + hmTf) return;                       // the market or timeframe changed while loading
   hm = got;
@@ -1209,7 +1214,7 @@ let scr = null, scrSort = store.get("gex.drvsort", "impact"), scrDir = Number(st
 const SCR_COLS = [["symbol", "Stock"], ["spark", "20 days"], ["price", "Price"], ["pct", "Today"], ["ext", "Pre / after"],
   ["weight", "Weight"], ["impact", "Index pts"], ["rel_volume", "Rel vol"], ["earnings", "Earnings"]];
 async function loadScreener(){
-  try { scr = await (await fetch(STATIC ? "data/screener.json" : "/api/screener", {cache: "no-store"})).json(); }
+  try { scr = await (await fetchFresh(STATIC ? "data/screener.json" : "/api/screener")).json(); }
   catch(e){ if(!scr) $("drvRows").innerHTML = `<tr><td colspan="9" class="expl">${esc(OFFLINE)}</td></tr>`; return; }
   renderScreener();
 }
@@ -1278,6 +1283,17 @@ load();
 loadNews();
 loadPosts();
 loadQuotes();
+// coming back to the tab (or waking the laptop) pulls everything at once instead of waiting for the timers
+let lastPull = Date.now();
+function refreshAll(){
+  lastPull = Date.now();
+  load(); loadQuotes(); loadNews(); loadPosts();
+  if(page === "screener") loadScreener();
+  if(page === "heatmap") loadHeatmap();
+  if(page === "briefings") loadBriefings();
+  if(page === "track") loadTrack();
+}
+document.addEventListener("visibilitychange", () => { if(!document.hidden && Date.now() - lastPull > 30000) refreshAll(); });
 setInterval(loadQuotes, STATIC ? 5 * 60 * 1000 : 60 * 1000);   // the hosted copy refreshes with each site build
 setInterval(load, STATIC ? 60000 : 20000);
 setInterval(loadPosts, 2 * 60 * 1000);                     // the service itself re-fetches at most every 5 min

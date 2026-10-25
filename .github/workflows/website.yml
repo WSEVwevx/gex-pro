@@ -4,9 +4,13 @@
 name: Website
 
 on:
+  # Times are UTC. GitHub starts scheduled runs late (or skips them) when it is busy, worst at the top
+  # of the hour, hence the odd minutes. For on-time runs, see "Reliable refresh" in docs/HOSTING.md.
   schedule:
-    - cron: "*/15 13-21 * * 1-5"   # every 15 min around US market hours (times are UTC)
-    - cron: "3 * * * *"            # every hour around the clock (the hourly TradingView paste, news, posts)
+    - cron: "4-59/10 22-23 * * 0"  # every 10 min from the Sunday futures open (6 pm ET)
+    - cron: "4-59/10 * * * 1-4"    # every 10 min Monday to Thursday, around the clock (Globex + cash)
+    - cron: "4-59/10 0-21 * * 5"   # every 10 min Friday until the futures close
+    - cron: "7 * * * *"            # every hour otherwise (weekend news, posts, the hourly paste)
   workflow_dispatch:                # "Run workflow" button on the Actions tab
   push:
     branches: [main]

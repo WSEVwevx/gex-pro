@@ -3,8 +3,9 @@
 This puts the same dashboard (Levels, Bias, News with the Trump feed) on a real web address such as
 `https://yourname.github.io/gex-pro/`. You can open it from any device, and your PC doesn't need to be on.
 
-**How it works:** GitHub runs a small job on its own computers about every 15 minutes during US market hours,
-and every hour otherwise, so each hourly TradingView paste is ready shortly after the hour. The job:
+**How it works:** GitHub runs a small job on its own computers about every 10 minutes while futures trade
+(Sunday 6 pm ET to Friday 5 pm ET) and every hour otherwise, so each hourly TradingView paste is ready shortly
+after the hour. The job:
 1. Fetches fresh Cboe options data, the ForexFactory calendar and Truth Social posts.
 2. Runs the same calculations as START.bat.
 3. Publishes the result as plain web pages.
@@ -47,7 +48,7 @@ Upload the changed files again the same way (**Add file > Upload files**). Each 
 |---|---|---|
 | Needs your PC on | Yes | No |
 | Options data | Cboe, 15-min delayed | Cboe, 15-min delayed |
-| How often it updates | Every minute or so in market hours | About every 15 min in market hours (GitHub can start runs 5–20 min late) |
+| How often it updates | Every minute or so in market hours | About every 10 min while futures trade (GitHub can start runs late, see below) |
 | Windows notifications | Yes | No: check the "Next paste" time on the site |
 | Who can open it | Only you (127.0.0.1) | Anyone who has the link |
 
@@ -57,5 +58,18 @@ Upload the changed files again the same way (**Add file > Upload files**). Each 
   instead, and the footer under the feed names the source.
 - **60-day pause:** GitHub pauses scheduled jobs in a repository with no changes for 60 days, and emails
   you first. Click **Enable workflow** on the Actions tab, or upload any file, to restart it.
+- **Opening the page always gets the newest build.** It skips the browser and GitHub caches, and pulls
+  everything again when you come back to the tab. If the newest build is over 30 minutes old while futures
+  trade, the page says so.
+- **Reliable refresh (optional, free).** GitHub's scheduler runs late or skips runs when it is busy (weekends
+  and the top of the hour are the worst). To have the site rebuilt on time, let cron-job.org start the job:
+  1. On GitHub: Settings > Developer settings > Personal access tokens > Fine-grained tokens > Generate new
+     token. Repository access: only `gex-pro`. Permissions: **Actions: Read and write**. Nothing else.
+  2. On cron-job.org (free account): Create cronjob. URL
+     `https://api.github.com/repos/WSEVwevx/gex-pro/actions/workflows/website.yml/dispatches`, every 10 minutes.
+     Advanced: method **POST**; headers `Authorization: Bearer <your token>`, `Accept: application/vnd.github+json`;
+     request body `{"ref":"main"}`.
+  3. A successful call returns 204 and a new run appears on the Actions tab. Keep the token private; it can
+     only start this job.
 - **The TradingView paste is the same.** Click "Copy for TradingView" on the hosted site exactly as on the
   local one.
