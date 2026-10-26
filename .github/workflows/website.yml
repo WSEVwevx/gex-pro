@@ -5,7 +5,7 @@ name: Website
 
 on:
   # How often: while futures trade, each run starts the next one when it finishes (the "next" job at the
-  # bottom): about every 4 min in cash hours, every 8 min overnight. GitHub's own schedule is unreliable
+  # bottom): about every 3 min in cash hours, every 6 min overnight. GitHub's own schedule is unreliable
   # (it ran the old every-10-min schedule a few times a day), so it is only the backup that restarts the
   # chain if it ever stops, and the hourly refresh when futures are closed. Times are UTC.
   schedule:
@@ -110,7 +110,7 @@ jobs:
           if futures:
               cash = d <= 4 and time(9, 15) <= t < time(16, 15)
               ran = (datetime.now(timezone.utc) - datetime.fromisoformat(sys.argv[1].replace("Z", "+00:00"))).total_seconds()
-              print(max(0, int((240 if cash else 480) - ran)))
+              print(max(0, int((180 if cash else 360) - ran)))   # ~45 Yahoo calls a run: faster risks its limits
           else:
               sunday = (now + timedelta(days=(6 - d) % 7)).replace(hour=18, minute=1, second=0, microsecond=0)
               until = (sunday - now).total_seconds()

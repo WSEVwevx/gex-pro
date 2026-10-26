@@ -280,14 +280,15 @@ function render(){
   const s = w.result && w.result.summary;
   // hosted copy: health was taken when the site was built, so also judge how old the build is
   const built = STATIC ? (Date.now() - Date.parse(data.now)) / 60000 : 0;
-  const svc = h.status === "ok" && built < 30 ? "ok" : h.status === "starting" ? "" : "warn";
-  const lag = STATIC && built > 30 && sessionLabel(new Date())[0] !== "Futures closed";
+  const open = sessionLabel(new Date())[0] !== "Futures closed";          // builds every 3-6 min while open, hourly otherwise
+  const lag = STATIC && built > (open ? 20 : 90);
+  const svc = h.status === "ok" && !lag ? "ok" : h.status === "starting" ? "" : "warn";
   const used = (s && s.provider) || w.provider, rt = s && s.ref_quality === "RT";
   const opts = s ? esc(s.options_source || w.source) + (s.etf ? "+" + esc(s.etf) : "") : esc(w.source);
   $("status").innerHTML = `<span class="chip"><i class="dot ${svc}"></i>Data <b>${esc(used)}</b> · ${opts}</span>
     <span class="chip">Options <b>${rt ? "real time" : "15-min delayed"}</b></span>
     ${s ? `<span class="chip">Updated <b>${ago(s.asof)}</b></span>` : ""}
-    ${STATIC ? `<span class="chip" title="The hosted site is rebuilt about every 4 minutes in cash hours, every 8 minutes overnight while futures trade, and hourly when they are closed">${lag ? '<i class="dot warn"></i>' : ""}Site rebuilt <b>${ago(data.now)}</b></span>` : ""}
+    ${STATIC ? `<span class="chip" title="The hosted site is rebuilt about every 3 minutes in cash hours, every 6 minutes overnight while futures trade, and hourly when they are closed">${lag ? '<i class="dot warn"></i>' : ""}Site rebuilt <b>${ago(data.now)}</b></span>` : ""}
     <span class="chip">Next paste <b>${h.next_publish_et ? esc(h.next_publish_et.slice(11)) + " ET" : "-"}</b></span>
     ${(() => { const e = nextHighUSD(); return e ? `<span class="chip" title="Next ${e.impact.toLowerCase()}-impact USD event (ForexFactory)"><i class="dot ${e.impact === "High" ? "bad" : "warn"}"></i>${esc(e.title)} <b>in ${dur(Date.parse(e.time) - Date.now())}</b></span>` : ""; })()}`;
   $("banner").innerHTML = !w.result ? `<div class="banner">${h.last_error ? "Data error: " + esc(h.last_error) : "First calculation in progress..."}</div>`
