@@ -254,9 +254,25 @@ class TestKeepLastGood(unittest.TestCase):
 
 
 class TestStaticSite(unittest.TestCase):
-    def test_build_writes_site_and_keeps_state_between_runs(self):
-        from gexpro import site
+    def test_hosted_prune_keeps_recent_days(self):
+        from datetime import datetime, timedelta, timezone
+
+        from gexsys.component import _prune
         with tempfile.TemporaryDirectory() as tmp:
+            now = datetime.now(timezone.utc)
+            days = {k: Path(tmp) / "NQ-CBOE" / (now - timedelta(days=k)).strftime("%Y%m%d") for k in (0, 4, 6, 30)}
+            for d in days.values():
+                d.mkdir(parents=True)
+            _prune(Path(tmp), 5)
+            self.assertEqual({k for k, d in days.items() if d.exists()}, {0, 4})
+
+    def test_build_writes_site_and_keeps_state_between_runs(self):
+        from unittest import mock
+
+        from gexpro import site
+        # the synthetic chain is dated 2026-10-20; the hosted build drops days older than 5 by the wall clock,
+        # which would empty the history between the two builds once that date is a week behind
+        with tempfile.TemporaryDirectory() as tmp, mock.patch("gexsys.component._prune"):
             out, state = Path(tmp) / "site", Path(tmp) / "state"
             build = lambda: site.build([GexComponent([synth_cfg(tmp)]), FeedsComponent(_Empty(), _Empty(), _Empty(), _Empty())], out, state)
             res = build()
