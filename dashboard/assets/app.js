@@ -287,7 +287,7 @@ function render(){
   $("status").innerHTML = `<span class="chip"><i class="dot ${svc}"></i>Data <b>${esc(used)}</b> · ${opts}</span>
     <span class="chip">Options <b>${rt ? "real time" : "15-min delayed"}</b></span>
     ${s ? `<span class="chip">Updated <b>${ago(s.asof)}</b></span>` : ""}
-    ${STATIC ? `<span class="chip" title="The hosted site is rebuilt about every 10 minutes while futures trade and every hour otherwise">${lag ? '<i class="dot warn"></i>' : ""}Site rebuilt <b>${ago(data.now)}</b></span>` : ""}
+    ${STATIC ? `<span class="chip" title="The hosted site is rebuilt about every 4 minutes in cash hours, every 8 minutes overnight while futures trade, and hourly when they are closed">${lag ? '<i class="dot warn"></i>' : ""}Site rebuilt <b>${ago(data.now)}</b></span>` : ""}
     <span class="chip">Next paste <b>${h.next_publish_et ? esc(h.next_publish_et.slice(11)) + " ET" : "-"}</b></span>
     ${(() => { const e = nextHighUSD(); return e ? `<span class="chip" title="Next ${e.impact.toLowerCase()}-impact USD event (ForexFactory)"><i class="dot ${e.impact === "High" ? "bad" : "warn"}"></i>${esc(e.title)} <b>in ${dur(Date.parse(e.time) - Date.now())}</b></span>` : ""; })()}`;
   $("banner").innerHTML = !w.result ? `<div class="banner">${h.last_error ? "Data error: " + esc(h.last_error) : "First calculation in progress..."}</div>`

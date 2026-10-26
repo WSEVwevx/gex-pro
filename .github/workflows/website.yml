@@ -4,8 +4,10 @@
 name: Website
 
 on:
-  # Times are UTC. GitHub starts scheduled runs late (or skips them) when it is busy, worst at the top
-  # of the hour, hence the odd minutes. For on-time runs, see "Reliable refresh" in docs/HOSTING.md.
+  # How often: while futures trade, each run starts the next one when it finishes (the "next" job at the
+  # bottom): about every 4 min in cash hours, every 8 min overnight. GitHub's own schedule is unreliable
+  # (it ran the old every-10-min schedule a few times a day), so it is only the backup that restarts the
+  # chain if it ever stops, and the hourly refresh when futures are closed. Times are UTC.
   schedule:
     - cron: "4-59/10 22-23 * * 0"  # every 10 min from the Sunday futures open (6 pm ET)
     - cron: "4-59/10 * * * 1-4"    # every 10 min Monday to Thursday, around the clock (Globex + cash)
@@ -19,6 +21,7 @@ permissions:
   contents: write                   # only to push the track record to its own branch (track-record)
   pages: write
   id-token: write
+  actions: write                    # only to start the next run (the "next" job)
 
 concurrency:
   group: website
@@ -81,3 +84,40 @@ jobs:
     steps:
       - id: deploy
         uses: actions/deploy-pages@v4
+
+  # Start the next run while futures trade. Runs that overlap collapse into one (concurrency above keeps
+  # at most one waiting), so a scheduled or push run joining in never doubles the chain.
+  next:
+    needs: [build, deploy]
+    if: ${{ !cancelled() && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 370             # may wait up to 6 h for the Sunday open
+    steps:
+      - name: Wait, then start the next run (while futures trade, or at the Sunday open)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          started=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}" --jq .run_started_at)
+          wait=$(python3 - "$started" <<'PY'
+          import sys
+          from datetime import datetime, time, timedelta, timezone
+          from zoneinfo import ZoneInfo
+          NY = ZoneInfo("America/New_York")
+          now = datetime.now(NY)
+          d, t = now.weekday(), now.time()                    # Monday = 0
+          # Sunday 6 pm ET to Friday 5 pm ET; the daily 5-6 pm break keeps the chain going
+          futures = (d == 6 and t >= time(18)) or d <= 3 or (d == 4 and t < time(17))
+          if futures:
+              cash = d <= 4 and time(9, 15) <= t < time(16, 15)
+              ran = (datetime.now(timezone.utc) - datetime.fromisoformat(sys.argv[1].replace("Z", "+00:00"))).total_seconds()
+              print(max(0, int((240 if cash else 480) - ran)))
+          else:
+              sunday = (now + timedelta(days=(6 - d) % 7)).replace(hour=18, minute=1, second=0, microsecond=0)
+              until = (sunday - now).total_seconds()
+              print(int(until) if 0 < until < 6 * 3600 - 600 else -1)   # wait for the open only if it is near
+          PY
+          )
+          if [ "$wait" -lt 0 ]; then echo "futures closed: the hourly schedule takes over"; exit 0; fi
+          echo "next run in ${wait}s"
+          sleep "$wait"
+          gh workflow run website.yml --ref main -R "${{ github.repository }}"
