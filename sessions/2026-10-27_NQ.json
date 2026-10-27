@@ -1,7 +1,7 @@
 {
  "session": "2026-10-27",
  "market": "NQ",
- "status": "pending",
+ "status": "graded",
  "plan": {
   "session": "2026-10-27",
   "market": "NQ",
@@ -23,5 +23,40 @@
   "side": "negative",
   "target": 29528.93
  },
- "outcome": null
+ "outcome": {
+  "open": 29407.19,
+  "high": 29719.63,
+  "low": 29340.54,
+  "close": 29660.83,
+  "source": "Cboe 1-minute",
+  "move": 387.43,
+  "move_em": 1.213,
+  "range_em": 1.187,
+  "em_close": false,
+  "em_range": false,
+  "em_up_break": true,
+  "em_down_break": false,
+  "cw": {
+   "level": 29675.0,
+   "dist_em": 1.257,
+   "touched": true,
+   "closed_beyond": false,
+   "held": true
+  },
+  "pw": {
+   "level": 28660.0,
+   "dist_em": 1.92,
+   "touched": false,
+   "closed_beyond": false,
+   "held": false
+  },
+  "zg": {
+   "open_side": "below",
+   "crossed": true
+  },
+  "bias_hit": true,
+  "target_beat": true,
+  "magnet": null
+ },
+ "graded_at": "2026-10-27T20:21:19.417192+00:00"
 }
