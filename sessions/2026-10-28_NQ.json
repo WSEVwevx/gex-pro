@@ -1,0 +1,27 @@
+{
+ "session": "2026-10-28",
+ "market": "NQ",
+ "status": "pending",
+ "plan": {
+  "session": "2026-10-28",
+  "market": "NQ",
+  "underlying": "NDX",
+  "asof": "2026-10-28T13:27:42.166096+00:00",
+  "frozen_at": "2026-10-28T14:01:05.459262+00:00",
+  "ref": 29651.44,
+  "em": 353.95,
+  "em_iv": 0.2293,
+  "regime": "INDETERMINATE",
+  "net": 284075322.0,
+  "zg": 29635.85,
+  "cw": 29675.0,
+  "pw": 29480.0,
+  "ag": 29480.0,
+  "bias": "Neutral",
+  "confidence": "Low",
+  "day_type": "Pivot around zero gamma",
+  "side": "pivot",
+  "target": 29635.85
+ },
+ "outcome": null
+}
