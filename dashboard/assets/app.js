@@ -1104,7 +1104,7 @@ function renderTape(){
 // ---------- GEX heatmap: futures candles (Lightweight Charts) with the gamma history painted underneath
 let hm = null, hmChart = null, hmCandles = null, hmLines = {}, hmPrim = null, hmMarket = null;
 let hmReset = true;          // next draw starts at the latest candles with auto-scaled prices (open, market or timeframe change)
-let hmTf = store.get("gex.hmtf", "5m"), hmOpacity = Number(store.get("gex.hmop", "60")), hmShowLv = store.get("gex.hmlv", "1") === "1";
+let hmTf = store.get("gex.hmtf", "5m"), hmOpacity = Number(store.get("gex.hmop", "50")), hmShowLv = store.get("gex.hmlv", "1") === "1";
 const hmUrl = () => STATIC ? `data/heatmap-${market}-${hmTf}.json` : `/api/heatmap?market=${encodeURIComponent(market)}&tf=${hmTf}`;
 const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 function rgbOf(c){ const d = document.createElement("i"); d.style.color = c; document.body.appendChild(d); const v = getComputedStyle(d).color; d.remove(); return (v.match(/[\d.]+/g) || [0, 0, 0]).slice(0, 3).map(Number); }
@@ -1118,6 +1118,41 @@ async function loadHeatmap(){
   hm = got;
   renderHeatmap();
 }
+// a level's path through the snapshots without short flickers: median of 7, then a change only
+// counts once it holds for two snapshots in a row (walls often hop between two strikes and back)
+function hmSteady(vals){
+  const med = vals.map((v, i) => { const w = vals.slice(Math.max(0, i - 3), i + 4).filter(x => x != null).sort((a, b) => a - b); return v == null || !w.length ? null : w[w.length >> 1]; });
+  const out = []; let cur = null;
+  med.forEach((v, i) => { if(cur == null || (v != null && v !== cur && med[i + 1] === v)) cur = v; out.push(v == null ? null : cur); });
+  return out;
+}
+// one column per candle: snapshots that fall in the same bar are averaged band by band (several 2 px
+// slivers drawn on top of each other stacked their colour into stripes)
+function hmPerBar(cols, times){
+  const out = [];
+  for(const c of cols){
+    const bar = hmSnap(times, c.t), prev = out[out.length - 1];
+    if(prev && prev._bar === bar && !!prev.rel === !!c.rel && prev.w === c.w && prev.base === c.base && prev.v.length === c.v.length){
+      prev._n++; prev.v = prev.v.map((v, b) => v + (c.v[b] - v) / prev._n);   // running mean
+      Object.assign(prev, {zg: c.zg, cw: c.cw, pw: c.pw, t: c.t});
+    } else out.push({...c, v: c.v.slice(), _bar: bar, _n: 1});
+  }
+  return out;
+}
+// each band averaged with the same price band in the snapshots around it (same kind only), so
+// back-to-back snapshots that differ slightly don't paint as stripes; the tooltip keeps the raw values
+function hmSmooth(cols, k = 3){
+  return cols.map((c, i) => {
+    const sum = new Map(), n = [];
+    for(let j = Math.max(0, i - k); j <= Math.min(cols.length - 1, i + k); j++){
+      const o = cols[j];
+      if(!!o.rel !== !!c.rel || o.w !== c.w) continue;
+      n.push(j);
+      o.v.forEach((v, b) => { const key = Math.round((o.base + b * o.w) * 100); sum.set(key, (sum.get(key) || 0) + v); });
+    }
+    return {...c, v: c.v.map((_, b) => (sum.get(Math.round((c.base + b * c.w) * 100)) || 0) / n.length)};
+  });
+}
 // bar time at or before t (columns snap to the candle they fall in)
 function hmSnap(times, t){ let lo = 0, hi = times.length - 1; if(hi < 0 || t < times[0]) return null; while(lo < hi){ const m = (lo + hi + 1) >> 1; times[m] <= t ? lo = m : hi = m - 1; } return times[lo]; }
 class HeatPrimitive {
@@ -1127,33 +1162,54 @@ class HeatPrimitive {
   updateAllViews(){}
   paneViews(){ return [this._view]; }
   draw(target){
-    if(!this.chart || !hm || !hm.columns.length) return;
+    if(!this.chart || !hm || !hm._cols || !hm._cols.length) return;
     const ts = this.chart.timeScale(), times = hm._times, fac = hm.factor, off = hm.offset;
     const pos = rgbOf(cssVar("--pos")), neg = rgbOf(cssVar("--neg")), maxA = hmOpacity / 100;
     target.useBitmapCoordinateSpace(sc => {
       const ctx = sc.context, hr = sc.horizontalPixelRatio, vr = sc.verticalPixelRatio, W = sc.bitmapSize.width;
-      hm.columns.forEach((c, i) => {
-        const bt = hmSnap(times, c.t), x0 = bt == null ? 0 : ts.timeToCoordinate(bt);
-        const nx = hm.columns[i + 1], bt1 = nx ? hmSnap(times, nx.t) : null;
-        let x1 = nx ? ts.timeToCoordinate(bt1) : null;
+      // a snapshot before the first candle has no bar: it sits at the left edge
+      const xOf = bt => bt == null ? 0 : ts.timeToCoordinate(bt);
+      hm._cols.forEach((c, i) => {
+        const x0 = xOf(hmSnap(times, c.t)), nx = hm._cols[i + 1];
+        let x1 = nx ? xOf(hmSnap(times, nx.t)) : null;
         if(x0 == null) return;
-        if(x1 == null || x1 <= x0) x1 = nx ? x0 + 2 : W / hr;
+        if(nx && x1 != null && x1 <= x0) return;            // shares its candle with the next column: that one is drawn
+        if(x1 == null) x1 = W / hr;
         const scale = c.rel ? 99 : hm._scale;
         c.v.forEach((v, j) => {
           if(!v) return;
           const p = (c.base + j * c.w) * fac + off, ya = this.series.priceToCoordinate(p + c.w * fac / 2), yb = this.series.priceToCoordinate(p - c.w * fac / 2);
           if(ya == null || yb == null) return;
-          const a = Math.min(1, Math.pow(Math.abs(v) / scale, 0.65)) * maxA, rgb = v > 0 ? pos : neg;
+          const r = Math.min(1, Math.abs(v) / scale);
+          if(r < 0.12) return;                              // noise floor: only bands with real gamma get colour
+          const a = Math.pow((r - 0.12) / 0.88, 0.8) * maxA, rgb = v > 0 ? pos : neg;
           ctx.fillStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${a.toFixed(3)})`;
-          ctx.fillRect(Math.round(x0 * hr), Math.round(ya * vr), Math.max(1, Math.round((x1 - x0) * hr)), Math.max(1, Math.round((yb - ya) * vr)));
+          // every edge rounded the same way, so neighbours meet exactly: no gaps, no doubled overlaps
+          const X0 = Math.round(x0 * hr), Y0 = Math.round(ya * vr);
+          ctx.fillRect(X0, Y0, Math.max(1, Math.round(x1 * hr) - X0), Math.max(1, Math.round(yb * vr) - Y0));
         });
       });
+      // levels: flat segments per steady stretch, no vertical joins
+      if(!hmShowLv || !hm._lv) return;
+      for(const [k, col, dash] of [["zg", cssVar("--zg"), [4, 3]], ["cw", cssVar("--pos"), []], ["pw", cssVar("--neg"), []]]){
+        ctx.strokeStyle = col; ctx.lineWidth = Math.max(1, Math.round(1.25 * vr)); ctx.setLineDash(dash.map(d => d * hr)); ctx.globalAlpha = .9;
+        let run = null;
+        const flush = () => { if(!run) return; const y = this.series.priceToCoordinate(run.v); if(y != null){ ctx.beginPath(); ctx.moveTo(Math.floor(run.x0 * hr), Math.round(y * vr) + .5); ctx.lineTo(Math.ceil(run.x1 * hr), Math.round(y * vr) + .5); ctx.stroke(); } run = null; };
+        hm._lv[k].forEach(([x0t, x1t, v], i, all) => {
+          const last = i === all.length - 1;
+          const x0 = xOf(x0t), x1 = last ? W / hr : xOf(x1t);
+          if(v == null || x0 == null){ flush(); return; }
+          if(run && run.v === v) run.x1 = x1 ?? run.x1; else { flush(); run = {v, x0, x1: x1 ?? x0}; }
+        });
+        flush();
+      }
+      ctx.setLineDash([]); ctx.globalAlpha = 1;
     });
   }
 }
 function hmColors(){
   return {layout: {background: {type: "solid", color: cssVar("--panel")}, textColor: cssVar("--ink3"), fontFamily: cssVar("--mono"), fontSize: 11},
-    grid: {vertLines: {color: `rgba(${cssVar("--fg-rgb")},.04)`}, horzLines: {color: `rgba(${cssVar("--fg-rgb")},.04)`}},
+    grid: {vertLines: {visible: false}, horzLines: {visible: false}},
     rightPriceScale: {borderColor: `rgba(${cssVar("--fg-rgb")},.1)`}, timeScale: {borderColor: `rgba(${cssVar("--fg-rgb")},.1)`, timeVisible: true, secondsVisible: false},
     crosshair: {mode: 0, vertLine: {color: `rgba(${cssVar("--fg-rgb")},.3)`}, horzLine: {color: `rgba(${cssVar("--fg-rgb")},.3)`}}};
 }
@@ -1168,23 +1224,30 @@ function renderHeatmap(){
   hm._times = hm.candles.map(c => c[0]);
   const vals = hm.columns.filter(c => !c.rel).flatMap(c => c.v.map(Math.abs)).filter(v => v > 0).sort((a, b) => a - b);
   hm._scale = vals.length ? vals[Math.floor(vals.length * 0.97)] || 1 : 1;
+  hm._cols = hmSmooth(hmPerBar(hm.columns, hm._times), hmTf === "1m" ? 3 : hmTf === "5m" ? 2 : 1);
   const fresh = !hmChart;
   if(fresh){
     hmChart = LC.createChart($("hmChart"), Object.assign({autoSize: true, handleScale: {axisPressedMouseMove: true}}, hmColors()));
-    hmCandles = hmChart.addCandlestickSeries({upColor: cssVar("--good"), downColor: cssVar("--bad"), borderVisible: false, wickUpColor: cssVar("--good"), wickDownColor: cssVar("--bad"), priceLineVisible: true});
+    hmCandles = hmChart.addCandlestickSeries({upColor: cssVar("--good"), downColor: cssVar("--bad"), borderVisible: false, wickUpColor: cssVar("--good"), wickDownColor: cssVar("--bad"),
+      priceLineVisible: true, priceLineStyle: LC.LineStyle.Dotted, priceLineWidth: 1});
     hmPrim = new HeatPrimitive(); hmCandles.attachPrimitive(hmPrim);
-    const mk = (col, style) => hmChart.addLineSeries({color: col, lineWidth: 1, lineStyle: style, lineType: LC.LineType.WithSteps, priceLineVisible: false, lastValueVisible: true, crosshairMarkerVisible: false});
-    hmLines = {zg: mk(cssVar("--zg"), LC.LineStyle.Dashed), cw: mk(cssVar("--pos"), LC.LineStyle.Solid), pw: mk(cssVar("--neg"), LC.LineStyle.Solid)};
     hmChart.subscribeCrosshairMove(hmHover);
     $("hmChart").appendChild($("hmTip")); $("hmChart").appendChild($("hmMsg"));   // keep them above the chart's canvases
   } else hmChart.applyOptions(hmColors());
   const keep = !hmReset && hmMarket === market + hmTf ? hmChart.timeScale().getVisibleLogicalRange() : null;
   hmCandles.setData(hm.candles.map(c => ({time: c[0], open: c[1], high: c[2], low: c[3], close: c[4]})));
+  // level paths (steadied) as [from bar, to bar, price] per snapshot; today's values as axis labels only
+  hm._lv = {};
+  const C = hm._cols;
   for(const k of ["zg", "cw", "pw"]){
-    const pts = new Map();
-    hm.columns.forEach(c => { const bt = hmSnap(hm._times, c.t); if(bt != null && c[k] != null) pts.set(bt, Math.round((c[k] * hm.factor + hm.offset) * 4) / 4); });
-    hmLines[k].setData(hmShowLv ? [...pts].sort((a, b) => a[0] - b[0]).map(([time, value]) => ({time, value})) : []);
+    const st = hmSteady(C.map(c => c[k] == null ? null : Math.round((c[k] * hm.factor + hm.offset) * 4) / 4));
+    hm._lv[k] = C.map((c, i) => [c._bar, C[i + 1] ? C[i + 1]._bar : null, st[i]]);
   }
+  (hmLines.tags || []).forEach(l => hmCandles.removePriceLine(l));
+  const lastCol = hm.columns[hm.columns.length - 1];
+  hmLines.tags = !hmShowLv || !lastCol ? [] : [["zg", "ZG", cssVar("--zg")], ["cw", "CW", cssVar("--pos")], ["pw", "PW", cssVar("--neg")]]
+    .filter(([k]) => lastCol[k] != null)
+    .map(([k, title, color]) => hmCandles.createPriceLine({price: Math.round((lastCol[k] * hm.factor + hm.offset) * 4) / 4, color, title, lineVisible: false, axisLabelVisible: true}));
   if(keep) hmChart.timeScale().setVisibleLogicalRange(keep);
   else { hmCandles.priceScale().applyOptions({autoScale: true}); hmReset = false; const n = hm.candles.length; hmChart.timeScale().setVisibleLogicalRange({from: Math.max(0, n - (hmTf === "1m" ? 390 : hmTf === "5m" ? 230 : 160)), to: n + 8}); }
   hmMarket = market + hmTf;
