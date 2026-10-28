@@ -18,7 +18,9 @@ Format (v1), semicolon-separated key=value tokens, ASCII only, plain decimals
 R = ranked levels near price for the chart's tags: C (most positive net GEX first), P (most negative
 net GEX first), A (most total gamma first), each "price:share %" in rank order.
 R0 = the same for the first expiration only (x0d = its date): C1-C7, P1-P7, Ab1-Ab3 close to price,
-the chart's default tags. Strikes are grouped into bands first (40 points on NDX, 10 on SPX).
+index + ETF options together, neighbouring strikes folded (40 points on NDX, 10 on SPX). R0e = the ETF's
+options alone at their own strikes (QQQ / SPY), g0e = the ETF's % of that expiry's gamma: the chart's
+"auto" choice uses R0e when the ETF holds most of it (NQ: QQQ), else R0 (ES: SPX).
 
 Level prices are in the OPTIONS-UNDERLYING space (e.g. NDX points).  The Pine
 script maps them to the chart with either a live TradingView reference symbol
@@ -32,6 +34,7 @@ from typing import Optional
 
 from .mapping import SOURCES
 
+FORMAT_VERSION = "2"          # bump when the paste gains fields the chart needs: the service republishes at once
 UNIT_CODES = {"usd_per_1pct": "USD1PCT", "usd_per_point": "USDPT", "delta_per_point": "DPT"}
 MAX_LEN = 1800
 
@@ -56,6 +59,7 @@ def pine_payload(summary: dict, market: str, source_key: str, method: str,
     basket = summary.get("basket") or []
     zgs = summary.get("zero_gamma_status", "")
     tok = {
+        "fv": FORMAT_VERSION,
         "prov": "".join(ch for ch in provider.upper() if ch.isalnum())[:8] or "?",
         "mkt": market, "src": source_key, "kind": src.kind.value, "tv": src.tv_symbol, "map": method,
         "fac": _n(factor, 6) if factor else "0", "off": _n(offset, 4),
@@ -116,6 +120,9 @@ def extras_tokens(ex: dict) -> dict:
         if n.get("ranked"):
             t["R0"] = ranked_token(n["ranked"])
             t["x0d"] = n["expiration"]
+        if n.get("ranked_etf"):
+            t["R0e"] = ranked_token(n["ranked_etf"])
+            t["g0e"] = str(round(100 * n.get("etf_share", 0.0)))
     for k, key in (("vc", "vol_call"), ("vp", "vol_put"), ("oc", "oi_call"), ("op", "oi_put")):
         if ex.get(key):
             t[k] = _n(_p(ex[key]))

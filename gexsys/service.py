@@ -40,6 +40,11 @@ class NotifyGate:
             return True
 
 
+def _fv(payload: str) -> str:
+    """The paste's format version (the fv token; none before version 2)."""
+    return next((kv[3:] for kv in payload.split(";") if kv.startswith("fv=")), "1")
+
+
 class MarketWorker(threading.Thread):
     def __init__(self, cfg: MarketConfig, gate: Optional[NotifyGate] = None):
         self.cfg = cfg
@@ -124,6 +129,8 @@ class MarketWorker(threading.Thread):
 
     def _maybe_publish(self, now: datetime) -> None:
         slot = publish.due(self.published_slot, now, self.cfg.publish)
+        if slot is None and self.published and self.result and self.result.get("pine")                 and _fv(self.result["pine"]) != _fv(self.published["payload"]):
+            slot = self.published_slot        # a new paste format (an update): republish now, not next hour
         if slot is None or not self.result or not self.result.get("pine"):
             return
         s = self.result["mapped"] or self.result["summary"]

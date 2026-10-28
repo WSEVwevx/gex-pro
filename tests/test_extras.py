@@ -84,6 +84,19 @@ class TestNearest(unittest.TestCase):
         res2 = eng.compute(snap, eng.EngineConfig(include_0dte=False))
         self.assertTrue(ex.nearest_expiry_levels(snap, eng.EngineConfig(include_0dte=False), res2)["label"].startswith("next "))
 
+    def test_first_expiry_rankings_index_and_etf(self):
+        today = ASOF.replace(hour=20)
+        idx = [contract(100, "C", oi=500, iv=0.2, exp=today), contract(100, "P", oi=500, iv=0.2, exp=today)]
+        # converted ETF legs: exact strike = ETF strike x ratio, grouped onto the index grid
+        etf = [replace(contract(101.3, "C", oi=40000, iv=0.2, exp=today), group_strike=101.0, symbol="Q1@TST"),
+               replace(contract(98.7, "P", oi=30000, iv=0.2, exp=today), group_strike=99.0, symbol="Q2@TST")]
+        snap = chain(idx + etf)
+        n = ex.nearest_expiry_levels(snap, eng.EngineConfig(), eng.compute(snap))
+        self.assertEqual(n["ranked_etf"]["call"][0]["price"], 101.3)        # the ETF's own strike, not the index grid
+        self.assertEqual(n["ranked_etf"]["put"][0]["price"], 98.7)
+        self.assertGreater(n["etf_share"], 0.5)                              # the ETF legs hold most of the gamma
+        self.assertTrue(n["ranked"]["call"])
+
 
 class TestExpectedMove(unittest.TestCase):
     def mk(self, spot=100.0, prev=98.0):

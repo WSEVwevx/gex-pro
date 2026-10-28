@@ -49,6 +49,23 @@ class TestConfig(unittest.TestCase):
                 cfgmod.from_dict(bad)
 
 
+class TestRepublish(unittest.TestCase):
+    def test_new_paste_format_republishes_at_once(self):
+        from datetime import datetime, timezone
+        with tempfile.TemporaryDirectory() as tmp:
+            w = MarketWorker(synth_cfg(tmp))
+            w.notify_desktop = lambda *a, **k: False
+            w.step()
+            pub = dict(w.published)
+            now = datetime.now(timezone.utc)
+            w._maybe_publish(now)
+            self.assertEqual(w.published["published_at"], pub["published_at"])        # same format: wait for the next slot
+            w.published["payload"] = w.published["payload"].replace("fv=", "old=")    # a paste from before version 2
+            w._maybe_publish(now)
+            self.assertNotEqual(w.published["published_at"], pub["published_at"])
+            self.assertIn("fv=", w.published["payload"])
+
+
 class TestPipeline(unittest.TestCase):
     def test_run_twice_produces_delta_and_files(self):
         with tempfile.TemporaryDirectory() as tmp:

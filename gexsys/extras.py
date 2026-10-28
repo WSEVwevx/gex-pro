@@ -55,11 +55,24 @@ def nearest_expiry_levels(snap: ChainSnapshot, cfg: eng.EngineConfig, res: eng.G
     label = "0DTE" if exp0 == today else f"next {exp0[5:]}"
     sub = eng.compute(snap, dataclasses.replace(cfg, expirations=[exp0]), asof=res.asof)
     s = summarize(sub, LevelConfig(top_n=0))
+    # the chart's tags: this expiry's strongest levels close to price (C1-C7, P1-P7, Ab1-Ab3), two ways:
+    #   ranked      index + ETF options together, on the index strike grid (neighbours folded together)
+    #   ranked_etf  the ETF's options alone at its own strikes (QQQ $1 = ~41 NQ points), the way the common
+    #               0DTE GEX tools draw NQ; etf_share says which chain holds more of this expiry's gamma
+    etf: dict = {}
+    for r in sub.rows:
+        if r.contract.group_strike is not None:                     # converted ETF leg: exact strike x ratio
+            b = etf.setdefault(round(r.contract.strike, 2), {"net": 0.0, "abs": 0.0})
+            b["net"] += r.exposure
+            b["abs"] += abs(r.exposure)
+    total = sum(v["abs"] for v in sub.by_strike.values()) if sub.by_strike else 0.0
+    ok = bool(sub.by_strike and sub.spot)
     return {"expiration": exp0, "label": label, "status": sub.status,
             "zero_gamma": s["zero_gamma"], "call_wall": s["call_wall"], "put_wall": s["put_wall"],
             "net": s["net"], "regime": s["regime"],
-            # the chart's default tags: this expiry's strongest bands, close to price (C1-C7, P1-P7, Ab1-Ab3)
-            "ranked": ranked_levels(sub.by_strike, sub.spot, RANK0_WINDOW, RANK0_N) if sub.by_strike and sub.spot else None}
+            "ranked": ranked_levels(sub.by_strike, sub.spot, RANK0_WINDOW, RANK0_N) if ok else None,
+            "ranked_etf": ranked_levels(etf, sub.spot, RANK0_WINDOW, RANK0_N, banded=False) if ok and etf else None,
+            "etf_share": sum(v["abs"] for v in etf.values()) / total if total else 0.0}
 
 
 def _argmax_by_strike(contracts, typ: OptionType, attr: str) -> Optional[dict]:

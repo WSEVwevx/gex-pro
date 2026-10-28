@@ -49,8 +49,8 @@ showRank = input.bool(true, "Ranked levels (C1-C7, P1-P7, Ab1-Ab3)", inline = "r
 styRank = input.string("────", "", options = ["────", "╌╌╌╌", "┈┈┈┈"], inline = "rk", group = G2)
 wRankPick = input.string("───", "", options = ["───", "━━━", "▬▬▬", "███"], inline = "rk", group = G2)
 wRank = pxOf(wRankPick)
-rankSrc = input.string("First expiry (0DTE)", "Ranked from", options = ["First expiry (0DTE)", "All expirations (45 days)"], group = G2,
-     tooltip = "First expiry (0DTE): today's expiring options (or the next expiry when none expire today). Their gamma sits close to price, so you get many nearby levels for intraday trading.\nAll expirations: every expiry out to 45 days; fewer, bigger levels further out.")
+rankSrc = input.string("First expiry: auto", "Ranked from", options = ["First expiry: auto", "First expiry: ETF only", "First expiry: index + ETF", "All expirations (45 days)"], group = G2,
+     tooltip = "First expiry = today's expiring options (or the next expiry when none expire today): their gamma sits close to price, so many nearby levels for intraday trading.\nauto (recommended): whichever chain holds most of that gamma - for NQ usually QQQ alone (levels on QQQ's own strikes, about 41 NQ points apart), for ES usually SPX with SPY.\nETF only: QQQ / SPY strikes alone.\nindex + ETF: both chains on the index's strike grid.\nAll expirations: every expiry out to 45 days; fewer, bigger levels further out.")
 rankC = input.int(7, "Levels: C", minval = 0, maxval = 7, inline = "rn", group = G2)
 rankP = input.int(7, "P", minval = 0, maxval = 7, inline = "rn", group = G2)
 rankA = input.int(3, "Ab", minval = 0, maxval = 3, inline = "rn", group = G2, tooltip = "How many call, put and absolute-gamma levels to draw (strongest first).")
@@ -199,6 +199,8 @@ type Snap
     float  chm = na
     string rk = ""
     string rk0 = ""
+    string rk0e = ""
+    float  g0e = na
     string x0d = ""
     bool   complete = false
 
@@ -229,7 +231,7 @@ parseOne(string txt) =>
              x0 = strOf(m, "x0"), z0 = numOf(m, "z0"), c0 = numOf(m, "c0"), p0 = numOf(m, "p0"),
              vc = numOf(m, "vc"), vp = numOf(m, "vp"), oc = numOf(m, "oc"), op = numOf(m, "op"), xp = strOf(m, "xp"),
              ema = numOf(m, "ema"), emd = numOf(m, "emd"), emw = numOf(m, "emw"), emx = strOf(m, "emx"),
-             prof = strOf(m, "P"), ag = numOf(m, "ag"), vxm = numOf(m, "vxm"), chm = numOf(m, "chm"), rk = strOf(m, "R"), rk0 = strOf(m, "R0"), x0d = strOf(m, "x0d"), complete = str.trim(array.get(toks, array.size(toks) - 1)) == "END")
+             prof = strOf(m, "P"), ag = numOf(m, "ag"), vxm = numOf(m, "vxm"), chm = numOf(m, "chm"), rk = strOf(m, "R"), rk0 = strOf(m, "R0"), rk0e = strOf(m, "R0e"), g0e = numOf(m, "g0e"), x0d = strOf(m, "x0d"), complete = str.trim(array.get(toks, array.size(toks) - 1)) == "END")
     s
 
 fam(string s) =>
@@ -462,6 +464,15 @@ drawLevel(float p, string name, string tag, color col, int width, string style, 
             array.push(tgStr, strength)
     p
 
+// Which ranking the tags use: [tokens, what they cover, first expiry?, ETF alone?]
+rankedOf(Snap s) =>
+    bool hasI = s.rk0 != ""
+    bool hasE = s.rk0e != ""
+    bool first = rankSrc != "All expirations (45 days)" and (hasI or hasE)
+    bool etf = first and (rankSrc == "First expiry: ETF only" ? hasE : rankSrc == "First expiry: index + ETF" ? not hasI : hasE and (nz(s.g0e) >= 50 or not hasI))
+    string what = not first ? "all expiries'" : etf ? s.etf + "'s own (this expiry)" : "this expiry's"
+    [first ? (etf ? s.rk0e : s.rk0) : s.rk, what, first, etf]
+
 ordinal(int k) =>
     k == 1 ? "1st" : k == 2 ? "2nd" : k == 3 ? "3rd" : str.tostring(k) + "th"
 
@@ -483,9 +494,7 @@ drawKey(Snap s, float f, float o, bool isSecond) =>
         drawLevel(mapP(s.mp, f, o), nm("+GEX", "Largest +GEX"), tag, color.new(cPos, tr), wMax, lnStyle(styMax))
         drawLevel(mapP(s.mn, f, o), nm("-GEX", "Largest -GEX"), tag, color.new(cNeg, tr), wMax, lnStyle(styMax))
     // ranked levels: the first expiry's bands (default) or all expiries'; ranks 1-2 in the picked style, weaker dotted
-    bool first = rankSrc == "First expiry (0DTE)" and s.rk0 != ""
-    string rks = first ? s.rk0 : s.rk
-    string scope = first ? "this expiry's" : "all expiries'"
+    [rks, scope, first, etfOnly] = rankedOf(s)
     if showRank and rks != ""
         float top = 0.0
         for item in str.split(rks, ",")
@@ -668,10 +677,11 @@ renderTags() =>
     string hdr = ""
     string foot = ""
     if not na(s)
-        bool first = rankSrc == "First expiry (0DTE)" and s.rk0 != ""
+        [rks, what, first, etfOnly] = rankedOf(s)
         string d = first and s.x0d != "" ? s.x0d : s.bk
         string md = str.length(d) >= 10 ? str.substring(d, 5, 7) + "/" + str.substring(d, 8, 10) : "-"
-        hdr := "🗓 " + md + " · " + (first ? "first expiry " + s.x0 : "all expirations" + (str.length(s.bk) >= 10 ? " to " + str.substring(s.bk, str.length(s.bk) - 5) : ""))
+        string chain = etfOnly ? s.etf + " standalone" : s.src + (s.etf != "" ? " + " + s.etf : "")
+        hdr := "🗓 " + md + " · " + chain + " · " + (first ? "first expiry " + s.x0 : "all expirations" + (str.length(s.bk) >= 10 ? " to " + str.substring(s.bk, str.length(s.bk) - 5) : ""))
         float a = ageOf(s)
         string ageS = na(a) ? "?" : a < 60 ? str.tostring(math.round(a)) + "m" : str.tostring(math.floor(a / 60)) + "h " + str.tostring(math.round(a % 60)) + "m"
         foot := "⏳ Updated " + ageS + " ago " + (staleOf(s) ? "⚠ STALE: copy a fresh paste from the GEX PRO website." : "✓")
@@ -742,7 +752,8 @@ if barstate.islast
         Snap sz = okA ? sA : sB
         float fz = okA ? facA : facB
         float oz = okA ? offA : offB
-        zFlip := rankSrc == "First expiry (0DTE)" and sz.rk0 != "" and not na(sz.z0) ? mapP(sz.z0, fz, oz) : mapP(sz.zg, fz, oz)
+        [rz, wz, firstZ, ez] = rankedOf(sz)
+        zFlip := firstZ and not na(sz.z0) ? mapP(sz.z0, fz, oz) : mapP(sz.zg, fz, oz)
     if tagMode
         renderTags()
 
