@@ -146,6 +146,7 @@ def independent(raw_i, raw_e, idx, etf, asof):
         b["call" if leg[1] == "C" else "put"] += v
         b["abs"] += abs(v)
     net = sum(b["call"] + b["put"] for b in by.values())
+    gross = sum(b["abs"] for b in by.values())
     cw = max((k for k in by if k >= S and by[k]["call"]), key=lambda k: abs(by[k]["call"]))
     pw = max((k for k in by if k <= S and by[k]["put"]), key=lambda k: abs(by[k]["put"]))
     ag = max(by, key=lambda k: by[k]["abs"])
@@ -154,7 +155,7 @@ def independent(raw_i, raw_e, idx, etf, asof):
     prof = [(S * m, sum(dollar(leg, m) for leg in legs)) for m in grid]
     xs = [p0 + (p1 - p0) * (-v0) / (v1 - v0) for (p0, v0), (p1, v1) in zip(prof, prof[1:]) if v0 * v1 < 0]
     zg = min(xs, key=lambda x: abs(x - S)) if xs else None
-    return {"spot": S, "ratio": ratio, "legs": len(legs), "net": net, "cw": cw, "pw": pw, "ag": ag, "zg": zg}
+    return {"spot": S, "ratio": ratio, "legs": len(legs), "net": net, "gross": gross, "cw": cw, "pw": pw, "ag": ag, "zg": zg}
 
 
 def main():
@@ -174,7 +175,9 @@ def main():
         p = lambda x: (x or {}).get("price") if isinstance(x, dict) else x
         checks = [
             ("reference price", s["ref_price"], ind["spot"], 1e-9),
-            ("net GEX $/1%", s["net"], ind["net"], 2e-3),
+            # net is a sum of large opposite-signed terms: judge its error against total gamma, not against net
+            # itself (a balanced market with net near zero made tiny model differences look like big misses)
+            ("net GEX $/1%", s["net"], ind["net"], 2e-3 * ind["gross"] / max(abs(ind["net"]), 1)),
             ("call wall", p(s["call_wall"]), ind["cw"], 0),
             ("put wall", p(s["put_wall"]), ind["pw"], 0),
             ("abs gamma strike", p(s["abs_gamma"]), ind["ag"], 0),

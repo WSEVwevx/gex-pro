@@ -8,6 +8,26 @@ from gexsys.normalize import normalize, parse_occ
 from tests.util import ASOF, chain, contract
 
 
+class TestRankedLevels(unittest.TestCase):
+    def test_bands_group_neighbouring_strikes(self):
+        from gexsys.levels import ranked_levels
+        bs = {k: {"net": n, "abs": abs(n)} for k, n in {29700: 5.0, 29710: 4.0, 29760: 3.0, 29600: -6.0, 29610: -1.0, 29900: 2.0}.items()}
+        r = ranked_levels(bs, 29700.0, n={"call": 7, "put": 7, "abs": 3})     # NDX bands are 40 points
+        self.assertEqual([x["price"] for x in r["call"]], [29700, 29760, 29900])  # 29710 folds into 29700 (within 40 points)
+        self.assertAlmostEqual(r["call"][0]["share"], 9.0 / 21.0)
+        self.assertEqual([x["price"] for x in r["put"]], [29600])
+        unb = ranked_levels(bs, 29700.0, n={"call": 7, "put": 7, "abs": 3}, banded=False)
+        self.assertEqual([x["price"] for x in unb["call"]], [29700, 29710, 29760, 29900])
+
+    def test_first_expiry_ranking_reaches_the_paste(self):
+        from gexsys.export import parse_payload, pine_payload
+        s = {"asof": "2026-10-20T15:00:00+00:00", "ref_price": 100.0, "net": 1.0, "regime": "POSITIVE", "status": "OK",
+             "extras": {"nearest": {"label": "0DTE", "expiration": "2026-10-20",
+                                    "ranked": {"call": [{"price": 101.0, "share": 0.2}], "put": [{"price": 99.0, "share": 0.1}], "abs": []}}}}
+        d = parse_payload(pine_payload(s, "ES", "SPX", "ratio", provider="CBOE"))
+        self.assertEqual((d["R0"], d["x0d"]), ("C101.00:20.0,P99.00:10.0", "2026-10-20"))
+
+
 class TestLevels(unittest.TestCase):
     def setUp(self):
         cs = [contract(95, "P", oi=5000, gamma=0.04), contract(100, "P", oi=1000, gamma=0.05),

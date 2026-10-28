@@ -36,7 +36,7 @@ from typing import Optional
 
 from . import engine as eng
 from . import marketcal, pricing
-from .levels import LevelConfig, summarize
+from .levels import RANK0_N, RANK0_WINDOW, LevelConfig, ranked_levels, summarize
 from .models import ChainSnapshot, OptionContract, OptionType
 
 NICE_WIDTHS = (0.5, 1, 2, 2.5, 5, 10, 25, 50, 100, 250)
@@ -57,7 +57,9 @@ def nearest_expiry_levels(snap: ChainSnapshot, cfg: eng.EngineConfig, res: eng.G
     s = summarize(sub, LevelConfig(top_n=0))
     return {"expiration": exp0, "label": label, "status": sub.status,
             "zero_gamma": s["zero_gamma"], "call_wall": s["call_wall"], "put_wall": s["put_wall"],
-            "net": s["net"], "regime": s["regime"]}
+            "net": s["net"], "regime": s["regime"],
+            # the chart's default tags: this expiry's strongest bands, close to price (C1-C7, P1-P7, Ab1-Ab3)
+            "ranked": ranked_levels(sub.by_strike, sub.spot, RANK0_WINDOW, RANK0_N) if sub.by_strike and sub.spot else None}
 
 
 def _argmax_by_strike(contracts, typ: OptionType, attr: str) -> Optional[dict]:

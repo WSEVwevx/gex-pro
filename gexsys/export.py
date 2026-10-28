@@ -17,6 +17,8 @@ Format (v1), semicolon-separated key=value tokens, ASCII only, plain decimals
 
 R = ranked levels near price for the chart's tags: C (most positive net GEX first), P (most negative
 net GEX first), A (most total gamma first), each "price:share %" in rank order.
+R0 = the same for the first expiration only (x0d = its date): C1-C7, P1-P7, Ab1-Ab3 close to price,
+the chart's default tags. Strikes are grouped into bands first (40 points on NDX, 10 on SPX).
 
 Level prices are in the OPTIONS-UNDERLYING space (e.g. NDX points).  The Pine
 script maps them to the chart with either a live TradingView reference symbol
@@ -83,13 +85,18 @@ def pine_payload(summary: dict, market: str, source_key: str, method: str,
         levels.append(f"{_p(c):.2f}:{c['sign']}:{c['share']:.3f}")
     tok["L"] = ",".join(levels)
     rk = summary.get("ranked") or {}
-    tok["R"] = ",".join(f"{code}{_p(x):.2f}:{100 * x['share']:.1f}" for side, code in (("call", "C"), ("put", "P"), ("abs", "A"))
-                        for x in rk.get(side) or [])
+    tok["R"] = ranked_token(rk)
     tok.update(extras_tokens(summary.get("extras") or {}))
     out = "GEX1;" + ";".join(f"{k}={v}" for k, v in tok.items()) + ";END"
     if any(ch in out for ch in "\n\r\"|") or len(out) > MAX_LEN:
         raise ValueError(f"payload invalid or too long ({len(out)} chars)")
     return out
+
+
+def ranked_token(rk: dict) -> str:
+    """C/P/A then "price:share %" in rank order, e.g. C20200.00:18.0,P19500.00:12.0,A20000.00:9.5"""
+    return ",".join(f"{code}{_p(x):.2f}:{100 * x['share']:.1f}" for side, code in (("call", "C"), ("put", "P"), ("abs", "A"))
+                    for x in (rk or {}).get(side) or [])
 
 
 def extras_tokens(ex: dict) -> dict:
@@ -106,6 +113,9 @@ def extras_tokens(ex: dict) -> dict:
     if n:
         t.update({"x0": n["label"], "z0": _n(_p(n.get("zero_gamma"))), "c0": _n(_p(n.get("call_wall"))),
                   "p0": _n(_p(n.get("put_wall")))})
+        if n.get("ranked"):
+            t["R0"] = ranked_token(n["ranked"])
+            t["x0d"] = n["expiration"]
     for k, key in (("vc", "vol_call"), ("vp", "vol_put"), ("oc", "oi_call"), ("op", "oi_put")):
         if ex.get(key):
             t[k] = _n(_p(ex[key]))

@@ -116,7 +116,7 @@ your browser, and the first visit follows your system setting.
   brighter = more), plus zero gamma and the walls as step lines. Hover for the numbers; a slider sets
   the heat strength. History grows as snapshots are saved (about 12 days in the app, 5 hosted).
 * **Live table:** a strike ladder like a trader's GEX matrix: net DEX, net GEX, net OI and net volume
-  for every strike near price, in futures prices, with level chips (C1-C3, P1-P5, Ab1-Ab3, zero gamma,
+  for every strike near price, in futures prices, with level chips (C1-C5, P1-P5, Ab1-Ab3, zero gamma,
   walls, expected move), the price row highlighted and a hover readout. An expiry strip on top picks
   which expirations it adds up (the nearest, every Friday, every monthly, then the rest pooled); a side
   panel shows net GEX and DEX for that pick, the key levels with distances, and put/call activity.

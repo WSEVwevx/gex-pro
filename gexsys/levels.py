@@ -23,6 +23,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from .engine import GexResult
+from .ladder import band_width
 
 
 @dataclass
@@ -117,20 +118,38 @@ def summarize(res: GexResult, cfg: Optional[LevelConfig] = None) -> dict:
 
 
 RANK_WINDOW = 0.06          # ranked levels: strikes within 6% of the reference price
-RANK_N = {"call": 3, "put": 5, "abs": 3}
+RANK_N = {"call": 5, "put": 5, "abs": 3}
+RANK0_WINDOW = 0.03         # first expiry: its gamma sits close to price
+RANK0_N = {"call": 7, "put": 7, "abs": 3}
 
 
-def ranked_levels(bs: dict, spot: float, window: float = RANK_WINDOW) -> dict:
+def ranked_levels(bs: dict, spot: float, window: float = RANK_WINDOW, n: Optional[dict] = None, banded: bool = True) -> dict:
     """The strongest strikes near price, for the chart's level tags (C1.., P1.., Ab1..).
 
     call: most positive net GEX first; put: most negative net GEX first; abs: most total gamma (calls and
-    puts, sign ignored) first. share = that strike's |net| (or total) over the sum across all strikes."""
+    puts, sign ignored) first. Banded: strongest first, and a strike within one band width (40 points on
+    NDX, 10 on SPX) of a level already taken adds its gamma to that level instead of taking a rank, so
+    levels sit at real strikes at least a band apart. share = the level's |net| (or total) over the sum
+    across all strikes."""
+    n = n or RANK_N
     near = {k: v for k, v in bs.items() if spot and abs(k - spot) <= window * spot}
     tot_net = sum(abs(v["net"]) for v in bs.values()) or 1.0
     tot_abs = sum(v["abs"] for v in bs.values()) or 1.0
-    pos = sorted(((k, v["net"]) for k, v in near.items() if v["net"] > 0), key=lambda kv: -kv[1])
-    neg = sorted(((k, v["net"]) for k, v in near.items() if v["net"] < 0), key=lambda kv: kv[1])
-    ab = sorted(((k, v["abs"]) for k, v in near.items() if v["abs"] > 0), key=lambda kv: -kv[1])
-    return {"call": [{"price": k, "value": n, "share": abs(n) / tot_net} for k, n in pos[:RANK_N["call"]]],
-            "put": [{"price": k, "value": n, "share": abs(n) / tot_net} for k, n in neg[:RANK_N["put"]]],
-            "abs": [{"price": k, "value": n, "share": n / tot_abs} for k, n in ab[:RANK_N["abs"]]]}
+    w = band_width(spot) if banded and spot else 0.0
+
+    def pick(vals: list) -> list:                     # [(strike, strength)] -> [[strike, summed strength]]
+        kept: list = []
+        for k, v in sorted(vals, key=lambda kv: -kv[1]):
+            home = next((x for x in kept if abs(x[0] - k) < w), None)
+            if home:
+                home[1] += v
+            else:
+                kept.append([k, v])
+        return sorted(kept, key=lambda x: -x[1])
+
+    pos = pick([(k, v["net"]) for k, v in near.items() if v["net"] > 0])
+    neg = pick([(k, -v["net"]) for k, v in near.items() if v["net"] < 0])
+    ab = pick([(k, v["abs"]) for k, v in near.items() if v["abs"] > 0])
+    return {"call": [{"price": k, "value": v, "share": v / tot_net} for k, v in pos[:n["call"]]],
+            "put": [{"price": k, "value": -v, "share": v / tot_net} for k, v in neg[:n["put"]]],
+            "abs": [{"price": k, "value": v, "share": v / tot_abs} for k, v in ab[:n["abs"]]]}

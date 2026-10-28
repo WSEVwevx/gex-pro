@@ -62,16 +62,26 @@ The dialog's separate Style tab has nothing to change.
   of price only. Key levels and max pain are 2 px, others 1 px. The GEX profile is off by default.
 * **Colours, style and width**: each level type has its colour, line style and thickness side by side in
   settings, picked from drawn previews: `────` solid, `╌╌╌╌` dashed, `┈┈┈┈` dotted; `───` 1 px up to `███` 4 px. Defaults: calls green, puts red, absolute gamma violet, zero gamma
-  amber (dashed), expected move grey, every line 1 px. Ranked walls fade with strength: the strongest
-  level is fully opaque and the weakest about 75% transparent, line and tag alike. Largest +/- GEX,
-  concentrations, volume walls and max pain are off by default (the ranked walls cover them).
+  amber (dashed), expected move grey, every line 1 px. Ranked levels fade with strength: the strongest
+  level is fully opaque and the weakest about 75% transparent, line and tag alike; ranks 1-2 use the
+  picked style, weaker ranks are dotted. Largest +/- GEX,
+  concentrations, volume walls and max pain are off by default (the ranked levels cover them).
 * **Tags + hover info** (the default label style): each level gets a short tag right of price with a
-  strength bar, e.g. `▬▬▬▬▬▬ P1`. Ranked walls: `C1`-`C3` (most positive net GEX), `P1`-`P5` (most
-  negative net GEX), `Ab1`-`Ab3` (most total gamma); the bar's length is the level's share of all gamma,
-  relative to the strongest. A `●` marks confluence (another level within 0.10%, set in "Confluence
-  within"). **Hover the tag** for the level's analysis: what it is and its rank, its distance from
-  price, which levels stack with it, the zone it sits in (above or below zero gamma, between the walls),
-  the regime and net GEX, and how old the paste is.
+  strength bar, e.g. `■■■■■■ C1  Ab2`. Ranked levels: `C1`-`C7` (most positive net GEX), `P1`-`P7` (most
+  negative net GEX), `Ab1`-`Ab3` (most total gamma). **Ranked from** picks their source: *First expiry
+  (0DTE)* (default: today's expiring options, whose gamma sits close to price, so many nearby levels for
+  intraday trading) or *All expirations* (out to 45 days: fewer, bigger levels further out). Neighbouring
+  strikes are folded together, so levels sit at real strikes at least 40 points apart on NQ (10 on ES).
+  The bar's length is the level's share of gamma, relative to the strongest. `●●` dots mark confluence
+  (that many levels at or within 0.10% of the price, set in "Confluence within").
+* **Hover a tag** for its analysis, laid out like this: the expiry it comes from; the price and its
+  distance from price; the confluence count and strength; each level stacked there with its rank and
+  meaning; the **zone context**; and the regime, data age and how to refresh. Zones, measured from the
+  gamma flip and the ranked levels: *Positive Gamma Zone* (flip to C1: call-dominated, moves dampened),
+  *Positive Gamma Extension Zone* (C1 to the next call level up: reduced hedging pressure), *Negative Gamma
+  Zone* (P1 to the flip: put-dominated, moves amplified) and *Negative Gamma Extension Zone* (P1 to the
+  next put level down). A level on a zone edge says it is a boundary between two zones. "Shade gamma zones"
+  draws them as a narrow column right of the last bar.
 * **Labels** ("Short" / "Full") sit right of the GEX profile on a dark pill: short code plus price with separators,
   e.g. `CW  29,883.25`. Codes: `ZG`, `CW`, `PW`, `+GEX`, `-GEX`, `+G 12%`, `0D ZG` / `0D CW` / `0D PW`,
   `VOL C` / `VOL P`, `OI C` / `OI P`, `MP 10-21`, `EM+` / `EM-`, `EMw+` / `EMw-`.

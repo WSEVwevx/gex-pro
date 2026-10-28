@@ -24,7 +24,8 @@ NICE = [1, 2, 2.5, 5, 10, 20, 25, 40, 50, 100, 200, 250, 500]
 MAX_EXPIRIES = 12
 
 
-def _width(spot: float) -> float:
+def band_width(spot: float) -> float:
+    """Price-band width: 40 points on NDX, 10 on SPX (about 60 rows over +/-3.5%)."""
     span = 2 * WINDOW * spot
     return min(NICE, key=lambda w: abs(span / w - TARGET_ROWS))
 
@@ -51,7 +52,7 @@ def build_ladder(res, snap) -> Optional[dict]:
     s = res.spot
     if not res.rows or not s or not math.isfinite(s):
         return None
-    w = _width(s)
+    w = band_width(s)
     exps = pick_expirations(sorted({r.contract.expiration for r in res.rows}))
     idx = {e: i for i, e in enumerate(exps)}
     other = len(exps)                                   # everything else in the basket, pooled
@@ -104,7 +105,7 @@ def heat_profile(res) -> Optional[dict]:
     s = res.spot
     if not res.by_strike or not s or not math.isfinite(s):
         return None
-    w = _width(s)
+    w = band_width(s)
     lo, hi = math.floor(s * (1 - HEAT_WINDOW) / w), math.ceil(s * (1 + HEAT_WINDOW) / w)
     v = [0.0] * (hi - lo + 1)
     for k, d in res.by_strike.items():

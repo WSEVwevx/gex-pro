@@ -35,8 +35,8 @@ class TestLadder(unittest.TestCase):
         self.assertNotIn(days[3], got)                                        # a Thursday after the first 3
         self.assertNotIn(days[7], got)                                        # a Tuesday after the first 3
         self.assertTrue(ladder._monthly(days[6].date()))
-        self.assertEqual(ladder._width(29000.0), 40)                          # NDX: 40-point rows
-        self.assertEqual(ladder._width(7650.0), 10)                           # SPX: 10-point rows
+        self.assertEqual(ladder.band_width(29000.0), 40)                          # NDX: 40-point rows
+        self.assertEqual(ladder.band_width(7650.0), 10)                           # SPX: 10-point rows
 
 
 if __name__ == "__main__":
