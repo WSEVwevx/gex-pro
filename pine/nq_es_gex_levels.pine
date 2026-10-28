@@ -101,6 +101,8 @@ lblMode  = input.string("Tags + hover info", "Labels", options = ["Tags + hover 
 lblSize  = input.string("Small", "", options = ["Tiny", "Small", "Normal"], inline = "lb", group = G4)
 lblBg    = input.bool(true, "Label background", inline = "lb2", group = G4)
 lblOff   = input.int(6, "offset (bars)", minval = 0, maxval = 200, inline = "lb2", group = G4, tooltip = "Used when the GEX profile is off; with the profile on, labels sit just right of it.")
+roundTo  = input.string("Whole points", "Level prices", options = ["Whole points", "5 points", "Exact (tick)"], group = G4,
+     tooltip = "Options levels aren't precise to a tick, so each level is drawn and labelled at a round price: whole points (29885), the nearest 5 points (29885, 29890...) or the exact converted price (29884.75).")
 confPct  = input.float(0.10, "Confluence within (%)", minval = 0.01, step = 0.01, group = G4,
      tooltip = "Tags + hover info: levels closer than this (% of price) count as one confluence zone in the hover text.")
 emFill   = input.bool(false, "Shade daily expected-move band", group = G4, tooltip = "Faint fill between today's expected high and low (uses the expected-move colour).")
@@ -321,8 +323,11 @@ mapInfo(Snap s, float lf, float lo, float refNow, string sym) =>
 [facA, offA, mstA] = mapInfo(sA, lfA, loA, refCA, symA)
 [facB, offB, mstB] = mapInfo(sB, lfB, loB, refCB, symB)
 
+// index price -> this chart's price, rounded per "Level prices"
+roundStep = roundTo == "5 points" ? 5.0 : roundTo == "Whole points" ? 1.0 : 0.0
 mapP(float p, float f, float o) =>
-    na(p) or na(f) ? na : math.round_to_mintick(p * f + o)
+    float v = na(p) or na(f) ? na : p * f + o
+    na(v) ? na : roundStep > 0 ? math.round(v / roundStep) * roundStep : math.round_to_mintick(v)
 
 sane(float p) =>
     na(p) ? true : math.abs(p - close) / close * 100.0 <= maxDistPct
@@ -399,7 +404,7 @@ nm(string short, string full) =>
     short + "|" + full
 
 fmtPx(float p) =>
-    str.tostring(p, "#,##0.00")
+    str.tostring(p, "#,##0.##")          // 29,885 (or 29,884.75 with exact prices)
 
 clearAll() =>
     for l in gLines
