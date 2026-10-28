@@ -103,7 +103,7 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
           <label class="hm-ctl"><input type="checkbox" id="hmLevels" checked> Levels</label></div>
         <div class="hm-chart" id="hmChart"><div class="hm-msg" id="hmMsg">Loading the chart...</div><div class="tip hm-tip" id="hmTip"></div></div>
         <div class="legend"><span><i class="sw" style="background:var(--pos)"></i>positive gamma (hedging calms moves)</span><span><i class="sw" style="background:var(--neg)"></i>negative gamma (hedging adds to moves)</span>
-          <span><i class="sw" style="background:var(--zg);height:2px"></i>zero gamma</span><span><i class="sw" style="background:var(--pos);height:2px"></i>call wall</span><span><i class="sw" style="background:var(--neg);height:2px"></i>put wall</span>
+          <span><i class="sw" style="background:var(--pos);height:2px"></i>call wall</span><span><i class="sw" style="background:var(--neg);height:2px"></i>put wall</span><span>ZG · CW · PW labels on the price axis = now</span>
           <span class="hm-note" id="hmNote"></span></div>
       </section>
     </div>

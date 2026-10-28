@@ -668,7 +668,7 @@ const HELP = {
   ladder_activity: {title: "Chain activity", tldr: "Who is positioned, and what is trading today.",
     body: `<p>Put/call ratios over the selected expirations and the rows shown: above 1 means more puts. Open interest is from yesterday's close; volume is today's.</p>`},
   heatmap: {title: "GEX heatmap", tldr: "Futures candles with dealer gamma painted behind them, snapshot by snapshot.",
-    body: `<p>Each column behind the candles is one GEX PRO snapshot; each cell is the net dealer gamma in that price band at that time. <b>Blue</b> = positive gamma (hedging leans against moves, so price tends to stall or pin there); <b>orange</b> = negative gamma (hedging adds to moves). Brighter = more gamma.</p><p>The step lines are zero gamma and the call and put walls at each snapshot. Watch how price reacts when it reaches a bright band, and how the bands move during the day. Hover anywhere for the numbers.</p><p>Candles: Yahoo Finance, delayed. Gamma: Cboe options, 15-min delayed, mapped to futures with today's basis. History builds up as snapshots are saved (about 12 days in the app, 5 on the hosted site).</p>`,
+    body: `<p>Each column behind the candles is one GEX PRO snapshot; each cell is the net dealer gamma in that price band at that time. <b>Blue</b> = positive gamma (hedging leans against moves, so price tends to stall or pin there); <b>orange</b> = negative gamma (hedging adds to moves). Brighter = more gamma.</p><p>The lines are the call wall (blue) and put wall (orange) wherever they held for an hour or more; the ZG, CW and PW labels on the price axis are where zero gamma and the walls are now. Watch how price reacts when it reaches a bright band, and how the bands move during the day. Hover anywhere for the numbers.</p><p>Candles: Yahoo Finance, delayed. Gamma: Cboe options, 15-min delayed, mapped to futures with today's basis. History builds up as snapshots are saved (about 12 days in the app, 5 on the hosted site).</p>`,
     watch: ["Price stalling at a bright blue band = positive-gamma support or resistance", "Price slicing through orange = negative gamma, moves can extend"]},
   paste: {title: "The hourly paste", tldr: "One text block that carries all levels to TradingView.",
     body: `<p>Published every hour on the hour (ET). One paste holds NQ and ES; each chart draws only its own market. The indicator marks levels stale after 90 minutes.</p>`},
@@ -1189,21 +1189,26 @@ class HeatPrimitive {
           ctx.fillRect(X0, Y0, Math.max(1, Math.round(x1 * hr) - X0), Math.max(1, Math.round(yb * vr) - Y0));
         });
       });
-      // levels: flat segments per steady stretch, no vertical joins
+      // walls: one solid line per stretch where the wall held for at least 12 bars (an hour on 5m); shorter
+      // stays and zero gamma (an estimate that moves every snapshot) only show as axis labels
       if(!hmShowLv || !hm._lv) return;
-      for(const [k, col, dash] of [["zg", cssVar("--zg"), [4, 3]], ["cw", cssVar("--pos"), []], ["pw", cssVar("--neg"), []]]){
-        ctx.strokeStyle = col; ctx.lineWidth = Math.max(1, Math.round(1.25 * vr)); ctx.setLineDash(dash.map(d => d * hr)); ctx.globalAlpha = .9;
+      const MIN_BARS = 12;
+      ctx.lineWidth = Math.max(1, Math.round(vr)); ctx.globalAlpha = .75;
+      for(const [k, col] of [["cw", cssVar("--pos")], ["pw", cssVar("--neg")]]){
+        ctx.strokeStyle = col;
         let run = null;
-        const flush = () => { if(!run) return; const y = this.series.priceToCoordinate(run.v); if(y != null){ ctx.beginPath(); ctx.moveTo(Math.floor(run.x0 * hr), Math.round(y * vr) + .5); ctx.lineTo(Math.ceil(run.x1 * hr), Math.round(y * vr) + .5); ctx.stroke(); } run = null; };
+        const flush = () => {
+          if(run && run.n >= MIN_BARS){ const y = this.series.priceToCoordinate(run.v);
+            if(y != null){ ctx.beginPath(); ctx.moveTo(Math.round(run.x0 * hr), Math.round(y * vr) + .5); ctx.lineTo(Math.round(run.x1 * hr), Math.round(y * vr) + .5); ctx.stroke(); } }
+          run = null; };
         hm._lv[k].forEach(([x0t, x1t, v], i, all) => {
-          const last = i === all.length - 1;
-          const x0 = xOf(x0t), x1 = last ? W / hr : xOf(x1t);
+          const x0 = xOf(x0t), x1 = i === all.length - 1 ? W / hr : xOf(x1t);
           if(v == null || x0 == null){ flush(); return; }
-          if(run && run.v === v) run.x1 = x1 ?? run.x1; else { flush(); run = {v, x0, x1: x1 ?? x0}; }
+          if(run && run.v === v){ run.x1 = x1 ?? run.x1; run.n++; } else { flush(); run = {v, x0, x1: x1 ?? x0, n: 1}; }
         });
         flush();
       }
-      ctx.setLineDash([]); ctx.globalAlpha = 1;
+      ctx.globalAlpha = 1;
     });
   }
 }
@@ -1239,7 +1244,7 @@ function renderHeatmap(){
   // level paths (steadied) as [from bar, to bar, price] per snapshot; today's values as axis labels only
   hm._lv = {};
   const C = hm._cols;
-  for(const k of ["zg", "cw", "pw"]){
+  for(const k of ["cw", "pw"]){
     const st = hmSteady(C.map(c => c[k] == null ? null : Math.round((c[k] * hm.factor + hm.offset) * 4) / 4));
     hm._lv[k] = C.map((c, i) => [c._bar, C[i + 1] ? C[i + 1]._bar : null, st[i]]);
   }
