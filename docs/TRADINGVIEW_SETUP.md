@@ -57,7 +57,7 @@ The dialog's separate Style tab has nothing to change.
 ### On the chart
 
 * **Lines** run across the chart's history and end at the current bar by default ("Across the chart,
-  end at price"), with the level's price in small text at the line's end; nothing is drawn over the
+  end at price"), with the level's price written on top of the line where it ends (plain digits, e.g. `29885`); nothing is drawn over the
   space right of price except the tags. Other choices: from the session open, the full chart, or right
   of price only. Key levels and max pain are 2 px, others 1 px. The GEX profile is off by default.
 * **Colours, style and width**: each level type has its colour, line style and thickness side by side in
@@ -67,7 +67,7 @@ The dialog's separate Style tab has nothing to change.
   picked style, weaker ranks are dotted. Largest +/- GEX,
   concentrations, volume walls and max pain are off by default (the ranked levels cover them).
 * **Tags + hover info** (the default label style): each level gets a short tag right of price with a
-  strength bar, e.g. `■■■■■■ C1  Ab2`. Ranked levels: `C1`-`C7` (most positive net GEX), `P1`-`P7` (most
+  strength bar, e.g. `▬▬▬▬▬▬ C1  Ab2`. Ranked levels: `C1`-`C7` (most positive net GEX), `P1`-`P7` (most
   negative net GEX), `Ab1`-`Ab3` (most total gamma). **Ranked from** picks their source. *First expiry*
   means today's expiring options (the next expiry when none expire today): their gamma sits close to
   price, so many nearby levels for intraday trading. *auto* (default) ranks whichever chain holds most of

@@ -703,16 +703,18 @@ renderTags() =>
              + array.get(tgFull, i) + near
              + rule + "🧭 ZONE CONTEXT" + rule + zoneTxt(zs, p)
              + (foot != "" ? rule + foot : "")
-        if extent == "Across the chart, end at price"            // the price at the line's end, like a price-scale mark
-            array.push(gLabels, label.new(bar_index, p, fmtPx(p), style = label.style_label_right, color = color.new(#0b0e13, 100),
-                 textcolor = color.new(array.get(tgCol, i), 25), size = size.tiny, textalign = text.align_right, tooltip = tip))
+        if extent == "Across the chart, end at price"
+            // the price sits ON TOP of the line where it ends (anchored by its bottom-right corner), plain digits like a
+            // price-scale mark: 29885, 29914.75
+            array.push(gLabels, label.new(bar_index, p, str.tostring(p, "#.##"), style = label.style_label_lower_right, color = color.new(#0b0e13, 100),
+                 textcolor = color.new(array.get(tgCol, i), 5), size = size.small, textalign = text.align_right, tooltip = tip))
         float st = array.get(tgStr, i)
         color lc = array.get(tgCol, i)
         if not na(st)
             int tp = math.round((1 - math.min(1.0, st)) * 75)
             line.set_color(array.get(gLines, i), color.new(lc, tp))
             lc := color.new(lc, math.min(tp, 40))
-        string blk = na(st) ? "" : str.repeat("■", math.max(1, math.round(st * 12))) + "  "
+        string blk = na(st) ? "" : str.repeat("▬", math.max(1, math.round(st * 12))) + "  "      // one continuous strength bar
         array.push(gLabels, label.new(bar_index + lblX, p, blk + str.replace_all(array.get(tgName, i), "·", "  ") + (nConf > 1 ? "  " + str.repeat("●", math.min(nConf, 5)) : ""),
              style = label.style_label_left, color = color.new(#0b0e13, 100), textcolor = lc, size = lSz,
              textalign = text.align_left, tooltip = tip))
