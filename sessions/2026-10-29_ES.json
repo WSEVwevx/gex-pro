@@ -1,7 +1,7 @@
 {
  "session": "2026-10-29",
  "market": "ES",
- "status": "pending",
+ "status": "graded",
  "plan": {
   "session": "2026-10-29",
   "market": "ES",
@@ -23,5 +23,40 @@
   "side": "pivot",
   "target": 7743.59
  },
- "outcome": null
+ "outcome": {
+  "open": 7699.61,
+  "high": 7732.21,
+  "low": 7690.94,
+  "close": 7717.64,
+  "source": "Cboe 1-minute",
+  "move": -26.34,
+  "move_em": -0.34,
+  "range_em": 0.533,
+  "em_close": true,
+  "em_range": true,
+  "em_up_break": false,
+  "em_down_break": false,
+  "cw": {
+   "level": 7800.0,
+   "dist_em": 0.723,
+   "touched": false,
+   "closed_beyond": false,
+   "held": false
+  },
+  "pw": {
+   "level": 7700.0,
+   "dist_em": 0.568,
+   "touched": true,
+   "closed_beyond": false,
+   "held": true
+  },
+  "zg": {
+   "open_side": "below",
+   "crossed": false
+  },
+  "bias_hit": null,
+  "target_beat": true,
+  "magnet": null
+ },
+ "graded_at": "2026-10-29T20:20:41.411878+00:00"
 }
