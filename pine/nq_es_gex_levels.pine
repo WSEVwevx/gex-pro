@@ -113,6 +113,8 @@ confPct  = input.float(0.10, "Confluence within (%)", minval = 0.01, step = 0.01
 emFill   = input.bool(false, "Shade daily expected-move band", group = G4, tooltip = "Faint fill between today's expected high and low (uses the expected-move colour).", display = display.none)
 zoneShade = input.bool(true, "Shade gamma zones next to price", group = G4,
      tooltip = "A narrow column right of the last bar: green = positive gamma zone (gamma flip to C1) and its extension (C1 to the next call level up), red = negative gamma zone (P1 to the gamma flip) and its extension (P1 to the next put level down). Hover a tag for the zone it sits in.", display = display.none)
+showOpen = input.bool(true, "Levels at the 9:30 open", group = G4, display = display.none,
+     tooltip = "When C1, P1, Ab1 or the gamma flip has moved since the 9:30 ET cash open, a faint dashed line marks where it stood at the open, so you can see how the map has shifted.")
 regimeBg = input.bool(false, "Tint today's session by gamma side", group = G4,
      tooltip = "Faint blue while price is above zero gamma (modeled positive gamma: calmer, mean-reverting), faint orange below it (negative gamma: bigger, trending moves). Today's session only.", display = display.none)
 
@@ -141,6 +143,10 @@ alCross         = input.bool(true, "Wall cross", inline = "a2", group = G7, disp
 alZG            = input.bool(true, "Zero-gamma cross", inline = "a2", group = G7, display = display.none)
 alStale         = input.bool(true, "Stale update", inline = "a3", group = G7, display = display.none)
 alCooldownMin   = input.int(15, "cooldown min", minval = 0, inline = "a3", group = G7, display = display.none)
+alRank          = input.bool(true, "Touch of C1 / P1 / Ab1", inline = "a4", group = G7, display = display.none)
+alZone          = input.bool(true, "Gamma zone change", inline = "a4", group = G7, display = display.none)
+alBand          = input.bool(true, "IV band touch (±1σ / ±2σ)", inline = "a5", group = G7, display = display.none,
+     tooltip = "Touches use the 'within ticks' distance above; every alert type has its own cooldown. Create one TradingView alert with 'Any alert() function call' to receive them all.")
 
 // ---------- 8 - Advanced
 G8 = "8 - Advanced"
@@ -214,6 +220,8 @@ type Snap
     string rk0e = ""
     float  g0e = na
     string x0d = ""
+    string sstat = ""
+    string opn = ""
     bool   complete = false
 
 strOf(map<string, string> m, string k) =>
@@ -244,7 +252,7 @@ parseOne(string txt) =>
              vc = numOf(m, "vc"), vp = numOf(m, "vp"), oc = numOf(m, "oc"), op = numOf(m, "op"), xp = strOf(m, "xp"),
              ema = numOf(m, "ema"), emd = numOf(m, "emd"), emw = numOf(m, "emw"), emx = strOf(m, "emx"), emm = numOf(m, "emm"), emmx = strOf(m, "emmx"),
              ivd = numOf(m, "ivd"), ivw = numOf(m, "ivw"), ivm = numOf(m, "ivm"),
-             prof = strOf(m, "P"), ag = numOf(m, "ag"), vxm = numOf(m, "vxm"), chm = numOf(m, "chm"), rk = strOf(m, "R"), rk0 = strOf(m, "R0"), rk0e = strOf(m, "R0e"), g0e = numOf(m, "g0e"), x0d = strOf(m, "x0d"), complete = str.trim(array.get(toks, array.size(toks) - 1)) == "END")
+             prof = strOf(m, "P"), ag = numOf(m, "ag"), vxm = numOf(m, "vxm"), chm = numOf(m, "chm"), rk = strOf(m, "R"), rk0 = strOf(m, "R0"), rk0e = strOf(m, "R0e"), g0e = numOf(m, "g0e"), x0d = strOf(m, "x0d"), sstat = strOf(m, "S"), opn = strOf(m, "O"), complete = str.trim(array.get(toks, array.size(toks) - 1)) == "END")
     s
 
 fam(string s) =>
@@ -397,6 +405,9 @@ var array<float>  tgStr  = array.new<float>()
 // ranked call / put levels (chart prices, rank order) and the gamma flip they are measured from: the zones
 var array<float>  zC = array.new<float>()
 var array<float>  zP = array.new<float>()
+var array<float>  zA = array.new<float>()
+var array<float>  ivP = array.new<float>()           // IV band prices and names, for the band alert
+var array<string> ivN = array.new<string>()
 var float zFlip = na
 tagMode = lblMode == "Tags + hover info"
 
@@ -441,6 +452,9 @@ clearAll() =>
     array.clear(tgStr)
     array.clear(zC)
     array.clear(zP)
+    array.clear(zA)
+    array.clear(ivP)
+    array.clear(ivN)
 
 // One line per price; another level at the same price joins the label: "CW · +GEX  29,883.25".
 // name is "short|full" (from nm) or plain text; strength 0-1 sizes the tag's bar, info adds a hover line.
@@ -550,6 +564,8 @@ drawKey(Snap s, float f, float o, bool isSecond) =>
                 else if kind == "A" and nA < rankA
                     nA += 1
                     string r = str.tostring(nA)
+                    if not isSecond and sane(rp)
+                        array.push(zA, rp)
                     drawLevel(rp, "Ab" + r + "|Absolute GEX #" + r, tag, color.new(cAG, tr), wRank, nA <= 2 ? lnStyle(styRank) : line.style_dashed, stren,
                          (nA == 1 ? "greatest total gamma exposure (call + put GEX combined): often a magnet" : ordinal(nA) + " highest total gamma exposure") + shTxt, "🟣")
     if nConc > 0 and s.lv != ""
@@ -576,8 +592,14 @@ ivBand(Snap s, float f, float o, string tag, int tr, string hz, string span, flo
             int trk = fade(tr + (k == 2 ? 10 : 0))
             string st = k == 1 ? lnStyle(styEM) : line.style_dashed
             string about = "options price about a " + pct + " chance " + span + " ends inside ±" + sg + " (±" + str.tostring(k * pts * nz(f, 1), "#") + " pts from " + fmtPx(mapP(s.ema, f, o)) + ")" + (src != "" ? "; " + src : "")
-            drawLevel(mapP(s.ema + k * pts, f, o), nm(hz + "+" + sg, hz + " IV band +" + sg), tag, color.new(cEM, trk), wEM, st, na, "upper edge: " + about, "⚪")
-            drawLevel(mapP(s.ema - k * pts, f, o), nm(hz + "-" + sg, hz + " IV band -" + sg), tag, color.new(cEM, trk), wEM, st, na, "lower edge: " + about, "⚪")
+            float up = drawLevel(mapP(s.ema + k * pts, f, o), nm(hz + "+" + sg, hz + " IV band +" + sg), tag, color.new(cEM, trk), wEM, st, na, "upper edge: " + about, "⚪")
+            float dn = drawLevel(mapP(s.ema - k * pts, f, o), nm(hz + "-" + sg, hz + " IV band -" + sg), tag, color.new(cEM, trk), wEM, st, na, "lower edge: " + about, "⚪")
+            if not na(up)
+                array.push(ivP, up)
+                array.push(ivN, hz + "+" + sg)
+            if not na(dn)
+                array.push(ivP, dn)
+                array.push(ivN, hz + "-" + sg)
     true
 
 drawMore(Snap s, float f, float o, bool isSecond) =>
@@ -702,6 +724,29 @@ zoneTxt(array<Zone> zs, float p) =>
     string outside = na(zFlip) ? "Outside the mapped zones." : "Outside the mapped zones, " + (p >= zFlip ? "above" : "below") + " the gamma flip (" + fmtPx(zFlip) + ")."
     nIn == 0 ? outside : head + inside
 
+// a tag name's past reactions from the paste's S field (kind:touches:held:median bounce)
+kindOf(string n) =>
+    n == "C1" or n == "P1" or n == "Ab1" or n == "ZG" or n == "CW" or n == "PW" ? n : n == "0D ZG" ? "flip" : ""
+
+statTxt(Snap s, string kind) =>
+    string out = ""
+    for item in str.split(s.sstat, ",")
+        array<string> f = str.split(item, ":")
+        if array.size(f) == 4 and array.get(f, 0) == kind
+            int n = int(nz(str.tonumber(array.get(f, 1))))
+            int h = int(nz(str.tonumber(array.get(f, 2))))
+            string b = array.get(f, 3)
+            string who = kind == "flip" ? "0DTE flip" : kind
+            out := n < 3 ? "📊 " + who + " history: " + str.tostring(n) + (n == 1 ? " touch" : " touches") + " in the last sessions, too few to judge."
+                 : "📊 " + who + " history (last sessions): held " + str.tostring(h) + " of " + str.tostring(n) + " touches" + (b != "" ? ", median bounce " + b + " pts" : "") + "."
+    out
+
+// each tag name in its own colour: C / CW green, P / PW red, Ab violet, ZG amber, IV bands grey...
+nameCol(string n, color dflt) =>
+    str.startswith(n, "Ab") or n == "AG" ? cAG : str.contains(n, "ZG") ? cZG : str.contains(n, "CW") ? cPos : str.contains(n, "PW") ? cNeg
+     : str.contains(n, "σ") or str.startswith(n, "EM") ? cEM : str.startswith(n, "MP") ? cMP : str.startswith(n, "VOL") ? cVol : str.startswith(n, "OI") ? cOI
+     : str.startswith(n, "C") or str.startswith(n, "+") ? cPos : str.startswith(n, "P") or str.startswith(n, "-") ? cNeg : dflt
+
 confWord(int n) =>
     n >= 4 ? "very strong confluence" : n == 3 ? "strong confluence" : "moderate confluence"
 
@@ -733,9 +778,16 @@ renderTags() =>
                 near += "\n" + array.get(tgFull, j)
         float dlt = p - close
         string where = (dlt >= 0 ? "▲ " : "▼ ") + str.tostring(math.abs(dlt) / close * 100, "0.00") + "% " + (dlt >= 0 ? "above" : "below") + " price, " + (dlt >= 0 ? "+" : "-") + str.tostring(math.abs(dlt), "#,##0.00") + " pts"
+        string hist = ""
+        if not na(s)
+            for nmx in str.split(array.get(tgName, i), "·")
+                string kd = kindOf(nmx)
+                string ln = kd != "" and s.sstat != "" ? statTxt(s, kd) : ""
+                if ln != ""
+                    hist += "\n" + ln
         string tip = hdr + rule + "📍 " + fmtPx(p) + " LEVEL ANALYSIS (" + where + ")" + rule
              + (nConf > 1 ? "🔗 Confluence " + str.repeat("●", math.min(nConf, 5)) + "\n" + str.tostring(nConf) + " levels converge: " + confWord(nConf) + ". Potential reaction zone.\n" : "")
-             + array.get(tgFull, i) + near
+             + array.get(tgFull, i) + near + hist
              + rule + "🧭 ZONE CONTEXT" + rule + zoneTxt(zs, p)
              + (foot != "" ? rule + foot : "")
         if extent == "Across the chart, end at price"
@@ -749,10 +801,20 @@ renderTags() =>
             int tp = math.round((1 - math.min(1.0, st)) * maxFade)
             line.set_color(array.get(gLines, i), color.new(lc, tp))
             // the tag text stays at full strength; only the line fades
-        string blk = na(st) ? "" : str.repeat("▬", math.max(1, math.round(st * 12))) + "  "      // one continuous strength bar
-        array.push(gLabels, label.new(bar_index + lblX, p, blk + str.replace_all(array.get(tgName, i), "·", "  ") + (nConf > 1 ? "  " + str.repeat("●", math.min(nConf, 5)) : ""),
-             style = label.style_label_left, color = color.new(#0b0e13, 100), textcolor = lc, size = lSz,
-             textalign = text.align_left, tooltip = tip))
+        // the strength bar is a thick line; then each name as its own label in its own colour. A monospace font
+        // and figure-space padding ( ) put the names side by side exactly, e.g. "C1  Ab2"
+        int x0 = bar_index + lblX
+        if not na(st)
+            int bl = math.max(1, math.round(st * 8))
+            array.push(gLines, line.new(x0, p, x0 + bl, p, color = color.new(lc, 0), width = 4))
+            x0 += bl + 1
+        array<string> nms = str.split(array.get(tgName, i), "·")
+        string pad = ""
+        for [k, nmx] in nms
+            string txt = pad + nmx + (k == array.size(nms) - 1 and nConf > 1 ? "  " + str.repeat("●", math.min(nConf, 5)) : "")
+            array.push(gLabels, label.new(x0, p, txt, style = label.style_label_left, color = color.new(#0b0e13, 100), textcolor = nameCol(nmx, lc),
+                 size = lSz, textalign = text.align_left, tooltip = tip, text_font_family = font.family_monospace))
+            pad += str.repeat(" ", str.length(nmx) + 2)
     // the zones as a narrow column just right of the last bar (extensions fainter)
     if zoneShade
         for z in zs
@@ -791,6 +853,26 @@ if barstate.islast
         float oz = okA ? offA : offB
         [rz, wz, firstZ, ez] = rankedOf(sz)
         zFlip := firstZ and not na(sz.z0) ? mapP(sz.z0, fz, oz) : mapP(sz.zg, fz, oz)
+    // where C1 / P1 / Ab1 / the flip stood at the 9:30 open, when they have moved since (paste field O)
+    if showOpen and (okA or okB)
+        Snap so = okA ? sA : sB
+        float fo = okA ? facA : facB
+        float oo = okA ? offA : offB
+        if so.opn != ""
+            int t930 = timestamp("America/New_York", year(time, "America/New_York"), month(time, "America/New_York"), dayofmonth(time, "America/New_York"), 9, 30)
+            for item in str.split(so.opn, ",")
+                array<string> f = str.split(item, ":")
+                if array.size(f) == 2
+                    string kd = array.get(f, 0)
+                    float pOpen = mapP(str.tonumber(array.get(f, 1)), fo, oo)
+                    float pNow = kd == "C1" ? (array.size(zC) > 0 ? array.get(zC, 0) : na) : kd == "P1" ? (array.size(zP) > 0 ? array.get(zP, 0) : na)
+                         : kd == "Ab1" ? (array.size(zA) > 0 ? array.get(zA, 0) : na) : zFlip
+                    if not na(pOpen) and sane(pOpen) and (na(pNow) or math.abs(pOpen - pNow) >= math.max(4 * syminfo.mintick, close * 0.0002))
+                        color gc = color.new(kd == "C1" ? cPos : kd == "P1" ? cNeg : kd == "Ab1" ? cAG : cZG, 45)
+                        int ts0 = math.min(t930, time - 1)
+                        array.push(gLines, line.new(ts0, pOpen, time, pOpen, xloc = xloc.bar_time, color = gc, width = 1, style = line.style_dashed))
+                        array.push(gLabels, label.new(ts0, pOpen, (kd == "flip" ? "flip" : kd) + " at open " + fmtPx(pOpen), xloc = xloc.bar_time, style = label.style_label_lower_left,
+                             color = color.new(#0b0e13, 100), textcolor = gc, size = size.tiny))
     if tagMode
         renderTags()
 
@@ -943,6 +1025,10 @@ var int lastAp = 0
 var int lastCr = 0
 var int lastZg = 0
 var int lastSt = 0
+var int lastRk = 0
+var int lastZn = 0
+var int lastBd = 0
+var string lastZone = ""
 cool(int last) =>
     timenow - last >= alCooldownMin * 60000
 
@@ -971,6 +1057,30 @@ if barstate.isrealtime
     if alZG and crossedZG and cool(lastZg)
         alert(syminfo.ticker + " crossed estimated zero gamma " + ps(zgF) + ".", alert.freq_once_per_bar)
         lastZg := timenow
+    // C1 / P1 / Ab1 touched, a new gamma zone, an IV band tagged
+    float tolA = alApproachTicks * syminfo.mintick
+    if alRank and cool(lastRk)
+        array<float> lv = array.from(array.size(zC) > 0 ? array.get(zC, 0) : na, array.size(zP) > 0 ? array.get(zP, 0) : na, array.size(zA) > 0 ? array.get(zA, 0) : na)
+        array<string> ln = array.from("C1", "P1", "Ab1")
+        for [k, v] in lv
+            if not na(v) and high >= v - tolA and low <= v + tolA and cool(lastRk)
+                alert(syminfo.ticker + " touched " + array.get(ln, k) + " " + ps(v) + " (price " + ps(close) + ").", alert.freq_once_per_bar)
+                lastRk := timenow
+    if alZone
+        string zn = ""
+        for z in zones()
+            if close >= z.lo and close <= z.hi
+                zn := z.name
+        if zn != "" and lastZone != "" and zn != lastZone and cool(lastZn)
+            alert(syminfo.ticker + " moved into the " + zn + " (price " + ps(close) + ").", alert.freq_once_per_bar)
+            lastZn := timenow
+        if zn != ""
+            lastZone := zn
+    if alBand and cool(lastBd)
+        for [k, v] in ivP
+            if high >= v - tolA and low <= v + tolA and cool(lastBd)
+                alert(syminfo.ticker + " touched the " + array.get(ivN, k) + " IV band " + ps(v) + ".", alert.freq_once_per_bar)
+                lastBd := timenow
     if alStale and anyStale and cool(lastSt)
         alert("GEX update for " + syminfo.ticker + " is stale - paste a fresh one from the website.", alert.freq_once_per_bar)
         lastSt := timenow

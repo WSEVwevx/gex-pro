@@ -97,6 +97,10 @@ class TestPineStatic(unittest.TestCase):
                               "profile": {"base": 1.0, "width": 1.0, "values": [1]}}}
         emitted = {kv.split("=", 1)[0] for kv in pine_payload(summary, "NQ", "NDX", "ratio", provider="CBOE",
                                                                delta={"zero_gamma": 1.0, "prev_regime": "POSITIVE"}).split(";")[1:] if "=" in kv}
+        # fields the service adds on every refresh (gexsys/service.py, add_tokens): open levels, reaction stats
+        svc = (Path(__file__).resolve().parent.parent / "gexsys" / "service.py").read_text(encoding="utf-8")
+        line = next(ln for ln in svc.splitlines() if "add_tokens(r[" in ln)
+        emitted |= set(re.findall(r'"(\w+)": [^,}]*_token\(', line))
         missing = read - emitted
         self.assertFalse(missing, f"Pine reads keys the service never sends: {sorted(missing)}")
 

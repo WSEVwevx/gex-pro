@@ -51,7 +51,7 @@ The dialog's separate Style tab has nothing to change.
 | 4 - Lines & labels | Where lines start (session open / full chart / right of price), labels (short / full / off), label size, label background, label offset, expected-move band shading, session tint by gamma side |
 | 5 - GEX profile | On/off, source, width, gap, opacity |
 | 6 - Info panel | On/off, detail, position, text size |
-| 7 - Alerts | Approach (ticks), wall cross, zero-gamma cross, stale update, cooldown |
+| 7 - Alerts | Approach (ticks), wall cross, zero-gamma cross, stale update, cooldown, touch of C1 / P1 / Ab1, gamma zone change, IV band touch |
 | 8 - Advanced | More levels from, source filter, reference override, stale time, safety distance, manual levels |
 
 ### On the chart
@@ -85,7 +85,13 @@ The dialog's separate Style tab has nothing to change.
   *Positive Gamma Extension Zone* (C1 to the next call level up: reduced hedging pressure), *Negative Gamma
   Zone* (P1 to the flip: put-dominated, moves amplified) and *Negative Gamma Extension Zone* (P1 to the
   next put level down). A level on a zone edge says it is a boundary between two zones. "Shade gamma zones"
-  draws them as a narrow column right of the last bar.
+  draws them as a narrow column right of the last bar. For C1, P1, Ab1, the 0DTE flip, ZG, CW and PW the box
+  also shows its **history**: how many times price touched that kind of level in the last sessions, how often
+  it held (no close beyond it within an hour) and the median bounce in points.
+* **Tag colours:** each name in a tag has its own colour (C and CW green, P and PW red, Ab violet, ZG amber,
+  IV bands grey), with the strength bar drawn as a thick line before them.
+* **Levels at the 9:30 open:** when C1, P1, Ab1 or the gamma flip has moved since the cash open, a faint dashed
+  line marks where it stood at 9:30 ("C1 at open 29,800"), so you can see how the map has shifted.
 * **Labels** ("Short" / "Full") sit right of the GEX profile on a dark pill: short code plus price with separators,
   e.g. `CW  29,883.25`. Codes: `ZG`, `CW`, `PW`, `+GEX`, `-GEX`, `+G 12%`, `0D ZG` / `0D CW` / `0D PW`,
   `VOL C` / `VOL P`, `OI C` / `OI P`, `MP 10-21`, IV bands `D+1σ` / `D-1σ` / `D+2σ` / `D-2σ` (`W` week, `M` month).
@@ -132,7 +138,8 @@ The dialog's separate Style tab has nothing to change.
 ## Alerts
 
 * Create an alert on the indicator and choose **"Any alert() function call"**. That gives the
-  approach, wall-cross, zero-gamma-cross and stale-snapshot alerts, each with a per-type cooldown,
+  approach, wall-cross, zero-gamma-cross, stale-snapshot, C1 / P1 / Ab1 touch, gamma-zone change and IV-band
+  touch alerts, each with a per-type cooldown,
   on real-time bars only.
 * Two `alertcondition`s are also available: zero-gamma cross and wall cross.
 * Webhooks: TradingView can POST alert messages to a URL on plans that support it. **Alerts can be
