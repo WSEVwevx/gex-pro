@@ -468,6 +468,8 @@ b.good,.drv-chg .good{color:var(--good)}b.bad,.drv-chg .bad{color:var(--bad)}
 .hm-msg[hidden]{display:none}
 .hm-tip{z-index:10;white-space:normal;max-width:300px}
 .hm-note{color:var(--ink4)}
+.hm-scale{display:inline-flex;align-items:center;gap:6px}
+.hm-ramp{display:inline-block;width:70px;height:8px;border-radius:2px;background:linear-gradient(90deg,var(--neg),rgba(127,127,127,.15) 50%,var(--pos))}
 
 /* ---------------------------------------------------------------- explain drawer */
 .explain-tab{display:inline-grid;place-items:center;height:30px;padding:0 10px;border:1px solid var(--line2);border-radius:3px;background:var(--panel2);color:var(--ink2);font:600 11.5px var(--sans);flex:none}

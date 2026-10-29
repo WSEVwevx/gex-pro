@@ -99,12 +99,14 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
     <div id="heatmapView" hidden>
       <section class="card hm-card" data-help="heatmap">
         <div class="head"><h2>GEX heatmap</h2><span class="sub" id="hmSub"></span><span class="spacer"></span>
+          <div class="filters" id="hmSpan" role="tablist" aria-label="Range"></div>
           <div class="filters" id="hmTf" role="tablist" aria-label="Timeframe"></div>
           <label class="hm-ctl" title="Heatmap strength">Heat <input type="range" id="hmOpacity" min="10" max="100" step="5" value="60"></label>
           <label class="hm-ctl"><input type="checkbox" id="hmLevels" checked> Levels</label></div>
         <div class="hm-chart" id="hmChart"><div class="hm-msg" id="hmMsg">Loading the chart...</div><div class="tip hm-tip" id="hmTip"></div></div>
         <div class="legend"><span><i class="sw" style="background:var(--pos)"></i>positive gamma (hedging calms moves)</span><span><i class="sw" style="background:var(--neg)"></i>negative gamma (hedging adds to moves)</span>
-          <span><i class="sw" style="background:var(--pos);height:2px"></i>call wall</span><span><i class="sw" style="background:var(--neg);height:2px"></i>put wall</span><span>ZG · CW · PW labels on the price axis = now</span>
+          <span><i class="sw" style="background:var(--pos);height:2px"></i>call wall</span><span><i class="sw" style="background:var(--neg);height:2px"></i>put wall</span><span>ZG · CW · PW labels on the price axis = now</span><span>right edge: the latest GEX profile with today's C / P / Ab levels</span>
+          <span class="hm-scale" id="hmScale"></span>
           <span class="hm-note" id="hmNote"></span></div>
       </section>
     </div>
