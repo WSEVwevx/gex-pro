@@ -41,11 +41,11 @@ wPWPick = input.string("───", "", options = ["───", "━━━", "�
 wPW = pxOf(wPWPick)
 showAG   = input.bool(true, "Absolute gamma", inline = "ag", group = G2)
 cAG      = input.color(#a78bfa, "", inline = "ag", group = G2, tooltip = "Strike with the most TOTAL gamma (calls + puts). Often acts like a magnet. Doesn't depend on any dealer-positioning assumption.")
-styAG = input.string("┈┈┈┈", "", options = ["────", "╌╌╌╌", "┈┈┈┈"], inline = "ag", group = G2)
+styAG = input.string("╌╌╌╌", "", options = ["────", "╌╌╌╌", "┈┈┈┈"], inline = "ag", group = G2)
 wAGPick = input.string("───", "", options = ["───", "━━━", "▬▬▬", "███"], inline = "ag", group = G2)
 wAG = pxOf(wAGPick)
 showRank = input.bool(true, "Ranked levels (C1-C7, P1-P7, Ab1-Ab3)", inline = "rk", group = G2,
-     tooltip = "The strongest price bands near price: C = most positive net GEX, P = most negative net GEX, Ab = most total gamma (call / put / absolute-gamma colours). 1 = strongest. Each line's opacity and its tag's bar show its share of gamma; ranks 1-2 use the style picked here, weaker ranks are dotted.")
+     tooltip = "The strongest price bands near price: C = most positive net GEX, P = most negative net GEX, Ab = most total gamma (call / put / absolute-gamma colours). 1 = strongest. Each line's opacity and its tag's bar show its share of gamma; ranks 1-2 use the style picked here, weaker ranks are dashed.")
 styRank = input.string("────", "", options = ["────", "╌╌╌╌", "┈┈┈┈"], inline = "rk", group = G2)
 wRankPick = input.string("───", "", options = ["───", "━━━", "▬▬▬", "███"], inline = "rk", group = G2)
 wRank = pxOf(wRankPick)
@@ -55,7 +55,7 @@ rankC = input.int(7, "Levels: C", minval = 0, maxval = 7, inline = "rn", group =
 rankP = input.int(7, "P", minval = 0, maxval = 7, inline = "rn", group = G2)
 rankA = input.int(3, "Ab", minval = 0, maxval = 3, inline = "rn", group = G2, tooltip = "How many call, put and absolute-gamma levels to draw (strongest first).")
 showMax  = input.bool(false, "Largest +/- GEX and concentrations", inline = "mx", group = G2, tooltip = "Strikes with the most positive / negative gamma, plus the extra concentrations below, in the call / put colours.")
-styMax = input.string("┈┈┈┈", "", options = ["────", "╌╌╌╌", "┈┈┈┈"], inline = "mx", group = G2)
+styMax = input.string("╌╌╌╌", "", options = ["────", "╌╌╌╌", "┈┈┈┈"], inline = "mx", group = G2)
 wMaxPick = input.string("───", "", options = ["───", "━━━", "▬▬▬", "███"], inline = "mx", group = G2)
 wMax = pxOf(wMaxPick)
 nConc    = input.int(0, "Other concentrations", minval = 0, maxval = 6, inline = "cc", group = G2)
@@ -76,17 +76,17 @@ wVolPick = input.string("───", "", options = ["───", "━━━", "�
 wVol = pxOf(wVolPick)
 showOI  = input.bool(false, "OI walls", inline = "oi", group = G3)
 cOI     = input.color(#9085e9, "", inline = "oi", group = G3, tooltip = "Strikes with the most open calls / puts as of yesterday's close.")
-styOI = input.string("┈┈┈┈", "", options = ["────", "╌╌╌╌", "┈┈┈┈"], inline = "oi", group = G3)
+styOI = input.string("╌╌╌╌", "", options = ["────", "╌╌╌╌", "┈┈┈┈"], inline = "oi", group = G3)
 wOIPick = input.string("───", "", options = ["───", "━━━", "▬▬▬", "███"], inline = "oi", group = G3)
 wOI = pxOf(wOIPick)
 showMP  = input.bool(false, "Max pain", inline = "mp", group = G3)
 cMP     = input.color(#c98500, "", inline = "mp", group = G3, tooltip = "Price where option holders lose the most at expiration.")
-styMP = input.string("┈┈┈┈", "", options = ["────", "╌╌╌╌", "┈┈┈┈"], inline = "mp", group = G3)
+styMP = input.string("╌╌╌╌", "", options = ["────", "╌╌╌╌", "┈┈┈┈"], inline = "mp", group = G3)
 wMPPick = input.string("───", "", options = ["───", "━━━", "▬▬▬", "███"], inline = "mp", group = G3)
 wMP = pxOf(wMPPick)
 mpCount = input.string("Nearest", "Max pain expirations", options = ["Nearest", "Nearest + next"], group = G3)
 showEM  = input.bool(true, "IV range bands", inline = "em", group = G3)
-cEM     = input.color(#8b95a5, "", inline = "em", group = G3, tooltip = "Price levels set by implied volatility: the range the options market prices in, from the previous close (the last close outside cash hours). +/-1σ: about 68% of the time price ends inside; +/-2σ: about 95%. Each horizon uses its own expiry's at-the-money IV. Weekly and monthly are fainter, 2σ dotted.")
+cEM     = input.color(#8b95a5, "", inline = "em", group = G3, tooltip = "Price levels set by implied volatility: the range the options market prices in, from the previous close (the last close outside cash hours). +/-1σ: about 68% of the time price ends inside; +/-2σ: about 95%. Each horizon uses its own expiry's at-the-money IV. Weekly and monthly are slightly lighter, 2σ dashed.")
 styEM = input.string("╌╌╌╌", "", options = ["────", "╌╌╌╌", "┈┈┈┈"], inline = "em", group = G3)
 wEMPick = input.string("───", "", options = ["───", "━━━", "▬▬▬", "███"], inline = "em", group = G3)
 wEM = pxOf(wEMPick)
@@ -104,6 +104,8 @@ lblMode  = input.string("Tags + hover info", "Labels", options = ["Tags + hover 
 lblSize  = input.string("Small", "", options = ["Tiny", "Small", "Normal"], inline = "lb", group = G4)
 lblBg    = input.bool(true, "Label background", inline = "lb2", group = G4)
 lblOff   = input.int(6, "offset (bars)", minval = 0, maxval = 200, inline = "lb2", group = G4, tooltip = "Used when the GEX profile is off; with the profile on, labels sit just right of it.")
+minOpac  = input.int(85, "Weakest line opacity %", minval = 20, maxval = 100, step = 5, group = G4,
+     tooltip = "How faint the weakest level may get. Lines fade with strength (and weekly / monthly / 2σ bands are lighter) but never below this. Raise it on grey or light chart backgrounds; 100 = every line fully solid.")
 roundTo  = input.string("Whole points", "Level prices", options = ["Whole points", "5 points", "Exact (tick)"], group = G4,
      tooltip = "Options levels aren't precise to a tick, so each level is drawn and labelled at a round price: whole points (29885), the nearest 5 points (29885, 29890...) or the exact converted price (29884.75).")
 confPct  = input.float(0.10, "Confluence within (%)", minval = 0.01, step = 0.01, group = G4,
@@ -332,6 +334,11 @@ mapInfo(Snap s, float lf, float lo, float refNow, string sym) =>
 [facA, offA, mstA] = mapInfo(sA, lfA, loA, refCA, symA)
 [facB, offB, mstB] = mapInfo(sB, lfB, loB, refCB, symB)
 
+// transparency for a line, never fainter than "Weakest line opacity"
+maxFade = 100 - minOpac
+fade(int tr) =>
+    math.min(tr, maxFade)
+
 // index price -> this chart's price, rounded per "Level prices"
 roundStep = roundTo == "5 points" ? 5.0 : roundTo == "Whole points" ? 1.0 : 0.0
 mapP(float p, float f, float o) =>
@@ -495,7 +502,7 @@ tagOf(Snap s) =>
 
 drawKey(Snap s, float f, float o, bool isSecond) =>
     string tag = tagOf(s)
-    int tr = isSecond ? 40 : 0
+    int tr = isSecond ? fade(40) : 0
     if showZG
         drawLevel(mapP(s.zg, f, o), nm("ZG", "Zero gamma"), tag, color.new(cZG, tr), wZG, lnStyle(styZG), na, "all-expiry gamma flip (estimate): above it dealer hedging calms moves, below it adds to them", "🟡")
     if showCW
@@ -531,19 +538,19 @@ drawKey(Snap s, float f, float o, bool isSecond) =>
                     string r = str.tostring(nC)
                     if not isSecond and sane(rp)
                         array.push(zC, rp)
-                    drawLevel(rp, "C" + r + "|Call level #" + r, tag, color.new(cPos, tr), wRank, nC <= 2 ? lnStyle(styRank) : line.style_dotted, stren,
+                    drawLevel(rp, "C" + r + "|Call level #" + r, tag, color.new(cPos, tr), wRank, nC <= 2 ? lnStyle(styRank) : line.style_dashed, stren,
                          (nC == 1 ? "highest positive net GEX: the main call-side concentration. If price moves beyond it, the next call level may take over" : ordinal(nC) + " highest positive net GEX") + shTxt, "🟢")
                 else if kind == "P" and nP < rankP
                     nP += 1
                     string r = str.tostring(nP)
                     if not isSecond and sane(rp)
                         array.push(zP, rp)
-                    drawLevel(rp, "P" + r + "|Put level #" + r, tag, color.new(cNeg, tr), wRank, nP <= 2 ? lnStyle(styRank) : line.style_dotted, stren,
+                    drawLevel(rp, "P" + r + "|Put level #" + r, tag, color.new(cNeg, tr), wRank, nP <= 2 ? lnStyle(styRank) : line.style_dashed, stren,
                          (nP == 1 ? "most negative net GEX: the main put-side concentration. Below it dealer hedging can speed up selling" : ordinal(nP) + " most negative net GEX") + shTxt, "🔴")
                 else if kind == "A" and nA < rankA
                     nA += 1
                     string r = str.tostring(nA)
-                    drawLevel(rp, "Ab" + r + "|Absolute GEX #" + r, tag, color.new(cAG, tr), wRank, nA <= 2 ? lnStyle(styRank) : line.style_dotted, stren,
+                    drawLevel(rp, "Ab" + r + "|Absolute GEX #" + r, tag, color.new(cAG, tr), wRank, nA <= 2 ? lnStyle(styRank) : line.style_dashed, stren,
                          (nA == 1 ? "greatest total gamma exposure (call + put GEX combined): often a magnet" : ordinal(nA) + " highest total gamma exposure") + shTxt, "🟣")
     if nConc > 0 and s.lv != ""
         int shown = 0
@@ -555,7 +562,7 @@ drawKey(Snap s, float f, float o, bool isSecond) =>
                 bool  isPos = array.get(parts, 1) == "+"
                 if not na(sp) and not na(sh) and sh * 100.0 >= minShare
                     drawLevel(mapP(sp, f, o), (isPos ? "+G " : "-G ") + str.tostring(sh * 100.0, "#") + "%", tag,
-                         color.new(isPos ? cPos : cNeg, tr + 35), wMax, lnStyle(styMax))
+                         color.new(isPos ? cPos : cNeg, fade(tr + 25)), wMax, lnStyle(styMax))
                     shown += 1
     true
 
@@ -566,8 +573,8 @@ ivBand(Snap s, float f, float o, string tag, int tr, string hz, string span, flo
         if k == 1 or iv2
             string sg = str.tostring(k) + "σ"
             string pct = k == 1 ? "68%" : "95%"
-            int trk = math.min(90, tr + (k == 2 ? 25 : 0))
-            string st = k == 1 ? lnStyle(styEM) : line.style_dotted
+            int trk = fade(tr + (k == 2 ? 10 : 0))
+            string st = k == 1 ? lnStyle(styEM) : line.style_dashed
             string about = "options price about a " + pct + " chance " + span + " ends inside ±" + sg + " (±" + str.tostring(k * pts * nz(f, 1), "#") + " pts from " + fmtPx(mapP(s.ema, f, o)) + ")" + (src != "" ? "; " + src : "")
             drawLevel(mapP(s.ema + k * pts, f, o), nm(hz + "+" + sg, hz + " IV band +" + sg), tag, color.new(cEM, trk), wEM, st, na, "upper edge: " + about, "⚪")
             drawLevel(mapP(s.ema - k * pts, f, o), nm(hz + "-" + sg, hz + " IV band -" + sg), tag, color.new(cEM, trk), wEM, st, na, "lower edge: " + about, "⚪")
@@ -575,12 +582,12 @@ ivBand(Snap s, float f, float o, string tag, int tr, string hz, string span, flo
 
 drawMore(Snap s, float f, float o, bool isSecond) =>
     string tag = tagOf(s)
-    int tr = isSecond ? 40 : 0
+    int tr = isSecond ? fade(40) : 0
     if show0 and s.x0 != ""
         string d0 = s.x0 == "0DTE" ? "0D" : s.x0
-        drawLevel(mapP(s.z0, f, o), nm(d0 + " ZG", s.x0 + " zero gamma"), tag, color.new(cZG, tr + 25), w0, line.style_dashed, na, "this expiry's gamma flip (estimate): where the gamma zones change sign", "🟡")
-        drawLevel(mapP(s.c0, f, o), nm(d0 + " CW", s.x0 + " call wall"), tag, color.new(cPos, tr + 25), w0, lnStyle(sty0), na, "the strike above price with the most call gamma in this expiry", "🟢")
-        drawLevel(mapP(s.p0, f, o), nm(d0 + " PW", s.x0 + " put wall"), tag, color.new(cNeg, tr + 25), w0, lnStyle(sty0), na, "the strike below price with the most put gamma in this expiry", "🔴")
+        drawLevel(mapP(s.z0, f, o), nm(d0 + " ZG", s.x0 + " zero gamma"), tag, color.new(cZG, fade(tr + 15)), w0, line.style_dashed, na, "this expiry's gamma flip (estimate): where the gamma zones change sign", "🟡")
+        drawLevel(mapP(s.c0, f, o), nm(d0 + " CW", s.x0 + " call wall"), tag, color.new(cPos, fade(tr + 15)), w0, lnStyle(sty0), na, "the strike above price with the most call gamma in this expiry", "🟢")
+        drawLevel(mapP(s.p0, f, o), nm(d0 + " PW", s.x0 + " put wall"), tag, color.new(cNeg, fade(tr + 15)), w0, lnStyle(sty0), na, "the strike below price with the most put gamma in this expiry", "🔴")
     if showVol
         drawLevel(mapP(s.vc, f, o), nm("VOL C", "Volume call wall"), tag, color.new(cVol, tr), wVol, lnStyle(styVol))
         drawLevel(mapP(s.vp, f, o), nm("VOL P", "Volume put wall"), tag, color.new(cVol, tr), wVol, lnStyle(styVol))
@@ -604,9 +611,9 @@ drawMore(Snap s, float f, float o, bool isSecond) =>
                 array.push(gBoxes, box.new(math.min(sessStartTime, time - 1), bandHi, time, bandLo, xloc = xloc.bar_time,
                      extend = extend.right, border_width = 0, border_color = color.new(cEM, 100), bgcolor = color.new(cEM, 92)))
         if ivW and not na(s.emw)
-            ivBand(s, f, o, tag, tr + 20, "W", "the week", s.emw, s.ivw, s.emx)
+            ivBand(s, f, o, tag, tr + 10, "W", "the week", s.emw, s.ivw, s.emx)
         if ivM and not na(s.emm)
-            ivBand(s, f, o, tag, tr + 35, "M", "the monthly expiry", s.emm, s.ivm, s.emmx)
+            ivBand(s, f, o, tag, tr + 20, "M", "the monthly expiry", s.emm, s.ivm, s.emmx)
     true
 
 // GEX profile: "base/width/v1,v2,..." with v in -99..99; bin i is centred at base + i*width (index prices).
@@ -735,13 +742,13 @@ renderTags() =>
             // the price sits ON TOP of the line where it ends (anchored by its bottom-right corner), plain digits like a
             // price-scale mark: 29885, 29914.75
             array.push(gLabels, label.new(bar_index, p, str.tostring(p, "#.##"), style = label.style_label_lower_right, color = color.new(#0b0e13, 100),
-                 textcolor = color.new(array.get(tgCol, i), 5), size = size.small, textalign = text.align_right, tooltip = tip))
+                 textcolor = color.new(array.get(tgCol, i), 0), size = size.small, textalign = text.align_right, tooltip = tip))
         float st = array.get(tgStr, i)
         color lc = array.get(tgCol, i)
         if not na(st)
-            int tp = math.round((1 - math.min(1.0, st)) * 75)
+            int tp = math.round((1 - math.min(1.0, st)) * maxFade)
             line.set_color(array.get(gLines, i), color.new(lc, tp))
-            lc := color.new(lc, math.min(tp, 40))
+            // the tag text stays at full strength; only the line fades
         string blk = na(st) ? "" : str.repeat("▬", math.max(1, math.round(st * 12))) + "  "      // one continuous strength bar
         array.push(gLabels, label.new(bar_index + lblX, p, blk + str.replace_all(array.get(tgName, i), "·", "  ") + (nConf > 1 ? "  " + str.repeat("●", math.min(nConf, 5)) : ""),
              style = label.style_label_left, color = color.new(#0b0e13, 100), textcolor = lc, size = lSz,

@@ -38,7 +38,7 @@ on/off switch and a colour swatch**. Line thickness and dash style are fixed per
 - key levels 2 px;
 - zero gamma dashed;
 - walls solid;
-- ±GEX, OI walls and max pain dotted;
+- ±GEX, OI walls and max pain dashed (dotted lines vanish on grey backgrounds);
 - volume walls and expected move dashed.
 
 The dialog's separate Style tab has nothing to change.
@@ -63,8 +63,9 @@ The dialog's separate Style tab has nothing to change.
 * **Colours, style and width**: each level type has its colour, line style and thickness side by side in
   settings, picked from drawn previews: `────` solid, `╌╌╌╌` dashed, `┈┈┈┈` dotted; `───` 1 px up to `███` 4 px. Defaults: calls green, puts red, absolute gamma violet, zero gamma
   amber (dashed), expected move grey, every line 1 px. Ranked levels fade with strength: the strongest
-  level is fully opaque and the weakest about 75% transparent, line and tag alike; ranks 1-2 use the
-  picked style, weaker ranks are dotted. Largest +/- GEX,
+  level is fully opaque and the weakest at the "Weakest line opacity" setting (85% by default); ranks 1-2 use the
+  picked style, weaker ranks are dashed. Lines never fade below "Weakest line opacity" (85% by default; raise
+  it to 100 for fully solid lines), and tag and price text always stay at full strength. Largest +/- GEX,
   concentrations, volume walls and max pain are off by default (the ranked levels cover them).
 * **Tags + hover info** (the default label style): each level gets a short tag right of price with a
   strength bar, e.g. `▬▬▬▬▬▬ C1  Ab2`. Ranked levels: `C1`-`C7` (most positive net GEX), `P1`-`P7` (most
@@ -92,7 +93,7 @@ The dialog's separate Style tab has nothing to change.
   cash hours): ±1σ (about 68% of the time price ends inside) and ±2σ (about 95%), for today's session, through
   this week's last expiry and through the monthly (third Friday). Each horizon uses its own expiry's
   at-the-money IV (calls and puts at the same strike). Day and week are on by default, month off; weekly and
-  monthly are fainter, 2σ dotted. Hover a band for its IV, expiry and points.
+  monthly are slightly lighter, 2σ dashed. Hover a band for its IV, expiry and points.
   "Full" spells them out.
 * **Shared prices:** levels at the same price share one line, e.g. `CW · +GEX  29,883.25`.
 * **Source names** appear in labels only when two sources are drawn. `STALE` is added once the update
