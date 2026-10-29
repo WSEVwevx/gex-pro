@@ -143,7 +143,8 @@ class MarketWorker(threading.Thread):
         r["session"] = {"changes": [dict(c, frm=fut(c["frm"]) if c["what"] != "regime" else c["frm"],
                                          to=fut(c["to"]) if c["what"] != "regime" else c["to"]) for c in session.changes(snaps)],
                         "open": {k: (fut(v) if isinstance(v, (int, float)) else v) for k, v in opened.items()} if opened else None,
-                        "stats": stats}
+                        "stats": stats,
+                        "levels": {k: (fut(v) if isinstance(v, (int, float)) else v) for k, v in session.key_levels(r["summary"]).items()}}
         if r.get("pine"):
             r["pine"] = add_tokens(r["pine"], {"O": session.open_token(opened) if opened else "", "S": session.stats_token(stats)})
 

@@ -74,6 +74,10 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
         <div class="card" data-help="net_gex"><div id="netCard"><div class="eyebrow">Net gamma exposure</div><div class="skeleton">Loading...</div></div></div>
       </section>
       <section class="stats" id="stats" data-help="stats"></section>
+      <section class="grid2 plan-row">
+        <div class="card" data-help="plan"><div id="planCard"><div class="skeleton">Loading...</div></div></div>
+        <div class="card" data-help="changes"><div class="head"><h2>What changed today</h2><span class="sub" id="chgSub"></span></div><div class="chg" id="chgFeed"></div></div>
+      </section>
       <section class="main">
         <div class="card" data-help="ladder">
           <div class="head"><h2>Levels</h2><span class="spacer"></span>

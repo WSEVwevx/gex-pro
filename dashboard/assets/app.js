@@ -300,6 +300,7 @@ function render(){
   const L = w.result.mapped || s, X = L.extras || {};
   const ref = L.futures_equiv_of_ref ?? s.ref_price;
   renderHero(w, s, L, X, ref);
+  renderPlan(w);
   renderLadder(L, X, ref, !!w.result.mapped);
   renderChart(w, s, L, ref);
   renderMaxPain(X);
@@ -641,6 +642,10 @@ const HELP = {
   screener: {title: "Index drivers", tldr: "The handful of stocks that move NQ and ES, and how many points each is worth today.",
     body: `<p>A few giant companies make up most of the Nasdaq-100 and a big share of the S&P 500, so their moves <b>are</b> the futures' moves. This page shows the biggest weights in the index for the market you pick (NQ or ES at the top).</p><p><b>Index pts</b> = the stock's weight × its % move today × the futures price: roughly how many points of NQ or ES that stock explains. The bars show who is lifting and who is dragging. <b>Pre / after</b> is the latest pre-market or after-hours move, and the line above it says what those moves imply for the future before the cash open. <b>Rel vol</b> is today's volume against the 3-month average (1.5× or more is highlighted).</p><p>Watch the <b>earnings</b> dates: when a top-five name reports after the close, NQ and ES often gap on it overnight.</p>`,
     watch: ["Top names all red but the future green = narrow, fragile move", "A mega cap reporting AMC = overnight gap risk for NQ / ES"]},
+  plan: {title: "Today's plan", tldr: "The regime, the key levels and what each side of them means, built from the latest data.",
+    body: `<p>The plan uses the first expiry's levels (the same C / P / Ab as the TradingView indicator) and the gamma flip. Each line is a zone: <b>above C1</b> (positive-gamma extension), <b>between the flip and C1</b> (positive gamma: two-way trade), <b>between P1 and the flip</b> (negative gamma: moves extend) and <b>below P1</b>. The highlighted line is where price is now.</p><p><b>Day range ±1σ</b> is the range the options market prices in from the previous close. <b>Data today</b> lists the medium- and high-impact US releases still ahead; <b>Earnings ahead</b> lists drivers reporting before the next open, with the move their options price in and what that is worth in index points.</p>`},
+  changes: {title: "What changed today", tldr: "Every level that moved since the 6 pm ET session start, and when.",
+    body: `<p>Each line is a level that moved and stayed moved for at least two snapshots (one-off flickers are ignored): C1 / C2, P1 / P2, Ab1, the 0DTE flip, zero gamma, the walls, and the regime. <b>At the 9:30 open</b> shows where the main levels stood when the cash session began, so you can see how far the map has drifted. The TradingView indicator draws those open levels as faint ghosts.</p>`},
   glossary: {title: "Glossary", tldr: "Every term on this site and on the indicator, in one line each.",
     body: `<p>Search a word, pick a topic, or jump to a letter. Each term says what it means, which topic it belongs to and where you see it (a page, a tag on the indicator, the hover box...). <b>Lesson →</b> opens the Library lesson that explains it from zero.</p><p>Every Explain panel lists the glossary terms it mentions; click one to jump straight here.</p>`},
   library: {title: "The Library", tldr: "A short course that explains everything on this site from zero.",
@@ -1419,7 +1424,7 @@ function renderScreener(){
   // earnings coming up among the drivers
   const soon = scr.stocks.filter(r => r["w_" + k] && r.earnings && Date.parse(r.earnings.date + "T23:59:00Z") >= Date.now() - 864e5)
     .sort((a, b) => a.earnings.date.localeCompare(b.earnings.date)).slice(0, 8);
-  $("drvEarn").innerHTML = soon.length ? soon.map(r => `<span class="drv-e${earnSoon(r.earnings) ? " hot" : ""}"><b>${esc(r.symbol)}</b>${esc(earnTxt(r.earnings))}</span>`).join("")
+  $("drvEarn").innerHTML = soon.length ? soon.map(r => `<span class="drv-e${earnSoon(r.earnings) ? " hot" : ""}"${r.earn_move ? ` title="Options price ±${num(r.earn_move.pct, 1)}% through the ${esc(r.earn_move.expiry.slice(5))} expiry (at-the-money straddle)"` : ""}><b>${esc(r.symbol)}</b>${esc(earnTxt(r.earnings))}${r.earn_move ? `<i>±${num(r.earn_move.pct, 1)}% · ±${num(Math.abs(r["earn_pts_" + k] || 0), 0)} ${esc(market)} pts</i>` : ""}</span>`).join("")
     : `<span class="expl">No driver reports in the next 30 days.</span>`;
   // table
   $("drvHead").innerHTML = SCR_COLS.map(([c, t]) => `<th data-k="${c}" class="${scrSort === c ? "on" : ""}" aria-sort="${scrSort === c ? (scrDir > 0 ? "ascending" : "descending") : "none"}">${t}${scrSort === c ? (scrDir > 0 ? " ▲" : " ▼") : ""}</th>`).join("");
@@ -1502,6 +1507,61 @@ function closeStockChart(){ $("scChart").hidden = true; }
 $("scClose").onclick = closeStockChart;
 $("scChart").onclick = e => { if(e.target === $("scChart")) closeStockChart(); };
 
+
+
+// ---------- Levels page: today's plan and what changed since the session began
+let planScr = null, planScrAt = 0;
+function planEarnings(k){
+  // drivers reporting before the next open, with the move their options price in (from the screener data)
+  if(Date.now() - planScrAt > 5 * 60 * 1000){
+    planScrAt = Date.now();
+    fetchFresh(STATIC ? "data/screener.json" : "/api/screener").then(r => r.json()).then(d => { planScr = d; if(page === "levels" && data) renderPlan(curW()); }).catch(() => {});
+  }
+  return ((planScr && planScr.stocks) || []).filter(r => r["w_" + k] && r.earn_move && r.earnings)
+    .sort((a, b) => Math.abs(b["earn_pts_" + k] || 0) - Math.abs(a["earn_pts_" + k] || 0)).slice(0, 4);
+}
+function renderPlan(w){
+  const S = w && w.result && w.result.session;
+  if(!S || !S.levels){ $("planCard").innerHTML = `<div class="eyebrow">Today's plan</div><div class="expl">The plan appears with the next refresh.</div>`; $("chgFeed").innerHTML = ""; return; }
+  const lv = S.levels, s = w.result.summary, X = (w.result.mapped || s).extras || {}, em = X.expected_move || {};
+  const ref = (w.result.mapped || {}).futures_equiv_of_ref ?? s.ref_price, k = market === "ES" ? "es" : "nq";
+  const p = x => x == null ? "-" : num(x, 0), d = (em.daily_points_fut ?? em.daily_points), a = em.anchor_fut ?? em.anchor;
+  const now = new Date(), t = new Date(now.toLocaleString("en-US", ET)), mins = t.getHours() * 60 + t.getMinutes();
+  const phase = t.getDay() === 0 || t.getDay() === 6 ? "weekend" : mins < 570 ? "before the open" : mins < 960 ? "cash session" : "after the close";
+  // where price sits, and what each side of it means
+  const C1 = lv.C1, P1 = lv.P1, F = lv.flip ?? lv.ZG;
+  // levels are numbered by strength, not price: only name a "next" level that lies beyond C1 / P1
+  const C2 = lv.C2 != null && lv.C2 > C1 ? lv.C2 : null, P2 = lv.P2 != null && lv.P2 < P1 ? lv.P2 : null;
+  const rows = [
+    C1 != null && [`Above C1 ${p(C1)}`, "positive-gamma extension: rallies tend to slow" + (C2 != null ? `; next call level ${p(C2)}` : ""), ref >= C1],
+    C1 != null && F != null && C1 > F && [`Between the flip ${p(F)} and C1 ${p(C1)}`, "positive gamma: expect two-way trade and fades back toward the middle", ref < C1 && ref >= F],
+    P1 != null && F != null && P1 < F && [`Between P1 ${p(P1)} and the flip ${p(F)}`, "negative gamma: moves can extend" + (P2 != null ? `; a break of P1 opens ${p(P2)}` : ""), ref < F && ref >= P1],
+    P1 != null && [`Below P1 ${p(P1)}`, "hedging adds to selling" + (P2 != null ? `; next put level ${p(P2)}` : ""), ref < P1],
+  ].filter(Boolean);
+  const day = now.toLocaleDateString("en-US", {...ET, weekday: "short", month: "short", day: "numeric"});
+  const usd = ((news && news.events) || []).filter(e => e.country === "USD" && (e.impact === "High" || e.impact === "Medium")
+    && new Date(e.time).toLocaleDateString("en-US", ET) === now.toLocaleDateString("en-US", ET) && Date.parse(e.time) > Date.now() - 3600e3);
+  const earn = planEarnings(k);
+  const R = {POSITIVE: ["positive", "var(--pos)"], NEGATIVE: ["negative", "var(--neg)"]}[lv.regime] || ["balanced", "var(--zg)"];
+  $("planCard").innerHTML = `<div class="head"><h2>Today's plan</h2><span class="sub">${esc(day)} · ${esc(market)} · ${esc(phase)}</span></div>
+    <div class="plan-kv"><span>Regime</span><b style="color:${R[1]}">${R[0]} gamma</b><span>Price</span><b class="m">${num(ref, 2)}</b>
+      <span>Day range ±1σ</span><b class="m">${d && a ? p(a - d) + " – " + p(a + d) : "-"}</b><span>Ab1 (magnet)</span><b class="m">${p(lv.Ab1)}</b></div>
+    <div class="plan-sc">${rows.map(([when, what, here]) => `<div class="${here ? "here" : ""}"><b>${esc(when)}</b><span>${esc(what)}</span>${here ? '<em>price is here</em>' : ""}</div>`).join("")}</div>
+    ${usd.length ? `<div class="plan-ev"><span class="eyebrow">Data today (ET)</span>${usd.map(e => `<span class="${e.impact === "High" ? "hi" : ""}">${esc(new Date(e.time).toLocaleTimeString("en-US", {...ET, hour: "numeric", minute: "2-digit"}))} ${esc(e.title)}</span>`).join("")}</div>` : ""}
+    ${earn.length ? `<div class="plan-ev"><span class="eyebrow">Earnings ahead</span>${earn.map(r => `<span>${esc(r.symbol)} ${esc(earnTxt(r.earnings))}: ±${num(r.earn_move.pct, 1)}% ≈ ±${num(Math.abs(r["earn_pts_" + k]), 0)} ${esc(market)} pts</span>`).join("")}</div>` : ""}
+    <div class="expl">Levels from the first expiry, the same as the indicator's C / P / Ab. A plan, not a prediction: news can override any level.</div>`;
+  // the change feed
+  const nm = {C1: "C1", C2: "C2", P1: "P1", P2: "P2", Ab1: "Ab1", flip: "0DTE flip", ZG: "Zero gamma", CW: "Call wall", PW: "Put wall", regime: "Regime"};
+  const ch = S.changes || [];
+  const at = x => new Date(x).toLocaleTimeString("en-US", {...ET, hour: "numeric", minute: "2-digit"});
+  $("chgFeed").innerHTML = (S.open ? `<div class="chg-open"><span class="eyebrow">At the 9:30 open</span>${["C1", "P1", "Ab1", "flip"].filter(x => S.open[x] != null).map(x => `<span>${nm[x]} <b class="m">${p(S.open[x])}</b></span>`).join("")}</div>` : "")
+    + (ch.length ? ch.map(c => { const reg = c.what === "regime", dv = reg ? 0 : c.to - c.frm;
+        return `<div class="chg-row"><span class="m t">${esc(at(c.t))}</span><b>${esc(nm[c.what] || c.what)}</b>
+          <span class="m">${reg ? esc(String(c.frm).toLowerCase()) + " → " + esc(String(c.to).toLowerCase()) : p(c.frm) + " → " + p(c.to)}</span>
+          ${reg ? "" : `<span class="m ${dv > 0 ? "good" : "bad"}">${signed(dv, 0)}</span>`}</div>`; }).join("")
+      : `<div class="expl">No level has moved since the 6 pm ET session start.</div>`);
+  $("chgSub").textContent = ch.length ? `${ch.length} change${ch.length === 1 ? "" : "s"} since 6 pm ET` : "";
+}
 
 // ---------- glossary: every term the site and the indicator use, searchable, by topic or A to Z
 let glTopic = "All", glFocus = "";
