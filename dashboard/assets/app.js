@@ -644,7 +644,7 @@ const HELP = {
   glossary: {title: "Glossary", tldr: "Every term on this site and on the indicator, in one line each.",
     body: `<p>Search a word, pick a topic, or jump to a letter. Each term says what it means, which topic it belongs to and where you see it (a page, a tag on the indicator, the hover box...). <b>Lesson →</b> opens the Library lesson that explains it from zero.</p><p>Every Explain panel lists the glossary terms it mentions; click one to jump straight here.</p>`},
   library: {title: "The Library", tldr: "A short course that explains everything on this site from zero.",
-    body: `<p>Start with <b>What is an option?</b> and follow the lessons in order, or search for any term. Each lesson ends with a quick check; answer it correctly and the lesson is marked as read. Your progress is saved in this browser.</p><p>Every Explain panel links to the matching lesson, so you can jump from a number on the screen straight to the idea behind it.</p>`},
+    body: `<p>Six chapters: options basics, dealers and the Greeks, gamma exposure, volatility, the GEX PRO levels (C / P / Ab, first expiry, gamma zones) and using GEX PRO day to day. Start with <b>What an option is</b> and follow them in order, or search for a topic. Each lesson ends with a quick check; answer it correctly and the lesson is marked as read. Your progress is saved in this browser.</p><p>Every Explain panel links to the matching lesson, so you can jump from a number on the screen straight to the idea behind it.</p>`},
   track: {title: "Live track record", tldr: "What GEX PRO said before each open, graded against what the market did.",
     body: `<p>At every session, the levels from the <b>last calculation timestamped before 09:30 ET</b> are frozen as that day's plan: expected move, regime, walls, zero gamma, bias. Nothing can be changed afterwards. After the close, the plan is graded against the index's open, high, low and close.</p><p>Everything is in index points (NDX for NQ, SPX for ES), so the futures basis can't flatter or hurt the result. Missed sessions are listed, not hidden.</p><p>Small samples lie. Until about 20 sessions are graded, read the numbers as a diary, not as proof. The 95% range shows how uncertain each rate still is.</p>`,
     watch: ["The 95% range narrows as sessions add up", "\"rebuilt\" = frozen later from saved snapshots, using only data from before the open"]},
@@ -820,6 +820,7 @@ function renderLibrary(){
     <h2 class="lib-title">${esc(L.title)}</h2>
     <div class="lib-one">${esc(L.oneLiner)}</div>
     <div class="lib-body">${body}</div>
+    ${L.points ? `<div class="lib-key"><div class="eyebrow">Key points</div><ul>${L.points.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>` : ""}
     ${L.example ? `<div class="lib-ex"><div class="eyebrow">Example</div><p>${esc(L.example)}</p></div>` : ""}
     ${L.gex ? `<button class="btn ghost lib-try" data-p="${esc(L.gex[0])}">Try it in GEX PRO: ${esc(L.gex[1])} →</button>` : ""}
     ${L.quiz ? `<div class="lib-quiz" id="libQuiz"><div class="eyebrow">Quick check</div><p class="q">${esc(L.quiz.q)}</p>
