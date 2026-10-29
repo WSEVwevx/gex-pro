@@ -1,6 +1,6 @@
 """Session context: watched levels, steady changes, the open's levels and reaction stats."""
 import unittest
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from gexsys import session
 from gexsys.marketcal import NY
