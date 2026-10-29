@@ -56,6 +56,7 @@ def world(**over):
 class TestParsing(unittest.TestCase):
     def test_weights(self):
         self.assertEqual(D.parse_weights(weights_html([("BRK.B", "Berkshire ", 1.5)])), [["BRK.B", "Berkshire", 1.5]])
+        self.assertEqual(D.parse_weights(weights_html([("LLY", "Eli Lilly &amp; Co.", 1.0)]))[0][1], "Eli Lilly & Co.")
 
     def test_extended_hours(self):
         self.assertEqual(D.parse_intraday(intraday(100, 90, last=101, last_t=250))["ext"]["session"], "after")
@@ -91,6 +92,25 @@ class TestDrivers(unittest.TestCase):
         self.assertIsNone(rows["ASML"]["pts_es"])                                        # not in the S&P 500
         self.assertAlmostEqual(out["totals"]["NQ"]["pts"], 240 - 0.10 * 0.01 * 20000)
         self.assertEqual((out["totals"]["NQ"]["up"], out["totals"]["NQ"]["down"]), (1, 1))
+
+    def test_charts_reuse_the_downloaded_bars(self):
+        full = json.dumps({"chart": {"result": [{"meta": {"regularMarketPrice": 110, "chartPreviousClose": 100,
+                                                           "currentTradingPeriod": {"regular": {"start": 100, "end": 200}}},
+                                                  "timestamp": [120, 180, 240],
+                                                  "indicators": {"quote": [{"open": [101, 105, None], "high": [106, 111, None],
+                                                                            "low": [100, 104, None], "close": [105, 110, None]}]}}]}}).encode()
+        daily_full = json.dumps({"chart": {"result": [{"timestamp": [1, 2], "indicators": {"quote": [
+            {"open": [90, 95], "high": [96, 101], "low": [89, 94], "close": [95, 100], "volume": [10, 20]}]}}]}}).encode()
+        net = Net(world(**{"chart/NVDA?range=1d": full, "chart/NVDA?range=3mo": daily_full}))
+        d = D.Drivers(top=3, opener=net)
+        c = d.charts("NVDA")
+        self.assertEqual(c["intraday"], [[120, 101, 106, 100, 105], [180, 105, 111, 104, 110]])   # empty bar skipped
+        self.assertEqual(c["daily"], [[1, 90, 96, 89, 95], [2, 95, 101, 94, 100]])
+        self.assertEqual((c["prev"], c["session"]), (100, [100, 200]))
+        n = len(net.calls)
+        d.charts()
+        self.assertEqual(len(net.calls), n)
+        self.assertEqual(d.charts("NOPE"), {})
 
     def test_weights_fallback_and_cache(self):
         with tempfile.TemporaryDirectory() as tmp:

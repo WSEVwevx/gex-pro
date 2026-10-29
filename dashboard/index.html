@@ -334,6 +334,17 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
     <div class="keys-grid" id="keysGrid"></div>
   </div>
 </div>
+<!-- screener: one stock's chart (the top 15 drivers) -->
+<div class="overlay" id="scChart" hidden>
+  <div class="keys-card sc-card" role="dialog" aria-label="Stock chart">
+    <div class="ex-head"><h3 id="scTitle">Chart</h3><button class="ex-close" id="scClose" aria-label="Close">×</button></div>
+    <div class="sc-body">
+      <div class="sc-top"><div class="sc-info" id="scInfo"></div><div class="filters" id="scTf" role="tablist" aria-label="Range"></div></div>
+      <div class="sc-box" id="scBox"><div class="hm-msg" id="scMsg" hidden></div></div>
+      <div class="sc-foot"><span class="expl" id="scFoot"></span><a class="btn ghost sm" id="scTv" target="_blank" rel="noopener">Open on TradingView ↗</a></div>
+    </div>
+  </div>
+</div>
 <!-- copy fallback: shown only when the browser blocks clipboard access -->
 <div class="overlay" id="copyBox" hidden>
   <div class="keys-card">

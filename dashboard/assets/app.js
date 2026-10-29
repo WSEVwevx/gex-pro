@@ -777,7 +777,7 @@ $("keys").onclick = e => { if(e.target === $("keys")) showKeys(false); };
 document.addEventListener("keydown", e => {
   const typing = /INPUT|TEXTAREA|SELECT/.test((document.activeElement || {}).tagName || "");
   if((e.key === "k" && (e.ctrlKey || e.metaKey)) || (e.key === "/" && !typing)){ e.preventDefault(); $("cmd").focus(); return; }
-  if(e.key === "Escape"){ showKeys(false); closeExplain(); $("copyBox").hidden = true; return; }
+  if(e.key === "Escape"){ showKeys(false); closeExplain(); $("copyBox").hidden = true; closeStockChart(); return; }
   if(typing || e.ctrlKey || e.metaKey || e.altKey) return;
   const n = e.key === "0" ? 10 : Number(e.key);
   if(n >= 1 && n <= PAGES.length) setPage(PAGES[n - 1][0]);
@@ -1331,8 +1331,11 @@ function renderScreener(){
   [...$("drvHead").children].forEach(th => th.onclick = () => { const c = th.dataset.k;
     if(scrSort === c) scrDir = -scrDir; else { scrSort = c; scrDir = c === "symbol" ? 1 : -1; }
     store.set("gex.drvsort", scrSort); store.set("gex.drvdir", String(scrDir)); renderScreener(); });
-  $("drvRows").innerHTML = rows.map(r => { const v = r["pts_" + k], cls = x => x > 0 ? "good" : x < 0 ? "bad" : "";
-    return `<tr${r.stale ? ' class="stale" title="Could not refresh: last known price"' : ""}><td><a class="scr-sym" href="https://www.tradingview.com/chart/?symbol=${encodeURIComponent(r.symbol.replace("-", "."))}" target="_blank" rel="noopener" title="Open ${esc(r.symbol)} on TradingView">${esc(r.symbol)}</a><span class="scr-name">${esc(r.name)}</span></td>
+  // the 15 biggest weights in this index open a chart when clicked; the rest link to TradingView
+  const top15 = new Set(rows.slice().sort((a, b) => b["w_" + k] - a["w_" + k]).slice(0, 15).map(r => r.symbol));
+  $("drvRows").innerHTML = rows.map(r => { const v = r["pts_" + k], cls = x => x > 0 ? "good" : x < 0 ? "bad" : "", ch = top15.has(r.symbol);
+    const sym = ch ? `<span class="scr-sym">${esc(r.symbol)}</span>` : `<a class="scr-sym" href="https://www.tradingview.com/chart/?symbol=${encodeURIComponent(r.symbol.replace("-", "."))}" target="_blank" rel="noopener" title="Open ${esc(r.symbol)} on TradingView">${esc(r.symbol)}</a>`;
+    return `<tr class="${ch ? "clk" : ""}${r.stale ? " stale" : ""}"${ch ? ` data-sym="${esc(r.symbol)}" title="Click for ${esc(r.symbol)}'s chart"` : r.stale ? ' title="Could not refresh: last known price"' : ""}><td>${sym}<span class="scr-name">${esc(r.name)}</span>${ch ? '<svg class="scr-ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 13h12M4 10l3-3 2 2 4-5"/></svg>' : ""}</td>
       <td>${spark(r.spark)}</td>
       <td class="m">${num(r.price, 2)}</td>
       <td class="m ${cls(r.pct)}">${signed(r.pct, 2)}%</td>
@@ -1343,8 +1346,67 @@ function renderScreener(){
       <td class="m${earnSoon(r.earnings) ? " hot" : ""}">${esc(earnTxt(r.earnings))}</td></tr>`; }).join("");
   const when = new Date(scr.fetched).toLocaleString("en-US", {...ET, hour: "numeric", minute: "2-digit"});
   const wd = scr.weights_asof ? new Date(scr.weights_asof).toLocaleDateString("en-US", {...ET, month: "short", day: "numeric"}) : "?";
-  $("scrSub").textContent = `${rows.length} biggest ${market === "ES" ? "S&P 500" : "Nasdaq-100"} weights · prices ${when} ET · weights ${wd}`;
+  $("scrSub").textContent = `${rows.length} biggest ${market === "ES" ? "S&P 500" : "Nasdaq-100"} weights · prices ${when} ET · weights ${wd} · click a stock for its chart`;
+  [...$("drvRows").querySelectorAll("tr[data-sym]")].forEach(tr => tr.onclick = () => openStockChart(tr.dataset.sym));
 }
+
+// ---------- screener: a chart for each of the top 15 drivers, from the bars the screener already downloads
+let scCharts = null, scSym = "", scRange = store.get("gex.scrange", "intraday"), scChart = null, scSeries = null, scPrev = null;
+// unix seconds -> the same wall-clock time in New York, as the chart's (UTC) time, so the axis reads ET
+function chartTimeET(t){
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-US", {...ET, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit"})
+    .formatToParts(new Date(t * 1000)).map(x => [x.type, x.value]));
+  return Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour % 24, +p.minute, +p.second) / 1000;
+}
+async function openStockChart(sym){
+  scSym = sym; $("scChart").hidden = false; $("scMsg").hidden = false; $("scMsg").textContent = "Loading the chart...";
+  let c = null;
+  try {
+    if(STATIC){ scCharts = scCharts || await (await fetchFresh("data/screener-charts.json")).json(); c = scCharts[sym]; }
+    else c = await (await fetchFresh(`/api/screener/chart?symbol=${encodeURIComponent(sym)}`)).json();
+  } catch(e){ $("scMsg").textContent = OFFLINE; return; }
+  if(!c || !c.symbol){ $("scMsg").textContent = "No chart data for this stock yet."; return; }
+  renderStockChart(c);
+}
+function renderStockChart(c){
+  const LC = window.LightweightCharts, k = market === "ES" ? "es" : "nq", r = ((scr && scr.stocks) || []).find(x => x.symbol === c.symbol) || {};
+  $("scTitle").textContent = `${c.symbol} · ${c.name}`;
+  $("scTv").href = `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(c.symbol.replace("-", "."))}`;
+  const cls = x => x > 0 ? "good" : x < 0 ? "bad" : "";
+  $("scInfo").innerHTML = `<b class="m">${num(r.price, 2)}</b><span class="m ${cls(r.pct)}">${r.pct == null ? "" : signed(r.pct, 2) + "%"}</span>`
+    + (r.ext ? `<span class="m ${cls(r.ext.pct)}"><span class="drv-tag">${r.ext.session === "pre" ? "PRE" : "AH"}</span>${signed(r.ext.pct, 2)}%</span>` : "")
+    + (r["w_" + k] ? `<span>${num(r["w_" + k], 2)}% of the ${market === "ES" ? "S&P 500" : "Nasdaq-100"}</span>` : "")
+    + (r["pts_" + k] != null ? `<span class="m ${cls(r["pts_" + k])}">${signed(r["pts_" + k], 1)} ${market} pts</span>` : "")
+    + (r.earnings ? `<span>earnings ${esc(earnTxt(r.earnings))}</span>` : "");
+  $("scTf").innerHTML = [["intraday", "Today · 5m"], ["daily", "3 months · daily"]].map(([v, t]) => `<button role="tab" aria-selected="${scRange === v}" data-k="${v}">${t}</button>`).join("");
+  [...$("scTf").children].forEach(b => b.onclick = () => { scRange = b.dataset.k; store.set("gex.scrange", scRange); renderStockChart(c); });
+  if(!LC){ $("scMsg").textContent = "The chart library could not load (it comes from unpkg.com)."; return; }
+  const bars = (scRange === "daily" ? c.daily : c.intraday) || [];
+  if(!bars.length){ $("scMsg").hidden = false; $("scMsg").textContent = scRange === "daily" ? "No daily bars yet." : "No bars today yet (they start with the pre-market)."; return; }
+  $("scMsg").hidden = true;
+  if(!scChart){
+    scChart = LC.createChart($("scBox"), Object.assign({autoSize: true}, hmColors()));
+    scSeries = scChart.addCandlestickSeries({borderVisible: false, priceLineVisible: true});
+    $("scBox").appendChild($("scMsg"));
+  } else scChart.applyOptions(hmColors());
+  const up = cssVar("--good"), dn = cssVar("--bad"), ext = `rgba(${cssVar("--fg-rgb")},.35)`, [s0, s1] = c.session || [];
+  scSeries.applyOptions({upColor: up, downColor: dn, wickUpColor: up, wickDownColor: dn});
+  // pre-market and after-hours candles in grey, so the cash session stands out
+  scSeries.setData(bars.map(([t, o, h, l, cl]) => {
+    const out = scRange === "intraday" && s0 && s1 && (t < s0 || t >= s1);
+    return Object.assign({time: scRange === "daily" ? chartTimeET(t) - chartTimeET(t) % 86400 : chartTimeET(t), open: o, high: h, low: l, close: cl}, out ? {color: ext, wickColor: ext} : {});
+  }));
+  if(scPrev){ scSeries.removePriceLine(scPrev); scPrev = null; }
+  if(scRange === "intraday" && c.prev) scPrev = scSeries.createPriceLine({price: c.prev, color: cssVar("--ink3"), lineStyle: LC.LineStyle.Dashed, lineWidth: 1, title: "prev close"});
+  scChart.timeScale().applyOptions({timeVisible: scRange === "intraday", secondsVisible: false});
+  scChart.timeScale().fitContent();
+  $("scFoot").textContent = scRange === "intraday" ? "5-minute candles in ET, Yahoo Finance (delayed). Grey candles: pre-market and after-hours. Dashed line: yesterday's close."
+    : "Daily candles for the last 3 months, Yahoo Finance.";
+}
+function closeStockChart(){ $("scChart").hidden = true; }
+$("scClose").onclick = closeStockChart;
+$("scChart").onclick = e => { if(e.target === $("scChart")) closeStockChart(); };
+
 
 // ---------- glossary: every term the site and the indicator use, searchable, by topic or A to Z
 let glTopic = "All", glFocus = "";

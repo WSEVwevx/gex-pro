@@ -11,6 +11,7 @@ points that stock's move is worth. An approximation (weights drift intraday, fut
 """
 from __future__ import annotations
 
+import html
 import json
 import logging
 import re
@@ -38,13 +39,27 @@ ROW = re.compile(r'<tr><td>\d+</td><td[^>]*><a href="/symbol/([^"]+)">([^<]*)</a
 WHEN = {"time-pre-market": "before open", "time-after-hours": "after close"}
 
 
-def parse_weights(html: str) -> list:
+def unescape(s: str) -> str:
+    """Company names arrive HTML-encoded ("Eli Lilly &amp; Co.")."""
+    return html.unescape(s)
+
+
+def parse_weights(page: str) -> list:
     """[[symbol, company, weight %], ...] in index order."""
-    return [[s, name.strip(), float(w)] for s, name, w in ROW.findall(html)]
+    return [[s, unescape(name).strip(), float(w)] for s, name, w in ROW.findall(page)]
+
+
+def _bars(r: dict) -> list:
+    """[[unix seconds, open, high, low, close], ...] from one chart result, empty bars skipped."""
+    q = ((r.get("indicators") or {}).get("quote") or [{}])[0]
+    o, h, lo, c = (q.get(k) or [] for k in ("open", "high", "low", "close"))
+    return [[int(t), round(o[i], 2), round(h[i], 2), round(lo[i], 2), round(c[i], 2)]
+            for i, t in enumerate(r.get("timestamp") or []) if i < min(len(o), len(h), len(lo), len(c)) and None not in (o[i], h[i], lo[i], c[i])]
 
 
 def parse_intraday(raw: bytes) -> Optional[dict]:
-    """Last regular-session price and change, plus the latest pre-market / after-hours print."""
+    """Last regular-session price and change, the latest pre-market / after-hours print, and the day's
+    5-minute bars (pre-market and after-hours included) for the stock's chart."""
     try:
         r = json.loads(raw)["chart"]["result"][0]
         m = r["meta"]
@@ -53,8 +68,9 @@ def parse_intraday(raw: bytes) -> Optional[dict]:
         return None
     if price <= 0 or prev <= 0:
         return None
-    out = {"price": price, "prev": prev, "pct": (price / prev - 1) * 100, "volume": m.get("regularMarketVolume"), "ext": None}
     reg = (m.get("currentTradingPeriod") or {}).get("regular") or {}
+    out = {"price": price, "prev": prev, "pct": (price / prev - 1) * 100, "volume": m.get("regularMarketVolume"), "ext": None,
+           "bars": _bars(r), "session": [reg.get("start"), reg.get("end")]}
     closes = ((r.get("indicators") or {}).get("quote") or [{}])[0].get("close") or []
     last = next(((t, c) for t, c in zip(reversed(r.get("timestamp") or []), reversed(closes)) if c), None)
     if last and reg.get("start") and reg.get("end"):
@@ -67,14 +83,17 @@ def parse_intraday(raw: bytes) -> Optional[dict]:
 
 
 def parse_daily(raw: bytes) -> Optional[dict]:
-    """3-month average volume (the last bar is excluded: it may be today) and the last 20 closes."""
+    """3-month average volume (the last bar is excluded: it may be today), the last 20 closes, and the
+    daily bars for the stock's chart."""
     try:
-        q = json.loads(raw)["chart"]["result"][0]["indicators"]["quote"][0]
+        r = json.loads(raw)["chart"]["result"][0]
+        q = r["indicators"]["quote"][0]
     except (KeyError, IndexError, TypeError, ValueError):
         return None
     vols = [v for v in (q.get("volume") or [])[:-1] if v]
     closes = [round(c, 2) for c in (q.get("close") or []) if c]
-    return {"avg_volume": sum(vols) / len(vols) if vols else None, "spark": closes[-21:-1] if len(closes) > 1 else closes}
+    return {"avg_volume": sum(vols) / len(vols) if vols else None, "spark": closes[-21:-1] if len(closes) > 1 else closes,
+            "bars": _bars(r)}
 
 
 def parse_earnings(raw: bytes, day: str) -> dict:
@@ -94,6 +113,7 @@ class Drivers:
         self._slow = {"weights": None, "weights_at": 0.0, "earnings": {}, "earnings_at": 0.0, "daily": {}}
         self._prices: dict = {}
         self._out: Optional[dict] = None
+        self._charts: dict = {}
         self._fetched = -1e18
         if cache_path and cache_path.exists():
             try:
@@ -142,7 +162,8 @@ class Drivers:
                     for sym, e in (parse_earnings(raw, d.isoformat()) if raw else {}).items():
                         cal.setdefault(sym, e)            # earliest date first: the next report
                 S["earnings"], S["earnings_at"] = cal, now
-        stale = [s for s in symbols_hint if now - (S["daily"].get(s) or {}).get("at", 0) >= 12 * 3600]
+        stale = [s for s in symbols_hint if now - (S["daily"].get(s) or {}).get("at", 0) >= 12 * 3600
+                 or "bars" not in (S["daily"].get(s) or {})]            # copies cached before the charts had bars
         if stale:
             with ThreadPoolExecutor(max_workers=6) as ex:
                 raws = list(ex.map(lambda s: self._try(DAILY.format(sym=urllib.parse.quote(s))), stale))
@@ -168,7 +189,7 @@ class Drivers:
             if s in seen:
                 continue
             seen.add(s)
-            name = (nq.get(s) or es.get(s))[0]
+            name = unescape((nq.get(s) or es.get(s))[0])         # also cached / bundled copies saved before decoding
             out.append((s.replace(".", "-"), name, nq.get(s, (None, 0.0))[1], es.get(s, (None, 0.0))[1]))
         return out
 
@@ -217,9 +238,20 @@ class Drivers:
                              "names": len(rows), "weight": sum(r["w_" + k] for r in rows),
                              "pts": sum(r["pts_" + k] or 0 for r in rows), "ext_pts": sum(r["ext_pts_" + k] or 0 for r in rows),
                              "up": sum(r["pct"] > 0 for r in rows), "down": sum(r["pct"] < 0 for r in rows)}
+            # each stock's chart, from the same downloads: today's 5-minute bars and 3 months of daily bars
+            self._charts = {r["symbol"]: {"symbol": r["symbol"], "name": r["name"], "prev": self._prices[r["symbol"]]["prev"],
+                                          "session": self._prices[r["symbol"]].get("session"),
+                                          "intraday": self._prices[r["symbol"]].get("bars") or [],
+                                          "daily": (self._slow["daily"].get(r["symbol"]) or {}).get("bars") or []} for r in stocks}
             W = self._slow["weights"] or {}
             self._out = {"fetched": datetime.fromtimestamp(now, timezone.utc).isoformat(),
                          "weights_asof": W.get("asof"), "weights_source": W.get("source"),
                          "source": "Weights: slickcharts.com. Prices: Yahoo Finance, delayed. Earnings: Nasdaq.com.",
                          "totals": totals, "stocks": stocks}
             return self._out
+
+    def charts(self, symbol: Optional[str] = None) -> dict:
+        """Chart bars for one stock ({} if unknown), or {symbol: chart} for every stock on the page."""
+        self.get()
+        with self._lock:
+            return dict(self._charts.get(symbol) or {}) if symbol else dict(self._charts)

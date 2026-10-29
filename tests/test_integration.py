@@ -145,6 +145,9 @@ class _Empty:
     def get(self):
         return {"events": [], "posts": [], "quotes": [], "stocks": [], "totals": {}, "fetched_at": None}
 
+    def charts(self, symbol=None):
+        return {}
+
 
 def app(workers):
     return [GexComponent.from_workers(workers), FeedsComponent(_Empty(), _Empty(), _Empty(), _Empty())]

@@ -1,9 +1,11 @@
 """The feeds component: what the website's News page, ticker and Screener need.
 
 Same shape as every GEX PRO component (see gexpro/components.py):
-  routes()                    /api/news (economic calendar), /api/posts (Truth Social), /api/quotes (ticker), /api/screener (NQ / ES drivers)
+  routes()                    /api/news (economic calendar), /api/posts (Truth Social), /api/quotes (ticker), /api/screener (NQ / ES drivers),
+                              /api/screener/chart?symbol=NVDA (one driver's chart bars)
   start() / stop()            one warm-up of the Screener's slow data; otherwise each feed fetches on request, cached
-  build_static(data, state)   news.json, posts.json, quotes.json and screener.json for the hosted site
+  build_static(data, state)   news.json, posts.json, quotes.json, screener.json and screener-charts.json
+                              for the hosted site
 """
 from __future__ import annotations
 
@@ -64,7 +66,12 @@ class FeedsComponent:
         return {"/api/news": lambda q: (200, self.calendar.get()),
                 "/api/posts": lambda q: (200, self.posts.get()),
                 "/api/quotes": lambda q: (200, self.quotes.get()),
-                "/api/screener": lambda q: (200, self.screener.get())}
+                "/api/screener": lambda q: (200, self.screener.get()),
+                "/api/screener/chart": self._chart}
+
+    def _chart(self, q):
+        c = self.screener.charts((q.get("symbol") or [""])[0].upper())
+        return (200, c) if c else (404, {"error": "not a stock on the screener"})
 
     def start(self) -> None:
         # the first Screener load fetches weights, earnings and 3-month volumes (~30 s): do it now, not on first open
@@ -81,4 +88,5 @@ class FeedsComponent:
         _write(data / "quotes.json", self.quotes.get())
         self._screener = self._screener or Drivers(cache_path=state / "drivers.json")
         _write(data / "screener.json", self.screener.get())
+        _write(data / "screener-charts.json", self.screener.charts())
         return {}
