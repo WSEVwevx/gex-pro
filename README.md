@@ -99,7 +99,7 @@ Full details: [METHODOLOGY](docs/METHODOLOGY.md). Caveats: [LIMITATIONS](docs/LI
 ## Website
 
 A terminal-style workspace: a command line (type `LIVE`, `TRK`, `NQ`, `ES`, `COPY`, `LIGHT`, `HELP` and press
-Enter, or press `/`), a ticker strip with both markets, a sidebar of pages (keys `1`-`8`), and an **Explain**
+Enter, or press `/`), a ticker strip with both markets, a sidebar of pages (keys `1`-`9`, `0`), and an **Explain**
 panel (the `?` on every module, the Explain button in the top bar, or `X`) that says in plain English
 what each module shows and what to watch, with the live numbers for the current market. The screen stays
 clean by default; **Notes** in the sidebar (or `D`) adds a one-line note under each number. A sun/moon button in the top
@@ -110,11 +110,16 @@ your browser, and the first visit follows your system setting.
   VIX, the dollar index, the 10-year yield, gold, oil, BTC, ETH, SOL, NVDA, AAPL, MSFT and TSLA: price
   and change from the previous close (Yahoo Finance's public data; exchange prices delayed). Hover to
   pause; hover a quote for its time.
-* **Heatmap:** NQ or ES futures candles (1, 5 or 15 minutes; Yahoo Finance, delayed) drawn with
-  TradingView's free Lightweight Charts library, with GEX history painted underneath: one column per
-  saved snapshot, each cell the net dealer gamma in that price band (blue positive, orange negative,
-  brighter = more), plus zero gamma and the walls as step lines. Hover for the numbers; a slider sets
-  the heat strength. History grows as snapshots are saved (about 12 days in the app, 5 hosted).
+* **Heatmap:** NQ or ES futures candles (1, 5 or 15 minutes; Yahoo Finance, delayed; times in ET) drawn
+  with TradingView's free Lightweight Charts library, with GEX history painted underneath: one column per
+  candle, each band the net dealer gamma at that price (blue positive, orange negative, brighter = more),
+  the walls where they held an hour or more, a marker at each 9:30 open, and at the right edge the latest
+  GEX profile with today's C1 / C2, P1 / P2, Ab1 and 0DTE flip. Today / 2 days / All ranges, a colour
+  scale, hover for the numbers. History grows as snapshots are saved (about 12 days in the app, 5 hosted).
+* **Screener:** the stocks that move NQ / ES: the biggest index weights (following the NQ / ES switch) with
+  today's and extended-hours moves, points contribution to the future, relative volume, a 20-day
+  sparkline and the next earnings, plus what the options market prices in for each report in index
+  points. Click any of the top 15 for its chart (today's 5-minute candles or 3 months of daily).
 * **Live table:** a strike ladder like a trader's GEX matrix: net DEX, net GEX, net OI and net volume
   for every strike near price, in futures prices, with level chips (C1-C5, P1-P5, Ab1-Ab3, zero gamma,
   walls, expected move), the price row highlighted and a hover readout. An expiry strip on top picks
@@ -128,11 +133,17 @@ your browser, and the first visit follows your system setting.
   where `history.csv` holds every session ever graded (kept forever; the local app syncs its copy from it). Plus a **historical backtest** of the expected-move
   band from VIX (S&P 500, since 1990) and VXN (Nasdaq-100, since 2009): by year, by vol level, and the
   distribution of daily moves against a normal curve. Hypothetical, not trading results.
-* **Library:** a beginner course in 19 short lessons (options basics, dealers and the Greeks, GEX levels,
-  volatility, using GEX PRO), each with an example, diagrams, a link into the terminal and a quick check;
-  an A-Z glossary; search; progress saved in your browser. Every Explain panel links to its lesson.
+* **Library:** a course in 26 short lessons in six chapters (options basics, dealers and the Greeks, GEX,
+  volatility, the GEX PRO levels, using GEX PRO), each with key points, a worked example, diagrams, a
+  link into the terminal and a quick check; search; progress saved in your browser. Every Explain panel
+  links to its lesson.
+* **Glossary:** 72 terms (every word on the site and the indicator), by topic or A to Z, each with where
+  you see it and its lesson; Explain panels link to the terms they mention.
 * **Levels:**
   - regime, price and net-GEX cards;
+  - today's plan: the zones around C1 / P1 and the flip with what each means, the day's ±1σ range,
+    the data releases still ahead and drivers reporting before the next open;
+  - what changed today: every level move since the 6 pm ET session start, and the levels at the 9:30 open;
   - market stats: put/call OI and volume, ATM IV, nearest-expiration share, changes since the last update;
   - a level ladder with explanations;
   - a GEX-by-price chart;
@@ -154,8 +165,9 @@ your browser, and the first visit follows your system setting.
   about market topics (tariffs, the Fed, China, oil, ...) are tagged and highlighted, and a
   "Market-related" filter shows only those.
 
-**Hosted copy:** the same website can run for free on GitHub Pages, updated by GitHub every ~15 minutes in market hours and every hour otherwise
-in market hours with Cboe delayed data, so you can open it on any device without your PC
+**Hosted copy:** the same website can run for free on GitHub Pages, rebuilt about every 3 minutes in cash
+hours and every 6 minutes overnight while futures trade (hourly otherwise) with Cboe delayed data, so you
+can open it on any device without your PC. On a phone, "Add to Home Screen" installs it as an app
 (`python -m gexpro build-site`, `.github/workflows/website.yml`). Setup: [docs/HOSTING.md](docs/HOSTING.md).
 
 Only one copy of the service can run at a time. If START.bat is already open, a second copy

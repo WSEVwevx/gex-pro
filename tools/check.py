@@ -41,6 +41,20 @@ def site() -> tuple[bool, str]:
 
     try:
         all_ = get("all.json")
+        # the build chain runs every 3-6 min while futures trade (Sun 18:00 - Fri 17:00 ET), hourly otherwise
+        from zoneinfo import ZoneInfo
+        et = datetime.now(ZoneInfo("America/New_York"))
+        open_ = (et.weekday() == 6 and et.hour >= 18) or et.weekday() <= 3 or (et.weekday() == 4 and et.hour < 17)
+        built_min = (datetime.now(timezone.utc) - datetime.fromisoformat(all_["now"])).total_seconds() / 60
+        good = built_min < (30 if open_ else 120)
+        ok &= good
+        lines.append(f"{'OK  ' if good else 'FAIL'} site rebuilt {built_min:.0f} min ago (futures {'open' if open_ else 'closed'})")
+        # Pine strings hold at most 4,096 characters, and the NQ + ES paste is one string
+        with urllib.request.urlopen(urllib.request.Request(f"{SITE}pine-published.txt?t={int(time.time())}", headers={"User-Agent": "Mozilla/5.0 (GEX PRO check)"}), timeout=30) as r:
+            paste = r.read().decode("utf-8")
+        good = 0 < len(paste) <= 3800
+        ok &= good
+        lines.append(f"{'OK  ' if good else 'FAIL'} TradingView paste {len(paste)} of 4,096 characters")
         for w in all_["workers"]:
             asof = datetime.fromisoformat(w["result"]["summary"]["asof"])
             age_h = (datetime.now(timezone.utc) - asof).total_seconds() / 3600

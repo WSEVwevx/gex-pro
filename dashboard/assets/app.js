@@ -1422,7 +1422,9 @@ function renderScreener(){
     return `<div class="drv-bar" title="${esc(r.name)}: ${signed(r.pct, 2)}% × ${num(r["w_" + k], 2)}% weight"><span class="s">${esc(r.symbol)}</span>
       <span class="t"><i class="${v >= 0 ? "good" : "bad"}" style="${v >= 0 ? "left:50%" : "right:50%"};width:${w}%"></i></span><span class="v ${v >= 0 ? "good" : "bad"}">${signed(v, 1)}</span></div>`; }).join("");
   // earnings coming up among the drivers
-  const soon = scr.stocks.filter(r => r["w_" + k] && r.earnings && Date.parse(r.earnings.date + "T23:59:00Z") >= Date.now() - 864e5)
+  // reports still ahead (today or later, ET), plus last night's report until the session it moves opens
+  const todayET = new Date().toLocaleDateString("en-CA", ET);
+  const soon = scr.stocks.filter(r => r["w_" + k] && r.earnings && (r.earnings.date >= todayET || r.earn_move))
     .sort((a, b) => a.earnings.date.localeCompare(b.earnings.date)).slice(0, 8);
   $("drvEarn").innerHTML = soon.length ? soon.map(r => `<span class="drv-e${earnSoon(r.earnings) ? " hot" : ""}"${r.earn_move ? ` title="Options price ±${num(r.earn_move.pct, 1)}% through the ${esc(r.earn_move.expiry.slice(5))} expiry (at-the-money straddle)"` : ""}><b>${esc(r.symbol)}</b>${esc(earnTxt(r.earnings))}${r.earn_move ? `<i>±${num(r.earn_move.pct, 1)}% · ±${num(Math.abs(r["earn_pts_" + k] || 0), 0)} ${esc(market)} pts</i>` : ""}</span>`).join("")
     : `<span class="expl">No driver reports in the next 30 days.</span>`;

@@ -71,6 +71,13 @@ jobs:
         with:
           path: .state
           key: gex-state-${{ github.run_id }}
+      # every run saves a new copy (~20 MB); keep only the newest few, or the repository's 10 GB cache fills up
+      - name: Delete older state copies
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh cache list -R "${{ github.repository }}" -L 100 --key gex-state- --sort created_at --order desc --json id -q '.[].id' | tail -n +4 | xargs -r -n1 gh cache delete -R "${{ github.repository }}" || true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
