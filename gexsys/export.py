@@ -34,7 +34,7 @@ from typing import Optional
 
 from .mapping import SOURCES
 
-FORMAT_VERSION = "2"          # bump when the paste gains fields the chart needs: the service republishes at once
+FORMAT_VERSION = "3"          # bump when the paste gains fields the chart needs: the service republishes at once
 UNIT_CODES = {"usd_per_1pct": "USD1PCT", "usd_per_point": "USDPT", "delta_per_point": "DPT"}
 MAX_LEN = 1800
 
@@ -109,7 +109,8 @@ def extras_tokens(ex: dict) -> dict:
     x0 nearest-expiration label ("0DTE" or "next MM-DD"); z0/c0/p0 its zero gamma / call wall / put wall
     vc/vp volume walls; oc/op open-interest walls
     xp max pain "YYYY-MM-DD:price" for the first two expirations
-    ema anchor, emd daily 1-sd points, emw weekly 1-sd points, emx weekly expiration
+    ema anchor, emd daily 1-sd points, emw weekly 1-sd points, emx weekly expiration,
+    emm monthly 1-sd points, emmx monthly expiration; ivd / ivw / ivm each band's ATM IV in %
     P  GEX profile "base/width/v1,v2,..." with v in -99..99 (bin i centred at base + i*width)
     """
     t: dict = {}
@@ -135,6 +136,12 @@ def extras_tokens(ex: dict) -> dict:
             t["emd"] = _n(em["daily_points"])
         if em.get("weekly_points") is not None:
             t.update({"emw": _n(em["weekly_points"]), "emx": em["weekly_expiry"]})
+        if em.get("monthly_points") is not None:
+            t.update({"emm": _n(em["monthly_points"]), "emmx": em["monthly_expiry"]})
+        # each band's at-the-money IV, in %: the hover text explains where the band comes from
+        for k, key in (("ivd", "daily_iv"), ("ivw", "weekly_iv"), ("ivm", "monthly_iv")):
+            if em.get(key):
+                t[k] = _n(100 * em[key], 1)
     g = ex.get("greeks")
     if g:
         t["vxm"] = _n(g["vanna_usd_per_vol_pt"] / 1e6, 1)       # $M of dealer delta per +1 IV point

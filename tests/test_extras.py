@@ -115,6 +115,10 @@ class TestExpectedMove(unittest.TestCase):
         self.assertEqual(em["weekly_expiry"], "2026-10-23")
         self.assertEqual(em["weekly_days"], 4)                         # Tue, Wed, Thu, Fri
         self.assertAlmostEqual(em["weekly_points"], 100 * math.sqrt(0.2 ** 2 * (77 / 8760)))   # to Fri 16:00
+        # monthly: through the third Friday of November (October's was the 16th, already past)
+        nov = datetime.fromisoformat("2026-11-20T16:00:00").replace(tzinfo=NY)
+        self.assertEqual((em["monthly_expiry"], em["monthly_iv"]), ("2026-11-20", 0.20))
+        self.assertAlmostEqual(em["monthly_points"], 100 * math.sqrt(0.2 ** 2 * (nov - ASOF).total_seconds() / (8760 * 3600)))
 
     def test_rth_full_session_is_forward_variance(self):
         exp = lambda d: datetime.fromisoformat(d + "T16:00:00").replace(tzinfo=NY)

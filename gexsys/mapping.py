@@ -186,7 +186,7 @@ def map_extras(ex: dict, ctx: MappingContext, tick: float) -> dict:
     em = ex.get("expected_move")
     if em:
         em = dict(em, anchor_fut=round_to_tick(ctx.map_price(em["anchor"]), tick))
-        for k in ("daily_points", "weekly_points"):
+        for k in ("daily_points", "weekly_points", "monthly_points"):
             if em.get(k) is not None:
                 em[k + "_fut"] = em[k] * ctx.factor
         out["expected_move"] = em

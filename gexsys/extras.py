@@ -224,6 +224,17 @@ def expected_moves(snap: ChainSnapshot, basket: list[str], asof: datetime, ivs_f
             wvar = w[we] if not rth else max(w[we], dvar)
         out.update(weekly_points=snap.spot * math.sqrt(wvar), weekly_iv=iv_of[we],
                    weekly_expiry=we.date().isoformat(), weekly_days=_sessions(sd, we.astimezone(marketcal.NY).date()))
+    # monthly: through the next standard monthly expiration (third Friday, holiday-adjusted), same construction
+    nm = marketcal.quarterly_expiry(sd.year, sd.month)
+    if nm < sd:
+        y, m = (sd.year + 1, 1) if sd.month == 12 else (sd.year, sd.month + 1)
+        nm = marketcal.quarterly_expiry(y, m)
+    monthly = [e for e in w if e.astimezone(marketcal.NY).date() == nm]
+    if monthly:
+        me = max(monthly)                                   # the PM-settled one when AM and PM both list
+        mvar = dvar + max(0.0, w[me] - w[e_today]) if rth and e_today else (w[me] if not rth else max(w[me], dvar))
+        out.update(monthly_points=snap.spot * math.sqrt(mvar), monthly_iv=iv_of[me],
+                   monthly_expiry=me.date().isoformat(), monthly_days=_sessions(sd, nm))
     return out
 
 

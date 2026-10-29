@@ -85,12 +85,15 @@ styMP = input.string("┈┈┈┈", "", options = ["────", "╌╌╌�
 wMPPick = input.string("───", "", options = ["───", "━━━", "▬▬▬", "███"], inline = "mp", group = G3)
 wMP = pxOf(wMPPick)
 mpCount = input.string("Nearest", "Max pain expirations", options = ["Nearest", "Nearest + next"], group = G3)
-showEM  = input.bool(true, "Expected move", inline = "em", group = G3)
-cEM     = input.color(#8b95a5, "", inline = "em", group = G3, tooltip = "1 standard-deviation range implied by options, from the previous close (weekly: lighter).")
+showEM  = input.bool(true, "IV range bands", inline = "em", group = G3)
+cEM     = input.color(#8b95a5, "", inline = "em", group = G3, tooltip = "Price levels set by implied volatility: the range the options market prices in, from the previous close (the last close outside cash hours). +/-1σ: about 68% of the time price ends inside; +/-2σ: about 95%. Each horizon uses its own expiry's at-the-money IV. Weekly and monthly are fainter, 2σ dotted.")
 styEM = input.string("╌╌╌╌", "", options = ["────", "╌╌╌╌", "┈┈┈┈"], inline = "em", group = G3)
 wEMPick = input.string("───", "", options = ["───", "━━━", "▬▬▬", "███"], inline = "em", group = G3)
 wEM = pxOf(wEMPick)
-emMode  = input.string("Daily", "Expected move range", options = ["Daily", "Weekly", "Daily + weekly"], group = G3)
+ivD = input.bool(true, "Day", inline = "ivh", group = G3)
+ivW = input.bool(true, "Week", inline = "ivh", group = G3)
+ivM = input.bool(false, "Month", inline = "ivh", group = G3)
+iv2 = input.bool(true, "±2σ too", inline = "ivh", group = G3, tooltip = "Which IV bands to draw: today's session, through this week's last expiry, through the monthly expiry (third Friday). ±2σ adds the outer bands.")
 
 // ---------- 4 - Lines & labels (shared by every level)
 G4 = "4 - Lines & labels"
@@ -195,6 +198,11 @@ type Snap
     float  emd = na
     float  emw = na
     string emx = ""
+    float  emm = na
+    string emmx = ""
+    float  ivd = na
+    float  ivw = na
+    float  ivm = na
     string prof = ""
     float  ag = na
     float  vxm = na
@@ -232,7 +240,8 @@ parseOne(string txt) =>
              dzg = numOf(m, "dzg"), preg = strOf(m, "preg"), lv = strOf(m, "L"),
              x0 = strOf(m, "x0"), z0 = numOf(m, "z0"), c0 = numOf(m, "c0"), p0 = numOf(m, "p0"),
              vc = numOf(m, "vc"), vp = numOf(m, "vp"), oc = numOf(m, "oc"), op = numOf(m, "op"), xp = strOf(m, "xp"),
-             ema = numOf(m, "ema"), emd = numOf(m, "emd"), emw = numOf(m, "emw"), emx = strOf(m, "emx"),
+             ema = numOf(m, "ema"), emd = numOf(m, "emd"), emw = numOf(m, "emw"), emx = strOf(m, "emx"), emm = numOf(m, "emm"), emmx = strOf(m, "emmx"),
+             ivd = numOf(m, "ivd"), ivw = numOf(m, "ivw"), ivm = numOf(m, "ivm"),
              prof = strOf(m, "P"), ag = numOf(m, "ag"), vxm = numOf(m, "vxm"), chm = numOf(m, "chm"), rk = strOf(m, "R"), rk0 = strOf(m, "R0"), rk0e = strOf(m, "R0e"), g0e = numOf(m, "g0e"), x0d = strOf(m, "x0d"), complete = str.trim(array.get(toks, array.size(toks) - 1)) == "END")
     s
 
@@ -550,6 +559,20 @@ drawKey(Snap s, float f, float o, bool isSecond) =>
                     shown += 1
     true
 
+// One IV horizon: ±1σ (and ±2σ) around the anchor, e.g. tags D+1σ / D-2σ, with what the band means on hover
+ivBand(Snap s, float f, float o, string tag, int tr, string hz, string span, float pts, float iv, string exp) =>
+    string src = (na(iv) ? "" : "ATM IV " + str.tostring(iv, "0.0") + "%") + (exp != "" ? (na(iv) ? "" : ", ") + "expiry " + str.substring(exp, 5) : "")
+    for k in array.from(1, 2)
+        if k == 1 or iv2
+            string sg = str.tostring(k) + "σ"
+            string pct = k == 1 ? "68%" : "95%"
+            int trk = math.min(90, tr + (k == 2 ? 25 : 0))
+            string st = k == 1 ? lnStyle(styEM) : line.style_dotted
+            string about = "options price about a " + pct + " chance " + span + " ends inside ±" + sg + " (±" + str.tostring(k * pts * nz(f, 1), "#") + " pts from " + fmtPx(mapP(s.ema, f, o)) + ")" + (src != "" ? "; " + src : "")
+            drawLevel(mapP(s.ema + k * pts, f, o), nm(hz + "+" + sg, hz + " IV band +" + sg), tag, color.new(cEM, trk), wEM, st, na, "upper edge: " + about, "⚪")
+            drawLevel(mapP(s.ema - k * pts, f, o), nm(hz + "-" + sg, hz + " IV band -" + sg), tag, color.new(cEM, trk), wEM, st, na, "lower edge: " + about, "⚪")
+    true
+
 drawMore(Snap s, float f, float o, bool isSecond) =>
     string tag = tagOf(s)
     int tr = isSecond ? 40 : 0
@@ -573,17 +596,17 @@ drawMore(Snap s, float f, float o, bool isSecond) =>
                 drawLevel(mapP(str.tonumber(array.get(parts, 1)), f, o), nm("MP " + d, "Max pain " + d), tag, color.new(cMP, tr), wMP, lnStyle(styMP))
             k += 1
     if showEM and not na(s.ema)
-        if emMode != "Weekly" and not na(s.emd)
-            drawLevel(mapP(s.ema + s.emd, f, o), nm("EM+", "Expected high today"), tag, color.new(cEM, tr), wEM, lnStyle(styEM))
-            drawLevel(mapP(s.ema - s.emd, f, o), nm("EM-", "Expected low today"), tag, color.new(cEM, tr), wEM, lnStyle(styEM))
+        if ivD and not na(s.emd)
+            ivBand(s, f, o, tag, tr, "D", "today's session", s.emd, s.ivd, "")
             float bandHi = mapP(s.ema + s.emd, f, o)
             float bandLo = mapP(s.ema - s.emd, f, o)
             if emFill and not isSecond and not na(bandHi) and not na(bandLo) and sane(bandHi) and sane(bandLo)
                 array.push(gBoxes, box.new(math.min(sessStartTime, time - 1), bandHi, time, bandLo, xloc = xloc.bar_time,
                      extend = extend.right, border_width = 0, border_color = color.new(cEM, 100), bgcolor = color.new(cEM, 92)))
-        if emMode != "Daily" and not na(s.emw)
-            drawLevel(mapP(s.ema + s.emw, f, o), nm("EMw+", "Expected high this week"), tag, color.new(cEM, tr + 25), wEM, lnStyle(styEM))
-            drawLevel(mapP(s.ema - s.emw, f, o), nm("EMw-", "Expected low this week"), tag, color.new(cEM, tr + 25), wEM, lnStyle(styEM))
+        if ivW and not na(s.emw)
+            ivBand(s, f, o, tag, tr + 20, "W", "the week", s.emw, s.ivw, s.emx)
+        if ivM and not na(s.emm)
+            ivBand(s, f, o, tag, tr + 35, "M", "the monthly expiry", s.emm, s.ivm, s.emmx)
     true
 
 // GEX profile: "base/width/v1,v2,..." with v in -99..99; bin i is centred at base + i*width (index prices).
@@ -814,7 +837,7 @@ rowName(string k) =>
         "x0"   => (hasA and sA.x0 != "" ? sA.x0 : "0DTE") + " ZG/CW/PW"
         "vol"  => "Vol walls C/P"
         "mp"   => "Max pain"
-        "em"   => "Exp. move"
+        "em"   => "IV range ±1σ"
         "ag"   => "Abs gamma"
         "hedge" => "Hedge per 1%"
         "charm" => "Charm flow"
@@ -880,7 +903,7 @@ valOf(string k, Snap s, float f, float o, bool ok, string mst) =>
                 t := mpFirst(s, f, o)
                 c := cMP
             "em" =>
-                t := na(s.emd) or na(f) ? "-" : "+/-" + str.tostring(s.emd * f, "#") + (na(s.emw) ? "" : "  wk +/-" + str.tostring(s.emw * f, "#"))
+                t := na(s.emd) or na(f) ? "-" : "±" + str.tostring(s.emd * f, "#") + (na(s.emw) ? "" : "  wk ±" + str.tostring(s.emw * f, "#")) + (na(s.emm) ? "" : "  mo ±" + str.tostring(s.emm * f, "#"))
             "map" =>
                 t := mst
                 c := na(f) ? cWarn : cDim

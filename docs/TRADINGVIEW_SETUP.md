@@ -47,7 +47,7 @@ The dialog's separate Style tab has nothing to change.
 |---|---|
 | 1 - Data | Levels payload, price mapping |
 | 2 - Key levels | Zero gamma, call wall, put wall, absolute gamma (on/off + colour each), largest ±GEX and concentrations (on/off), extra concentrations (count, min %) |
-| 3 - More levels | 0DTE levels (on/off), volume walls, OI walls, max pain, expected move (on/off + colour each), max-pain expirations, expected-move range |
+| 3 - More levels | 0DTE levels (on/off), volume walls, OI walls, max pain, IV range bands (on/off + colour each), max-pain expirations, which IV bands (day / week / month, ±2σ) |
 | 4 - Lines & labels | Where lines start (session open / full chart / right of price), labels (short / full / off), label size, label background, label offset, expected-move band shading, session tint by gamma side |
 | 5 - GEX profile | On/off, source, width, gap, opacity |
 | 6 - Info panel | On/off, detail, position, text size |
@@ -87,7 +87,12 @@ The dialog's separate Style tab has nothing to change.
   draws them as a narrow column right of the last bar.
 * **Labels** ("Short" / "Full") sit right of the GEX profile on a dark pill: short code plus price with separators,
   e.g. `CW  29,883.25`. Codes: `ZG`, `CW`, `PW`, `+GEX`, `-GEX`, `+G 12%`, `0D ZG` / `0D CW` / `0D PW`,
-  `VOL C` / `VOL P`, `OI C` / `OI P`, `MP 10-21`, `EM+` / `EM-`, `EMw+` / `EMw-`.
+  `VOL C` / `VOL P`, `OI C` / `OI P`, `MP 10-21`, IV bands `D+1σ` / `D-1σ` / `D+2σ` / `D-2σ` (`W` week, `M` month).
+* **IV range bands:** the range implied volatility prices in, from the previous close (the last close outside
+  cash hours): ±1σ (about 68% of the time price ends inside) and ±2σ (about 95%), for today's session, through
+  this week's last expiry and through the monthly (third Friday). Each horizon uses its own expiry's
+  at-the-money IV (calls and puts at the same strike). Day and week are on by default, month off; weekly and
+  monthly are fainter, 2σ dotted. Hover a band for its IV, expiry and points.
   "Full" spells them out.
 * **Shared prices:** levels at the same price share one line, e.g. `CW · +GEX  29,883.25`.
 * **Source names** appear in labels only when two sources are drawn. `STALE` is added once the update

@@ -85,7 +85,8 @@ class TestPineStatic(unittest.TestCase):
                                           "ranked_etf": {"call": [{"price": 1.0, "share": 0.1}], "put": [], "abs": []}, "etf_share": 0.6},
                               "vol_call": {"price": 1.0}, "vol_put": {"price": 1.0}, "oi_call": {"price": 1.0}, "oi_put": {"price": 1.0},
                               "max_pain": [{"expiration": "2026-10-20", "price": 1.0}],
-                              "expected_move": {"anchor": 1.0, "daily_points": 1.0, "weekly_points": 1.0, "weekly_expiry": "2026-10-23"},
+                              "expected_move": {"anchor": 1.0, "daily_points": 1.0, "weekly_points": 1.0, "weekly_expiry": "2026-10-23",
+                                                "monthly_points": 1.0, "monthly_expiry": "2026-11-20", "daily_iv": 0.2, "weekly_iv": 0.2, "monthly_iv": 0.2},
                               "greeks": {"vanna_usd_per_vol_pt": 1.0, "charm_usd_per_day": 1.0},
                               "profile": {"base": 1.0, "width": 1.0, "values": [1]}}}
         emitted = {kv.split("=", 1)[0] for kv in pine_payload(summary, "NQ", "NDX", "ratio", provider="CBOE",
