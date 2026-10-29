@@ -10,11 +10,12 @@ import logging
 import os
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
-from . import marketcal, publish
+from . import marketcal, publish, session
+from .export import add_tokens
 from .alerts import AlertEngine
 from .config import MarketConfig, make_provider
 from .models import to_jsonable
@@ -40,6 +41,11 @@ class NotifyGate:
             return True
 
 
+def _futures_candles(market: str) -> list:
+    from .heatmap import fetch_candles            # Yahoo 5-minute futures candles, last 5 days
+    return fetch_candles(market, "5m")
+
+
 def _fv(payload: str) -> str:
     """The paste's format version (the fv token; none before version 2)."""
     return next((kv[3:] for kv in payload.split(";") if kv.startswith("fv=")), "1")
@@ -61,6 +67,7 @@ class MarketWorker(threading.Thread):
         self.failures = 0
         self.next_run = 0.0
         self._pruned_at = 0.0
+        self.candles_fn = None if getattr(self.provider, "name", "") == "synthetic" else _futures_candles   # reaction stats
         self.published: Optional[dict] = None
         self.published_slot: Optional[datetime] = None
         self.notify_desktop = publish.notify_desktop
@@ -122,6 +129,48 @@ class MarketWorker(threading.Thread):
             self._save_last_good(r)
         return True
 
+    def _add_session(self, r: dict, now: datetime) -> None:
+        """The day's level changes, the open's levels and the reaction stats, on the result and in the paste."""
+        if r["summary"].get("status") == "UNAVAILABLE":
+            return
+        folder = self.store.root / self.key
+        snaps = session.summaries_since(folder, session.session_start(now))
+        m = (r.get("mapped") or {}).get("mapping") or {}
+        f, o = m.get("factor") or 1.0, m.get("offset") or 0.0
+        fut = lambda p: None if p is None else round((p * f + o) * 4) / 4
+        opened = session.open_levels(snaps, now)
+        stats = self._stats(folder, now, f, o)
+        r["session"] = {"changes": [dict(c, frm=fut(c["frm"]) if c["what"] != "regime" else c["frm"],
+                                         to=fut(c["to"]) if c["what"] != "regime" else c["to"]) for c in session.changes(snaps)],
+                        "open": {k: (fut(v) if isinstance(v, (int, float)) else v) for k, v in opened.items()} if opened else None,
+                        "stats": stats}
+        if r.get("pine"):
+            r["pine"] = add_tokens(r["pine"], {"O": session.open_token(opened) if opened else "", "S": session.stats_token(stats)})
+
+    def _stats(self, folder: Path, now: datetime, f: float, o: float) -> dict:
+        """Reaction stats, recomputed at most hourly (cached beside the snapshots, so hosted builds share it)."""
+        cache = self.store.root / f"stats-{self.key}.json"
+        try:
+            c = json.loads(cache.read_text(encoding="utf-8"))
+            if time.time() - c["at"] < 3600:
+                return c["stats"]
+        except (OSError, ValueError, KeyError):
+            pass
+        if not self.candles_fn:
+            return {}
+        try:
+            candles = self.candles_fn(self.cfg.market)
+        except Exception as e:
+            log.info("reaction stats: no candles for %s: %s", self.key, e)
+            return {}
+        stats = session.reaction_stats(session.summaries_since(folder, now - timedelta(days=12)), candles, f, o)
+        try:
+            cache.parent.mkdir(parents=True, exist_ok=True)
+            cache.write_text(json.dumps({"at": time.time(), "stats": stats}), encoding="utf-8")
+        except OSError:
+            pass
+        return stats
+
     def run(self) -> None:
         while not self._stop.is_set():
             self.step()
@@ -155,6 +204,7 @@ class MarketWorker(threading.Thread):
         now = now or datetime.now(timezone.utc)
         try:
             r = run_once(self.cfg, self.provider, self.store, self.alerts)
+            self._add_session(r, now)
             if time.time() - self._pruned_at > 6 * 3600:      # keep the local snapshot folder small
                 self._pruned_at = time.time()
                 self.store.prune(self.key)

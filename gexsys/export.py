@@ -34,7 +34,7 @@ from typing import Optional
 
 from .mapping import SOURCES
 
-FORMAT_VERSION = "3"          # bump when the paste gains fields the chart needs: the service republishes at once
+FORMAT_VERSION = "4"          # bump when the paste gains fields the chart needs: the service republishes at once
 UNIT_CODES = {"usd_per_1pct": "USD1PCT", "usd_per_point": "USDPT", "delta_per_point": "DPT"}
 MAX_LEN = 1800
 
@@ -97,6 +97,12 @@ def pine_payload(summary: dict, market: str, source_key: str, method: str,
     return out
 
 
+def add_tokens(payload: str, tok: dict) -> str:
+    """Add key=value tokens before the END marker (empty values are skipped)."""
+    extra = "".join(f"{k}={v};" for k, v in tok.items() if v)
+    return payload[:-3] + extra + "END" if extra and payload.endswith("END") else payload
+
+
 def ranked_token(rk: dict) -> str:
     """C/P/A then "price:share %" in rank order, e.g. C20200.00:18.0,P19500.00:12.0,A20000.00:9.5"""
     return ",".join(f"{code}{_p(x):.2f}:{100 * x['share']:.1f}" for side, code in (("call", "C"), ("put", "P"), ("abs", "A"))
@@ -111,6 +117,7 @@ def extras_tokens(ex: dict) -> dict:
     xp max pain "YYYY-MM-DD:price" for the first two expirations
     ema anchor, emd daily 1-sd points, emw weekly 1-sd points, emx weekly expiration,
     emm monthly 1-sd points, emmx monthly expiration; ivd / ivw / ivm each band's ATM IV in %
+    (added by the service, gexsys/session.py) O the levels at today's 09:30 open, S reaction stats per level kind
     P  GEX profile "base/width/v1,v2,..." with v in -99..99 (bin i centred at base + i*width)
     """
     t: dict = {}
