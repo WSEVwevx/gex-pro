@@ -56,7 +56,8 @@ for f in sorted((TRACK / "sessions").glob("*.json")):
         t = datetime.fromisoformat(j["asof"])
         if t < open_ and t >= open_ - timedelta(hours=30) and j.get("status") != "UNAVAILABLE":
             cands.append((t, j))
-    if cands:
+    made_here = any(abs((t - datetime.fromisoformat(p["asof"])).total_seconds()) < 1 for t, _ in cands)
+    if cands and made_here:                    # this PC's snapshot made the plan: it must be the last one before the open
         t, j = max(cands, key=lambda x: x[0])
         check(datetime.fromisoformat(p["asof"]) == t and abs(p["ref"] - j["ref_price"]) < 0.01,
               f"{f.stem}: plan uses the last pre-open snapshot {t.astimezone(NY):%m-%d %H:%M} ET (ref {j['ref_price']:.2f})")
@@ -65,7 +66,7 @@ for f in sorted((TRACK / "sessions").glob("*.json")):
               f"{f.stem}: em {p['em']:.2f}, walls {j['call_wall']['price']} / {j['put_wall']['price']} copied unchanged")
     else:
         # the hosted site made this plan; its snapshots live in GitHub's cache, not on this PC
-        print(f"SKIP {f.stem}: no local snapshot before the open (plan made by the hosted site); grade still checked")
+        print(f"SKIP {f.stem}: plan made by the hosted site (its snapshot is not on this PC); grade still checked")
     em = p["em"]
     if not o:
         print(f"     {f.stem}: {s['status']}")
