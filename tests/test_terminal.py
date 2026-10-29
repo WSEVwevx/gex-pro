@@ -35,6 +35,16 @@ class TestAssets(unittest.TestCase):
                     self.assertIn(src, page)
                 with urllib.request.urlopen(base + "/api/all") as r:
                     self.assertIn("workers", json.loads(r.read()))
+                # the installable app: manifest and service worker at the root, icons in assets
+                with urllib.request.urlopen(base + "/manifest.webmanifest") as r:
+                    man = json.loads(r.read())
+                    self.assertIn("manifest", r.headers["Content-Type"])
+                for icon in man["icons"]:
+                    with urllib.request.urlopen(base + "/" + icon["src"]) as r:
+                        self.assertEqual(r.read()[1:4], b"PNG")
+                with urllib.request.urlopen(base + "/sw.js") as r:
+                    self.assertIn(b"addEventListener", r.read())
+                self.assertIn('rel="manifest"', page)
             finally:
                 httpd.shutdown()
                 httpd.server_close()
@@ -52,6 +62,7 @@ class TestAssets(unittest.TestCase):
             self.assertRegex(html, r'"assets/library\.js\?v=[0-9a-f]{10}"')            # the Library's lessons
             self.assertLess(html.index("window.GEX_STATIC = true"), html.index("assets/app.js"))   # flag first
             self.assertTrue((out / "assets" / "app.js").exists() and (out / "data" / "all.json").exists())
+            self.assertTrue((out / "manifest.webmanifest").exists() and (out / "sw.js").exists() and (out / "assets" / "app-512.png").exists())
 
 
 

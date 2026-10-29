@@ -14,6 +14,8 @@ DASHBOARD = Path(__file__).resolve().parent.parent / "dashboard"
 ASSET_TYPES = {".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".svg": "image/svg+xml",
                ".png": "image/png", ".woff2": "font/woff2"}
 ASSET_NAME = re.compile(r"^[A-Za-z0-9_.-]+$")            # one plain file name: no folders, no ".." tricks
+# the installable-app files live at the site's root (a service worker controls only its own folder and below)
+ROOT_FILES = {"/manifest.webmanifest": "application/manifest+json", "/sw.js": "text/javascript; charset=utf-8"}
 
 
 def collect_routes(components) -> dict:
@@ -47,6 +49,8 @@ def make_handler(components):
                 f = DASHBOARD / "index.html"           # read on every request: edits show up on reload
                 if f.exists():
                     return self._send(200, f.read_bytes(), "text/html; charset=utf-8")
+            if u.path in ROOT_FILES:
+                return self._send(200, (DASHBOARD / u.path[1:]).read_bytes(), ROOT_FILES[u.path])
             if u.path.startswith("/assets/"):
                 name = u.path[len("/assets/"):]
                 f = DASHBOARD / "assets" / name

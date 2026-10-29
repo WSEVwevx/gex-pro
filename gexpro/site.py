@@ -35,5 +35,7 @@ def build(components, out: str | Path, state: str | Path) -> dict:
             tag = hashlib.sha256(f.read_bytes()).hexdigest()[:10]
             html = html.replace(f'"assets/{f.name}"', f'"assets/{f.name}?v={tag}"')
     (out / "index.html").write_text(html.replace("<script", STATIC_FLAG + "\n<script", 1), encoding="utf-8")
+    for name in ("manifest.webmanifest", "sw.js"):     # the installable-app files, at the site's root
+        shutil.copy2(DASHBOARD / name, out / name)
     (out / ".nojekyll").write_text("", encoding="utf-8")
     return status

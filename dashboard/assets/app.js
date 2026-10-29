@@ -1600,6 +1600,10 @@ function glTermsIn(text){
   return LIB.glossary.filter(([t]) => { const n = t.split(/ \(| \//)[0].toLowerCase(); return n.length > 2 && new RegExp("[^a-z0-9]" + n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "[^a-z0-9]").test(low); }).map(g => g[0]).slice(0, 10);
 }
 
+// installable app: the service worker (network first) lets phones add GEX PRO to the home screen
+if("serviceWorker" in navigator && (location.protocol === "https:" || /^(127\.0\.0\.1|localhost)$/.test(location.hostname)))
+  navigator.serviceWorker.register("sw.js").catch(() => {});
+
 setPage(page);
 load();
 loadNews();
