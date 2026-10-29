@@ -54,6 +54,12 @@ class TestPineStatic(unittest.TestCase):
                     self.assertNotIn(n, BUILTINS, f"line {i}: '{n}' shadows a Pine built-in")
             depth += l.count("(") + l.count("[") - l.count(")") - l.count("]")
 
+    def test_inputs_stay_out_of_the_status_line(self):
+        # TradingView prints every input's value next to the indicator's name unless it opts out;
+        # a fresh chart should show just "GEX PRO", not a row of line-style glyphs
+        calls = re.findall(r"(?<![\w.])input\.\w+\(", PINE)
+        self.assertEqual(len(calls), PINE.count("display = display.none"), "an input is missing display = display.none")
+
     def test_every_input_is_used(self):
         for name in re.findall(r"^([A-Za-z_]\w*)\s*=\s*input\.", NO_STRINGS, re.M):
             uses = len(re.findall(rf"(?<![\w.]){name}(?!\w)", NO_STRINGS))
