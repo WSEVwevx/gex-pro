@@ -60,9 +60,10 @@ try { localStorage.removeItem("gex.page"); } catch(e) {}
 let impactF = store.get("gex.impact", "med");       // high | med | all
 let curF = store.get("gex.cur", "USD");             // USD | all
 let news = null;
-const VIEW_IDS = ["levels", "ladder", "heatmap", "screener", "bias", "track", "briefings", "news", "indicator", "library"];
+const VIEW_IDS = ["levels", "ladder", "heatmap", "screener", "bias", "track", "briefings", "news", "indicator", "library", "glossary"];
 function setPage(p){
   if(!VIEW_IDS.includes(p)) p = "levels";
+  if(p !== page){ const ar = document.querySelector(".area"); if(ar) ar.scrollTop = 0; window.scrollTo(0, 0); }   // a new page opens at its top
   page = p;
   document.querySelectorAll("#pages button[data-p]").forEach(b => b.setAttribute("aria-selected", String(b.dataset.p === p)));
   VIEW_IDS.forEach(v => { $(v + "View").hidden = v !== p; });
@@ -74,6 +75,7 @@ function setPage(p){
   if(p === "news") renderNews();
   if(p === "indicator") loadIndicator();
   if(p === "library") renderLibrary();
+  if(p === "glossary") renderGlossary();
   if(p === "track") loadTrack();
   if(p === "screener") loadScreener();
   if(p === "heatmap" && window.__hmOpen) window.__hmOpen();
@@ -559,8 +561,8 @@ function renderMaxPain(X){
 const PAGES = [
   ["levels", "Levels", "LVL"], ["ladder", "Live table", "LIVE"], ["heatmap", "Heatmap", "HEAT"], ["screener", "Screener", "SCRN"],
   ["bias", "Bias", "BIAS"], ["track", "Track record", "TRK"], ["briefings", "Briefings", "BRF"], ["news", "News", "NEWS"], ["indicator", "Indicator", "IND"],
-  ["library", "Library", "LIB"]];
-const NO_MARKET_PAGES = ["news", "indicator", "briefings", "library", "track"];
+  ["library", "Library", "LIB"], ["glossary", "Glossary", "GLOS"]];
+const NO_MARKET_PAGES = ["news", "indicator", "briefings", "library", "glossary", "track"];
 const pickP = v => v && typeof v === "object" ? v.price : v;
 const curW = () => data && (data.workers.find(x => x.market === market && x.result) || data.workers.find(x => x.market === market));
 
@@ -639,6 +641,8 @@ const HELP = {
   screener: {title: "Index drivers", tldr: "The handful of stocks that move NQ and ES, and how many points each is worth today.",
     body: `<p>A few giant companies make up most of the Nasdaq-100 and a big share of the S&P 500, so their moves <b>are</b> the futures' moves. This page shows the biggest weights in the index for the market you pick (NQ or ES at the top).</p><p><b>Index pts</b> = the stock's weight × its % move today × the futures price: roughly how many points of NQ or ES that stock explains. The bars show who is lifting and who is dragging. <b>Pre / after</b> is the latest pre-market or after-hours move, and the line above it says what those moves imply for the future before the cash open. <b>Rel vol</b> is today's volume against the 3-month average (1.5× or more is highlighted).</p><p>Watch the <b>earnings</b> dates: when a top-five name reports after the close, NQ and ES often gap on it overnight.</p>`,
     watch: ["Top names all red but the future green = narrow, fragile move", "A mega cap reporting AMC = overnight gap risk for NQ / ES"]},
+  glossary: {title: "Glossary", tldr: "Every term on this site and on the indicator, in one line each.",
+    body: `<p>Search a word, pick a topic, or jump to a letter. Each term says what it means, which topic it belongs to and where you see it (a page, a tag on the indicator, the hover box...). <b>Lesson →</b> opens the Library lesson that explains it from zero.</p><p>Every Explain panel lists the glossary terms it mentions; click one to jump straight here.</p>`},
   library: {title: "The Library", tldr: "A short course that explains everything on this site from zero.",
     body: `<p>Start with <b>What is an option?</b> and follow the lessons in order, or search for any term. Each lesson ends with a quick check; answer it correctly and the lesson is marked as read. Your progress is saved in this browser.</p><p>Every Explain panel links to the matching lesson, so you can jump from a number on the screen straight to the idea behind it.</p>`},
   track: {title: "Live track record", tldr: "What GEX PRO said before each open, graded against what the market did.",
@@ -673,7 +677,7 @@ const HELP = {
   paste: {title: "The hourly paste", tldr: "One text block that carries all levels to TradingView.",
     body: `<p>Published every hour on the hour (ET). One paste holds NQ and ES; each chart draws only its own market. The indicator marks levels stale after 90 minutes.</p>`},
 };
-const PAGE_HELP = {levels: "regime", ladder: "livetable", heatmap: "heatmap", screener: "screener", bias: "bias", briefings: "briefings", news: "calendar", indicator: "indicator", library: "library", track: "track"};
+const PAGE_HELP = {levels: "regime", ladder: "livetable", heatmap: "heatmap", screener: "screener", bias: "bias", briefings: "briefings", news: "calendar", indicator: "indicator", library: "library", glossary: "glossary", track: "track"};
 let exKey = null;
 function openExplain(key){
   const h = HELP[key]; if(!h) return;
@@ -686,7 +690,9 @@ function openExplain(key){
   const rel = [...document.querySelectorAll(`#${page}View [data-help]`)].map(e => e.dataset.help).filter((k, i, a) => HELP[k] && k !== key && a.indexOf(k) === i);
   const lesson = (window.GEX_LIBRARY || {lessons: []}).lessons.find(l => l.id === ((window.GEX_LIBRARY || {}).forHelp || {})[key]);
   $("exMore").innerHTML = (lesson ? `<button class="ex-learn" data-lesson="${esc(lesson.id)}"><span class="eyebrow">Learn the basics</span><b>${esc(lesson.title)}</b><span>${lesson.minutes} min lesson in the Library →</span></button>` : "")
-    + (rel.length ? `<span class="eyebrow" style="width:100%">Also on this page</span>` + rel.map(k => `<button data-k="${k}">${esc(HELP[k].title)}</button>`).join("") : "");
+    + (rel.length ? `<span class="eyebrow" style="width:100%">Also on this page</span>` + rel.map(k => `<button data-k="${k}">${esc(HELP[k].title)}</button>`).join("") : "")
+    + (() => { const ts = glTermsIn(h.title + " " + h.tldr + " " + h.body); return ts.length ? `<span class="eyebrow" style="width:100%">Terms in the glossary</span>` + ts.map(t => `<button data-g="${esc(t)}">${esc(t)}</button>`).join("") : ""; })();
+  [...$("exMore").querySelectorAll("button[data-g]")].forEach(b => b.onclick = () => openGlossary(b.dataset.g));
   [...$("exMore").querySelectorAll("button[data-k]")].forEach(b => b.onclick = () => openExplain(b.dataset.k));
   const lb = $("exMore").querySelector("[data-lesson]");
   if(lb) lb.onclick = () => { closeExplain(); openLesson(lb.dataset.lesson); };
@@ -733,7 +739,7 @@ const COMMANDS = [
   {code: "NOTES", desc: "Show or hide the notes under numbers", run: () => $("notesBtn").click()},
   {code: "LIGHT", desc: "Light mode", run: () => setTheme("light")}, {code: "DARK", desc: "Dark (night) mode", run: () => setTheme("dark")},
   {code: "LEARN", desc: "Start the beginner course", run: () => openLesson(LIB.lessons[0].id)},
-  {code: "GLOSSARY", desc: "Open the A-Z glossary", run: () => { libTab = "glossary"; setPage("library"); }},
+  {code: "GLOSSARY", desc: "Open the A-Z glossary", run: () => setPage("glossary")},
 ];
 let cmdSel = 0;
 function cmdMatches(q){ q = q.trim().toUpperCase(); return q ? COMMANDS.filter(c => c.code.startsWith(q) || c.desc.toUpperCase().includes(q)) : COMMANDS; }
@@ -758,7 +764,7 @@ $("cmd").addEventListener("keydown", e => {
 });
 
 // ---------- keyboard
-const KEYS = [["/  or  Ctrl+K", "Command line"], ["1 - 9, 0", "Pages (Levels, Live table, Heatmap, Screener, Bias, Track record, Briefings, News, Indicator, Library)"],
+const KEYS = [["/  or  Ctrl+K", "Command line"], ["1 - 9, 0", "Pages (Levels, Live table, Heatmap, Screener, Bias, Track record, Briefings, News, Indicator, Library); GLOS opens the Glossary"],
   ["N  /  E", "Switch to NQ / ES"], ["X", "Explain this page"], ["T", "Light / dark mode"], ["D", "Notes under numbers on / off"], ["C", "Copy the TradingView paste"], ["?", "This list"], ["Esc", "Close panels"]];
 function showKeys(on){ $("keys").hidden = !on; if(on) $("keysGrid").innerHTML = KEYS.map(([k, d]) => `<kbd>${esc(k)}</kbd><span>${esc(d)}</span>`).join(""); }
 $("keysBtn").onclick = () => showKeys(true);
@@ -795,18 +801,10 @@ function renderLibrary(){
   const q = ($("libSearch").value || "").trim().toLowerCase();
   const hit = s => !q || s.toLowerCase().includes(q);
   $("libTabs").innerHTML = [["course", "Course"], ["glossary", "Glossary"]].map(([k, t]) => `<button role="tab" aria-selected="${libTab === k}" data-k="${k}">${t}</button>`).join("");
-  [...$("libTabs").children].forEach(b => b.onclick = () => { libTab = b.dataset.k; renderLibrary(); });
+  [...$("libTabs").children].forEach(b => b.onclick = () => { if(b.dataset.k === "glossary") return setPage("glossary"); libTab = b.dataset.k; renderLibrary(); });
   const n = LIB.lessons.length, done = LIB.lessons.filter(l => libRead.has(l.id)).length;
   $("libBar").style.width = (n ? 100 * done / n : 0) + "%";
   $("libCount").textContent = `${done} of ${n} lessons read`;
-  $("libCourse").hidden = libTab !== "course"; $("libGlossary").hidden = libTab !== "glossary";
-  if(libTab === "glossary"){
-    const rows = LIB.glossary.filter(([t, d]) => hit(t + " " + d));
-    $("libGloss").innerHTML = rows.map(([t, d, id]) => `<div class="gterm"><b>${esc(t)}</b><span>${esc(d)}</span>${id ? `<button class="linkbtn" data-l="${esc(id)}">Lesson →</button>` : ""}</div>`).join("")
-      || `<div class="expl">No term matches "${esc(q)}".</div>`;
-    [...$("libGloss").querySelectorAll("[data-l]")].forEach(b => b.onclick = () => openLesson(b.dataset.l));
-    return;
-  }
   const visible = LIB.lessons.filter(l => hit(l.title + " " + l.oneLiner + " " + l.body.replace(/<[^>]+>/g, " ")));
   $("libToc").innerHTML = LIB.chapters.map(([ck, ct]) => {
     const ls = visible.filter(l => l.chapter === ck);
@@ -1345,6 +1343,43 @@ function renderScreener(){
   const when = new Date(scr.fetched).toLocaleString("en-US", {...ET, hour: "numeric", minute: "2-digit"});
   const wd = scr.weights_asof ? new Date(scr.weights_asof).toLocaleDateString("en-US", {...ET, month: "short", day: "numeric"}) : "?";
   $("scrSub").textContent = `${rows.length} biggest ${market === "ES" ? "S&P 500" : "Nasdaq-100"} weights · prices ${when} ET · weights ${wd}`;
+}
+
+// ---------- glossary: every term the site and the indicator use, searchable, by topic or A to Z
+let glTopic = "All", glFocus = "";
+const glKey = t => t.replace(/^[^A-Za-z0-9]+/, "").toUpperCase();
+function renderGlossary(){
+  const G = LIB.glossary.slice().sort((a, b) => glKey(a[0]).localeCompare(glKey(b[0])));
+  const topics = ["All", ...new Set(LIB.glossary.map(g => g[3]))];
+  $("glTopics").innerHTML = topics.map(k => `<button role="tab" aria-selected="${glTopic === k}" data-k="${esc(k)}">${esc(k)}</button>`).join("");
+  [...$("glTopics").children].forEach(b => b.onclick = () => { glTopic = b.dataset.k; renderGlossary(); });
+  const q = $("glSearch").value.trim().toLowerCase();
+  const rows = G.filter(g => (glTopic === "All" || g[3] === glTopic) && (!q || (g[0] + " " + g[1] + " " + g[4]).toLowerCase().includes(q)));
+  const letters = [...new Set(rows.map(g => glKey(g[0])[0]))];
+  $("glAz").innerHTML = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map(L => letters.includes(L) ? `<button data-l="${L}">${L}</button>` : `<span>${L}</span>`).join("")
+    + (letters.some(L => /[0-9]/.test(L)) ? `<button data-l="0">#</button>` : "");
+  [...$("glAz").querySelectorAll("button")].forEach(b => b.onclick = () => {
+    const el = document.querySelector(`#glList [data-letter="${b.dataset.l === "0" ? letters.find(L => /[0-9]/.test(L)) : b.dataset.l}"]`);
+    el && el.scrollIntoView({behavior: "smooth", block: "start"}); });
+  let last = "";
+  $("glList").innerHTML = rows.map(([t, d, lesson, topic, where]) => {
+    const L = glKey(t)[0], head = L !== last ? `<div class="gl-letter" data-letter="${L}">${/[0-9]/.test(L) ? "#" : L}</div>` : "";
+    last = L;
+    return head + `<div class="gl-row${t === glFocus ? " focus" : ""}" id="gl-${esc(glKey(t).replace(/[^A-Z0-9]+/g, "-"))}">
+      <b>${esc(t)}</b><div><span>${esc(d)}</span><em>${esc(topic)} · seen in ${esc(where)}</em></div>
+      ${lesson ? `<button class="linkbtn" data-l="${esc(lesson)}">Lesson →</button>` : "<i></i>"}</div>`;
+  }).join("") || `<div class="expl">No term matches "${esc(q)}".</div>`;
+  [...$("glList").querySelectorAll("[data-l]")].forEach(b => b.onclick = () => openLesson(b.dataset.l));
+  $("glSub").textContent = `${rows.length} of ${G.length} terms`;
+  if(glFocus){ const el = $("gl-" + glKey(glFocus).replace(/[^A-Z0-9]+/g, "-")); glFocus = ""; el && setTimeout(() => el.scrollIntoView({behavior: "smooth", block: "center"}), 30); }
+}
+// open the glossary on one term (from the Explain drawer)
+function openGlossary(term){ glTopic = "All"; $("glSearch").value = ""; glFocus = term; closeExplain(); if(page === "glossary") renderGlossary(); else setPage("glossary"); }
+$("glSearch").addEventListener("input", renderGlossary);
+// glossary terms named in a piece of help text (the part before " (" or " /", whole words), for the Explain drawer
+function glTermsIn(text){
+  const low = " " + text.toLowerCase().replace(/<[^>]+>/g, " ") + " ";
+  return LIB.glossary.filter(([t]) => { const n = t.split(/ \(| \//)[0].toLowerCase(); return n.length > 2 && new RegExp("[^a-z0-9]" + n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "[^a-z0-9]").test(low); }).map(g => g[0]).slice(0, 10);
 }
 
 setPage(page);

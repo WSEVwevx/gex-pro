@@ -306,9 +306,22 @@ td.m{font-family:var(--mono)}
 .lib-quiz .choices button.wrong{border-color:rgba(224,90,90,.6);background:rgba(224,90,90,.10)}
 .lib-quiz .why{margin:12px 0 0;font-size:13.5px;line-height:1.6;color:var(--ink2)}
 .lib-nav{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:22px;padding-top:16px;border-top:1px solid var(--line)}
-.gloss{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:3px;overflow:hidden}
-.gterm{display:grid;grid-template-columns:170px 1fr auto;gap:12px;align-items:center;padding:11px 14px;background:var(--panel);font-size:13px;color:var(--ink2)}
-.gterm b{color:var(--ink);font-weight:650}
+/* glossary page */
+.gl-tools{display:grid;gap:10px;margin-bottom:10px}
+.gl-tools .lib-search{max-width:420px}
+.gl-az{display:flex;flex-wrap:wrap;gap:2px;margin-bottom:12px;font:600 11.5px var(--mono)}
+.gl-az button,.gl-az span{min-width:24px;padding:3px 0;text-align:center;border-radius:3px}
+.gl-az button{background:none;border:1px solid var(--line2);color:var(--ink)}
+.gl-az button:hover{border-color:var(--line3)}
+.gl-az span{color:var(--ink4)}
+.gl-list{display:grid;border:1px solid var(--line);border-radius:3px;overflow:hidden}
+.gl-letter{padding:6px 14px;background:var(--panel2);color:var(--ink3);font:700 11px var(--mono);letter-spacing:.1em;border-bottom:1px solid var(--line);scroll-margin-top:12px}
+.gl-row{display:grid;grid-template-columns:220px 1fr auto;gap:14px;align-items:start;padding:11px 14px;border-bottom:1px solid var(--line);font-size:13px;color:var(--ink2);scroll-margin-top:60px}
+.gl-row:last-child{border-bottom:0}
+.gl-row b{color:var(--ink);font-weight:650}
+.gl-row div{display:grid;gap:3px}
+.gl-row em{font-style:normal;color:var(--ink4);font-size:11.5px}
+.gl-row.focus{background:rgba(57,135,229,.10);box-shadow:inset 3px 0 0 var(--pos)}
 .ex-more .ex-learn{display:grid;gap:2px;width:100%;text-align:left;background:var(--panel2);border:1px solid var(--line2);border-radius:3px;padding:10px 12px;margin-bottom:8px}
 .ex-learn b{color:var(--ink);font-size:13.5px}.ex-learn span:last-child{color:var(--ink3);font-size:11.5px}
 
@@ -470,7 +483,7 @@ b.good,.drv-chg .good{color:var(--good)}b.bad,.drv-chg .bad{color:var(--bad)}
 .keys-grid kbd{font:700 11.5px var(--mono);color:var(--prompt);background:var(--page);border:1px solid var(--line2);border-radius:3px;padding:2px 8px;justify-self:start}
 
 /* ---------------------------------------------------------------- responsive */
-@media(max-width:1180px){.topbar .clock{display:none}.ld-wrap{grid-template-columns:1fr}.ld-side{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}.trk-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.lib{grid-template-columns:1fr}.lib-toc{position:static;max-height:none}.lib-hero{grid-template-columns:1fr}.gloss{grid-template-columns:1fr}.hero,.ihero{grid-template-columns:1fr 1fr}.hero>:first-child,.ihero>:first-child{grid-column:1/-1}.main,.grid2,.grid2.wide-left,.bgrid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:1180px){.topbar .clock{display:none}.ld-wrap{grid-template-columns:1fr}.ld-side{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}.trk-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.lib{grid-template-columns:1fr}.lib-toc{position:static;max-height:none}.lib-hero{grid-template-columns:1fr}.hero,.ihero{grid-template-columns:1fr 1fr}.hero>:first-child,.ihero>:first-child{grid-column:1/-1}.main,.grid2,.grid2.wide-left,.bgrid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:820px){
   :root{--side:0px}
   .term{grid-template-columns:1fr;grid-template-rows:var(--mq) auto auto auto 1fr;grid-template-areas:"mq" "top" "tick" "side" "area";height:auto;min-height:100vh}
@@ -488,7 +501,7 @@ b.good,.drv-chg .good{color:var(--good)}b.bad,.drv-chg .bad{color:var(--bad)}
   .toast{left:14px;right:14px;bottom:14px;max-width:none}
   .ev{grid-template-columns:58px 56px 1fr}.ev .cur,.ev .fp{display:none}
   .side-label{display:none}
-  .lib-article{padding:18px}.gterm{grid-template-columns:1fr}
+  .lib-article{padding:18px}.gl-row{grid-template-columns:1fr}
 }
 
 /* ---------------------------------------------------------------- notes (the long helper lines under numbers) */
