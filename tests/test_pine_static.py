@@ -26,6 +26,12 @@ class TestPineStatic(unittest.TestCase):
         self.assertIn("//@version=6", PINE)
         self.assertRegex(PINE, r"indicator\(\"")
 
+    def test_every_string_closes_on_its_own_line(self):
+        # Pine strings cannot span lines (CE10017): a raw line break inside one must be written as \n
+        for i, l in enumerate(PINE.splitlines(), 1):
+            rest = re.sub(r'"(?:[^"\\]|\\.)*"', "S", l).split("//")[0]
+            self.assertNotIn('"', rest, f"line {i}: a string is not closed on its line")
+
     def test_brackets_balanced(self):
         for o, c in ("()", "[]"):
             self.assertEqual(NO_STRINGS.count(o), NO_STRINGS.count(c), f"unbalanced {o}{c}")

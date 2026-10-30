@@ -768,8 +768,7 @@ statTxt(Snap s, string kind) =>
             string verdict = pct >= 70 ? "reliable" : pct >= 50 ? "mixed" : "often breaks"
             out := n < 3 ? "📊 " + who + ": " + str.tostring(n) + (n == 1 ? " touch" : " touches") + " in recent sessions, too few for a hold rate yet."
                  : "📊 " + who + " HOLD RATE " + str.tostring(pct) + "% (" + verdict + "): held " + str.tostring(h) + " of " + str.tostring(n) + " recent touches"
-                 + (b != "" ? ", median bounce " + b + " pts" : "") + ".
-   A hold = no close through the level within the next hour."
+                 + (b != "" ? ", median bounce " + b + " pts" : "") + ".\n   A hold = no close through the level within the next hour."
     out
 
 // each tag name in its own colour: C / CW green, P / PW red, Ab violet, ZG amber, IV bands grey...
@@ -817,9 +816,7 @@ renderTags() =>
                 if ln != ""
                     hist += "\n" + ln
         string tip = hdr + rule + "📍 " + fmtPx(p) + " LEVEL ANALYSIS (" + where + ")" + rule
-             + (hist != "" ? str.substring(hist, 1) + "
-
-" : "")
+             + (hist != "" ? str.substring(hist, 1) + "\n\n" : "")
              + (nConf > 1 ? "🔗 Confluence " + str.repeat("●", math.min(nConf, 5)) + "\n" + str.tostring(nConf) + " levels converge: " + confWord(nConf) + ". Potential reaction zone.\n" : "")
              + array.get(tgFull, i) + near
              + rule + "🧭 ZONE CONTEXT" + rule + zoneTxt(zs, p)
