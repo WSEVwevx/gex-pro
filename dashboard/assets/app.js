@@ -1501,6 +1501,8 @@ function renderStockChart(c){
   if(scPrev){ scSeries.removePriceLine(scPrev); scPrev = null; }
   if(scRange === "intraday" && c.prev) scPrev = scSeries.createPriceLine({price: c.prev, color: cssVar("--ink3"), lineStyle: LC.LineStyle.Dashed, lineWidth: 1, title: "prev close"});
   scChart.timeScale().applyOptions({timeVisible: scRange === "intraday", secondsVisible: false});
+  // dragging the price axis turns auto-fit off for good; every new stock or range starts fitted to its own prices
+  scSeries.priceScale().applyOptions({autoScale: true});
   scChart.timeScale().fitContent();
   $("scFoot").textContent = scRange === "intraday" ? "5-minute candles in ET, Yahoo Finance (delayed). Grey candles: pre-market and after-hours. Dashed line: yesterday's close."
     : "Daily candles for the last 3 months, Yahoo Finance.";
