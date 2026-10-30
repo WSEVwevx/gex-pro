@@ -67,6 +67,16 @@ class TestRepublish(unittest.TestCase):
 
 
 class TestPipeline(unittest.TestCase):
+    def test_seeded_history_is_not_a_previous_result(self):
+        # snapshots restored from the state-seed branch carry levels only; the next run must not diff against them
+        with tempfile.TemporaryDirectory() as tmp:
+            c = synth_cfg(tmp)
+            store = SnapshotStore(tmp)
+            store.save("NQ-SYNTHETIC", {"asof": "2026-10-19T15:00:00+00:00", "status": "OK", "seeded": True,
+                                         "zero_gamma": {"price": 1.0}, "heat": {"base": 0, "w": 1, "v": [1]}})
+            r = run_once(c, cfgmod.make_provider(c), store)
+            self.assertIsNone(r["delta"])
+
     def test_run_twice_produces_delta_and_files(self):
         with tempfile.TemporaryDirectory() as tmp:
             c = synth_cfg(tmp)

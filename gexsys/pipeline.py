@@ -93,6 +93,8 @@ def run_once(cfg: MarketConfig, provider, store: Optional[SnapshotStore] = None,
 
     store_key = f"{cfg.market}-{summary['provider']}"   # each source has its own history
     prev = store.latest(store_key) if store else None
+    if prev and prev.get("seeded"):           # history restored from the state-seed branch: levels only, not a full result
+        prev = None
     delta = eng.diff(prev, summary) if prev else None
     gq = "SYN" if snap.spot_quality == Quality.SYNTHETIC else _greeks_label(res)
     factor = mapped["mapping"]["factor"] if mapped else None

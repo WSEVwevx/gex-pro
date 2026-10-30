@@ -45,6 +45,15 @@ jobs:
           path: .state
           key: gex-state-${{ github.run_id }}
           restore-keys: gex-state-
+      # If the cached state was lost, refill it once from the state-seed branch (snapshot history and briefings
+      # saved from the live site); files already in .state are kept, and a marker stops it running again.
+      - name: Restore state from the seed branch if needed
+        run: |
+          if [ ! -f .state/.seeded ] && git ls-remote --exit-code --heads origin state-seed > /dev/null; then
+            git fetch -q origin state-seed
+            mkdir -p .state && git archive FETCH_HEAD | tar -x -k -C .state 2>/dev/null || true
+            touch .state/.seeded && echo "state refilled from state-seed"
+          fi
       # The track record lives in the track-record branch: a public, timestamped history of every plan
       # (frozen before the open) and every grade, which no cache eviction can lose.
       - name: Load the track record
