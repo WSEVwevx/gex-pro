@@ -421,7 +421,8 @@ if timeframe.change("D")
 
 lnStyle(string s) =>
     s == "╌╌╌╌" or s == "Dashed" ? line.style_dashed : s == "┈┈┈┈" or s == "Dotted" ? line.style_dotted : line.style_solid
-lSz = lblSize == "Tiny" ? size.tiny : lblSize == "Small" ? size.small : size.normal
+// text sizes in points, one up from TradingView's Tiny / Small / Normal (7 / 10 / 12) so the numbers read a touch larger
+lSz = lblSize == "Tiny" ? 8 : lblSize == "Small" ? 11 : 13
 lblX = showProf ? profOffset + profWidth + 2 : lblOff
 lblBgCol = lblBg ? color.new(#0b0e13, 25) : color.new(#0b0e13, 100)
 twoSrc = okA and okB
@@ -794,7 +795,7 @@ renderTags() =>
             // the price sits ON TOP of the line where it ends (anchored by its bottom-right corner), plain digits like a
             // price-scale mark: 29885, 29914.75
             array.push(gLabels, label.new(bar_index, p, str.tostring(p, "#.##"), style = label.style_label_lower_right, color = color.new(#0b0e13, 100),
-                 textcolor = color.new(array.get(tgCol, i), 0), size = size.small, textalign = text.align_right, tooltip = tip))
+                 textcolor = color.new(array.get(tgCol, i), 0), size = lSz, textalign = text.align_right, tooltip = tip))
         float st = array.get(tgStr, i)
         color lc = array.get(tgCol, i)
         if not na(st)
@@ -871,8 +872,8 @@ if barstate.islast
                         color gc = color.new(kd == "C1" ? cPos : kd == "P1" ? cNeg : kd == "Ab1" ? cAG : cZG, 45)
                         int ts0 = math.min(t930, time - 1)
                         array.push(gLines, line.new(ts0, pOpen, time, pOpen, xloc = xloc.bar_time, color = gc, width = 1, style = line.style_dashed))
-                        array.push(gLabels, label.new(ts0, pOpen, (kd == "flip" ? "flip" : kd) + " at open " + fmtPx(pOpen), xloc = xloc.bar_time, style = label.style_label_lower_left,
-                             color = color.new(#0b0e13, 100), textcolor = gc, size = size.tiny))
+                        array.push(gLabels, label.new(ts0, pOpen, (kd == "flip" ? "flip" : kd) + " open  " + fmtPx(pOpen), xloc = xloc.bar_time, style = label.style_label_lower_left,
+                             color = color.new(#0b0e13, 100), textcolor = gc, size = 8))
     if tagMode
         renderTags()
 
@@ -880,7 +881,7 @@ if barstate.islast
 // Info panel: a row per item, a column per source. Hidden entirely when "Show panel" is off.
 // =====================================================================================================
 tPos = tabPos == "Top right" ? position.top_right : tabPos == "Top left" ? position.top_left : tabPos == "Bottom right" ? position.bottom_right : position.bottom_left
-tSz  = tabSize == "Tiny" ? size.tiny : tabSize == "Small" ? size.small : size.normal
+tSz  = tabSize == "Tiny" ? 8 : tabSize == "Small" ? 11 : 13
 var table tab = showTab ? table.new(tPos, 3, 18, bgcolor = color.new(#0b0e13, 12), frame_color = color.new(#2a313c, 0), frame_width = 1, border_width = 0) : table(na)
 cTxt  = color.new(#e3e7ee, 0)
 cDim  = color.new(#7d8796, 0)
