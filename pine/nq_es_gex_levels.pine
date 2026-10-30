@@ -108,6 +108,8 @@ minOpac  = input.int(85, "Weakest line opacity %", minval = 20, maxval = 100, st
      tooltip = "How faint the weakest level may get. Lines fade with strength (and weekly / monthly / 2σ bands are lighter) but never below this. Raise it on grey or light chart backgrounds; 100 = every line fully solid.", display = display.none)
 roundTo  = input.string("Whole points", "Level prices", options = ["Whole points", "5 points", "Exact (tick)"], group = G4,
      tooltip = "Options levels aren't precise to a tick, so each level is drawn and labelled at a round price: whole points (29885), the nearest 5 points (29885, 29890...) or the exact converted price (29884.75).", display = display.none)
+mergePct = input.float(0.03, "Merge levels within (%)", minval = 0, maxval = 0.2, step = 0.01, group = G4,
+     tooltip = "Levels closer than this (% of price; 0.03% is about 9 NQ / 2 ES points) share one line and one tag, e.g. P1 from QQQ and the put wall from NDX landing 3 points apart. 0 = only identical prices.", display = display.none)
 confPct  = input.float(0.10, "Confluence within (%)", minval = 0.01, step = 0.01, group = G4,
      tooltip = "Tags + hover info: levels closer than this (% of price) count as one confluence zone in the hover text.", display = display.none)
 emFill   = input.bool(false, "Shade daily expected-move band", group = G4, tooltip = "Faint fill between today's expected high and low (uses the expected-move colour).", display = display.none)
@@ -456,7 +458,24 @@ clearAll() =>
     array.clear(ivP)
     array.clear(ivN)
 
-// One line per price; another level at the same price joins the label: "CW · +GEX  29,883.25".
+// The already-drawn level a new price joins: the nearest one within the merge distance, or -1
+mergeIdx(float p) =>
+    float tolM = math.max(syminfo.mintick / 2, close * mergePct / 100)
+    int idx = -1
+    float best = na
+    for [i, q] in gPrices
+        float d = math.abs(q - p)
+        if d <= tolM and (na(best) or d < best)
+            idx := i
+            best := d
+    idx
+
+// a price snapped onto the level it merges with, so zones and alerts use the drawn line
+snapP(float p) =>
+    int i = na(p) ? -1 : mergeIdx(p)
+    i >= 0 ? array.get(gPrices, i) : p
+
+// One line per price; another level at (or within the merge distance of) the same price joins the label: "CW · +GEX  29,883.25".
 // name is "short|full" (from nm) or plain text; strength 0-1 sizes the tag's bar, info adds a hover line.
 drawLevel(float p, string name, string tag, color col, int width, string style, float strength = na, string info = "", string ico = "•") =>
     if not na(p) and sane(p)
@@ -465,10 +484,7 @@ drawLevel(float p, string name, string tag, color col, int width, string style, 
         string full = array.size(nf) > 1 ? array.get(nf, 1) : short
         string item = (lblMode == "Full" ? full : short) + tag
         string fullItem = ico + " " + full + tag + (info != "" ? " — " + info : "")
-        int idx = -1
-        for [i, q] in gPrices
-            if math.abs(q - p) < syminfo.mintick / 2
-                idx := i
+        int idx = mergeIdx(p)
         if idx >= 0
             string body = array.get(gBodies, idx)
             if not str.contains(body, item)
@@ -476,7 +492,7 @@ drawLevel(float p, string name, string tag, color col, int width, string style, 
                 array.set(gBodies, idx, body)
                 label lb = array.get(gLabels, idx)
                 if not na(lb)
-                    label.set_text(lb, body + "  " + fmtPx(p))
+                    label.set_text(lb, body + "  " + fmtPx(array.get(gPrices, idx)))
                 if tagMode
                     array.set(tgName, idx, array.get(tgName, idx) + "·" + short)
                     array.set(tgFull, idx, array.get(tgFull, idx) + "\n" + fullItem)
@@ -497,7 +513,7 @@ drawLevel(float p, string name, string tag, color col, int width, string style, 
             array.push(tgFull, fullItem)
             array.push(tgCol, col)
             array.push(tgStr, strength)
-    p
+    snapP(p)
 
 // Which ranking the tags use: [tokens, what they cover, first expiry?, ETF alone?]
 rankedOf(Snap s) =>
@@ -543,7 +559,7 @@ drawKey(Snap s, float f, float o, bool isSecond) =>
             string kind = str.substring(item, 0, 1)
             array<string> pr = str.split(str.substring(item, 1), ":")
             if array.size(pr) == 2
-                float rp = mapP(str.tonumber(array.get(pr, 0)), f, o)
+                float rp = snapP(mapP(str.tonumber(array.get(pr, 0)), f, o))
                 float sh = str.tonumber(array.get(pr, 1))
                 float stren = top > 0 and not na(sh) ? sh / top : na
                 string shTxt = " (" + str.tostring(sh, "0.0") + "% of " + scope + " gamma)"
