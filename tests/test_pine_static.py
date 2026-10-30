@@ -65,6 +65,83 @@ class TestPineStatic(unittest.TestCase):
         self.assertNotRegex(CODE, r"(?<![\w.])(?:size|text_size)\s*=\s*\d")
         self.assertNotRegex(CODE, r"(?:lSz|tSz)\s*=.*\?\s*\d")
 
+    def test_only_reviewed_builtins_and_arguments(self):
+        # every built-in call and named argument here has been checked against the Pine v6 reference; a new one
+        # (or a typo, or a v5 leftover like transp / when) must be checked there too before it joins the list
+        inp = {"display", "group", "inline", "tooltip"}
+        known = {
+            "array.clear": set(), "array.from": set(), "array.get": set(), "array.min": set(), "array.push": set(),
+            "array.set": set(), "array.size": set(), "box.delete": set(), "label.delete": set(), "line.delete": set(),
+            "box.new": {"bgcolor", "border_color", "border_width", "extend", "xloc"},
+            "color.new": set(), "label.set_text": set(), "line.set_color": set(),
+            "input.bool": inp, "input.color": inp, "input.float": inp | {"maxval", "minval", "step"},
+            "input.int": inp | {"maxval", "minval", "step"}, "input.string": inp | {"options"}, "input.text_area": {"display", "group", "tooltip"},
+            "label.new": {"color", "size", "style", "text_font_family", "textalign", "textcolor", "tooltip", "xloc"},
+            "line.new": {"color", "extend", "style", "width", "xloc"},
+            "map.contains": set(), "map.get": set(), "map.put": set(),
+            "math.abs": set(), "math.floor": set(), "math.max": set(), "math.min": set(), "math.round": set(), "math.round_to_mintick": set(),
+            "request.security": {"gaps", "ignore_invalid_symbol", "lookahead"},
+            "str.contains": set(), "str.length": set(), "str.pos": set(), "str.repeat": set(), "str.split": set(), "str.startswith": set(),
+            "str.substring": set(), "str.tonumber": set(), "str.tostring": set(), "str.trim": set(), "str.upper": set(),
+            "ta.cross": set(), "timeframe.change": set(),
+            "table.cell": {"bgcolor", "text_color", "text_halign", "text_size"}, "table.clear": set(),
+            "table.new": {"bgcolor", "border_width", "frame_color", "frame_width"},
+        }
+        for m in re.finditer(r"(?<![\w.])((?:array|box|color|input|label|line|map|math|request|str|ta|table|timeframe)\.\w+)\(", NO_STRINGS):
+            name = m.group(1)
+            self.assertIn(name, known, f"{name}() is not on the reviewed list: check it in the Pine v6 reference, then add it")
+            depth, j = 1, m.end()
+            while depth:
+                depth += NO_STRINGS[j] in "([" and 1 or 0
+                depth -= NO_STRINGS[j] in ")]" and 1 or 0
+                j += 1
+            d, top = 0, ""
+            for ch in NO_STRINGS[m.end():j - 1]:
+                d += ch in "([" and 1 or 0
+                d -= ch in ")]" and 1 or 0
+                top += ch if d == 0 else " "
+            for arg in re.findall(r"(?:^|,)\s*(\w+)\s*=(?!=)", top):
+                self.assertIn(arg, known[name], f"{name}(): '{arg} =' is not an argument it takes")
+
+    def test_continuation_lines_are_not_block_indented(self):
+        # Pine reads a line indented by a multiple of 4 as a new statement in a block; a wrapped line must use
+        # another indent (5 here), and a block line a multiple of 4
+        depth, cont = 0, False
+        for i, l in enumerate(NO_STRINGS.splitlines(), 1):
+            if l.strip():
+                ind = len(l) - len(l.lstrip(" "))
+                wrapped = depth > 0 or cont or l.lstrip()[:1] in "+:?"
+                if wrapped:
+                    self.assertNotEqual(ind % 4, 0, f"line {i}: a wrapped line indented by a multiple of 4 spaces")
+                else:
+                    self.assertEqual(ind % 4, 0, f"line {i}: a statement indented by {ind} spaces")
+                s = l.rstrip()
+                cont = s.endswith((",", "?", ":", "+", "-", "*", "/", " and", " or", "=")) and not s.endswith("=>")
+            depth += l.count("(") + l.count("[") - l.count(")") - l.count("]")
+
+    def test_functions_only_reassign_their_own_locals(self):
+        # Pine rejects := on a function's parameter or on a global variable from inside a function
+        lines = NO_STRINGS.splitlines()
+        i = 0
+        while i < len(lines):
+            m = re.match(r"^([A-Za-z_]\w*)\(([^)]*)\)\s*=>\s*$", lines[i])
+            if not m:
+                i += 1
+                continue
+            params = {p.split("=")[0].split()[-1] for p in m.group(2).split(",") if p.strip()}
+            local, j = set(), i + 1
+            while j < len(lines) and (not lines[j].strip() or lines[j].startswith(" ")):
+                l = lines[j]
+                for d in re.findall(r"^\s+(?:var\s+)?(?:float|int|bool|string|color|label|line|box|table|array<\w+>|\w+)?\s*([A-Za-z_]\w*)\s*=(?!=)", l):
+                    local.add(d)
+                local |= set(re.findall(r"^\s+for\s+\[?\s*(\w+)", l)) | set(re.findall(r"^\s+for\s+\[\s*\w+\s*,\s*(\w+)", l))
+                local |= {v.strip() for t in re.findall(r"^\s+\[([^\]]+)\]\s*=", l) for v in t.split(",")}
+                for tgt in re.findall(r"(?<![\w.])([A-Za-z_]\w*)\s*:=", l):
+                    self.assertNotIn(tgt, params, f"line {j + 1}: {m.group(1)}() assigns its parameter '{tgt}'")
+                    self.assertIn(tgt, local, f"line {j + 1}: {m.group(1)}() assigns '{tgt}', which is not its own local variable")
+                j += 1
+            i = j
+
     def test_every_input_is_used(self):
         for name in re.findall(r"^([A-Za-z_]\w*)\s*=\s*input\.", NO_STRINGS, re.M):
             uses = len(re.findall(rf"(?<![\w.]){name}(?!\w)", NO_STRINGS))

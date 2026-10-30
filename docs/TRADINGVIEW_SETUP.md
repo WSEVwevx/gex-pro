@@ -86,12 +86,17 @@ The dialog's separate Style tab has nothing to change.
   Zone* (P1 to the flip: put-dominated, moves amplified) and *Negative Gamma Extension Zone* (P1 to the
   next put level down). A level on a zone edge says it is a boundary between two zones. "Shade gamma zones"
   draws them as a narrow column right of the last bar. For C1, P1, Ab1, the 0DTE flip, ZG, CW and PW the box
-  also shows its **history**: how many times price touched that kind of level in the last sessions, how often
-  it held (no close beyond it within an hour) and the median bounce in points.
+  opens with its **hold rate**, e.g. `HOLD RATE 70% (reliable): held 7 of 10 recent touches, median bounce 18 pts`
+  (a hold = no close beyond the level within an hour; 70%+ reliable, 50-69% mixed, below 50% often breaks;
+  fewer than 3 touches is too few to judge).
 * **Tag colours:** each name in a tag has its own colour (C and CW green, P and PW red, Ab violet, ZG amber,
   IV bands grey), with the strength bar drawn as a thick line before them.
 * **Levels at the 9:30 open:** when C1, P1, Ab1 or the gamma flip has moved since the cash open, a faint dashed
-  line marks where it stood at 9:30 ("C1 at open 29,800"), so you can see how the map has shifted.
+  line marks where it stood at 9:30 ("C1 open  29,800"), so you can see how the map has shifted.
+* **Merged levels:** levels within "Merge levels within (%)" of each other (0.03% by default, about 9 NQ / 2 ES
+  points) share one line and one tag, e.g. P1 from QQQ and the put wall from NDX converting 3 points apart.
+* **Compact chart** (first setting under Key levels): only C1-C3, P1-P3, Ab1 and the gamma flip the zones use;
+  walls, 0DTE walls, IV bands, max pain, volume / OI walls and concentrations are hidden until you turn it off.
 * **Labels** ("Short" / "Full") sit right of the GEX profile on a dark pill: short code plus price with separators,
   e.g. `CW  29,883.25`. Codes: `ZG`, `CW`, `PW`, `+GEX`, `-GEX`, `+G 12%`, `0D ZG` / `0D CW` / `0D PW`,
   `VOL C` / `VOL P`, `OI C` / `OI P`, `MP 10-21`, IV bands `D+1σ` / `D-1σ` / `D+2σ` / `D-2σ` (`W` week, `M` month).
