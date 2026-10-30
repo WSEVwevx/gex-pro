@@ -421,8 +421,7 @@ if timeframe.change("D")
 
 lnStyle(string s) =>
     s == "╌╌╌╌" or s == "Dashed" ? line.style_dashed : s == "┈┈┈┈" or s == "Dotted" ? line.style_dotted : line.style_solid
-// text sizes in points, one up from TradingView's Tiny / Small / Normal (7 / 10 / 12) so the numbers read a touch larger
-lSz = lblSize == "Tiny" ? 8 : lblSize == "Small" ? 11 : 13
+lSz = lblSize == "Tiny" ? size.tiny : lblSize == "Small" ? size.small : size.normal
 lblX = showProf ? profOffset + profWidth + 2 : lblOff
 lblBgCol = lblBg ? color.new(#0b0e13, 25) : color.new(#0b0e13, 100)
 twoSrc = okA and okB
@@ -873,7 +872,7 @@ if barstate.islast
                         int ts0 = math.min(t930, time - 1)
                         array.push(gLines, line.new(ts0, pOpen, time, pOpen, xloc = xloc.bar_time, color = gc, width = 1, style = line.style_dashed))
                         array.push(gLabels, label.new(ts0, pOpen, (kd == "flip" ? "flip" : kd) + " open  " + fmtPx(pOpen), xloc = xloc.bar_time, style = label.style_label_lower_left,
-                             color = color.new(#0b0e13, 100), textcolor = gc, size = 8))
+                             color = color.new(#0b0e13, 100), textcolor = gc, size = size.tiny))
     if tagMode
         renderTags()
 
@@ -881,7 +880,7 @@ if barstate.islast
 // Info panel: a row per item, a column per source. Hidden entirely when "Show panel" is off.
 // =====================================================================================================
 tPos = tabPos == "Top right" ? position.top_right : tabPos == "Top left" ? position.top_left : tabPos == "Bottom right" ? position.bottom_right : position.bottom_left
-tSz  = tabSize == "Tiny" ? 8 : tabSize == "Small" ? 11 : 13
+tSz  = tabSize == "Tiny" ? size.tiny : tabSize == "Small" ? size.small : size.normal
 var table tab = showTab ? table.new(tPos, 3, 18, bgcolor = color.new(#0b0e13, 12), frame_color = color.new(#2a313c, 0), frame_width = 1, border_width = 0) : table(na)
 cTxt  = color.new(#e3e7ee, 0)
 cDim  = color.new(#7d8796, 0)

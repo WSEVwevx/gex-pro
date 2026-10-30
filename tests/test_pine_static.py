@@ -60,6 +60,11 @@ class TestPineStatic(unittest.TestCase):
         calls = re.findall(r"(?<![\w.])input\.\w+\(", PINE)
         self.assertEqual(len(calls), PINE.count("display = display.none"), "an input is missing display = display.none")
 
+    def test_text_sizes_are_builtin_constants(self):
+        # a number as a label / table text size broke the TradingView compile once; only size.* is known to work
+        self.assertNotRegex(CODE, r"(?<![\w.])(?:size|text_size)\s*=\s*\d")
+        self.assertNotRegex(CODE, r"(?:lSz|tSz)\s*=.*\?\s*\d")
+
     def test_every_input_is_used(self):
         for name in re.findall(r"^([A-Za-z_]\w*)\s*=\s*input\.", NO_STRINGS, re.M):
             uses = len(re.findall(rf"(?<![\w.]){name}(?!\w)", NO_STRINGS))
