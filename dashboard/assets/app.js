@@ -409,7 +409,7 @@ function renderChart(w, s, L, ref){
     return;
   }
   $("chartwrap").hidden = false; $("chartTable").hidden = true; $("tableToggle").textContent = "View as table";
-  const svg = $("chart"), W = Math.max($("chartwrap").clientWidth, 320), H = 440, padL = 66, padR = 150, padT = 8, padB = 8;
+  const svg = $("chart"), W = Math.max($("chartwrap").clientWidth, 280), H = 440, padL = 66, padR = 150, padT = 8, padB = 8;
   const y = p => padT + (hi - p) / (hi - lo) * (H - padT - padB);
   const mx = Math.max(1, ...bars.map(b => Math.abs(b.net)));
   const cx = padL + (W - padL - padR) / 2, xs = (W - padL - padR) / 2 - 4;
@@ -498,7 +498,7 @@ function renderBias(w){
 }
 
 function drawBias(b, col){
-  const svg = $("biasChart"), W = Math.max($("biasWrap").clientWidth, 320), H = 420, padL = 70, padR = 132, padT = 14, padB = 30;
+  const svg = $("biasChart"), W = Math.max($("biasWrap").clientWidth, 280), H = 420, padL = 70, padR = 132, padT = 14, padB = 30;
   const lv = Object.entries(b.levels || {}).filter(([, p]) => Math.abs(p - b.ref) <= 1.6 * b.expected_move);
   const ys = [...b.cone.flatMap(c => [c[1], c[2]]), ...b.path.map(p => p[1]), ...b.range, ...lv.map(([, p]) => p)];
   const lo = Math.min(...ys) - b.expected_move * 0.08, hi = Math.max(...ys) + b.expected_move * 0.08, T = b.session.minutes;
