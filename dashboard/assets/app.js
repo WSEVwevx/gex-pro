@@ -152,7 +152,7 @@ function renderBriefings(){
   $("briefHead").style.setProperty("--accent", b.kind === "asia" ? "var(--oi)" : "var(--pos)");
   $("briefKicker").textContent = weekly ? "The week in prices" : b.kind === "asia" ? "Night session · Asia open" : "Before the US open";
   $("briefTitle").textContent = weekly ? `${b.title} · week ending ${when({month: "short", day: "numeric"})}` : `${b.title} · ${when({weekday: "long", month: "short", day: "numeric"})} session`;
-  $("briefSides").hidden = weekly;
+  $("briefSides").style.display = weekly ? "none" : "";      // no calendar or posts in a recap
   $("briefMeta").innerHTML = `<span class="chip">Written <b>${new Date(b.generated_at).toLocaleString("en-US", {...ET, weekday:"short", hour:"numeric", minute:"2-digit"})} ET</b></span>`
     + (b.late ? `<span class="chip" title="The app wasn't running at the scheduled time, so this was written when it started"><i class="dot warn"></i>Written late</span>` : "") + nxt
     + (b.indexes || []).map(x => `<span class="chip">${esc(x.name)} <b style="color:${x.pct > 0 ? "var(--good)" : x.pct < 0 ? "var(--bad)" : "inherit"}">${signed(x.pct, 1)}%</b></span>`).join("");
