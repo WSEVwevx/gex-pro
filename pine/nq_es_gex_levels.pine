@@ -135,7 +135,7 @@ profOpac   = input.int(65, "Opacity %", minval = 10, maxval = 100, group = G5, d
 G6 = "6 - Info panel"
 showTab   = input.bool(true, "Show panel", inline = "t1", group = G6, tooltip = "Off hides the panel completely; levels stay on the chart.", display = display.none)
 tabDetail = input.string("Compact", "", options = ["Minimal", "Compact", "Full"], inline = "t1", group = G6,
-     tooltip = "Minimal: regime, zero gamma, data age.\nCompact: + call and put walls.\nFull: + net GEX, +/- GEX strikes, 0DTE levels, volume walls, max pain, expected move, mapping.", display = display.none)
+     tooltip = "Minimal: regime, gamma pressure, zero gamma, data age.\nCompact: + call and put walls.\nFull: + net GEX, +/- GEX strikes, 0DTE levels, volume walls, max pain, expected move, mapping.", display = display.none)
 tabPos    = input.string("Top right", "Position", options = ["Top right", "Top left", "Bottom right", "Bottom left"], inline = "t2", group = G6, display = display.none)
 tabSize   = input.string("Small", "", options = ["Tiny", "Small", "Normal"], inline = "t2", group = G6, display = display.none)
 
@@ -943,12 +943,13 @@ srcTxt(Snap s) =>
 cell(int c, int r, string t, color col, color bg = na) =>
     table.cell(tab, c, r, t, text_color = col, text_halign = c == 0 ? text.align_left : text.align_right, text_size = tSz, bgcolor = bg)
 
-rowKeys = tabDetail == "Minimal" ? array.from("reg", "zg", "data") : tabDetail == "Compact" ? array.from("reg", "zg", "cw", "pw", "data")
-     : array.from("reg", "net", "hedge", "charm", "zg", "cw", "pw", "ag", "mx", "x0", "vol", "mp", "em", "map", "data")
+rowKeys = tabDetail == "Minimal" ? array.from("reg", "prs", "zg", "data") : tabDetail == "Compact" ? array.from("reg", "prs", "zg", "cw", "pw", "data")
+     : array.from("reg", "prs", "net", "hedge", "charm", "zg", "cw", "pw", "ag", "mx", "x0", "vol", "mp", "em", "map", "data")
 
 rowName(string k) =>
     switch k
         "reg"  => "Regime"
+        "prs"  => "Pressure"
         "net"  => "Net GEX"
         "zg"   => "Zero gamma"
         "cw"   => "Call wall"
@@ -981,6 +982,17 @@ valOf(string k, Snap s, float f, float o, bool ok, string mst) =>
                 t := s.reg == "POS" ? "+ Positive" : s.reg == "NEG" ? "- Negative" : s.reg == "IND" ? "~ Balanced" : "-"
                 t := t + (s.preg != "" and s.preg != s.reg ? " (new)" : "")
                 c := s.reg == "POS" ? cPos : s.reg == "NEG" ? cNeg : cTxt
+            "prs" =>
+                // which way hedging leans at this price: the side of the gamma flip, and how far past it in daily
+                // expected moves (five blocks = 1σ or more away; right at the flip reads Neutral)
+                [rkP, whatP, firstP, etfP] = rankedOf(s)
+                float fp = firstP and not na(s.z0) ? mapP(s.z0, f, o) : mapP(s.zg, f, o)
+                if not na(fp) and not na(s.emd) and not na(f) and s.emd > 0
+                    float away = math.abs(close - fp) / (s.emd * f)
+                    int blocks = math.min(5, math.max(1, math.round(away * 5)))
+                    bool flat = away < 0.1
+                    t := str.repeat("▰", blocks) + str.repeat("▱", 5 - blocks) + " " + (flat ? "Neutral" : close >= fp ? "Calming" : "Amplifying")
+                    c := flat ? cZG : close >= fp ? cPos : cNeg
             "net" =>
                 t := na(s.net) ? "-" : (s.net >= 0 ? "+" : "") + str.tostring(s.net, "#.#") + "B"
                 c := na(s.net) ? cTxt : s.net >= 0 ? cPos : cNeg

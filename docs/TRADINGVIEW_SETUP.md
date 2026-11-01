@@ -93,6 +93,9 @@ The dialog's separate Style tab has nothing to change.
   IV bands grey), with the strength bar drawn as a thick line before them.
 * **Levels at the 9:30 open:** when C1, P1, Ab1 or the gamma flip has moved since the cash open, a faint dashed
   line marks where it stood at 9:30 ("C1 open  29,800"), so you can see how the map has shifted.
+* **Pressure** (info panel): a small five-block meter, e.g. `▰▰▰▱▱ Calming`. Above the gamma flip modeled dealer
+  hedging leans calming, below it amplifying; each block is 0.2 daily expected moves from the flip, and within 0.1
+  it reads Neutral. It is an estimate from price and the flip, not measured flow.
 * **Merged levels:** levels within "Merge levels within (%)" of each other (0.03% by default, about 9 NQ / 2 ES
   points) share one line and one tag, e.g. P1 from QQQ and the put wall from NDX converting 3 points apart.
 * **Compact chart** (first setting under Key levels): only C1-C3, P1-P3, Ab1 and the gamma flip the zones use;
