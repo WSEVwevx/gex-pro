@@ -148,6 +148,18 @@ class TestPineStatic(unittest.TestCase):
                 j += 1
             i = j
 
+    def test_settings_rows_have_one_title(self):
+        # TradingView warns (CW10026) when two inputs on one inline row both have a title
+        rows = {}
+        for l in PINE.splitlines():
+            m = re.match(r'^\w+\s*=\s*input\.(\w+)\((.*)inline = "(\w+)"', l)
+            if m:
+                args = re.findall(r'"(?:[^"\\]|\\.)*"', m.group(2).split("options")[0])
+                title = args[1] if m.group(1) == "string" else args[0] if args else '""'
+                rows.setdefault(m.group(3), []).append(title)
+        for key, titles in rows.items():
+            self.assertLessEqual(sum(t != '""' for t in titles), 1, f'inline row "{key}" has several titles: {titles}')
+
     def test_every_input_is_used(self):
         for name in re.findall(r"^([A-Za-z_]\w*)\s*=\s*input\.", NO_STRINGS, re.M):
             uses = len(re.findall(rf"(?<![\w.]){name}(?!\w)", NO_STRINGS))

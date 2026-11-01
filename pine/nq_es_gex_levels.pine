@@ -53,15 +53,15 @@ wRankPick = input.string("───", "", options = ["───", "━━━", "
 wRank = pxOf(wRankPick)
 rankSrc = input.string("First expiry: auto", "Ranked from", options = ["First expiry: auto", "First expiry: ETF only", "First expiry: index + ETF", "All expirations (45 days)"], group = G2,
      tooltip = "First expiry = today's expiring options (or the next expiry when none expire today): their gamma sits close to price, so many nearby levels for intraday trading.\nauto (recommended): whichever chain holds most of that gamma - for NQ usually QQQ alone (levels on QQQ's own strikes, about 41 NQ points apart), for ES usually SPX with SPY.\nETF only: QQQ / SPY strikes alone.\nindex + ETF: both chains on the index's strike grid.\nAll expirations: every expiry out to 45 days; fewer, bigger levels further out.", display = display.none)
-rankC = input.int(7, "Levels: C", minval = 0, maxval = 7, inline = "rn", group = G2, display = display.none)
-rankP = input.int(7, "P", minval = 0, maxval = 7, inline = "rn", group = G2, display = display.none)
-rankA = input.int(3, "Ab", minval = 0, maxval = 3, inline = "rn", group = G2, tooltip = "How many call, put and absolute-gamma levels to draw (strongest first).", display = display.none)
+rankC = input.int(7, "Call levels", minval = 0, maxval = 7, group = G2, display = display.none)
+rankP = input.int(7, "Put levels", minval = 0, maxval = 7, group = G2, display = display.none)
+rankA = input.int(3, "Absolute-gamma levels", minval = 0, maxval = 3, group = G2, tooltip = "How many call, put and absolute-gamma levels to draw (strongest first).", display = display.none)
 showMax  = input.bool(false, "Largest +/- GEX and concentrations", inline = "mx", group = G2, tooltip = "Strikes with the most positive / negative gamma, plus the extra concentrations below, in the call / put colours.", display = display.none)
 styMax = input.string("╌╌╌╌", "", options = ["────", "╌╌╌╌", "┈┈┈┈"], inline = "mx", group = G2, display = display.none)
 wMaxPick = input.string("───", "", options = ["───", "━━━", "▬▬▬", "███"], inline = "mx", group = G2, display = display.none)
 wMax = pxOf(wMaxPick)
-nConc    = input.int(0, "Other concentrations", minval = 0, maxval = 6, inline = "cc", group = G2, display = display.none)
-minShare = input.float(5.0, "min %", minval = 0, step = 0.5, inline = "cc", group = G2,
+nConc    = input.int(0, "Other concentrations", minval = 0, maxval = 6, group = G2, display = display.none)
+minShare = input.float(5.0, "Concentrations: min %", minval = 0, step = 0.5, group = G2,
      tooltip = "Extra big-gamma strikes, labeled +G / -G with their share of total exposure. 0 = off.", display = display.none)
 
 // ---------- 3 - More levels: same clean rows
@@ -92,10 +92,10 @@ cEM     = input.color(#8b95a5, "", inline = "em", group = G3, tooltip = "Price l
 styEM = input.string("╌╌╌╌", "", options = ["────", "╌╌╌╌", "┈┈┈┈"], inline = "em", group = G3, display = display.none)
 wEMPick = input.string("───", "", options = ["───", "━━━", "▬▬▬", "███"], inline = "em", group = G3, display = display.none)
 wEM = pxOf(wEMPick)
-ivD = input.bool(true, "Day", inline = "ivh", group = G3, display = display.none)
-ivW = input.bool(true, "Week", inline = "ivh", group = G3, display = display.none)
-ivM = input.bool(false, "Month", inline = "ivh", group = G3, display = display.none)
-iv2 = input.bool(true, "±2σ too", inline = "ivh", group = G3, tooltip = "Which IV bands to draw: today's session, through this week's last expiry, through the monthly expiry (third Friday). ±2σ adds the outer bands.", display = display.none)
+ivD = input.bool(true, "IV bands: day", group = G3, display = display.none)
+ivW = input.bool(true, "IV bands: week", group = G3, display = display.none)
+ivM = input.bool(false, "IV bands: month", group = G3, display = display.none)
+iv2 = input.bool(true, "IV bands: ±2σ too", group = G3, tooltip = "Which IV bands to draw: today's session, through this week's last expiry, through the monthly expiry (third Friday). ±2σ adds the outer bands.", display = display.none)
 
 // ---------- 4 - Lines & labels (shared by every level)
 G4 = "4 - Lines & labels"
@@ -104,8 +104,8 @@ extent   = input.string("Across the chart, end at price", "Lines", options = ["A
 lblMode  = input.string("Tags + hover info", "Labels", options = ["Tags + hover info", "Short", "Full", "Off"], inline = "lb", group = G4,
      tooltip = "Tags + hover info: a short tag right of price (C1, P1, Ab1, ZG...) with a strength bar; hover the tag for that level's analysis.\nShort: ZG, CW, PW, +GEX, -GEX, 0D ZG, VOL C, MP 10-21, EM+...\nFull: Zero gamma, Call wall, ...", display = display.none)
 lblSize  = input.string("Small", "", options = ["Tiny", "Small", "Normal"], inline = "lb", group = G4, display = display.none)
-lblBg    = input.bool(true, "Label background", inline = "lb2", group = G4, display = display.none)
-lblOff   = input.int(6, "offset (bars)", minval = 0, maxval = 200, inline = "lb2", group = G4, tooltip = "Used when the GEX profile is off; with the profile on, labels sit just right of it.", display = display.none)
+lblBg    = input.bool(true, "Label background", group = G4, display = display.none)
+lblOff   = input.int(6, "Label offset (bars)", minval = 0, maxval = 200, group = G4, tooltip = "Used when the GEX profile is off; with the profile on, labels sit just right of it.", display = display.none)
 minOpac  = input.int(85, "Weakest line opacity %", minval = 20, maxval = 100, step = 5, group = G4,
      tooltip = "How faint the weakest level may get. Lines fade with strength (and weekly / monthly / 2σ bands are lighter) but never below this. Raise it on grey or light chart backgrounds; 100 = every line fully solid.", display = display.none)
 roundTo  = input.string("Whole points", "Level prices", options = ["Whole points", "5 points", "Exact (tick)"], group = G4,
@@ -127,8 +127,8 @@ G5 = "5 - GEX profile"
 showProf   = input.bool(false, "Show profile", inline = "pf", group = G5,
      tooltip = "Gamma exposure by price, drawn right of the last bar. Blue extends right (positive), orange extends left (negative).", display = display.none)
 profSrc    = input.string("First source", "", options = ["First source", "Second source"], inline = "pf", group = G5, display = display.none)
-profWidth  = input.int(40, "Width", minval = 10, maxval = 200, inline = "pw", group = G5, display = display.none)
-profOffset = input.int(3, "gap", minval = 1, maxval = 100, inline = "pw", group = G5, display = display.none)
+profWidth  = input.int(40, "Profile width", minval = 10, maxval = 200, group = G5, display = display.none)
+profOffset = input.int(3, "Profile gap", minval = 1, maxval = 100, group = G5, display = display.none)
 profOpac   = input.int(65, "Opacity %", minval = 10, maxval = 100, group = G5, display = display.none)
 
 // ---------- 6 - Info panel
@@ -141,14 +141,14 @@ tabSize   = input.string("Small", "", options = ["Tiny", "Small", "Normal"], inl
 
 // ---------- 7 - Alerts (real-time bars; create an alert with "Any alert() function call")
 G7 = "7 - Alerts"
-alApproach      = input.bool(true, "Approaching a key level", inline = "a1", group = G7, display = display.none)
-alApproachTicks = input.int(20, "within ticks", minval = 1, inline = "a1", group = G7, display = display.none)
-alCross         = input.bool(true, "Wall cross", inline = "a2", group = G7, display = display.none)
-alZG            = input.bool(true, "Zero-gamma cross", inline = "a2", group = G7, display = display.none)
-alStale         = input.bool(true, "Stale update", inline = "a3", group = G7, display = display.none)
-alCooldownMin   = input.int(15, "cooldown min", minval = 0, inline = "a3", group = G7, display = display.none)
-alRank          = input.bool(true, "Touch of C1 / P1 / Ab1", inline = "a4", group = G7, display = display.none)
-alZone          = input.bool(true, "Gamma zone change", inline = "a4", group = G7, display = display.none)
+alApproach      = input.bool(true, "Approaching a key level", group = G7, display = display.none)
+alApproachTicks = input.int(20, "Approach distance (ticks)", minval = 1, group = G7, display = display.none)
+alCross         = input.bool(true, "Wall cross", group = G7, display = display.none)
+alZG            = input.bool(true, "Zero-gamma cross", group = G7, display = display.none)
+alStale         = input.bool(true, "Stale update", group = G7, display = display.none)
+alCooldownMin   = input.int(15, "Alert cooldown (min)", minval = 0, group = G7, display = display.none)
+alRank          = input.bool(true, "Touch of C1 / P1 / Ab1", group = G7, display = display.none)
+alZone          = input.bool(true, "Gamma zone change", group = G7, display = display.none)
 alBand          = input.bool(true, "IV band touch (±1σ / ±2σ)", inline = "a5", group = G7, display = display.none,
      tooltip = "Touches use the 'within ticks' distance above; every alert type has its own cooldown. Create one TradingView alert with 'Any alert() function call' to receive them all.")
 
