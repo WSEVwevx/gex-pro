@@ -6,6 +6,7 @@ from datetime import date, datetime, timedelta, timezone
 from briefings import schedule as sch
 from briefings.component import BriefingsComponent
 from briefings.compose import compose
+from briefings.weekly import recap
 from gexsys.marketcal import is_trading_day
 
 NY = sch.NY
@@ -31,6 +32,92 @@ def ctx(now, regime="NEGATIVE", zg=30000.0):
             "posts": [{"time": (now - timedelta(hours=2)).isoformat(), "text": "TARIFFS on China!", "market_words": ["china", "tariff"],
                        "tone": "bearish", "url": "https://x.example/1"},
                       {"time": (now - timedelta(hours=1)).isoformat(), "text": "Happy birthday", "market_words": [], "tone": None}]}
+
+
+def week_bars(closes, start=date(2026, 10, 23), gap=None):
+    """closes[0] is the Friday before; the rest are Monday onward. gap = (index, open) overrides that day's open."""
+    days = [start] + [start + timedelta(days=3 + i) for i in range(len(closes) - 1)]
+    out = {}
+    for i, (d, c) in enumerate(zip(days, closes)):
+        o = closes[i - 1] if i else c
+        if gap and gap[0] == i:
+            o = gap[1]
+        out[d.isoformat()] = {"open": o, "high": max(o, c) + 1, "low": min(o, c) - 1, "close": c}
+    return out
+
+
+def week_input(**kw):
+    idx = {"S&P 500": week_bars([100, 101, 102, 103, 102, 98], gap=(5, 99)), "Nasdaq-100": week_bars([200, 202, 204, 206, 204, 190]),
+           "Dow": week_bars([300, 300, 300, 300, 300, 303]), "Russell 2000": week_bars([400, 400, 400, 400, 400, 396]),
+           "VIX": week_bars([15, 15, 15, 16, 17, 20])}
+    idx.update(kw)
+    stocks = [{"symbol": s, "name": s, "bars": week_bars([100, 100, 100, 100, 100, c])} for s, c in (("AAA", 110), ("BBB", 95), ("CCC", 101), ("DDD", 99))]
+    return {"indexes": idx, "stocks": stocks}
+
+
+class TestWeekly(unittest.TestCase):
+    END = date(2026, 10, 30)
+
+    def test_recap_states_the_measured_week(self):
+        now = et(2026, 10, 30, 17, 5)
+        b = recap(week_input(), self.END, et(2026, 10, 30, 17), now)
+        t = b["headline"]
+        self.assertIn("The S&P 500 fell 2.0% to 98 this week, and the Nasdaq-100 fell 5.0% to 190.", t)
+        self.assertIn("The Dow rose 1.0% to 303, and the Russell 2000 fell 1.0% to 396.", t)
+        self.assertIn("3 up days out of 5", t)
+        self.assertIn("best session on Monday (+1.0%) and its worst on Friday (-3.9%)", t)
+        self.assertIn("near the bottom of that range", t)                     # low 97, high 104, close 98
+        self.assertIn("biggest opening gap was Friday, -2.9%", t)             # 102 to 99
+        self.assertIn("lagged the S&P 500 by 3.0 percentage points", t)
+        self.assertIn("The VIX rose from 15.0 to 20.0.", t)
+        self.assertIn("AAA (+10.0%) did best and BBB (-5.0%) did worst", t)
+        self.assertLess(b["sentences"], 10)
+        self.assertEqual(t.count(". ") + 1, b["sentences"])
+        self.assertEqual([x["name"] for x in b["indexes"]], ["S&P 500", "Nasdaq-100", "Dow", "Russell 2000", "VIX"])
+
+    def test_waits_for_the_final_bar_and_survives_missing_extras(self):
+        slot, now = et(2026, 10, 30, 17), et(2026, 10, 30, 17, 5)
+        short = week_input()
+        short["indexes"]["S&P 500"] = week_bars([100, 101, 102, 103, 102])      # Friday's bar not in yet
+        self.assertIsNone(recap(short, self.END, slot, now))
+        self.assertIsNone(recap(None, self.END, slot, now))
+        b = recap({"indexes": {k: week_input()["indexes"][k] for k in ("S&P 500", "Nasdaq-100")}, "stocks": []}, self.END, slot, now)
+        self.assertNotIn("VIX", b["headline"])
+        self.assertLess(b["sentences"], 10)
+
+    def test_due_on_the_weeks_last_trading_day_only(self):
+        self.assertIsNone(sch.due("weekly", et(2026, 10, 30, 16, 59), lambda d: False))
+        self.assertEqual(sch.next_slot("weekly", et(2026, 10, 28, 12), is_trading_day), et(2026, 10, 30, 17))
+        self.assertEqual(sch.due("weekly", et(2026, 11, 1, 12), is_trading_day), (et(2026, 10, 30, 17), date(2026, 10, 30)))
+        # Good Friday 2026: the week ends on Thursday
+        self.assertEqual(sch.next_slot("weekly", et(2026, 3, 31, 12), is_trading_day), et(2026, 4, 2, 17))
+
+    def test_component_writes_once_and_keeps_recaps(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            calls = []
+            def data():
+                calls.append(1)
+                return week_input()
+            now = [et(2026, 11, 1, 12)]
+            c = BriefingsComponent(lambda: {"markets": []}, is_trading_day, store_dir=tmp, clock=lambda: now[0], week_data=data)
+            self.assertEqual(c.tick(), ["2026-10-30-weekly"])
+            self.assertEqual(c.tick(), [])
+            self.assertEqual(len(calls), 1)
+            self.assertEqual(c.payload()["latest"]["weekly"]["kind"], "weekly")
+            for i in range(45):                                                  # older daily briefings are pruned, recaps are not
+                c._save(f"2026-09-{i + 10:02d}-nyam", {"kind": "nyam"})
+            self.assertTrue(c._path("2026-10-30-weekly").exists())
+
+    def test_retries_slowly_while_prices_are_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            calls = []
+            now = [et(2026, 10, 30, 17, 5)]
+            c = BriefingsComponent(lambda: {"markets": []}, is_trading_day, store_dir=tmp, clock=lambda: now[0], week_data=lambda: calls.append(1) or {})
+            c.tick(); c.tick()
+            self.assertEqual(len(calls), 1)
+            now[0] += timedelta(minutes=31)
+            c.tick()
+            self.assertEqual(len(calls), 2)
 
 
 class TestSchedule(unittest.TestCase):

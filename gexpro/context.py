@@ -10,6 +10,7 @@ import json
 from datetime import date, datetime, time, timedelta, timezone
 
 from gexsys import bias, marketcal
+from trackrecord import prices
 
 
 def _p(v):
@@ -52,6 +53,23 @@ def snapshot(gex, feeds) -> dict:
     except Exception:
         posts = []
     return {"now": datetime.now(timezone.utc).isoformat(), "markets": markets, "events": events, "posts": posts}
+
+
+# ---------------------------------------------------------------- the weekly recap's prices
+WEEK_INDEXES = {"S&P 500": "^GSPC", "Nasdaq-100": "^NDX", "Dow": "^DJI", "Russell 2000": "^RUT", "VIX": "^VIX"}
+
+
+def week_data(feeds) -> dict:
+    """Daily bars for the main indexes and the Screener's stocks (see briefings/weekly.py)."""
+    stocks = []
+    try:
+        for sym, c in feeds.screener.charts().items():
+            bars = {datetime.fromtimestamp(t, marketcal.NY).date().isoformat(): {"open": o, "high": h, "low": l, "close": cl}
+                    for t, o, h, l, cl in c.get("daily") or []}
+            stocks.append({"symbol": sym, "name": c.get("name"), "bars": bars})
+    except Exception:
+        stocks = []
+    return {"indexes": {name: prices.yahoo_daily(sym) for name, sym in WEEK_INDEXES.items()}, "stocks": stocks}
 
 
 # ---------------------------------------------------------------- track record: the levels known before an open

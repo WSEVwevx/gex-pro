@@ -24,7 +24,7 @@ from gexsys import marketcal, publish
 from gexsys.component import GexComponent
 from trackrecord.component import TrackRecordComponent
 
-from .context import pre_open, snapshot
+from .context import pre_open, snapshot, week_data
 
 
 class Component(Protocol):
@@ -40,7 +40,7 @@ def default_components(gex_configs) -> list:
     """Order matters for the hosted build: briefings and the track record read what gex just built."""
     gex, feeds = GexComponent(gex_configs), FeedsComponent()
     briefings = BriefingsComponent(context=lambda: snapshot(gex, feeds), is_trading_day=marketcal.is_trading_day,
-                                   notify=publish.notify_desktop)
+                                   notify=publish.notify_desktop, week_data=lambda: week_data(feeds))
     track = TrackRecordComponent(pre_open=lambda d: pre_open(gex, d), is_trading_day=marketcal.is_trading_day,
                                  session_close=lambda d: datetime.combine(d, marketcal.rth_close(d), marketcal.NY))
     return [gex, feeds, briefings, track]

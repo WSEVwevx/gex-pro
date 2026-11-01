@@ -1,7 +1,7 @@
 """The briefings component.
 
 Same shape as every GEX PRO component (see gexpro/components.py):
-  routes()                    /api/briefings: the latest NY AM and Asia briefings, recent history, next times
+  routes()                    /api/briefings: the latest NY AM, Asia and weekly write-ups, recent history, next times
   start() / stop()            a background check every minute that writes a briefing when one is due
   build_static(data, state)   briefings.json for the hosted site (history kept in state/briefings)
 
@@ -24,9 +24,11 @@ from typing import Callable, Optional
 
 from . import schedule
 from .compose import compose
+from .weekly import recap
 
 log = logging.getLogger("briefings")
-KEEP = 40
+KEEP = 40                 # daily briefings kept; weekly recaps are kept for good
+WEEK_RETRY_S = 1800       # a recap waiting on prices tries again this often
 MIRROR_URL = "https://wsevwevx.github.io/gex-pro/data/briefings.json"      # the public copy ($GEXPRO_BRIEFINGS_MIRROR)
 
 
@@ -38,8 +40,11 @@ class BriefingsComponent:
     name = "briefings"
 
     def __init__(self, context: Callable[[], dict], is_trading_day: Callable, notify: Optional[Callable] = None,
-                 store_dir: Optional[Path] = None, clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc)):
+                 store_dir: Optional[Path] = None, clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
+                 week_data: Optional[Callable[[], dict]] = None):
         self.context, self.is_trading_day, self.notify, self.clock = context, is_trading_day, notify, clock
+        self.week_data = week_data
+        self._week_try: Optional[datetime] = None
         self.dir = Path(store_dir) if store_dir else _default_dir()
         self._lock = threading.Lock()
         self._stop = threading.Event()
@@ -60,7 +65,7 @@ class BriefingsComponent:
         tmp = self._path(sid).with_suffix(".tmp")
         tmp.write_text(json.dumps(b), encoding="utf-8")
         tmp.replace(self._path(sid))
-        for old in sorted(self.dir.glob("*.json"))[:-KEEP]:
+        for old in sorted(f for f in self.dir.glob("*.json") if not f.stem.endswith("-weekly"))[:-KEEP]:
             old.unlink(missing_ok=True)
 
     def history(self) -> list[dict]:
@@ -114,15 +119,28 @@ class BriefingsComponent:
                 sid = schedule.slot_id(kind, slot)
                 if self._path(sid).exists():
                     continue
-                ctx = self.context()
-                if not any(m.get("price") and m.get("zero_gamma") is not None for m in ctx.get("markets", [])):
-                    log.info("briefing %s waiting for GEX levels", sid)
-                    continue
-                morning = None
-                if kind == "asia":
-                    am = self._load(f"{slot.astimezone(schedule.NY):%Y-%m-%d}-nyam")
-                    morning = {m["market"]: m for m in (am or {}).get("markets", [])}
-                b = compose(kind, ctx, slot, session, morning)
+                if kind == "weekly":
+                    if not self.week_data or (self._week_try and (now - self._week_try).total_seconds() < WEEK_RETRY_S):
+                        continue
+                    self._week_try = now
+                    try:
+                        b = recap(self.week_data(), session, slot, now)
+                    except Exception:
+                        log.exception("weekly recap prices failed")
+                        b = None
+                    if not b:
+                        log.info("weekly recap %s waiting for final prices", sid)
+                        continue
+                else:
+                    ctx = self.context()
+                    if not any(m.get("price") and m.get("zero_gamma") is not None for m in ctx.get("markets", [])):
+                        log.info("briefing %s waiting for GEX levels", sid)
+                        continue
+                    morning = None
+                    if kind == "asia":
+                        am = self._load(f"{slot.astimezone(schedule.NY):%Y-%m-%d}-nyam")
+                        morning = {m["market"]: m for m in (am or {}).get("markets", [])}
+                    b = compose(kind, ctx, slot, session, morning)
                 self._save(sid, b)
                 written.append(sid)
                 log.info("briefing %s written", sid)
@@ -141,7 +159,7 @@ class BriefingsComponent:
         return {"latest": latest, "next": nxt,
                 "history": [{"id": schedule.slot_id(b["kind"], datetime.fromisoformat(b["slot"])), "kind": b["kind"],
                              "title": b["title"], "session": b["session"], "slot": b["slot"]} for b in hist],
-                "by_id": {schedule.slot_id(b["kind"], datetime.fromisoformat(b["slot"])): b for b in hist[:20]}}
+                "by_id": {schedule.slot_id(b["kind"], datetime.fromisoformat(b["slot"])): b for i, b in enumerate(hist) if i < 20 or b["kind"] == "weekly"}}
 
     # ---------------------------------------------------------------- component contract
     def routes(self) -> dict:

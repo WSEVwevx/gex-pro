@@ -81,6 +81,16 @@ def daily(underlying: str, since: date = date(1990, 1, 1)) -> dict[str, dict]:
     return {}
 
 
+def yahoo_daily(sym: str, days: int = 45) -> dict[str, dict]:
+    """date -> bar for any Yahoo symbol over the last `days` days; {} when the source fails."""
+    p2 = int(datetime.now(timezone.utc).timestamp()) + 86400
+    try:
+        return parse_yahoo_daily(_get(YAHOO.format(sym=urllib.parse.quote(sym), p1=p2 - (days + 1) * 86400, p2=p2)), f"Yahoo {sym} daily")
+    except Exception as e:
+        log.warning("daily %s failed: %s", sym, e)
+        return {}
+
+
 def parse_cboe_intraday(raw: bytes) -> Optional[dict]:
     """Today's session from 1-minute bars: {"date", OHLC, "last": "HH:MM"} (ET), or None."""
     rows = json.loads(raw).get("data", [])

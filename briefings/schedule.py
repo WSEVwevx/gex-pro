@@ -4,6 +4,7 @@
   asia : 19:00 ET on evenings whose next calendar day is a trading day (Sunday-Thursday, not before a
          holiday), for the next day's session. Globex is open again and Asia is starting (Tokyo opens at
          19:00 ET in winter, 20:00 in summer). Valid until 09:00 ET next morning, when the NY AM briefing takes over.
+  weekly: 17:00 ET on the week's last trading day, once its final prices are in. Valid for a week.
 
 A briefing missed because the app was off is written as soon as it starts, as long as its window is
 still open (marked as late). `is_trading_day(date) -> bool` comes from the app shell.
@@ -15,13 +16,16 @@ from typing import Callable, Optional
 from zoneinfo import ZoneInfo
 
 NY = ZoneInfo("America/New_York")
-KINDS = ("nyam", "asia")
-TITLES = {"nyam": "NY AM briefing", "asia": "Asia session briefing"}
-SLOT = {"nyam": time(9, 0), "asia": time(19, 0)}
+KINDS = ("nyam", "asia", "weekly")
+TITLES = {"nyam": "NY AM briefing", "asia": "Asia session briefing", "weekly": "Weekly recap"}
+SLOT = {"nyam": time(9, 0), "asia": time(19, 0), "weekly": time(17, 0)}
 
 
 def _slot_for_day(kind: str, d: date, is_trading_day: Callable) -> Optional[tuple[datetime, date, datetime]]:
     """(slot time, session date, window end) if `kind` has a slot on calendar day d."""
+    if kind == "weekly":
+        last = is_trading_day(d) and not any(is_trading_day(d + timedelta(days=i)) for i in range(1, 7 - d.weekday()))
+        return (datetime.combine(d, SLOT[kind], NY), d, datetime.combine(d + timedelta(days=7), SLOT[kind], NY)) if last else None
     if kind == "nyam":
         if not is_trading_day(d):
             return None

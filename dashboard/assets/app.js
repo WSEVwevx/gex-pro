@@ -131,13 +131,13 @@ async function loadBriefings(){
   catch(e){ $("briefTitle").textContent = "Briefings unavailable"; $("briefLead").textContent = OFFLINE; return; }
   renderBriefings();
 }
-const BKIND = {nyam: "NY AM", asia: "Asia"};
+const BKIND = {nyam: "NY AM", asia: "Asia", weekly: "Weekly"};
 function renderBriefings(){
   if(!brief) return;
   const latest = Object.values(brief.latest || {}).filter(Boolean).sort((a, b) => b.slot.localeCompare(a.slot));
   const b = briefPick ? (brief.by_id[briefPick] || brief.latest[briefPick]) : latest[0];
   const kindNow = b ? b.kind : null;
-  $("briefKind").innerHTML = ["nyam", "asia"].map(k => `<button role="tab" aria-selected="${kindNow === k && !String(briefPick).includes("-")}" data-k="${k}"${brief.latest[k] ? "" : " disabled"}>${BKIND[k]}</button>`).join("");
+  $("briefKind").innerHTML = ["nyam", "asia", "weekly"].map(k => `<button role="tab" aria-selected="${kindNow === k && !String(briefPick).includes("-")}" data-k="${k}"${brief.latest[k] ? "" : " disabled"}>${BKIND[k]}</button>`).join("");
   [...$("briefKind").children].forEach(x => x.onclick = () => { briefPick = x.dataset.k; renderBriefings(); });
   $("briefPick").innerHTML = `<option value="">Earlier briefings</option>` + (brief.history || []).filter(h => brief.by_id[h.id]).map(h =>
     `<option value="${esc(h.id)}"${briefPick === h.id ? " selected" : ""}>${esc(BKIND[h.kind])} · ${new Date(h.session + "T12:00:00Z").toLocaleDateString("en-US", {weekday:"short", month:"short", day:"numeric", timeZone:"UTC"})}</option>`).join("");
@@ -148,11 +148,14 @@ function renderBriefings(){
     $("briefMeta").innerHTML = nxt; $("briefLead").textContent = "The first one is written at the next briefing time (or as soon as the app starts during a briefing window).";
     $("briefMarkets").innerHTML = ""; $("briefCal").innerHTML = ""; $("briefPosts").innerHTML = ""; return;
   }
+  const weekly = b.kind === "weekly", when = o => new Date(b.session + "T12:00:00Z").toLocaleDateString("en-US", {...o, timeZone: "UTC"});
   $("briefHead").style.setProperty("--accent", b.kind === "asia" ? "var(--oi)" : "var(--pos)");
-  $("briefKicker").textContent = b.kind === "asia" ? "Night session · Asia open" : "Before the US open";
-  $("briefTitle").textContent = `${b.title} · ${new Date(b.session + "T12:00:00Z").toLocaleDateString("en-US", {weekday:"long", month:"short", day:"numeric", timeZone:"UTC"})} session`;
+  $("briefKicker").textContent = weekly ? "The week in prices" : b.kind === "asia" ? "Night session · Asia open" : "Before the US open";
+  $("briefTitle").textContent = weekly ? `${b.title} · week ending ${when({month: "short", day: "numeric"})}` : `${b.title} · ${when({weekday: "long", month: "short", day: "numeric"})} session`;
+  $("briefSides").hidden = weekly;
   $("briefMeta").innerHTML = `<span class="chip">Written <b>${new Date(b.generated_at).toLocaleString("en-US", {...ET, weekday:"short", hour:"numeric", minute:"2-digit"})} ET</b></span>`
-    + (b.late ? `<span class="chip" title="The app wasn't running at the scheduled time, so this was written when it started"><i class="dot warn"></i>Written late</span>` : "") + nxt;
+    + (b.late ? `<span class="chip" title="The app wasn't running at the scheduled time, so this was written when it started"><i class="dot warn"></i>Written late</span>` : "") + nxt
+    + (b.indexes || []).map(x => `<span class="chip">${esc(x.name)} <b style="color:${x.pct > 0 ? "var(--good)" : x.pct < 0 ? "var(--bad)" : "inherit"}">${signed(x.pct, 1)}%</b></span>`).join("");
   $("briefLead").textContent = b.headline;
   const col = r => r === "POSITIVE" ? "var(--pos)" : r === "NEGATIVE" ? "var(--neg)" : "var(--zg)";
   $("briefMarkets").innerHTML = (b.markets || []).map(m => `<section class="card bm accent" style="--accent:${col(m.regime)}">
@@ -632,7 +635,7 @@ const HELP = {
     body: `<p>The line is the base-case path; the cone is the ±1σ expected move growing through the session. About one day in three, price leaves the cone.</p>`},
   factors: {title: "Factors", tldr: "Each ingredient of the bias, with its score and reason.", body: `<p>Positive scores lean bullish, negative bearish. "Day type" rows set the character of the session rather than the direction.</p>`},
   briefings: {title: "Briefings", tldr: "A written summary before the US open and before the Asia session.",
-    body: `<p><b>NY AM</b> at 9:00 AM ET: levels, regime, expected range, 0DTE levels, today's US data and market-moving posts. <b>Asia</b> at 7:00 PM ET: where we closed, what changed since the morning, the overnight Asia/Europe calendar and tomorrow's US data.</p>`},
+    body: `<p><b>NY AM</b> at 9:00 AM ET: levels, regime, expected range, 0DTE levels, today's US data and market-moving posts. <b>Asia</b> at 7:00 PM ET: where we closed, what changed since the morning, the overnight Asia/Europe calendar and tomorrow's US data. <b>Weekly</b> after the week's last close: how the main indexes, the VIX and the biggest stocks moved, in under 10 sentences. It is written from daily prices, so it says what happened, not why.</p>`},
   calendar: {title: "Economic calendar", tldr: "Scheduled data releases that can override any level.",
     body: `<p>From ForexFactory. High-impact USD releases (CPI, payrolls, Fed) move NQ and ES the most. Levels often break on these releases, then rebuild as options reposition.</p>`},
   posts: {title: "Trump posts", tldr: "Posts that have moved futures, tagged when they mention market topics.",
