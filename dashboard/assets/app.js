@@ -942,7 +942,7 @@ function renderTrackMoves(ss){
   if(!rows.length){ $("trkMoveSub").textContent = ""; svg.innerHTML = ""; svg.setAttribute("height", 0); return; }
   const out = rows.filter(s => !s.outcome.em_close).length;
   $("trkMoveSub").textContent = `${out} of ${rows.length} closed outside the band (amber)${trkM === "ALL" ? " · ES left, NQ right on each day" : ""}`;
-  const W = Math.max(wrap.clientWidth, 320), H = 220, pl = 40, pr = 10, pt = 12, pb = 26;
+  const W = Math.max(wrap.clientWidth, 280), H = 220, pl = 40, pr = 10, pt = 12, pb = 26;
   const edge = Math.max(2, Math.ceil(Math.max(...rows.map(s => Math.abs(s.outcome.move_em))))), days = [...new Set(rows.map(s => s.session))];
   const y = v => pt + (edge - v) / (2 * edge) * (H - pt - pb), bw = (W - pl - pr) / rows.length;
   let g = `<rect x="${pl}" y="${y(1)}" width="${W - pl - pr}" height="${y(-1) - y(1)}" fill="rgba(var(--fg-rgb),.05)"/>`;
@@ -999,7 +999,7 @@ function renderBacktest(){
     <br><b>Proxy:</b> this uses the 30-day ${B.vol_index} because free history of GEX PRO's own same-day IV does not exist. The live track record above uses GEX PRO's actual band.`;
   // by year
   const ys = B.by_year, wrap = $("btYearWrap"), svg = $("btYear");
-  const W = Math.max(wrap.clientWidth, 320), H = 260, pl = 44, pr = 10, pt = 12, pb = 26, lo = 0.4, hi = 1.0;
+  const W = Math.max(wrap.clientWidth, 280), H = 260, pl = 44, pr = 10, pt = 12, pb = 26, lo = 0.4, hi = 1.0;
   const bw = (W - pl - pr) / ys.length, y = v => pt + (hi - Math.max(lo, Math.min(hi, v))) / (hi - lo) * (H - pt - pb);
   let g = "";
   for(let v = 0.4; v <= 1.0001; v += 0.1) g += `<line x1="${pl}" x2="${W - pr}" y1="${y(v)}" y2="${y(v)}" stroke="rgba(var(--fg-rgb),.05)"/><text x="${pl - 6}" y="${y(v) + 4}" text-anchor="end">${num(100 * v, 0)}%</text>`;
@@ -1020,7 +1020,7 @@ function renderBacktest(){
   };
   svg.onmouseleave = () => { tip.style.opacity = 0; };
   // distribution of moves vs the normal curve
-  const hst = B.hist, dw = $("btDistWrap"), ds = $("btDist"), DW = Math.max(dw.clientWidth, 320), DH = 260, nb = hst.counts.length;
+  const hst = B.hist, dw = $("btDistWrap"), ds = $("btDist"), DW = Math.max(dw.clientWidth, 280), DH = 260, nb = hst.counts.length;
   const top = Math.max(...hst.counts, ...hst.normal) * 1.08, bx = i => pl + i / nb * (DW - pl - pr), by = v => pt + (1 - v / top) * (DH - pt - pb);
   let d = `<rect x="${bx((hst.edge - 1) / hst.bin)}" y="${pt}" width="${bx((hst.edge + 1) / hst.bin) - bx((hst.edge - 1) / hst.bin)}" height="${DH - pt - pb}" fill="rgba(var(--fg-rgb),.035)"/>`;
   hst.counts.forEach((c, i) => { d += `<rect x="${bx(i) + 1}" y="${by(c)}" width="${Math.max(1, bx(1) - bx(0) - 2)}" height="${by(0) - by(c)}" rx="1.5" fill="var(--pos)" fill-opacity=".8"/>`; });
