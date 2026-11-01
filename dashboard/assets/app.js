@@ -655,6 +655,10 @@ const HELP = {
     watch: ["The 95% range narrows as sessions add up", "\"rebuilt\" = frozen later from saved snapshots, using only data from before the open"]},
   track_scorecard: {title: "Scorecard", tldr: "Each claim the model makes, and how often it came true.",
     body: `<p><b>Expected move:</b> a fair one-sigma band should contain the close about 68% of the time. Much more means the band is too wide; much less, too narrow.</p><p><b>Regime:</b> the model says negative-gamma sessions should range wider than positive-gamma ones, measured in expected moves.</p><p><b>Walls:</b> a wall is <i>touched</i> when price trades within 5% of an expected move of it, and <i>held</i> when the close stays on the near side.</p><p><b>Bias:</b> only Bullish and Bearish calls are graded, against the close vs the plan's price. Compare it with the baseline, which always picks the more common direction.</p>`},
+  track_moves: {title: "Daily move vs the expected band", tldr: "How far each session moved, measured in expected moves.",
+    body: `<p>Each bar is one session's move from the plan price to the close, divided by the plan's expected move. The shaded strip is ±1σ. Bars that closed outside it are amber. A fair band has about a third of bars outside, roughly evenly up and down.</p>`},
+  track_split: {title: "Where it worked", tldr: "The same results split by gamma regime and plan confidence.",
+    body: `<p>Shows whether the band and the bias did better on some kinds of day. Groups here are small, so a big gap between them can easily be chance until there are many more sessions.</p>`},
   track_log: {title: "Every session", tldr: "The plan and its grade, one row per market per day.",
     body: `<p><b>Close</b> shows the close and how far it moved from the plan's price in expected moves (σ). <b>In band</b> means the close landed inside ± one expected move. Hover a wall result to see its price.</p><p>A plan marked <b>rebuilt</b> was frozen after the open from snapshots saved before it. Its data is still timestamped before the open, so no later information is used.</p>`},
   backtest: {title: "Historical backtest", tldr: "Decades of data on how well implied volatility predicts the next day's range.",
@@ -889,10 +893,15 @@ function renderTrack(){
   // scorecard
   const row = (name, st, meaning) => st ? `<tr><td>${name}</td><td class="m"><b>${pct(st.rate)}</b></td><td class="m">${st.n ? `${st.k}/${st.n}` : "-"}</td><td class="m">${ciTxt(st)}</td><td class="trk-mean">${meaning}</td></tr>` : "";
   const rp = (S.range_em || {}).positive || {}, rn = (S.range_em || {}).negative || {};
-  const regimeVerdict = rp.n && rn.n ? (rn.mean > rp.mean ? `<span class="trk-tag good">as modeled</span>` : `<span class="trk-tag bad">not as modeled</span>`) : "";
+  // a verdict needs a few sessions on each side; one day proves nothing either way
+  const regimeVerdict = rp.n >= 5 && rn.n >= 5 ? (rn.mean > rp.mean ? `<span class="trk-tag good">as modeled</span>` : `<span class="trk-tag bad">not as modeled</span>`)
+    : rp.n && rn.n ? `<span class="trk-tag">too few sessions to judge</span>` : "";
+  // plain verdicts: the band against its 68% target (by the 95% range), the bias against always picking the commoner direction
+  const bandVerdict = !emc.ci ? "" : emc.ci[0] > emc.expected ? `<span class="trk-tag warn">band looks too wide</span>` : emc.ci[1] < emc.expected ? `<span class="trk-tag warn">band looks too narrow</span>` : `<span class="trk-tag good">in line with 68%</span>`;
+  const biasVerdict = bi.rate == null || bi.baseline == null ? "" : !bi.ci || bi.ci[0] <= bi.baseline ? (bi.rate > bi.baseline ? `<span class="trk-tag">above baseline, not proven</span>` : `<span class="trk-tag bad">no edge so far</span>`) : `<span class="trk-tag good">beats baseline</span>`;
   $("trkScoreSub").textContent = n ? `${n} session${n === 1 ? "" : "s"} · ${trkM === "ALL" ? "NQ and ES together" : trkM}` : "";
   $("trkScore").innerHTML = n ? `<table class="trk-table"><tr><th>Test</th><th>Result</th><th>Count</th><th>95% range</th><th>What it means</th></tr>
-    ${row("Close inside the expected move", S.em_close, "A fair 1σ band holds about 68%. Far above = band too wide; far below = too narrow.")}
+    ${row("Close inside the expected move", S.em_close, `A fair 1σ band holds about 68%. Far above = band too wide; far below = too narrow. ${bandVerdict}`)}
     ${row("Whole session inside the band", S.em_range, "Both the high and the low stayed inside the band.")}
     ${row("Broke above the band", S.em_up_break, "The high went past the upper edge.")}
     ${row("Broke below the band", S.em_down_break, "The low went past the lower edge.")}
@@ -901,12 +910,14 @@ function renderTrack(){
     ${row("Call wall held when touched", S.call_wall.held, `Reached on ${S.call_wall.touched.k} of ${S.call_wall.touched.n} sessions with a wall above.`)}
     ${row("Put wall held when touched", S.put_wall.held, `Reached on ${S.put_wall.touched.k} of ${S.put_wall.touched.n} sessions with a wall below.`)}
     ${row("Traded through zero gamma", S.zg_crossed, "How often the flip level was crossed during the session.")}
-    ${row("Bias direction right", S.bias, `Neutral days are not graded. Baseline: always picking the more common direction = ${pct(bi.baseline)}.`)}
+    ${row("Bias direction right", S.bias, `Neutral days are not graded. Baseline: always picking the more common direction = ${pct(bi.baseline)}. ${biasVerdict}`)}
     ${row("Base case beat \"no change\"", S.target_beat, "The close was nearer the base-case target than to the price the plan was made at.")}
     ${row("Closed nearer the magnet strike", S.magnet, "Positive gamma only: the close ended nearer the absolute gamma strike than the open.")}
   </table>` : `<div class="expl">Nothing graded yet. The first plan is graded after its session closes.</div>`;
   // every session
   const ss = (trk.sessions || []).filter(s => trkM === "ALL" || s.market === trkM);
+  renderTrackMoves(ss); renderTrackSplit(ss);
+  $("trkCsv").onclick = () => trackCsv(ss);
   $("trkLogSub").textContent = `${ss.length} session${ss.length === 1 ? "" : "s"} · newest first`;
   const wall = w => !w ? `<span class="dim">-</span>` : !w.touched ? `<span class="dim" title="${num(w.level, 2)}">not reached</span>`
     : w.held ? `<span class="good" title="${num(w.level, 2)}">held</span>` : `<span class="bad" title="${num(w.level, 2)}">broke</span>`;
@@ -924,8 +935,56 @@ function renderTrack(){
   }).join("")}</table>` : `<div class="expl">No sessions yet.</div>`;
   renderBacktest();
 }
+// each graded session's move from the plan price against the ±1σ band; ALL pairs NQ and ES day by day
+function renderTrackMoves(ss){
+  const rows = ss.filter(s => s.outcome && s.outcome.move_em != null).slice().sort((a, b) => a.session.localeCompare(b.session) || a.market.localeCompare(b.market));
+  const wrap = $("trkMoveWrap"), svg = $("trkMove"), tip = $("trkMoveTip");
+  if(!rows.length){ $("trkMoveSub").textContent = ""; svg.innerHTML = ""; svg.setAttribute("height", 0); return; }
+  const out = rows.filter(s => !s.outcome.em_close).length;
+  $("trkMoveSub").textContent = `${out} of ${rows.length} closed outside the band (amber)${trkM === "ALL" ? " · ES left, NQ right on each day" : ""}`;
+  const W = Math.max(wrap.clientWidth, 320), H = 220, pl = 40, pr = 10, pt = 12, pb = 26;
+  const edge = Math.max(2, Math.ceil(Math.max(...rows.map(s => Math.abs(s.outcome.move_em))))), days = [...new Set(rows.map(s => s.session))];
+  const y = v => pt + (edge - v) / (2 * edge) * (H - pt - pb), bw = (W - pl - pr) / rows.length;
+  let g = `<rect x="${pl}" y="${y(1)}" width="${W - pl - pr}" height="${y(-1) - y(1)}" fill="rgba(var(--fg-rgb),.05)"/>`;
+  for(let v = -edge; v <= edge; v++) g += `<line x1="${pl}" x2="${W - pr}" y1="${y(v)}" y2="${y(v)}" stroke="rgba(var(--fg-rgb),${v === 0 ? .25 : .05})"/><text x="${pl - 6}" y="${y(v) + 4}" text-anchor="end">${v === 0 ? "0" : signed(v, 0) + "σ"}</text>`;
+  rows.forEach((s, i) => {
+    const v = s.outcome.move_em, top = y(Math.max(v, 0)), h = Math.max(1, Math.abs(y(v) - y(0)));
+    g += `<rect x="${pl + i * bw + bw * 0.2}" y="${top}" width="${Math.max(2, bw * 0.6)}" height="${h}" rx="1.5" fill="${s.outcome.em_close ? "var(--pos)" : "var(--warn)"}"/>`;
+  });
+  const every = Math.ceil(days.length / Math.max(2, Math.floor((W - pl - pr) / 60)));
+  days.forEach((d, i) => { if(i % every) return;
+    const first = rows.findIndex(s => s.session === d), n = rows.filter(s => s.session === d).length;
+    g += `<text x="${pl + (first + n / 2) * bw}" y="${H - 8}" text-anchor="middle">${esc(d.slice(5))}</text>`; });
+  svg.setAttribute("width", W); svg.setAttribute("height", H); svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.innerHTML = g;
+  svg.onmousemove = e => {
+    const i = Math.max(0, Math.min(rows.length - 1, Math.floor((e.clientX - svg.getBoundingClientRect().left - pl) / bw))), s = rows[i], o = s.outcome;
+    tip.innerHTML = `<b>${esc(s.session)} ${esc(s.market)}</b><br>Move ${signed(o.move, 0)} pts · ${signed(o.move_em, 2)}σ<br>${o.em_close ? "Closed inside the band" : "Closed outside the band"} · ${esc((s.plan.regime || "").toLowerCase())} gamma`;
+    tip.style.opacity = 1; tip.style.left = Math.min(pl + i * bw + 12, W - 230) + "px"; tip.style.top = "14px";
+  };
+  svg.onmouseleave = () => { tip.style.opacity = 0; };
+}
+// the same results split by gamma regime and by the plan's confidence, counted from the sessions in view
+function renderTrackSplit(ss){
+  const done = ss.filter(s => s.plan && s.outcome), tally = (rows, f) => { const v = rows.map(f).filter(x => x != null); return {k: v.filter(Boolean).length, n: v.length}; };
+  const cell = t => t.n ? `<td class="m"><b>${pct(t.k / t.n)}</b> <span class="dim">${t.k}/${t.n}</span></td>` : `<td class="m dim">-</td>`;
+  const group = (label, key, order) => order.map(v => { const r = done.filter(s => s.plan[key] === v); if(!r.length) return "";
+    return `<tr><td>${label} ${esc(v.toLowerCase())}</td><td class="m">${r.length}</td>${cell(tally(r, s => s.outcome.em_close))}${cell(tally(r, s => s.outcome.bias_hit))}</tr>`; }).join("");
+  const others = (key, known) => [...new Set(done.map(s => s.plan[key]).filter(v => v && !known.includes(v)))];
+  const regs = ["POSITIVE", "NEGATIVE"], confs = ["High", "Medium", "Low"];
+  $("trkSplitSub").textContent = done.length ? `${done.length} graded · small groups swing a lot` : "";
+  $("trkSplit").innerHTML = done.length ? `<table class="trk-table"><tr><th>Group</th><th>Sessions</th><th>Close in band</th><th>Bias right</th></tr>
+    ${group("Regime:", "regime", [...regs, ...others("regime", regs)])}${group("Confidence:", "confidence", [...confs, ...others("confidence", confs)])}</table>` : `<div class="expl">Nothing graded yet.</div>`;
+}
+function trackCsv(ss){
+  const q = v => v == null ? "" : /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v);
+  const head = ["session", "market", "status", "regime", "bias", "confidence", "ref", "expected_move", "open", "high", "low", "close", "move_pts", "move_sigma", "closed_in_band", "bias_right"];
+  const rows = ss.map(s => { const p = s.plan || {}, o = s.outcome || {}; return [s.session, s.market, s.status, p.regime, p.bias, p.confidence, p.ref, p.em, o.open, o.high, o.low, o.close, o.move, o.move_em, o.em_close, o.bias_hit].map(q).join(","); });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([[head.join(","), ...rows].join("\n") + "\n"], {type: "text/csv"}));
+  a.download = `gex-track-record-${trkM}.csv`; a.click(); URL.revokeObjectURL(a.href);
+}
 function renderBacktest(){
-  const B = (((trk || {}).backtest || {}).markets || {})[btM];
+  const B =(((trk || {}).backtest || {}).markets || {})[btM];
   if(!B){ $("btTitle").textContent = "Backtest data not available yet"; $("btKpis").innerHTML = ""; return; }
   const O = B.overall, R = B.recent, g1 = B.after_gap.one_day, gw = B.after_gap.weekend_or_holiday;
   $("btTitle").textContent = `${MKT_NAME[B.underlying] || B.underlying} with ${B.vol_index}, ${B.start.slice(0, 4)} to ${B.end.slice(0, 4)}: ${O.n.toLocaleString("en-US")} sessions`;
