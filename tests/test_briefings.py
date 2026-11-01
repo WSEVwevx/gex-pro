@@ -101,7 +101,7 @@ class TestWeekly(unittest.TestCase):
         self.assertIn("CPI y/y came in at 3.1% against 2.9% expected on Friday", t)
         self.assertIn("the 10-year yield went from 4.00% to 4.25%", t)
         self.assertIn("oil rose 5.0%", t)
-        self.assertIn("; leveraged funds were net longer than 12% in ES and 80% in NQ of the past 3 years (CFTC, Oct 27).", t)
+        self.assertIn("; leveraged funds' net position was above 12% in ES and 80% in NQ of the past 3 years (CFTC, Oct 27).", t)
         self.assertLess(b["sentences"], 10)
         self.assertEqual([h["day"] for h in b["headlines"]], [fri, "2026-10-26"])                                # worst and best days
 

@@ -490,7 +490,7 @@ function renderCot(){
   const when = new Date(s.asof + "T12:00:00Z").toLocaleDateString("en-US", {month: "short", day: "numeric", timeZone: "UTC"});
   $("cotSub").textContent = `${s.contract} · as of ${when}`;
   const n = v => (v > 0 ? "+" : "") + Math.round(v).toLocaleString("en-US");
-  $("cotBody").innerHTML = `<table class="trk-table"><tr><th>Group</th><th>Net contracts</th><th>Week change</th><th>3-year rank</th><th>Reading</th></tr>
+  $("cotBody").innerHTML = `<table class="trk-table"><tr><th>Group</th><th>Net</th><th>Week</th><th>3-yr rank</th><th>Reading</th></tr>
     ${s.groups.map(g => `<tr><td>${esc(g.name)}</td><td class="m">${n(g.net)}</td><td class="m">${n(g.change)}</td><td class="m"><b>${num(g.rank, 0)}%</b></td><td class="trk-mean">${esc(g.label)}</td></tr>`).join("")}</table>`;
 }
 function renderBias(w){

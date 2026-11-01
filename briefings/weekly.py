@@ -19,7 +19,7 @@ from typing import Optional
 
 from .schedule import TITLES
 
-VERSION = 3             # a stored recap from an older version is rewritten while its week is current
+VERSION = 4             # a stored recap from an older version is rewritten while its week is current
 MAIN = "S&P 500"
 TECH = "Nasdaq-100"
 OTHERS = ("Dow", "Russell 2000")
@@ -191,7 +191,7 @@ def _funds(data: dict) -> str:
         return ""
     d = date.fromisoformat(asof)
     when = f"{d:%b} {d.day}"
-    return f"; leveraged funds were net longer than {' and '.join(parts)} of the past 3 years (CFTC, {when})"
+    return f"; leveraged funds' net position was above {' and '.join(parts)} of the past 3 years (CFTC, {when})"
 
 
 def recap(data: Optional[dict], end: date, slot: datetime, now: datetime) -> Optional[dict]:
