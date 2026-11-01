@@ -654,7 +654,7 @@ const HELP = {
     body: `<p>At every session, the levels from the <b>last calculation timestamped before 09:30 ET</b> are frozen as that day's plan: expected move, regime, walls, zero gamma, bias. Nothing can be changed afterwards. After the close, the plan is graded against the index's open, high, low and close.</p><p>Everything is in index points (NDX for NQ, SPX for ES), so the futures basis can't flatter or hurt the result. Missed sessions are listed, not hidden.</p><p>Small samples lie. Until about 20 sessions are graded, read the numbers as a diary, not as proof. The 95% range shows how uncertain each rate still is.</p>`,
     watch: ["The 95% range narrows as sessions add up", "\"rebuilt\" = frozen later from saved snapshots, using only data from before the open"]},
   track_scorecard: {title: "Scorecard", tldr: "Each claim the model makes, and how often it came true.",
-    body: `<p><b>Expected move:</b> a fair one-sigma band should contain the close about 68% of the time. Much more means the band is too wide; much less, too narrow.</p><p><b>Regime:</b> the model says negative-gamma sessions should range wider than positive-gamma ones, measured in expected moves.</p><p><b>Walls:</b> a wall is <i>touched</i> when price trades within 5% of an expected move of it, and <i>held</i> when the close stays on the near side.</p><p><b>Bias:</b> only Bullish and Bearish calls are graded, against the close vs the plan's price. Compare it with the baseline, which always picks the more common direction.</p>`},
+    body: `<p><b>Expected move:</b> a fair one-sigma band should contain the close about 68% of the time. Much more means the band is too wide; much less, too narrow.</p><p><b>Regime:</b> the model says negative-gamma sessions should range wider than positive-gamma ones, measured in expected moves.</p><p><b>Walls:</b> a wall is <i>touched</i> when price trades within 5% of an expected move of it, and <i>held</i> when the close stays on the near side.</p><p><b>Plain levels:</b> the same test on price levels with no options meaning, run on every session in the backtest history (SPX from 1990, NDX from 2009) at the same distances from price as the walls actually touched. A real wall should beat this. History uses the previous close and the 30-day vol index, so it is a close match, not an exact one.</p><p><b>Bias:</b> only Bullish and Bearish calls are graded, against the close vs the plan's price. Compare it with the baseline, which always picks the more common direction.</p>`},
   track_moves: {title: "Daily move vs the expected band", tldr: "How far each session moved, measured in expected moves.",
     body: `<p>Each bar is one session's move from the plan price to the close, divided by the plan's expected move. The shaded strip is ±1σ. Bars that closed outside it are amber. A fair band has about a third of bars outside, roughly evenly up and down.</p>`},
   track_split: {title: "Where it worked", tldr: "The same results split by gamma regime and plan confidence.",
@@ -885,7 +885,7 @@ function renderTrack(){
   $("trkKpis").innerHTML =
     kpi("Sessions graded", num(n, 0), trk.started ? `since ${esc(trk.started)} · ${S.early ? `<span class="trk-tag warn">early: ${n} of ${trk.rules.min_sample}</span>` : `<span class="trk-tag good">sample ok</span>`}` : "starts with the next session")
     + kpi("Close inside expected move", pct(emc.rate), emc.n ? `${emc.k} of ${emc.n} · a fair band holds 68%` : "no graded sessions yet")
-    + kpi("Walls held when touched", pct(wh.rate), wh.n ? `${wh.k} of ${wh.n} touches` : "no wall touched yet")
+    + kpi("Walls held when touched", pct(wh.rate), wh.n ? `${wh.k} of ${wh.n} touches${wh.baseline ? ` · plain levels ${pct(wh.baseline.rate)}` : ""}` : "no wall touched yet")
     + kpi("Bias direction right", pct(bi.rate), bi.n ? `${bi.k} of ${bi.n} calls · baseline ${pct(bi.baseline)}` : "no directional calls graded yet");
   const proof = trk.proof_url ? ` Every plan and grade is committed to a public git branch as it happens: <a href="${esc(trk.proof_url)}" target="_blank" rel="noopener">see the history</a>.` : "";
   $("trkNote").innerHTML = (S.early ? `Early days: ${n} graded session${n === 1 ? "" : "s"}. The numbers need about ${trk.rules.min_sample} sessions before they mean much, and 100+ to be convincing. ` : "")
@@ -898,6 +898,8 @@ function renderTrack(){
     : rp.n && rn.n ? `<span class="trk-tag">too few sessions to judge</span>` : "";
   // plain verdicts: the band against its 68% target (by the 95% range), the bias against always picking the commoner direction
   const bandVerdict = !emc.ci ? "" : emc.ci[0] > emc.expected ? `<span class="trk-tag warn">band looks too wide</span>` : emc.ci[1] < emc.expected ? `<span class="trk-tag warn">band looks too narrow</span>` : `<span class="trk-tag good">in line with 68%</span>`;
+  const wb = wh.baseline, wallVerdict = !wb || !wh.ci ? "" : wh.ci[1] < wb.rate ? `<span class="trk-tag bad">worse than plain levels</span>`
+    : wh.ci[0] > wb.rate ? `<span class="trk-tag good">beats plain levels</span>` : wh.rate > wb.rate ? `<span class="trk-tag">above plain levels, not proven</span>` : `<span class="trk-tag">no edge so far</span>`;
   const biasVerdict = bi.rate == null || bi.baseline == null ? "" : !bi.ci || bi.ci[0] <= bi.baseline ? (bi.rate > bi.baseline ? `<span class="trk-tag">above baseline, not proven</span>` : `<span class="trk-tag bad">no edge so far</span>`) : `<span class="trk-tag good">beats baseline</span>`;
   $("trkScoreSub").textContent = n ? `${n} session${n === 1 ? "" : "s"} · ${trkM === "ALL" ? "NQ and ES together" : trkM}` : "";
   $("trkScore").innerHTML = n ? `<table class="trk-table"><tr><th>Test</th><th>Result</th><th>Count</th><th>95% range</th><th>What it means</th></tr>
@@ -909,6 +911,7 @@ function renderTrack(){
       <td class="trk-mean">Session range in expected moves. The model says negative gamma runs wider. ${regimeVerdict}</td></tr>
     ${row("Call wall held when touched", S.call_wall.held, `Reached on ${S.call_wall.touched.k} of ${S.call_wall.touched.n} sessions with a wall above.`)}
     ${row("Put wall held when touched", S.put_wall.held, `Reached on ${S.put_wall.touched.k} of ${S.put_wall.touched.n} sessions with a wall below.`)}
+    ${row("Walls held vs plain levels", wh, wb ? `Plain price levels at the same distances held ${pct(wb.rate)}, over ${wb.days.toLocaleString("en-US")} real sessions. ${wallVerdict}` : "Needs a touched wall to compare.")}
     ${row("Traded through zero gamma", S.zg_crossed, "How often the flip level was crossed during the session.")}
     ${row("Bias direction right", S.bias, `Neutral days are not graded. Baseline: always picking the more common direction = ${pct(bi.baseline)}. ${biasVerdict}`)}
     ${row("Base case beat \"no change\"", S.target_beat, "The close was nearer the base-case target than to the price the plan was made at.")}

@@ -241,7 +241,7 @@ class TrackRecordComponent:
         path = (self.cache_dir or self.dir) / "backtest.json"
         cached = self._read(path)
         now = self.clock()
-        if cached and "strategy_lab" not in cached and now - datetime.fromisoformat(cached["built"]) < BACKTEST_MAX_AGE:
+        if cached and "strategy_lab" not in cached and all("levels" in m for m in cached["markets"].values()) and now - datetime.fromisoformat(cached["built"]) < BACKTEST_MAX_AGE:
             return cached                                       # (an old cache that still holds the removed strategy lab is rebuilt)
         today = now.astimezone(NY).date()
         final = today.isoformat() if now >= self.session_close(today) + timedelta(minutes=20) else (today - timedelta(days=1)).isoformat()
@@ -267,10 +267,14 @@ class TrackRecordComponent:
         ss = self.sessions()
         graded = [s for s in ss if s.get("status") == "graded"]
         markets = sorted({s["market"] for s in ss})
+        bt = self.backtest()
+        stats = {m: summarize([s for s in graded if s["market"] == m]) for m in markets}
+        stats["ALL"] = summarize(graded)
+        for m, st in stats.items():                             # what plain price levels score at the walls' distances
+            st["walls_held"]["baseline"] = backtest.wall_baseline([s for s in graded if m == "ALL" or s["market"] == m], bt.get("markets") or {})
         return {"now": self.clock().isoformat(), "started": self._started(), "proof_url": self.proof_url,
                 "rules": {"touch_em": 0.05, "min_sample": 20, "freeze": "levels from the last calculation timestamped before 09:30 ET"},
-                "stats": dict({m: summarize([s for s in graded if s["market"] == m]) for m in markets}, ALL=summarize(graded)),
-                "sessions": ss, "backtest": self.backtest()}
+                "stats": stats, "sessions": ss, "backtest": bt}
 
     # ---------------------------------------------------------------- component contract
     def routes(self) -> dict:

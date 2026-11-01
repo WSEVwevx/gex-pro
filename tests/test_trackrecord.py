@@ -101,6 +101,28 @@ class TestBacktest(unittest.TestCase):
         self.assertEqual(r["overall"]["close_in"]["rate"], 1.0)        # +/-1 moves against a ~1.9-point band
         self.assertEqual(r["after_gap"]["weekend_or_holiday"]["n"] + r["after_gap"]["one_day"]["n"], 59)
 
+    def test_plain_levels_use_the_walls_test(self):
+        # the same rule as score._wall: touched within 5% of em, held when the close stays on the near side
+        rows = [{"high_em": 0.97, "low_em": -0.2, "move_em": 0.5},     # reaches 0.95: touches 1.0 above, closes under it
+                {"high_em": 1.4, "low_em": -0.1, "move_em": 1.2},      # touches 1.0 and closes beyond it
+                {"high_em": 1.0, "low_em": -1.0, "move_em": 1.0},      # a close exactly on the level has not gone beyond it
+                {"high_em": 0.9, "low_em": -0.1, "move_em": 0.2}]      # never gets within 5% of 1.0
+        t = backtest.level_table(rows)
+        one = next(x for x in t["above"] if x["d"] == 1.0)
+        self.assertEqual((one["touched"], one["held"]), (3, 2))
+        low = next(x for x in t["below"] if x["d"] == 1.0)
+        self.assertEqual((low["touched"], low["held"]), (1, 1))
+
+    def test_wall_baseline_matches_each_touched_wall(self):
+        tab = {"above": [{"d": 0.5, "touched": 10, "held": 4}, {"d": 1.0, "touched": 10, "held": 2}],
+               "below": [{"d": 0.5, "touched": 10, "held": 6}, {"d": 1.0, "touched": 0, "held": 0}]}
+        mk = {"NQ": {"levels": tab, "overall": {"n": 100}}}
+        ss = [{"market": "NQ", "outcome": {"cw": {"touched": True, "dist_em": 0.9}, "pw": {"touched": True, "dist_em": 0.4}}},
+              {"market": "NQ", "outcome": {"cw": {"touched": False, "dist_em": 0.5}, "pw": {"touched": True, "dist_em": 0.95}}},   # no history at that level
+              {"market": "ES", "outcome": {"cw": {"touched": True, "dist_em": 0.5}}}]                                                # no table for ES
+        self.assertEqual(backtest.wall_baseline(ss, mk), {"rate": 0.4, "walls": 2, "days": 100})         # (0.2 + 0.6) / 2
+        self.assertIsNone(backtest.wall_baseline([], mk))
+
     def test_parsers(self):
         csv = b"DATE,OPEN,HIGH,LOW,CLOSE\n10/21/2026,17.25,17.58,16.51,16.68\nbad,row\n"
         self.assertEqual(prices.parse_cboe_vol_csv(csv), {"2026-10-21": 16.68})
