@@ -206,6 +206,13 @@ class Drivers:
             except OSError:
                 pass
 
+    def weights(self) -> dict:
+        """{"NQ": {yahoo symbol: weight %}, "ES": {...}}: every index member, from the last good copy."""
+        self.get()                                               # loads them on first use
+        with self._lock:
+            W = self._slow["weights"] or {}
+            return {m:{s.replace(".", "-"): w for s, _, w in W.get(m) or []} for m in ("NQ", "ES")}
+
     def universe(self) -> list:
         """The top `top` names by weight in each index, merged: [(yahoo symbol, name, w_nq, w_es)]."""
         W = self._slow["weights"] or {}

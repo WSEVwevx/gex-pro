@@ -51,8 +51,7 @@ def week_input(**kw):
            "Dow": week_bars([300, 300, 300, 300, 300, 303]), "Russell 2000": week_bars([400, 400, 400, 400, 400, 396]),
            "VIX": week_bars([15, 15, 15, 16, 17, 20])}
     idx.update(kw)
-    stocks = [{"symbol": s, "name": s, "bars": week_bars([100, 100, 100, 100, 100, c])} for s, c in (("AAA", 110), ("BBB", 95), ("CCC", 101), ("DDD", 99))]
-    return {"indexes": idx, "stocks": stocks}
+    return {"indexes": idx}
 
 
 class TestWeekly(unittest.TestCase):
@@ -68,12 +67,55 @@ class TestWeekly(unittest.TestCase):
         self.assertIn("best session on Monday (+1.0%) and its worst on Friday (-3.9%)", t)
         self.assertIn("near the bottom of that range", t)                     # low 97, high 104, close 98
         self.assertIn("biggest opening gap was Friday, -2.9%", t)             # 102 to 99
-        self.assertIn("lagged the S&P 500 by 3.0 percentage points", t)
         self.assertIn("The VIX rose from 15.0 to 20.0.", t)
-        self.assertIn("AAA (+10.0%) did best and BBB (-5.0%) did worst", t)
         self.assertLess(b["sentences"], 10)
         self.assertEqual(t.count(". ") + 1, b["sentences"])
         self.assertEqual([x["name"] for x in b["indexes"]], ["S&P 500", "Nasdaq-100", "Dow", "Russell 2000", "VIX"])
+
+    def test_reasons_come_from_weights_timing_and_calendars(self):
+        data = week_input()
+        flat = {d: b["close"] for d, b in week_bars([100, 100, 100, 100, 100, 100]).items()}
+        fri = "2026-10-30"
+        closes = {f"S{i}": dict(flat) for i in range(110)}
+        closes["AAA"] = dict(flat, **{fri: 80.0})                             # -20% on Friday, 10% of the index
+        closes["BBB"] = dict(flat, **{fri: 90.0})                             # -10%, 5% of the index
+        closes["CCC"] = dict(flat, **{fri: 110.0})                            # +10%, 1%
+        weights = dict({f"S{i}": 0.5 for i in range(110)}, AAA=10.0, BBB=5.0, CCC=1.0)
+        data.update(weights={"S&P 500": weights, "Nasdaq-100": weights}, closes=closes,
+                    sectors={k: week_bars([100, 100, 100, 100, 100, c]) for k, c in (("Energy", 104), ("Tech", 92), ("Banks", 100), ("Health", 101))},
+                    markets={"10-year yield": week_bars([4.0, 4, 4, 4, 4, 4.25]), "oil": week_bars([80, 80, 80, 80, 80, 84])},
+                    earnings=[{"date": "2026-10-29", "symbol": "AAA", "time": "time-after-hours", "surprise": -6.0},
+                              {"date": fri, "symbol": "CCC", "time": "time-pre-market", "surprise": 3.0},
+                              {"date": "2026-10-28", "symbol": "ZZZ", "time": "time-pre-market", "surprise": 1.0}],
+                    economy=[{"date": fri, "title": "CPI y/y", "actual": "3.1%", "consensus": "2.9%"}],
+                    headlines=lambda d: [{"day": d.isoformat(), "title": "Stocks slide", "source": "Wire", "url": "https://x.example"}])
+        b = recap(data, self.END, et(2026, 10, 30, 17), et(2026, 10, 30, 17, 5))
+        t = b["headline"]
+        self.assertIn("AAA (-20.0%) and BBB (-10.0%) accounted for about -2.50 points of the Nasdaq-100's -5.0% and -2.50 of the S&P 500's -2.0%", t)   # 10 x -20% + 5 x -10%
+        self.assertIn("1 of 113 S&P 500 stocks rose", t)
+        self.assertIn("By sector, Energy did best (+4.0%) and Tech did worst (-8.0%).", t)
+        self.assertIn("AAA fell 20.0% on Friday after earnings that missed estimates by 6%", t)                  # after hours Thursday
+        self.assertIn("CCC rose 10.0% on Friday after earnings that beat estimates by 3%", t)
+        self.assertNotIn("ZZZ", t)
+        self.assertIn("CPI y/y came in at 3.1% against 2.9% expected on Friday", t)
+        self.assertIn("the 10-year yield went from 4.00% to 4.25%", t)
+        self.assertIn("oil rose 5.0%", t)
+        self.assertLess(b["sentences"], 10)
+        self.assertEqual([h["day"] for h in b["headlines"]], [fri, "2026-10-26"])                                # worst and best days
+
+    def test_two_tickers_of_one_company_count_once(self):
+        data = week_input()
+        flat = {d: b["close"] for d, b in week_bars([100, 100, 100, 100, 100, 100]).items()}
+        fri = "2026-10-30"
+        closes = dict({f"S{i}": dict(flat) for i in range(20)}, GOOGL=dict(flat, **{fri: 90.0}), GOOG=dict(flat, **{fri: 90.0}))
+        weights = dict({f"S{i}": 1.0 for i in range(20)}, GOOGL=3.0, GOOG=3.0)
+        data.update(weights={"S&P 500": weights, "Nasdaq-100": weights}, closes=closes,
+                    earnings=[{"date": fri, "symbol": s, "time": "time-not-supplied", "surprise": -2.0} for s in ("GOOGL", "GOOG")])
+        t = recap(data, self.END, et(2026, 10, 30, 17), et(2026, 10, 30, 17, 5))["headline"]
+        self.assertIn("GOOGL (-10.0%)", t)
+        self.assertIn("about -0.60 points", t)                                # 6 x -10%: both tickers' weight, one company
+        self.assertNotIn("GOOG (", t)
+        self.assertIn("GOOGL fell 10.0% on Friday around earnings that missed estimates by 2%", t)      # no report time: not "after"
 
     def test_waits_for_the_final_bar_and_survives_missing_extras(self):
         slot, now = et(2026, 10, 30, 17), et(2026, 10, 30, 17, 5)
@@ -95,15 +137,20 @@ class TestWeekly(unittest.TestCase):
     def test_component_writes_once_and_keeps_recaps(self):
         with tempfile.TemporaryDirectory() as tmp:
             calls = []
-            def data():
-                calls.append(1)
+            def data(end):
+                calls.append(end)
                 return week_input()
             now = [et(2026, 11, 1, 12)]
             c = BriefingsComponent(lambda: {"markets": []}, is_trading_day, store_dir=tmp, clock=lambda: now[0], week_data=data)
             self.assertEqual(c.tick(), ["2026-10-30-weekly"])
             self.assertEqual(c.tick(), [])
-            self.assertEqual(len(calls), 1)
+            self.assertEqual(calls, [date(2026, 10, 30)])
             self.assertEqual(c.payload()["latest"]["weekly"]["kind"], "weekly")
+            stored = c._load("2026-10-30-weekly")                                 # an older version's recap is rewritten once
+            c._save("2026-10-30-weekly", dict(stored, version=1))
+            c._week_try = None
+            self.assertEqual(c.tick(), ["2026-10-30-weekly"])
+            self.assertEqual(c._load("2026-10-30-weekly")["version"], stored["version"])
             for i in range(45):                                                  # older daily briefings are pruned, recaps are not
                 c._save(f"2026-09-{i + 10:02d}-nyam", {"kind": "nyam"})
             self.assertTrue(c._path("2026-10-30-weekly").exists())
@@ -112,7 +159,7 @@ class TestWeekly(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             calls = []
             now = [et(2026, 10, 30, 17, 5)]
-            c = BriefingsComponent(lambda: {"markets": []}, is_trading_day, store_dir=tmp, clock=lambda: now[0], week_data=lambda: calls.append(1) or {})
+            c = BriefingsComponent(lambda: {"markets": []}, is_trading_day, store_dir=tmp, clock=lambda: now[0], week_data=lambda end: calls.append(1) or {})
             c.tick(); c.tick()
             self.assertEqual(len(calls), 1)
             now[0] += timedelta(minutes=31)

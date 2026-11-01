@@ -157,6 +157,8 @@ function renderBriefings(){
     + (b.late ? `<span class="chip" title="The app wasn't running at the scheduled time, so this was written when it started"><i class="dot warn"></i>Written late</span>` : "") + nxt
     + (b.indexes || []).map(x => `<span class="chip">${esc(x.name)} <b style="color:${x.pct > 0 ? "var(--good)" : x.pct < 0 ? "var(--bad)" : "inherit"}">${signed(x.pct, 1)}%</b></span>`).join("");
   $("briefLead").textContent = b.headline;
+  $("briefNews").style.display = (b.headlines || []).length ? "" : "none";
+  $("briefNewsList").innerHTML = (b.headlines || []).map(x => `<div class="bpost"><div class="meta"><b style="color:var(--ink2)">${esc(new Date(x.day + "T12:00:00Z").toLocaleDateString("en-US", {weekday: "short", timeZone: "UTC"}))}</b>${x.source ? `<span>${esc(x.source)}</span>` : ""}${/^https:/.test(x.url || "") ? `<a href="${esc(x.url)}" target="_blank" rel="noopener">open</a>` : ""}</div>${esc(x.title)}</div>`).join("");
   const col = r => r === "POSITIVE" ? "var(--pos)" : r === "NEGATIVE" ? "var(--neg)" : "var(--zg)";
   $("briefMarkets").innerHTML = (b.markets || []).map(m => `<section class="card bm accent" style="--accent:${col(m.regime)}">
     <div class="head" style="margin-bottom:0"><h2>${esc(m.market)}</h2><span class="chip" style="color:${col(m.regime)}">${esc((m.regime || "").toLowerCase())} gamma</span></div>
@@ -635,7 +637,7 @@ const HELP = {
     body: `<p>The line is the base-case path; the cone is the ±1σ expected move growing through the session. About one day in three, price leaves the cone.</p>`},
   factors: {title: "Factors", tldr: "Each ingredient of the bias, with its score and reason.", body: `<p>Positive scores lean bullish, negative bearish. "Day type" rows set the character of the session rather than the direction.</p>`},
   briefings: {title: "Briefings", tldr: "A written summary before the US open and before the Asia session.",
-    body: `<p><b>NY AM</b> at 9:00 AM ET: levels, regime, expected range, 0DTE levels, today's US data and market-moving posts. <b>Asia</b> at 7:00 PM ET: where we closed, what changed since the morning, the overnight Asia/Europe calendar and tomorrow's US data. <b>Weekly</b> after the week's last close: how the main indexes, the VIX and the biggest stocks moved, in under 10 sentences. It is written from daily prices, so it says what happened, not why.</p>`},
+    body: `<p><b>NY AM</b> at 9:00 AM ET: levels, regime, expected range, 0DTE levels, today's US data and market-moving posts. <b>Asia</b> at 7:00 PM ET: where we closed, what changed since the morning, the overnight Asia/Europe calendar and tomorrow's US data. <b>Weekly</b> after the week's last close: how the market moved, in under 10 sentences. It also shows what was behind the move: each stock's share of the index move, sectors, earnings reactions, economic data and headlines from the biggest days. Those are measured links by weight and timing, not proof of cause.</p>`},
   calendar: {title: "Economic calendar", tldr: "Scheduled data releases that can override any level.",
     body: `<p>From ForexFactory. High-impact USD releases (CPI, payrolls, Fed) move NQ and ES the most. Levels often break on these releases, then rebuild as options reposition.</p>`},
   posts: {title: "Trump posts", tldr: "Posts that have moved futures, tagged when they mention market topics.",

@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 from datetime import date, datetime, time, timedelta, timezone
 
+from feeds import weekinfo
 from gexsys import bias, marketcal
 from trackrecord import prices
 
@@ -57,19 +58,24 @@ def snapshot(gex, feeds) -> dict:
 
 # ---------------------------------------------------------------- the weekly recap's prices
 WEEK_INDEXES = {"S&P 500": "^GSPC", "Nasdaq-100": "^NDX", "Dow": "^DJI", "Russell 2000": "^RUT", "VIX": "^VIX"}
+WEEK_MARKETS = {"10-year yield": "^TNX", "dollar": "DX-Y.NYB", "oil": "CL=F"}
+WEEK_SECTORS = {"Technology": "XLK", "Communication": "XLC", "Consumer Discretionary": "XLY", "Consumer Staples": "XLP", "Financials": "XLF",
+                "Health Care": "XLV", "Industrials": "XLI", "Energy": "XLE", "Materials": "XLB", "Real Estate": "XLRE", "Utilities": "XLU"}
 
 
-def week_data(feeds) -> dict:
-    """Daily bars for the main indexes and the Screener's stocks (see briefings/weekly.py)."""
-    stocks = []
+def week_data(feeds, end: date) -> dict:
+    """Everything the weekly recap reads for the week ending `end` (see briefings/weekly.py). Each source may fail on its own."""
+    bars = lambda table: {name: prices.yahoo_daily(sym) for name, sym in table.items()}
     try:
-        for sym, c in feeds.screener.charts().items():
-            bars = {datetime.fromtimestamp(t, marketcal.NY).date().isoformat(): {"open": o, "high": h, "low": l, "close": cl}
-                    for t, o, h, l, cl in c.get("daily") or []}
-            stocks.append({"symbol": sym, "name": c.get("name"), "bars": bars})
+        w = feeds.screener.weights()
     except Exception:
-        stocks = []
-    return {"indexes": {name: prices.yahoo_daily(sym) for name, sym in WEEK_INDEXES.items()}, "stocks": stocks}
+        w = {}
+    weights = {"S&P 500": w.get("ES") or {}, "Nasdaq-100": w.get("NQ") or {}}
+    monday = end - timedelta(days=end.weekday())
+    return {"indexes": bars(WEEK_INDEXES), "markets": bars(WEEK_MARKETS), "sectors": bars(WEEK_SECTORS), "weights": weights,
+            "closes": weekinfo.closes(sorted({s for t in weights.values() for s in t})),
+            "earnings": weekinfo.earnings(monday - timedelta(days=3), end), "economy": weekinfo.economy(monday, end),
+            "headlines": weekinfo.headlines}
 
 
 # ---------------------------------------------------------------- track record: the levels known before an open

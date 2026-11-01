@@ -24,7 +24,7 @@ from typing import Callable, Optional
 
 from . import schedule
 from .compose import compose
-from .weekly import recap
+from .weekly import VERSION as WEEKLY_VERSION, recap
 
 log = logging.getLogger("briefings")
 KEEP = 40                 # daily briefings kept; weekly recaps are kept for good
@@ -41,7 +41,7 @@ class BriefingsComponent:
 
     def __init__(self, context: Callable[[], dict], is_trading_day: Callable, notify: Optional[Callable] = None,
                  store_dir: Optional[Path] = None, clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
-                 week_data: Optional[Callable[[], dict]] = None):
+                 week_data: Optional[Callable] = None):
         self.context, self.is_trading_day, self.notify, self.clock = context, is_trading_day, notify, clock
         self.week_data = week_data
         self._week_try: Optional[datetime] = None
@@ -117,14 +117,15 @@ class BriefingsComponent:
                     continue
                 slot, session = d
                 sid = schedule.slot_id(kind, slot)
-                if self._path(sid).exists():
+                old = self._load(sid) if self._path(sid).exists() else None
+                if self._path(sid).exists() and (kind != "weekly" or (old or {}).get("version", 1) >= WEEKLY_VERSION):
                     continue
                 if kind == "weekly":
                     if not self.week_data or (self._week_try and (now - self._week_try).total_seconds() < WEEK_RETRY_S):
                         continue
                     self._week_try = now
                     try:
-                        b = recap(self.week_data(), session, slot, now)
+                        b = recap(self.week_data(session), session, slot, now)
                     except Exception:
                         log.exception("weekly recap prices failed")
                         b = None
