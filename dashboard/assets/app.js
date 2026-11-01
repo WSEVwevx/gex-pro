@@ -8,8 +8,8 @@ const store = { get(k, d){ try { return localStorage.getItem(k) ?? d; } catch(e)
 // Static mode: the hosted copy (python -m gexsys build-site) reads files that a scheduled job rewrites,
 // instead of the local service's /api endpoints.
 const STATIC = !!window.GEX_STATIC;
-const API = STATIC ? {all: "data/all.json", news: "data/news.json", posts: "data/posts.json", indicator: "data/indicator.json", briefings: "data/briefings.json", track: "data/trackrecord.json", quotes: "data/quotes.json"}
-                   : {all: "/api/all", news: "/api/news", posts: "/api/posts", indicator: "/api/indicator", briefings: "/api/briefings", track: "/api/trackrecord", quotes: "/api/quotes"};
+const API = STATIC ? {all: "data/all.json", news: "data/news.json", posts: "data/posts.json", indicator: "data/indicator.json", briefings: "data/briefings.json", track: "data/trackrecord.json", quotes: "data/quotes.json", positioning: "data/positioning.json"}
+                   : {all: "/api/all", news: "/api/news", posts: "/api/posts", indicator: "/api/indicator", briefings: "/api/briefings", track: "/api/trackrecord", quotes: "/api/quotes", positioning: "/api/positioning"};
 const pineUrl = m => STATIC ? `data/pine-published${m ? "-" + m : ""}.txt`
                             : `/api/pine/all?which=published${m ? "&market=" + encodeURIComponent(m) : ""}`;
 // every data request skips the browser cache; on the hosted copy a unique query also skips GitHub's
@@ -476,7 +476,25 @@ function renderStats(w, s, L, X){
 }
 
 const BIAS_COLOR = {Bullish: "var(--pos)", Bearish: "var(--neg)", Neutral: "var(--zg)"};
+// CFTC positioning: fetched once per page load, it only changes weekly
+let cot = null, cotAsked = false;
+async function loadCot(){
+  if(cotAsked) return;
+  cotAsked = true;
+  try { cot = await (await fetchFresh(API.positioning)).json(); renderCot(); } catch(e){ cotAsked = false; }
+}
+function renderCot(){
+  const s = ((cot || {}).markets || {})[market];
+  $("cotCard").style.display = s ? "" : "none";
+  if(!s) return;
+  const when = new Date(s.asof + "T12:00:00Z").toLocaleDateString("en-US", {month: "short", day: "numeric", timeZone: "UTC"});
+  $("cotSub").textContent = `${s.contract} · as of ${when}`;
+  const n = v => (v > 0 ? "+" : "") + Math.round(v).toLocaleString("en-US");
+  $("cotBody").innerHTML = `<table class="trk-table"><tr><th>Group</th><th>Net contracts</th><th>Week change</th><th>3-year rank</th><th>Reading</th></tr>
+    ${s.groups.map(g => `<tr><td>${esc(g.name)}</td><td class="m">${n(g.net)}</td><td class="m">${n(g.change)}</td><td class="m"><b>${num(g.rank, 0)}%</b></td><td class="trk-mean">${esc(g.label)}</td></tr>`).join("")}</table>`;
+}
 function renderBias(w){
+  loadCot(); renderCot();
   const b = w.result.bias;
   if(!b){ $("biasCard").innerHTML = `<div class="eyebrow">Today's bias</div><div class="expl">Not available right now (needs levels and an expected move).</div>`; return; }
   const col = BIAS_COLOR[b.bias], ref = b.ref;
@@ -660,6 +678,8 @@ const HELP = {
     watch: ["The 95% range narrows as sessions add up", "\"rebuilt\" = frozen later from saved snapshots, using only data from before the open"]},
   track_scorecard: {title: "Scorecard", tldr: "Each claim the model makes, and how often it came true.",
     body: `<p><b>Expected move:</b> a fair one-sigma band should contain the close about 68% of the time. Much more means the band is too wide; much less, too narrow.</p><p><b>Regime:</b> the model says negative-gamma sessions should range wider than positive-gamma ones, measured in expected moves.</p><p><b>Walls:</b> a wall is <i>touched</i> when price trades within 5% of an expected move of it, and <i>held</i> when the close stays on the near side.</p><p><b>Plain levels:</b> the same test on price levels with no options meaning, run on every session in the backtest history (SPX from 1990, NDX from 2009) at the same distances from price as the walls actually touched. A real wall should beat this. History uses the previous close and the 30-day vol index, so it is a close match, not an exact one.</p><p><b>Bias:</b> only Bullish and Bearish calls are graded, against the close vs the plan's price. Compare it with the baseline, which always picks the more common direction.</p>`},
+  positioning: {title: "Big trader positioning", tldr: "How large funds were positioned in the E-minis, compared with their own last 3 years.",
+    body: `<p>From the CFTC's weekly Traders in Financial Futures report. <b>Leveraged funds</b> are hedge funds and similar traders. <b>Asset managers</b> are pensions, mutual funds and insurers.</p><p><b>Net</b> is long contracts minus short contracts. <b>3-year rank</b> is the share of the last 3 years' reports with a lower net position: 90% means longer than 90% of the time. Read the rank, not the sign. Leveraged funds are often short ES as part of hedged trades, so a big short can be completely normal.</p><p>Extreme readings show how crowded a position is, not when it will turn. Positions are from Tuesday and published Friday.</p>`},
   track_moves: {title: "Daily move vs the expected band", tldr: "How far each session moved, measured in expected moves.",
     body: `<p>Each bar is one session's move from the plan price to the close, divided by the plan's expected move. The shaded strip is ±1σ. Bars that closed outside it are amber. A fair band has about a third of bars outside, roughly evenly up and down.</p>`},
   track_split: {title: "Where it worked", tldr: "The same results split by gamma regime and plan confidence.",

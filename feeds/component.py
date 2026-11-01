@@ -18,6 +18,7 @@ from typing import Optional
 from .forexfactory import Calendar
 from .quotes import Quotes
 from .drivers import Drivers
+from .positioning import Positioning
 from .truthsocial import Posts
 
 
@@ -34,8 +35,9 @@ class FeedsComponent:
     name = "feeds"
 
     def __init__(self, calendar: Optional[Calendar] = None, posts: Optional[Posts] = None, quotes: Optional[Quotes] = None,
-                 screener: Optional[Drivers] = None):
+                 screener: Optional[Drivers] = None, positioning: Optional[Positioning] = None):
         self._calendar, self._posts, self._quotes, self._screener = calendar, posts, quotes, screener
+        self._positioning = positioning
 
     # created on first use, so building the hosted site never touches the local caches
     @property
@@ -62,11 +64,18 @@ class FeedsComponent:
             self._screener = Drivers(cache_path=_state_dir() / "drivers.json")
         return self._screener
 
+    @property
+    def positioning(self) -> Positioning:
+        if self._positioning is None:
+            self._positioning = Positioning(cache_path=_state_dir() / "positioning.json")
+        return self._positioning
+
     def routes(self) -> dict:
         return {"/api/news": lambda q: (200, self.calendar.get()),
                 "/api/posts": lambda q: (200, self.posts.get()),
                 "/api/quotes": lambda q: (200, self.quotes.get()),
                 "/api/screener": lambda q: (200, self.screener.get()),
+                "/api/positioning": lambda q: (200, self.positioning.get()),
                 "/api/screener/chart": self._chart}
 
     def _chart(self, q):
@@ -89,4 +98,6 @@ class FeedsComponent:
         self._screener = self._screener or Drivers(cache_path=state / "drivers.json")
         _write(data / "screener.json", self.screener.get())
         _write(data / "screener-charts.json", self.screener.charts())
+        self._positioning = self._positioning or Positioning(cache_path=state / "positioning.json")
+        _write(data / "positioning.json", self.positioning.get())
         return {}

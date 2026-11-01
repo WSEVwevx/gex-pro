@@ -72,7 +72,11 @@ def week_data(feeds, end: date) -> dict:
         w = {}
     weights = {"S&P 500": w.get("ES") or {}, "Nasdaq-100": w.get("NQ") or {}}
     monday = end - timedelta(days=end.weekday())
-    return {"indexes": bars(WEEK_INDEXES), "markets": bars(WEEK_MARKETS), "sectors": bars(WEEK_SECTORS), "weights": weights,
+    try:
+        held = feeds.positioning.get().get("markets") or {}
+    except Exception:
+        held = {}
+    return {"positioning": held, "indexes": bars(WEEK_INDEXES), "markets": bars(WEEK_MARKETS), "sectors": bars(WEEK_SECTORS), "weights": weights,
             "closes": weekinfo.closes(sorted({s for t in weights.values() for s in t})),
             "earnings": weekinfo.earnings(monday - timedelta(days=3), end), "economy": weekinfo.economy(monday, end),
             "headlines": weekinfo.headlines}

@@ -9,7 +9,8 @@ data (from the app shell, see gexpro/context.py); only the two main indexes are 
    "markets": {"10-year yield": bars, "dollar": bars, "oil": bars}, "sectors": {"Technology": bars, ...},
    "weights": {"S&P 500": {symbol: weight %}, "Nasdaq-100": {...}}, "closes": {symbol: {date: close}},
    "earnings": [{"date", "symbol", "time", "surprise"}], "economy": [{"date", "title", "actual", "consensus"}],
-   "headlines": callable(date) -> [{"day", "title", "source", "url"}]}
+   "headlines": callable(date) -> [{"day", "title", "source", "url"}],
+   "positioning": {"ES": {"asof", "groups": [{"key", "rank"}, ...]}, "NQ": ...}}     CFTC, see feeds/positioning.py
 """
 from __future__ import annotations
 
@@ -18,7 +19,7 @@ from typing import Optional
 
 from .schedule import TITLES
 
-VERSION = 2             # a stored recap from an older version is rewritten while its week is current
+VERSION = 3             # a stored recap from an older version is rewritten while its week is current
 MAIN = "S&P 500"
 TECH = "Nasdaq-100"
 OTHERS = ("Dow", "Russell 2000")
@@ -174,8 +175,23 @@ def _backdrop(data: dict, end: date, vix: Optional[dict]) -> Optional[str]:
         parts.append(f"the dollar {'rose' if usd['chg'] > 0 else 'fell'} {abs(usd['chg']):.1f}%")
     if not parts:
         return None
-    text = ", ".join(parts[:-1]) + (" and " if len(parts) > 1 else "") + parts[-1] + "."
+    text = ", ".join(parts[:-1]) + (" and " if len(parts) > 1 else "") + parts[-1] + _funds(data) + "."
     return text[0].upper() + text[1:]
+
+
+def _funds(data: dict) -> str:
+    """Where leveraged funds' net position sits in its own 3-year range, as a closing clause."""
+    parts, asof = [], ""
+    for m, s in sorted((data.get("positioning") or {}).items()):
+        rank = next((g["rank"] for g in s.get("groups") or [] if g.get("key") == "lev_money"), None)
+        if rank is not None:
+            parts.append(f"{rank}% in {m}")
+            asof = s.get("asof") or asof
+    if not parts:
+        return ""
+    d = date.fromisoformat(asof)
+    when = f"{d:%b} {d.day}"
+    return f"; leveraged funds were net longer than {' and '.join(parts)} of the past 3 years (CFTC, {when})"
 
 
 def recap(data: Optional[dict], end: date, slot: datetime, now: datetime) -> Optional[dict]:

@@ -88,7 +88,8 @@ class TestWeekly(unittest.TestCase):
                               {"date": fri, "symbol": "CCC", "time": "time-pre-market", "surprise": 3.0},
                               {"date": "2026-10-28", "symbol": "ZZZ", "time": "time-pre-market", "surprise": 1.0}],
                     economy=[{"date": fri, "title": "CPI y/y", "actual": "3.1%", "consensus": "2.9%"}],
-                    headlines=lambda d: [{"day": d.isoformat(), "title": "Stocks slide", "source": "Wire", "url": "https://x.example"}])
+                    headlines=lambda d: [{"day": d.isoformat(), "title": "Stocks slide", "source": "Wire", "url": "https://x.example"}],
+                    positioning={m: {"asof": "2026-10-27", "groups": [{"key": "lev_money", "rank": r}]} for m, r in (("NQ", 80), ("ES", 12))})
         b = recap(data, self.END, et(2026, 10, 30, 17), et(2026, 10, 30, 17, 5))
         t = b["headline"]
         self.assertIn("AAA (-20.0%) and BBB (-10.0%) accounted for about -2.50 points of the Nasdaq-100's -5.0% and -2.50 of the S&P 500's -2.0%", t)   # 10 x -20% + 5 x -10%
@@ -100,6 +101,7 @@ class TestWeekly(unittest.TestCase):
         self.assertIn("CPI y/y came in at 3.1% against 2.9% expected on Friday", t)
         self.assertIn("the 10-year yield went from 4.00% to 4.25%", t)
         self.assertIn("oil rose 5.0%", t)
+        self.assertIn("; leveraged funds were net longer than 12% in ES and 80% in NQ of the past 3 years (CFTC, Oct 27).", t)
         self.assertLess(b["sentences"], 10)
         self.assertEqual([h["day"] for h in b["headlines"]], [fri, "2026-10-26"])                                # worst and best days
 
