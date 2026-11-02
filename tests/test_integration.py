@@ -302,7 +302,7 @@ class TestStaticSite(unittest.TestCase):
         from gexpro import site
         # the synthetic chain is dated 2026-10-20; the hosted build drops days older than 5 by the wall clock,
         # which would empty the history between the two builds once that date is a week behind
-        with tempfile.TemporaryDirectory() as tmp, mock.patch("gexsys.component._prune"):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch("gexsys.component._prune"), mock.patch("gexsys.storage.SnapshotStore.prune"):
             out, state = Path(tmp) / "site", Path(tmp) / "state"
             build = lambda: site.build([GexComponent([synth_cfg(tmp)]), FeedsComponent(_Empty(), _Empty(), _Empty(), _Empty())], out, state)
             res = build()

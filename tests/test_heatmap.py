@@ -3,6 +3,7 @@ import json
 import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
+from unittest import mock
 
 from gexsys import heatmap
 from gexsys.ladder import HEAT_WINDOW
@@ -17,7 +18,8 @@ class TestHeatmap(unittest.TestCase):
         self.assertEqual(heatmap.parse_candles(raw), [[100, 1, 2, 0.5, 1.5], [220, 3, 4, 2.5, 3.5]])
 
     def test_profile_saved_and_read_back(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        # the synthetic chain is dated 2026-10-20: the worker's age-based cleanup must not delete it by the wall clock
+        with tempfile.TemporaryDirectory() as tmp, mock.patch("gexsys.storage.SnapshotStore.prune"):
             w = MarketWorker(synth_cfg(tmp))
             w.step()
             s = w.result["summary"]
