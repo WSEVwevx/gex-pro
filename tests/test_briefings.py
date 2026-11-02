@@ -157,6 +157,15 @@ class TestWeekly(unittest.TestCase):
                 c._save(f"2026-09-{i + 10:02d}-nyam", {"kind": "nyam"})
             self.assertTrue(c._path("2026-10-30-weekly").exists())
 
+    def test_opening_the_page_never_waits_for_the_recap(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            calls = []
+            c = BriefingsComponent(lambda: {"markets": []}, is_trading_day, store_dir=tmp, clock=lambda: et(2026, 11, 1, 12),
+                                   week_data=lambda end: calls.append(end) or week_input())
+            code, body = c.routes()["/api/briefings"]({})
+            self.assertEqual((code, calls, body["latest"]["weekly"]), (200, [], None))     # the page loads at once
+            self.assertEqual(c.tick(), ["2026-10-30-weekly"])                               # the background check writes it
+
     def test_retries_slowly_while_prices_are_missing(self):
         with tempfile.TemporaryDirectory() as tmp:
             calls = []

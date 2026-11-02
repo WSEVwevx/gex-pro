@@ -106,8 +106,9 @@ class BriefingsComponent:
         return copied
 
     # ---------------------------------------------------------------- writing
-    def tick(self) -> list[str]:
-        """Write every briefing that is due and not written yet. Returns the ids written."""
+    def tick(self, weekly: bool = True) -> list[str]:
+        """Write every briefing that is due and not written yet. Returns the ids written.
+        weekly=False leaves the recap to the background check: gathering its data takes about 40 seconds."""
         written = []
         with self._lock:
             now = self.clock()
@@ -121,7 +122,7 @@ class BriefingsComponent:
                 if self._path(sid).exists() and (kind != "weekly" or (old or {}).get("version", 1) >= WEEKLY_VERSION):
                     continue
                 if kind == "weekly":
-                    if not self.week_data or (self._week_try and (now - self._week_try).total_seconds() < WEEK_RETRY_S):
+                    if not weekly or not self.week_data or (self._week_try and (now - self._week_try).total_seconds() < WEEK_RETRY_S):
                         continue
                     self._week_try = now
                     try:
@@ -165,7 +166,8 @@ class BriefingsComponent:
     # ---------------------------------------------------------------- component contract
     def routes(self) -> dict:
         def get(q):
-            self.tick()                                    # catch up on request too (cheap when nothing is due)
+            if not self._lock.locked():                    # catch up on request too, but never wait on a background write
+                self.tick(weekly=False)
             return 200, self.payload()
         return {"/api/briefings": get}
 
