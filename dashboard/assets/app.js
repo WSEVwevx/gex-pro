@@ -156,7 +156,8 @@ function renderBriefings(){
   $("briefMeta").innerHTML = `<span class="chip">Written <b>${new Date(b.generated_at).toLocaleString("en-US", {...ET, weekday:"short", hour:"numeric", minute:"2-digit"})} ET</b></span>`
     + (b.late ? `<span class="chip" title="The app wasn't running at the scheduled time, so this was written when it started"><i class="dot warn"></i>Written late</span>` : "") + nxt
     + (b.indexes || []).map(x => `<span class="chip">${esc(x.name)} <b style="color:${x.pct > 0 ? "var(--good)" : x.pct < 0 ? "var(--bad)" : "inherit"}">${signed(x.pct, 1)}%</b></span>`).join("");
-  $("briefLead").textContent = b.headline;
+  if(b.sections) $("briefLead").innerHTML = b.sections.map(x => `<div class="bsec"><div class="eyebrow">${esc(x.title)}</div><p>${esc(x.text)}</p></div>`).join("");
+  else $("briefLead").textContent = b.headline;
   $("briefNews").style.display = (b.headlines || []).length ? "" : "none";
   $("briefNewsList").innerHTML = (b.headlines || []).map(x => `<div class="bpost"><div class="meta"><b style="color:var(--ink2)">${esc(new Date(x.day + "T12:00:00Z").toLocaleDateString("en-US", {weekday: "short", timeZone: "UTC"}))}</b>${x.source ? `<span>${esc(x.source)}</span>` : ""}${/^https:/.test(x.url || "") ? `<a href="${esc(x.url)}" target="_blank" rel="noopener">open</a>` : ""}</div>${esc(x.title)}</div>`).join("");
   const col = r => r === "POSITIVE" ? "var(--pos)" : r === "NEGATIVE" ? "var(--neg)" : "var(--zg)";
@@ -490,7 +491,7 @@ function renderCot(){
   const when = new Date(s.asof + "T12:00:00Z").toLocaleDateString("en-US", {month: "short", day: "numeric", timeZone: "UTC"});
   $("cotSub").textContent = `${s.contract} · as of ${when}`;
   const n = v => (v > 0 ? "+" : "") + Math.round(v).toLocaleString("en-US");
-  $("cotBody").innerHTML = `<table class="trk-table"><tr><th>Group</th><th>Net</th><th>Week</th><th>3-yr rank</th><th>Reading</th></tr>
+  $("cotBody").innerHTML = `<table class="trk-table"><tr><th>Group</th><th>Net</th><th>Week</th><th>Rank</th><th>Reading</th></tr>
     ${s.groups.map(g => `<tr><td>${esc(g.name)}</td><td class="m">${n(g.net)}</td><td class="m">${n(g.change)}</td><td class="m"><b>${num(g.rank, 0)}%</b></td><td class="trk-mean">${esc(g.label)}</td></tr>`).join("")}</table>`;
 }
 function renderBias(w){
@@ -950,7 +951,9 @@ function renderTrack(){
   const wall = w => !w ? `<span class="dim">-</span>` : !w.touched ? `<span class="dim" title="${num(w.level, 2)}">not reached</span>`
     : w.held ? `<span class="good" title="${num(w.level, 2)}">held</span>` : `<span class="bad" title="${num(w.level, 2)}">broke</span>`;
   const yes = (v, a = "yes", b = "no") => v == null ? `<span class="dim">-</span>` : v ? `<span class="good">${a}</span>` : `<span class="bad">${b}</span>`;
-  const rebuilt = s => s.plan && s.plan.frozen_at && Date.parse(s.plan.frozen_at) - Date.parse(s.session + "T13:30:00Z") > 4 * 3600e3;
+  // the 09:30 open in real time, whichever side of daylight saving the session falls on
+  const openMs = day => { const noon = Date.parse(day + "T16:00:00Z") / 1000; return (Date.parse(day + "T09:30:00Z") / 1000 + noon - chartTimeET(noon)) * 1000; };
+  const rebuilt = s => s.plan && s.plan.frozen_at && Date.parse(s.plan.frozen_at) - openMs(s.session) > 4 * 3600e3;
   $("trkLog").innerHTML = ss.length ? `<table class="trk-table"><tr><th>Session</th><th>Mkt</th><th>Plan</th><th>Ref</th><th>±EM</th><th>Close</th><th>In band</th><th>Call wall</th><th>Put wall</th><th>Bias</th><th></th></tr>${ss.map(s => {
     const p = s.plan, o = s.outcome, day = new Date(s.session + "T12:00:00Z").toLocaleDateString("en-US", {weekday: "short", month: "short", day: "numeric", timeZone: "UTC"});
     if(!p) return `<tr><td>${esc(day)}</td><td>${esc(s.market)}</td><td colspan="9" class="dim">${esc(s.why || s.status)}</td></tr>`;

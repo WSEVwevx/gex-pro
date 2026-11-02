@@ -236,6 +236,7 @@ td.m{font-family:var(--mono)}
 .bsec{margin-top:12px}
 .bsec .eyebrow{margin-bottom:3px}
 .bsec p{margin:3px 0 0;font-size:12.5px;line-height:1.55;color:var(--ink2)}
+.bhead .lead .bsec p{font-size:15px;line-height:1.6;color:var(--ink)}
 .bev{display:grid;grid-template-columns:86px 44px 1fr auto;gap:10px;align-items:center;padding:7px 0;border-top:1px solid var(--line);font-size:12.5px}
 .bev .tm{font:11.5px var(--mono);color:var(--ink2)} .bev .fp{font:11.5px var(--mono);color:var(--ink3);white-space:nowrap}
 .bpost{padding:8px 0;border-top:1px solid var(--line);font-size:12.5px;line-height:1.5}

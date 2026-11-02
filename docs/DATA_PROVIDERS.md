@@ -59,3 +59,14 @@ Multipliers: 50 for ES options, 20 for NQ, 5 and 2 for the micros. Timestamps ne
 
 * Cboe's feed is for personal use. `storage.store_raw` defaults to `false`, so only derived numbers
   are written to disk.
+
+## Other free feeds (not used for option levels)
+
+| Source | Used for | Where |
+|---|---|---|
+| Yahoo Finance | index, sector and stock closes for the weekly recap; Screener prices | `feeds/weekinfo.py`, `feeds/drivers.py`, `trackrecord/prices.py` |
+| Nasdaq.com calendars | past earnings with the surprise, economic data with actual vs consensus | `feeds/weekinfo.py` |
+| Google News RSS | headlines from the week's biggest days, shown with their source | `feeds/weekinfo.py` |
+| CFTC Traders in Financial Futures | weekly E-mini positioning (Tuesday's data, published Friday) | `feeds/positioning.py` |
+
+Each one is optional: if a source fails, its sentence or card is left out and the rest still works.

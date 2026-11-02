@@ -19,7 +19,7 @@ from typing import Optional
 
 from .schedule import TITLES
 
-VERSION = 4             # a stored recap from an older version is rewritten while its week is current
+VERSION = 5             # a stored recap from an older version is rewritten while its week is current
 MAIN = "S&P 500"
 TECH = "Nasdaq-100"
 OTHERS = ("Dow", "Russell 2000")
@@ -222,6 +222,7 @@ def recap(data: Optional[dict], end: date, slot: datetime, now: datetime) -> Opt
     gap = max(s["gaps"], key=lambda x: abs(x[1]))
     gap_txt = f", and the biggest opening gap was {_day(gap[0])}, {gap[1]:+.1f}% from the previous close" if abs(gap[1]) >= GAP_MIN else ""
     lines.append(f"It traded between {s['low']:,.0f} and {s['high']:,.0f} and closed {place}{gap_txt}.")
+    price_end = len(lines)
     lead = _leader_text(n, s, rows)
     if lead:
         lines.append(lead)
@@ -229,9 +230,14 @@ def recap(data: Optional[dict], end: date, slot: datetime, now: datetime) -> Opt
     if len(secs) >= 4:
         lines.append(f"By sector, {secs[-1][1]} did best ({secs[-1][0]:+.1f}%) and {secs[0][1]} did worst ({secs[0][0]:+.1f}%).")
     days = [d for d, _ in s["days"]]
-    for extra in (_earnings(data, end, days), _economy(data), _backdrop(data, end, vix)):
+    for extra in (_earnings(data, end, days), _economy(data)):
         if extra:
             lines.append(extra[0].upper() + extra[1:])
+    behind_end = len(lines)
+    back = _backdrop(data, end, vix)
+    if back:
+        lines.append(back)
+    parts = (("Price action", lines[:price_end]), ("What was behind it", lines[price_end:behind_end]), ("Backdrop", lines[behind_end:]))
 
     news = []
     get_news = data.get("headlines")
@@ -243,5 +249,6 @@ def recap(data: Optional[dict], end: date, slot: datetime, now: datetime) -> Opt
                 continue
     chips = [{"name": k, "close": v["close"], "pct": round(v["chg"], 2)} for k, v in ((MAIN, s), (TECH, n), *have, ("VIX", vix)) if v]
     return {"kind": "weekly", "title": TITLES["weekly"], "slot": slot.isoformat(), "session": end.isoformat(), "version": VERSION,
-            "generated_at": now.isoformat(), "headline": " ".join(lines[:9]), "sentences": len(lines[:9]), "indexes": chips,
+            "generated_at": now.isoformat(), "headline": " ".join(lines), "sentences": len(lines), "indexes": chips,
+            "sections": [{"title": t, "text": " ".join(x)} for t, x in parts if x],
             "headlines": news, "markets": [], "calendar": [], "posts": {}}

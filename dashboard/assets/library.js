@@ -393,6 +393,11 @@ window.GEX_LIBRARY = (() => {
     ["Points contribution", "Index weight × the stock's % move × the futures price: roughly how many NQ / ES points that stock's move is worth.", "index-drivers", "Site & indicator", "Screener"],
     ["Relative volume", "Today's volume divided by the 3-month average. 1.5× or more is unusual interest.", "open-interest-volume", "Site & indicator", "Screener"],
     ["BMO / AMC", "Earnings reported before the market opens / after the market closes. AMC reports from big names often gap NQ and ES overnight.", "index-drivers", "Site & indicator", "Screener earnings"],
+    ["Leveraged funds", "Hedge funds and similar traders in the CFTC's weekly report. Often short index futures as part of hedged trades, so read their position against its own history.", "dealers", "Dealers & positioning", "Bias page"],
+    ["Asset managers", "Pensions, mutual funds and insurers in the CFTC's weekly report. Usually long index futures.", "dealers", "Dealers & positioning", "Bias page"],
+    ["3-year rank", "The share of the last 3 years' weekly reports with a lower net position. 90% means longer than 90% of the time. It shows how crowded a position is, not when it will turn.", "dealers", "Dealers & positioning", "Bias page"],
+    ["Market breadth", "How many stocks rose compared with how many fell. An index can fall while most of its stocks rise if a few giants drop.", "index-drivers", "Using GEX PRO", "Weekly recap"],
+    ["Plain levels", "Price levels with no options meaning, tested the same way as the walls over years of real sessions. A wall has to beat them to show an edge.", "daily-routine", "Using GEX PRO", "Track record page"],
     ["Track record", "Each session's plan, frozen before the 9:30 open, graded after the close. Kept forever in a public history.", "daily-routine", "Site & indicator", "Track record page"],
   ];
 

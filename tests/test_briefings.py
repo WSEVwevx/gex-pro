@@ -104,6 +104,8 @@ class TestWeekly(unittest.TestCase):
         self.assertIn("; leveraged funds' net position was above 12% in ES and 80% in NQ of the past 3 years (CFTC, Oct 27).", t)
         self.assertLess(b["sentences"], 10)
         self.assertEqual([h["day"] for h in b["headlines"]], [fri, "2026-10-26"])                                # worst and best days
+        self.assertEqual([x["title"] for x in b["sections"]], ["Price action", "What was behind it", "Backdrop"])
+        self.assertEqual(" ".join(x["text"] for x in b["sections"]), t)                                          # nothing lost in the split
 
     def test_two_tickers_of_one_company_count_once(self):
         data = week_input()

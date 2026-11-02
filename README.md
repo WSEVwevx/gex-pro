@@ -151,7 +151,12 @@ your browser, and the first visit follows your system setting.
 * **Briefings** (the local app also copies in the ones the hosted site wrote while your PC was off): a NY AM briefing at 9:00 AM ET on trading days and an Asia session briefing at 7:00 PM ET
   the evening before each trading day: both markets' regime, levels, expected range, bias and game plan, the
   relevant calendar (overnight Asia/Europe events for the Asia one) and market-moving posts. A Windows
-  notification when each is written; a missed one is written late when the app starts.
+  notification when each is written; a missed one is written late when the app starts. A **weekly recap**
+  after the week's last close says how the market moved and what was behind it in under 10 sentences (index
+  moves, breadth across about 500 stocks, each stock's share of the index move, sectors, earnings reactions,
+  economic data, yields, oil and the dollar), with headlines from the biggest days.
+* **Big trader positioning** (Bias page): the CFTC's weekly report for the ES and NQ E-minis, leveraged funds
+  and asset managers, each ranked against its own last 3 years. Background only, not part of the bias score.
 * **Indicator:** the GEX PRO TradingView script, always the current version, with Copy / Download
   buttons, install steps, version and last-updated time, and the script's recent changes.
 * **Bias:** a transparent, rule-based reading of today's positioning:
