@@ -89,7 +89,7 @@ class TestPineStatic(unittest.TestCase):
             "request.security": {"gaps", "ignore_invalid_symbol", "lookahead"},
             "str.contains": set(), "str.length": set(), "str.pos": set(), "str.repeat": set(), "str.split": set(), "str.startswith": set(),
             "str.substring": set(), "str.tonumber": set(), "str.tostring": set(), "str.trim": set(), "str.upper": set(),
-            "ta.cross": set(), "timeframe.change": set(),
+            "ta.cross": set(), "timeframe.change": set(), "timeframe.in_seconds": set(),
             "table.cell": {"bgcolor", "text_color", "text_halign", "text_size"}, "table.clear": set(),
             "table.new": {"bgcolor", "border_width", "frame_color", "frame_width"},
         }

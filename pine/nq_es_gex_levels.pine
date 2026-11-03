@@ -427,6 +427,9 @@ lnStyle(string s) =>
     s == "╌╌╌╌" or s == "Dashed" ? line.style_dashed : s == "┈┈┈┈" or s == "Dotted" ? line.style_dotted : line.style_solid
 lSz = lblSize == "Tiny" ? size.tiny : lblSize == "Small" ? size.small : size.normal
 lblX = showProf ? profOffset + profWidth + 2 : lblOff
+zoneX = showProf ? profOffset : math.max(1, lblX - 5)      // bars right of price where the zone column starts
+// "end at price" lines run on to the zone column; lines are placed by time, so count the bars in milliseconds
+lineEndT = time + zoneX * timeframe.in_seconds() * 1000
 lblBgCol = lblBg ? color.new(#0b0e13, 25) : color.new(#0b0e13, 100)
 twoSrc = okA and okB
 
@@ -503,7 +506,7 @@ drawLevel(float p, string name, string tag, color col, int width, string style, 
         else
             bool toPrice = extent == "Across the chart, end at price"
             int t1 = extent == "Right of price" ? time : extent == "Full chart" or toPrice ? math.min(firstTime, time - 1) : math.min(sessStartTime, time - 1)
-            int t2 = extent == "Right of price" ? time + 1 : time      // t2 > t1 gives the line a direction to extend
+            int t2 = extent == "Right of price" ? time + 1 : toPrice ? lineEndT : time      // t2 > t1 gives the line a direction to extend
             array.push(gPrices, p)
             array.push(gBodies, item)
             array.push(gLines, line.new(t1, p, t2, p, xloc = xloc.bar_time, extend = extent == "Full chart" ? extend.both : toPrice ? extend.none : extend.right,
@@ -824,7 +827,7 @@ renderTags() =>
         if extent == "Across the chart, end at price"
             // the price sits ON TOP of the line where it ends (anchored by its bottom-right corner), plain digits like a
             // price-scale mark: 29885, 29914.75
-            array.push(gLabels, label.new(bar_index, p, str.tostring(p, "#.##"), style = label.style_label_lower_right, color = color.new(#0b0e13, 100),
+            array.push(gLabels, label.new(bar_index + zoneX, p, str.tostring(p, "#.##"), style = label.style_label_lower_right, color = color.new(#0b0e13, 100),
                  textcolor = color.new(array.get(tgCol, i), 0), size = lSz, textalign = text.align_right, tooltip = tip))
         float st = array.get(tgStr, i)
         color lc = array.get(tgCol, i)
@@ -848,10 +851,9 @@ renderTags() =>
             pad += str.repeat(" ", str.length(nmx) + 2)
     // the zones as a narrow column just left of the labels, clear of price (extensions fainter)
     if zoneShade
-        int zx0 = showProf ? profOffset : math.max(1, lblX - 5)
         for z in zs
             color zc = color.new(z.pos ? cPos : cNeg, z.ext ? 91 : 82)
-            array.push(gBoxes, box.new(bar_index + zx0, z.hi, bar_index + math.max(2, lblX - 1), z.lo, border_width = 0,
+            array.push(gBoxes, box.new(bar_index + zoneX, z.hi, bar_index + math.max(2, lblX - 1), z.lo, border_width = 0,
                  border_color = color.new(zc, 100), bgcolor = zc))
     true
 
