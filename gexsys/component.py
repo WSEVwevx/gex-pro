@@ -22,6 +22,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterable, Optional
 
+from . import marketcal
 from .config import MarketConfig
 from .export import combine
 from .heatmap import RANGE, HeatmapCache, build as build_heatmap
@@ -47,8 +48,16 @@ def _prune(root: Path, keep_days: int) -> None:
             shutil.rmtree(day, ignore_errors=True)
 
 
+def _calendar(now: datetime) -> dict:
+    """This year's and next year's market holidays and 13:00 closes, for the page's session clock."""
+    y = now.astimezone(marketcal.NY).year
+    days = lambda fn: sorted(d.isoformat() for yr in (y, y + 1) for d in fn(yr))
+    return {"holidays": days(marketcal.nyse_holidays), "early_closes": days(marketcal.early_closes)}
+
+
 def _all(workers: Iterable[MarketWorker], **extra) -> dict:
-    return to_jsonable(dict(now=datetime.now(timezone.utc).isoformat(), **extra, workers=[
+    now = datetime.now(timezone.utc)
+    return to_jsonable(dict(now=now.isoformat(), calendar=_calendar(now), **extra, workers=[
         {"key": w.key, "market": w.cfg.market, "provider": w.label, "source": w.cfg.source,
          "description": w.cfg.description, "health": w.health(), "published": w.published, "result": w.result}
         for w in workers]))

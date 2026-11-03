@@ -14,6 +14,13 @@ class TestCalendar(unittest.TestCase):
                   date(2026, 6, 19), date(2026, 7, 3), date(2026, 9, 7), date(2026, 11, 26), date(2026, 12, 25)):
             self.assertIn(d, h, d)
 
+    def test_calendar_for_page_clock(self):
+        from gexsys.component import _calendar
+        c = _calendar(datetime(2027, 1, 1, 3, 0, tzinfo=U))          # still Dec 31 in New York
+        self.assertIn("2026-11-26", c["holidays"])
+        self.assertIn("2027-11-25", c["holidays"])
+        self.assertEqual(c["early_closes"][:2], ["2026-11-27", "2026-12-24"])
+
     def test_saturday_new_year_not_observed(self):
         self.assertNotIn(date(2021, 12, 31), mc.nyse_holidays(2021))
         self.assertNotIn(date(2021, 12, 31), mc.nyse_holidays(2022))
@@ -24,7 +31,9 @@ class TestCalendar(unittest.TestCase):
         self.assertIn(date(2026, 12, 24), e)
         self.assertNotIn(date(2026, 7, 3), e)            # holiday itself in 2026
         self.assertIn(date(2025, 7, 3), mc.early_closes(2025))
-        self.assertEqual(mc.session_state(datetime(2026, 11, 27, 18, 30, tzinfo=U)), "ETH")   # 13:30 ET
+        self.assertEqual(mc.session_state(datetime(2026, 11, 27, 18, 10, tzinfo=U)), "ETH")      # 13:10 ET
+        self.assertEqual(mc.session_state(datetime(2026, 11, 27, 18, 30, tzinfo=U)), "CLOSED")   # 13:30 ET, futures halted
+        self.assertEqual(mc.session_state(datetime(2026, 12, 24, 23, 30, tzinfo=U)), "CLOSED")   # Christmas Eve evening
 
     def test_dst_transitions(self):
         # 2026-03-08 spring forward. 09:35 EST = 14:35Z (Fri); 09:35 EDT = 13:35Z (Mon)
@@ -40,6 +49,8 @@ class TestCalendar(unittest.TestCase):
         self.assertEqual(mc.session_state(datetime(2026, 10, 25, 22, 30, tzinfo=U)), "ETH")     # Sun 18:30 EDT
         self.assertEqual(mc.session_state(datetime(2026, 10, 20, 21, 30, tzinfo=U)), "CLOSED")  # 17:30 halt
         self.assertEqual(mc.session_state(datetime(2026, 12, 25, 15, 0, tzinfo=U)), "HOLIDAY")
+        self.assertEqual(mc.session_state(datetime(2026, 11, 26, 23, 30, tzinfo=U)), "ETH")      # Thanksgiving 18:30 reopen
+        self.assertEqual(mc.session_state(datetime(2026, 4, 3, 22, 30, tzinfo=U)), "HOLIDAY")    # Good Friday: weekend next
         self.assertEqual(mc.refresh_interval(datetime(2026, 10, 20, 15, 0, tzinfo=U)), 60)
 
     def test_rollover(self):

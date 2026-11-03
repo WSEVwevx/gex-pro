@@ -114,9 +114,12 @@ def session_state(dt: datetime) -> str:
     t = dt.astimezone(NY)
     d, clock, wd = t.date(), t.time(), t.weekday()
     if d in nyse_holidays(d.year):
-        return "HOLIDAY"
+        # Globex reopens at 18:00 ET for the next trading day (not after Good Friday: that is the weekend)
+        return "ETH" if clock >= time(18, 0) and is_trading_day(d + timedelta(days=1)) else "HOLIDAY"
     if wd < 5 and time(9, 30) <= clock < rth_close(d):
         return "RTH"
+    if d in early_closes(d.year) and clock >= time(13, 15):     # CME halts index futures at 13:15 ET
+        return "CLOSED"
     # Globex equity index: Sun 18:00 -> Fri 17:00 ET, daily halt 17:00-18:00 ET
     if wd == 5 or (wd == 6 and clock < time(18, 0)) or (wd == 4 and clock >= time(17, 0)):
         return "CLOSED"

@@ -91,7 +91,9 @@ class MarketWorker(threading.Thread):
     def _save_published(self) -> None:
         try:
             self._pub_path.parent.mkdir(parents=True, exist_ok=True)
-            self._pub_path.write_text(json.dumps(to_jsonable(self.published)), encoding="utf-8")
+            tmp = self._pub_path.with_suffix(".tmp")      # a crash mid-write must not lose the last payload
+            tmp.write_text(json.dumps(to_jsonable(self.published)), encoding="utf-8")
+            os.replace(tmp, self._pub_path)
         except OSError as e:
             log.warning("could not save published payload for %s: %s", self.key, e)
 

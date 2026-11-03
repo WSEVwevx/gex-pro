@@ -594,8 +594,13 @@ const curW = () => data && (data.workers.find(x => x.market === market && x.resu
 // ---------- clock and session state (New York)
 function sessionLabel(d){
   const t = new Date(d.toLocaleString("en-US", ET)), wd = t.getDay(), m = t.getHours() * 60 + t.getMinutes();
+  // holidays and 13:00 closes come from the server's market calendar
+  const day = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+  const cal = (data && data.calendar) || {}, early = (cal.early_closes || []).includes(day);
+  if((cal.holidays || []).includes(day) && m < 18 * 60) return ["Market holiday", "bad"];
   if(wd === 6 || (wd === 0 && m < 18 * 60) || (wd === 5 && m >= 17 * 60)) return ["Futures closed", "bad"];
-  if(wd >= 1 && wd <= 5 && m >= 570 && m < 960) return ["US cash open", "ok"];
+  if(early && m >= 13 * 60 + 15) return ["Futures closed", "bad"];
+  if(wd >= 1 && wd <= 5 && m >= 570 && m < (early ? 780 : 960)) return ["US cash open", "ok"];
   if(m >= 17 * 60 && m < 18 * 60) return ["Daily break", "warn"];
   return [m >= 960 || m < 240 ? "Globex · Asia" : "Globex · Europe", "warn"];
 }
