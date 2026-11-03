@@ -105,7 +105,7 @@ lblMode  = input.string("Tags + hover info", "Labels", options = ["Tags + hover 
      tooltip = "Tags + hover info: a short tag right of price (C1, P1, Ab1, ZG...) with a strength bar; hover the tag for that level's analysis.\nShort: ZG, CW, PW, +GEX, -GEX, 0D ZG, VOL C, MP 10-21, EM+...\nFull: Zero gamma, Call wall, ...", display = display.none)
 lblSize  = input.string("Small", "", options = ["Tiny", "Small", "Normal"], inline = "lb", group = G4, display = display.none)
 lblBg    = input.bool(true, "Label background", group = G4, display = display.none)
-lblOff   = input.int(6, "Label offset (bars)", minval = 0, maxval = 200, group = G4, tooltip = "Used when the GEX profile is off; with the profile on, labels sit just right of it.", display = display.none)
+lblOff   = input.int(16, "Label offset (bars)", minval = 0, maxval = 200, group = G4, tooltip = "Used when the GEX profile is off; with the profile on, labels sit just right of it.", display = display.none)
 minOpac  = input.int(85, "Weakest line opacity %", minval = 20, maxval = 100, step = 5, group = G4,
      tooltip = "How faint the weakest level may get. Lines fade with strength (and weekly / monthly / 2σ bands are lighter) but never below this. Raise it on grey or light chart backgrounds; 100 = every line fully solid.", display = display.none)
 roundTo  = input.string("Whole points", "Level prices", options = ["Whole points", "5 points", "Exact (tick)"], group = G4,
@@ -128,7 +128,7 @@ showProf   = input.bool(false, "Show profile", inline = "pf", group = G5,
      tooltip = "Gamma exposure by price, drawn right of the last bar. Blue extends right (positive), orange extends left (negative).", display = display.none)
 profSrc    = input.string("First source", "", options = ["First source", "Second source"], inline = "pf", group = G5, display = display.none)
 profWidth  = input.int(40, "Profile width", minval = 10, maxval = 200, group = G5, display = display.none)
-profOffset = input.int(3, "Profile gap", minval = 1, maxval = 100, group = G5, display = display.none)
+profOffset = input.int(13, "Profile gap", minval = 1, maxval = 100, group = G5, display = display.none)
 profOpac   = input.int(65, "Opacity %", minval = 10, maxval = 100, group = G5, display = display.none)
 
 // ---------- 6 - Info panel
@@ -846,11 +846,12 @@ renderTags() =>
             array.push(gLabels, label.new(x0, p, txt, style = label.style_label_left, color = color.new(#0b0e13, 100), textcolor = nameCol(nmx, lc),
                  size = lSz, textalign = text.align_left, tooltip = tip, text_font_family = font.family_monospace))
             pad += str.repeat(" ", str.length(nmx) + 2)
-    // the zones as a narrow column just right of the last bar (extensions fainter)
+    // the zones as a narrow column just left of the labels, clear of price (extensions fainter)
     if zoneShade
+        int zx0 = showProf ? profOffset : math.max(1, lblX - 5)
         for z in zs
             color zc = color.new(z.pos ? cPos : cNeg, z.ext ? 91 : 82)
-            array.push(gBoxes, box.new(bar_index + 1, z.hi, bar_index + math.max(2, lblX - 1), z.lo, border_width = 0,
+            array.push(gBoxes, box.new(bar_index + zx0, z.hi, bar_index + math.max(2, lblX - 1), z.lo, border_width = 0,
                  border_color = color.new(zc, 100), bgcolor = zc))
     true
 
