@@ -35,7 +35,32 @@ def parse_candles(raw: bytes) -> list:
         o, h, l, c = q["open"][i], q["high"][i], q["low"][i], q["close"][i]
         if None not in (o, h, l, c) and min(o, h, l, c) > 0:
             out.append([int(t), round(o, 2), round(h, 2), round(l, 2), round(c, 2)])
-    return out
+    return clean_candles(out)
+
+
+def clean_candles(bars: list) -> list:
+    """Fix bad prints: Yahoo sometimes sends a bar that OPENS at a stale price far from the market, and that
+    stale open is also its high or low (e.g. 2026-10-30 15:00 ET, NQ open = high = 29562 with the market at
+    28240). A bar's open counts as bad when it is more than 10 typical bar ranges AND 1% of price away from
+    its own close, the previous close and the next open; it is set to the previous close, and the high or low
+    it made is cut back to the bar's real prices. Real spikes open near the previous close and stay as they
+    are, wicks and all (the 2025-04-07 headline spike, for example)."""
+    if len(bars) < 3:
+        return bars
+    ranges = sorted(b[2] - b[3] for b in bars)
+    typical = ranges[len(ranges) // 2] or min((r for r in ranges if r > 0), default=0)
+    for i, b in enumerate(bars):
+        t, o, h, low, c = b
+        ref = [c] + ([bars[i - 1][4]] if i else []) + ([bars[i + 1][1]] if i + 1 < len(bars) else [])
+        limit = max(10 * typical, 0.01 * c)
+        if min(ref) - limit <= o <= max(ref) + limit:
+            continue
+        new_o = bars[i - 1][4] if i else c
+        new_h = h if h < o else max(new_o, c)          # the high was the stale open: the bar's real top is unknown
+        new_l = low if low > o else min(new_o, c)
+        bars[i] = [t, new_o, max(new_h, new_o, c), min(new_l, new_o, c), c]
+        log.info("candle %s: bad open %s replaced by the previous close %s", t, o, new_o)
+    return bars
 
 
 def fetch_candles(market: str, tf: str) -> list:

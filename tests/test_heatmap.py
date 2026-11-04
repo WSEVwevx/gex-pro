@@ -17,6 +17,22 @@ class TestHeatmap(unittest.TestCase):
             {"open": [1, None, 3], "high": [2, None, 4], "low": [0.5, None, 2.5], "close": [1.5, None, 3.5]}]}}]}}).encode()
         self.assertEqual(heatmap.parse_candles(raw), [[100, 1, 2, 0.5, 1.5], [220, 3, 4, 2.5, 3.5]])
 
+    def test_bad_open_fixed(self):
+        # the real 2026-10-30 15:00 ET NQ 5m bar: Yahoo's open (= high) was a stale 29562, the market ~28240
+        bars = [[0, 28250.0, 28262.0, 28228.0, 28234.5], [300, 29562.0, 29562.0, 28283.25, 28307.75],
+                [600, 28307.75, 28320.0, 28290.0, 28300.0]] + [[900 + 300 * i, 28300.0, 28330.0, 28290.0, 28310.0] for i in range(20)]
+        out = heatmap.clean_candles([b[:] for b in bars])
+        self.assertEqual(out[1], [300, 28234.5, 28307.75, 28234.5, 28307.75])
+        self.assertEqual(out[0], bars[0])
+        self.assertEqual(out[2:], bars[2:])
+
+    def test_real_spike_kept(self):
+        # a headline spike opens at the market and reverses inside the bar (NQ 2025-04-07 14:00 ET-like): kept as is
+        bars = [[300 * i, 17200.0, 17260.0, 17180.0, 17240.0] for i in range(20)]
+        bars[10] = [3000, 17273.0, 18361.5, 17163.0, 17658.5]
+        bars[11] = [3300, 17658.0, 17700.0, 17500.0, 17550.0]
+        self.assertEqual(heatmap.clean_candles([b[:] for b in bars]), bars)
+
     def test_profile_saved_and_read_back(self):
         # the synthetic chain is dated 2026-10-20: the worker's age-based cleanup must not delete it by the wall clock
         with tempfile.TemporaryDirectory() as tmp, mock.patch("gexsys.storage.SnapshotStore.prune"):
