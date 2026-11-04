@@ -1500,7 +1500,9 @@ function renderHeatmap(){
   else {
     hmCandles.priceScale().applyOptions({autoScale: true}); hmReset = false;
     const n = hm.candles.length, st = hm._starts || [0];
-    const from = Math.max(0, (hmSpan === "all" ? 0 : st[Math.max(0, st.length - (hmSpan === "2d" ? 2 : 1))] || 0) - 2);
+    // a session under 3 hours old (just after the 18:00 reopen) is too short to count as one of the days shown
+    const young = st.length > 1 && n && hm._times[n - 1] - hm._times[st[st.length - 1]] < 3 * 3600 ? 1 : 0;
+    const from = Math.max(0, (hmSpan === "all" ? 0 : st[Math.max(0, st.length - (hmSpan === "2d" ? 2 : 1) - young)] || 0) - 2);
     // pick the right offset so the profile space is ~190 px once the candles fill the rest of the width
     const plot = Math.max(300, $("hmChart").clientWidth - 80), bars = Math.max(1, n - from);
     const ro2 = Math.max(16, Math.round(190 * bars / Math.max(100, plot - 190)));
