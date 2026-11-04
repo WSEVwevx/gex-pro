@@ -51,6 +51,7 @@ class Quotes:
         self._lock = threading.Lock()
         self._last: dict[str, dict] = {}
         self._fetched = -1e18
+        self._ok = -1e18                    # the last time at least one quote came back
 
     def _one(self, sym: str) -> Optional[dict]:
         req = urllib.request.Request(URL.format(sym=urllib.parse.quote(sym)), headers={"User-Agent": "Mozilla/5.0 (GEX PRO ticker)"})
@@ -68,6 +69,8 @@ class Quotes:
                 self._fetched = now
                 with ThreadPoolExecutor(max_workers=6) as ex:
                     got = dict(zip([s[1] for s in self.symbols], ex.map(self._one, [s[1] for s in self.symbols])))
+                if any(got.values()):
+                    self._ok = now
                 for label, sym, _, _ in self.symbols:
                     if got.get(sym):
                         self._last[label] = dict(got[sym], stale=False)
@@ -76,4 +79,5 @@ class Quotes:
             quotes = [dict(self._last[label], label=label, symbol=sym, dp=dp, kind=kind)
                       for label, sym, dp, kind in self.symbols if label in self._last]
             return {"fetched": datetime.fromtimestamp(self._fetched, timezone.utc).isoformat() if self._fetched > 0 else None,
+                    "ok_at": datetime.fromtimestamp(self._ok, timezone.utc).isoformat() if self._ok > 0 else None,
                     "source": "Yahoo Finance (exchange data delayed)", "quotes": quotes}

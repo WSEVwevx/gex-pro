@@ -86,7 +86,7 @@ class Positioning:
             if self._out is not None and self.clock() - self._at < TTL_S:
                 return self._out
             self._at = self.clock()
-            fresh = {}
+            fresh, errors = {}, []
             for m in CONTRACTS:
                 try:
                     got = self._market(m)
@@ -94,8 +94,10 @@ class Positioning:
                         fresh[m] = got
                 except Exception as e:
                     log.warning("CFTC positioning %s failed: %s", m, e)
+                    errors.append(f"{m}: {e}")
             merged = dict((self._out or {}).get("markets") or {}, **fresh)     # a market that failed keeps its last report
-            self._out = {"markets": merged, "source": "CFTC Traders in Financial Futures"}
+            self._out = {"markets": merged, "source": "CFTC Traders in Financial Futures",
+                         "error": "; ".join(errors) or None}
             if fresh and self.cache_path:
                 self.cache_path.parent.mkdir(parents=True, exist_ok=True)
                 self.cache_path.write_text(json.dumps(self._out), encoding="utf-8")

@@ -18,7 +18,7 @@ import logging
 import os
 import threading
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -162,6 +162,19 @@ class BriefingsComponent:
                 "history": [{"id": schedule.slot_id(b["kind"], datetime.fromisoformat(b["slot"])), "kind": b["kind"],
                              "title": b["title"], "session": b["session"], "slot": b["slot"]} for b in hist],
                 "by_id": {schedule.slot_id(b["kind"], datetime.fromisoformat(b["slot"])): b for i, b in enumerate(hist) if i < 20 or b["kind"] == "weekly"}}
+
+    def sources(self) -> list:
+        """The Data health page's row: flags a briefing still missing 30 minutes after its time."""
+        now = self.clock()
+        missing = []
+        for kind in schedule.KINDS:
+            d = schedule.due(kind, now, self.is_trading_day)
+            if d and now - d[0] > timedelta(minutes=30) and not self._path(schedule.slot_id(kind, d[0])).exists():
+                missing.append(f"{schedule.TITLES[kind]} for {d[0].astimezone(schedule.NY):%a %H:%M} ET")
+        hist = self.history()
+        last = (hist[0].get("generated_at") or hist[0].get("slot")) if hist else None
+        return [{"name": "Briefings", "provider": "GEX PRO (from the sources above)", "pages": ["Briefings"],
+                 "last_ok": last, "error": "not written yet: " + ", ".join(missing) if missing else None}]
 
     # ---------------------------------------------------------------- component contract
     def routes(self) -> dict:

@@ -63,13 +63,17 @@ def site() -> tuple[bool, str]:
             lines.append(f"{'OK  ' if good else 'FAIL'} levels {w['market']}: {age_h:.1f} h old")
         checks = {"quotes.json": lambda d: len(d["quotes"]), "screener.json": lambda d: len(d["stocks"]),
                   "news.json": lambda d: len(d.get("events") or d.get("items") or d) if d else 0,
-                  "trackrecord.json": lambda d: 1 if d else 0}
+                  "trackrecord.json": lambda d: 1 if d else 0, "sources.json": lambda d: len(d["sources"])}
         for m in ("NQ", "ES"):
             checks[f"heatmap-{m}-5m.json"] = lambda d: len(d["candles"]) and len(d["columns"])
         for name, count in checks.items():
             n = count(get(name))
             ok &= n > 0
             lines.append(f"{'OK  ' if n > 0 else 'FAIL'} {name}: {n}")
+        for r in get("sources.json")["sources"]:             # the Data health page: any source the last build saw failing
+            if r["status"] in ("down", "failing"):
+                ok = False
+                lines.append(f"FAIL source {r['name']}: {r.get('error')}")
     except Exception as e:
         return False, f"FAIL could not read the hosted site: {e}"
     return ok, "\n".join(lines)

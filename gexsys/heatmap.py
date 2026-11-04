@@ -101,6 +101,14 @@ class HeatmapCache:
         self.ttl_s = ttl_s
         self._lock = threading.Lock()
         self._data: dict = {}
+        self.status: dict = {}            # market -> {"ok": last good fetch (ISO), "error": last failure or None}
+
+    def note(self, market: str, error: Optional[str] = None) -> None:
+        s = self.status.setdefault(market, {"ok": None, "error": None})
+        if error:
+            s["error"] = error
+        else:
+            s.update(ok=datetime.now(timezone.utc).isoformat(), error=None)
 
     def get(self, worker, tf: str) -> dict:
         key = (worker.key, tf)
@@ -110,8 +118,10 @@ class HeatmapCache:
                 return got[1]
         try:
             out = build(worker, tf)
+            self.note(worker.cfg.market)
         except Exception as e:
             log.warning("heatmap %s %s failed: %s", worker.key, tf, e)
+            self.note(worker.cfg.market, f"{type(e).__name__}: {e}")
             if got:
                 return got[1]
             out = build(worker, tf, candles=[])

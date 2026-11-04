@@ -61,6 +61,7 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
     <button role="tab" data-p="indicator" aria-selected="false"><svg viewBox="0 0 20 20"><path d="M7 6l-4 4 4 4M13 6l4 4-4 4"/></svg><span>Indicator</span><kbd>IND</kbd></button>
     <button role="tab" data-p="library" aria-selected="false"><svg viewBox="0 0 20 20"><path d="M4 4h4v12H4zM9 4h3v12H9zM13 5l3 1-3 11-3-1z"/></svg><span>Library</span><kbd>LIB</kbd></button>
     <button role="tab" data-p="glossary" aria-selected="false"><svg viewBox="0 0 20 20"><path d="M5 3h9a2 2 0 0 1 2 2v12H6a1 1 0 0 1-1-1zM5 15h11M8 7h5M8 10h3"/></svg><span>Glossary</span><kbd>GLOS</kbd></button>
+    <button role="tab" data-p="health" aria-selected="false"><svg viewBox="0 0 20 20"><path d="M2 10h4l2-5 4 10 2-5h4"/></svg><span>Data health</span><kbd>DATA</kbd></button>
     <span class="spacer"></span>
     <button class="side-help notes-btn" id="notesBtn" aria-pressed="false" title="Show the one-line notes under each number (D)"><svg viewBox="0 0 20 20"><path d="M4 5h12M4 9h12M4 13h8"/></svg><span>Notes</span><kbd>D</kbd></button>
     <button class="side-help" id="keysBtn" title="Keyboard shortcuts (?)"><svg viewBox="0 0 20 20"><rect x="2" y="5" width="16" height="10" rx="2"/><path d="M5 9h1M8 9h1M11 9h1M14 9h1M6 12h8"/></svg><span>Shortcuts</span><kbd>?</kbd></button>
@@ -302,6 +303,15 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
         </div>
         <div class="gl-az" id="glAz" aria-label="Jump to letter"></div>
         <div class="gl-list" id="glList"></div>
+      </section>
+    </div>
+
+    <!-- DATA HEALTH: every outside source, when it last worked, whether its last try failed -->
+    <div id="healthView" hidden>
+      <section class="card" data-help="health">
+        <div class="head"><h2>Data health</h2><span class="sub" id="hlSub"></span></div>
+        <div class="expl">Every outside source the site uses. A source that fails keeps showing its last good copy, so check here when a number looks old.</div>
+        <div class="hl-list" id="hlList"></div>
       </section>
     </div>
 

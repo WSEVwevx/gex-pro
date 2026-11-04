@@ -157,6 +157,10 @@ your browser, and the first visit follows your system setting.
   economic data, yields, oil and the dollar), with headlines from the biggest days.
 * **Big trader positioning** (Bias page): the CFTC's weekly report for the ES and NQ E-minis, leveraged funds
   and asset managers, each ranked against its own last 3 years. Background only, not part of the bias score.
+* **Data health:** every outside source (Cboe chains, Yahoo prices and candles, ForexFactory, Truth Social,
+  slickcharts, the CFTC, plus the briefings, the track record's closing prices and, on the hosted copy, the site
+  build itself): when it last worked, and whether its last try failed or it is running late or on a backup. A red
+  dot on the menu item means something failed.
 * **Indicator:** the GEX PRO TradingView script, always the current version, with Copy / Download
   buttons, install steps, version and last-updated time, and the script's recent changes.
 * **Bias:** a transparent, rule-based reading of today's positioning:

@@ -276,6 +276,17 @@ class TrackRecordComponent:
                 "rules": {"touch_em": 0.05, "min_sample": 20, "freeze": "levels from the last calculation timestamped before 09:30 ET"},
                 "stats": stats, "sessions": ss, "backtest": bt}
 
+    def sources(self) -> list:
+        """The Data health page's row: sessions still waiting for a final price 3 hours after the close."""
+        now = self.clock()
+        ss = self.sessions()
+        waiting = [s for s in ss if s.get("status") == "pending"
+                   and now > self.session_close(date.fromisoformat(s["session"])) + timedelta(hours=3)]
+        graded = [s["graded_at"] for s in ss if s.get("graded_at")]
+        return [{"name": "Closing prices for grading", "provider": "Cboe (same evening), Yahoo Finance (daily)",
+                 "pages": ["Track record"], "last_ok": max(graded, default=None),
+                 "error": f"{len(waiting)} session(s) past the close still waiting for a final price" if waiting else None}]
+
     # ---------------------------------------------------------------- component contract
     def routes(self) -> dict:
         def get(q):

@@ -206,6 +206,10 @@ class Drivers:
             except OSError:
                 pass
 
+    def peek(self) -> Optional[dict]:
+        """The last built page without waiting: None until the first load (about 30 s) finishes."""
+        return self._out
+
     def weights(self) -> dict:
         """{"NQ": {yahoo symbol: weight %}, "ES": {...}}: every index member, from the last good copy."""
         self.get()                                               # loads them on first use

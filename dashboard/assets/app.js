@@ -8,8 +8,8 @@ const store = { get(k, d){ try { return localStorage.getItem(k) ?? d; } catch(e)
 // Static mode: the hosted copy (python -m gexsys build-site) reads files that a scheduled job rewrites,
 // instead of the local service's /api endpoints.
 const STATIC = !!window.GEX_STATIC;
-const API = STATIC ? {all: "data/all.json", news: "data/news.json", posts: "data/posts.json", indicator: "data/indicator.json", briefings: "data/briefings.json", track: "data/trackrecord.json", quotes: "data/quotes.json", positioning: "data/positioning.json"}
-                   : {all: "/api/all", news: "/api/news", posts: "/api/posts", indicator: "/api/indicator", briefings: "/api/briefings", track: "/api/trackrecord", quotes: "/api/quotes", positioning: "/api/positioning"};
+const API = STATIC ? {all: "data/all.json", news: "data/news.json", posts: "data/posts.json", indicator: "data/indicator.json", briefings: "data/briefings.json", track: "data/trackrecord.json", quotes: "data/quotes.json", positioning: "data/positioning.json", sources: "data/sources.json"}
+                   : {all: "/api/all", news: "/api/news", posts: "/api/posts", indicator: "/api/indicator", briefings: "/api/briefings", track: "/api/trackrecord", quotes: "/api/quotes", positioning: "/api/positioning", sources: "/api/sources"};
 const pineUrl = m => STATIC ? `data/pine-published${m ? "-" + m : ""}.txt`
                             : `/api/pine/all?which=published${m ? "&market=" + encodeURIComponent(m) : ""}`;
 // every data request skips the browser cache; on the hosted copy a unique query also skips GitHub's
@@ -60,7 +60,7 @@ try { localStorage.removeItem("gex.page"); } catch(e) {}
 let impactF = store.get("gex.impact", "med");       // high | med | all
 let curF = store.get("gex.cur", "USD");             // USD | all
 let news = null;
-const VIEW_IDS = ["levels", "ladder", "heatmap", "screener", "bias", "track", "briefings", "news", "indicator", "library", "glossary"];
+const VIEW_IDS = ["levels", "ladder", "heatmap", "screener", "bias", "track", "briefings", "news", "indicator", "library", "glossary", "health"];
 function setPage(p){
   if(!VIEW_IDS.includes(p)) p = "levels";
   if(p !== page){ const ar = document.querySelector(".area"); if(ar) ar.scrollTop = 0; window.scrollTo(0, 0); }   // a new page opens at its top
@@ -77,6 +77,7 @@ function setPage(p){
   if(p === "library") renderLibrary();
   if(p === "glossary") renderGlossary();
   if(p === "track") loadTrack();
+  if(p === "health") loadSources();
   if(p === "screener") loadScreener();
   if(p === "heatmap" && window.__hmOpen) window.__hmOpen();
   if(!NO_MARKET_PAGES.includes(p) && data) render();
@@ -269,6 +270,36 @@ function renderNews(){
 async function load(){
   try{ data = await (await fetchFresh(API.all)).json(); render(); if(page === "indicator") renderIndicator(); }
   catch(e){ $("banner").innerHTML = `<div class="banner bad">${OFFLINE}</div>`; }
+}
+
+// ---------- data health: every outside source, when it last worked, whether its last try failed
+let sources = null;
+const HL = {ok: ["ok", "Working"], partial: ["warn", "Working, partly"], late: ["warn", "Late"], waiting: ["", "Not checked yet"],
+            failing: ["bad", "Last try failed"], down: ["bad", "Not working"]};
+// the hosted copy is only as fresh as its last build: about every 3-6 min while futures trade, hourly otherwise
+const buildLag = iso => STATIC && (Date.now() - Date.parse(iso)) / 60000 > (sessionLabel(new Date())[0] === "Futures closed" ? 90 : 20);
+async function loadSources(){
+  try { sources = await (await fetchFresh(API.sources)).json(); }
+  catch(e) { sources = sources || {sources: [], error: OFFLINE}; }
+  const bad = (sources.sources || []).some(r => r.status === "failing" || r.status === "down") || (sources.now && buildLag(sources.now));
+  document.querySelector('#pages button[data-p="health"]').classList.toggle("alert", !!bad);
+  if(page === "health") renderSources();
+}
+function renderSources(){
+  if(!sources){ $("hlList").innerHTML = '<div class="expl">Checking every source...</div>'; return; }
+  const rows = (sources.sources || []).slice();
+  if(STATIC && sources.now) rows.unshift({name: "Hosted site", provider: "GitHub Actions", pages: ["Every page"], last_ok: sources.now,
+    status: buildLag(sources.now) ? "late" : "ok", detail: "Rebuilt about every 3 minutes in cash hours, every 6 minutes overnight while futures trade, and hourly when they are closed."});
+  const n = rows.filter(r => !["ok", "waiting"].includes(r.status)).length, wait = rows.filter(r => r.status === "waiting").length;
+  $("hlSub").textContent = sources.error || (n ? `${n} of ${rows.length} need attention` : wait ? `${rows.length - wait} working, ${wait} not checked yet`
+    : `All ${rows.length} working`) + (sources.now ? ` · checked ${ago(sources.now)}` : "");
+  $("hlList").innerHTML = rows.map(r => {
+    const [cls, word] = HL[r.status] || ["", r.status], msg = r.error || r.note || r.detail || "";
+    const when = r.last_ok ? `worked ${Date.now() - Date.parse(r.last_ok) < 60000 ? "just now" : dur(Date.now() - Date.parse(r.last_ok)) + " ago"}` : "no good copy yet";
+    return `<div class="hl-row"><i class="dot ${cls}"></i><div><b>${esc(r.name)}</b><span>${esc(r.provider || "")}</span></div>
+      <div><b>${esc(word)}</b><span>${esc(when)}</span></div>
+      <div class="hl-msg">${esc(msg)}${(r.pages || []).length ? `<span>Used by: ${esc(r.pages.join(", "))}</span>` : ""}</div></div>`;
+  }).join("");
 }
 
 function ago(iso){ const m = (Date.now() - Date.parse(iso))/60000; return m < 1 ? "just now" : m < 60 ? `${Math.round(m)} min ago` : `${Math.floor(m/60)} h ${Math.round(m%60)} min ago`; }
@@ -586,8 +617,8 @@ function renderMaxPain(X){
 const PAGES = [
   ["levels", "Levels", "LVL"], ["ladder", "Live table", "LIVE"], ["heatmap", "Heatmap", "HEAT"], ["screener", "Screener", "SCRN"],
   ["bias", "Bias", "BIAS"], ["track", "Track record", "TRK"], ["briefings", "Briefings", "BRF"], ["news", "News", "NEWS"], ["indicator", "Indicator", "IND"],
-  ["library", "Library", "LIB"], ["glossary", "Glossary", "GLOS"]];
-const NO_MARKET_PAGES = ["news", "indicator", "briefings", "library", "glossary", "track"];
+  ["library", "Library", "LIB"], ["glossary", "Glossary", "GLOS"], ["health", "Data health", "DATA"]];
+const NO_MARKET_PAGES = ["news", "indicator", "briefings", "library", "glossary", "track", "health"];
 const pickP = v => v && typeof v === "object" ? v.price : v;
 const curW = () => data && (data.workers.find(x => x.market === market && x.result) || data.workers.find(x => x.market === market));
 
@@ -679,6 +710,9 @@ const HELP = {
     body: `<p>Search a word, pick a topic, or jump to a letter. Each term says what it means, which topic it belongs to and where you see it (a page, a tag on the indicator, the hover box...). <b>Lesson →</b> opens the Library lesson that explains it from zero.</p><p>Every Explain panel lists the glossary terms it mentions; click one to jump straight here.</p>`},
   library: {title: "The Library", tldr: "A short course that explains everything on this site from zero.",
     body: `<p>Six chapters: options basics, dealers and the Greeks, gamma exposure, volatility, the GEX PRO levels (C / P / Ab, first expiry, gamma zones) and using GEX PRO day to day. Start with <b>What an option is</b> and follow them in order, or search for a topic. Each lesson ends with a quick check; answer it correctly and the lesson is marked as read. Your progress is saved in this browser.</p><p>Every Explain panel links to the matching lesson, so you can jump from a number on the screen straight to the idea behind it.</p>`},
+  health: {title: "Data health", tldr: "Every outside source, when it last worked and whether its last try failed.",
+    body: `<p>GEX PRO uses only free sources: Cboe for the options chains, Yahoo Finance for prices and candles, ForexFactory for the calendar, Truth Social for posts, slickcharts for index weights and the CFTC for positioning. When one fails, its page keeps the <b>last good copy</b> instead of going blank, so a failure is easy to miss. This page shows each one.</p><p><b>Green</b> = working. <b>Amber</b> = late (no new data for longer than usual) or working only partly, e.g. on a backup source. <b>Red</b> = the last try failed. A red dot on <b>Data health</b> in the menu means something failed.</p>`,
+    watch: ["Red options chain = levels and the TradingView paste are not updating", "The weekly CFTC report is normally up to 10 days old: that is still green"]},
   track: {title: "Live track record", tldr: "What GEX PRO said before each open, graded against what the market did.",
     body: `<p>At every session, the levels from the <b>last calculation timestamped before 09:30 ET</b> are frozen as that day's plan: expected move, regime, walls, zero gamma, bias. Nothing can be changed afterwards. After the close, the plan is graded against the index's open, high, low and close.</p><p>Everything is in index points (NDX for NQ, SPX for ES), so the futures basis can't flatter or hurt the result. Missed sessions are listed, not hidden.</p><p>Small samples lie. Until about 20 sessions are graded, read the numbers as a diary, not as proof. The 95% range shows how uncertain each rate still is.</p>`,
     watch: ["The 95% range narrows as sessions add up", "\"rebuilt\" = frozen later from saved snapshots, using only data from before the open"]},
@@ -717,7 +751,7 @@ const HELP = {
   paste: {title: "The hourly paste", tldr: "One text block that carries all levels to TradingView.",
     body: `<p>Published every hour on the hour (ET). One paste holds NQ and ES; each chart draws only its own market. The indicator marks levels stale after 90 minutes.</p>`},
 };
-const PAGE_HELP = {levels: "regime", ladder: "livetable", heatmap: "heatmap", screener: "screener", bias: "bias", briefings: "briefings", news: "calendar", indicator: "indicator", library: "library", glossary: "glossary", track: "track"};
+const PAGE_HELP = {levels: "regime", ladder: "livetable", heatmap: "heatmap", screener: "screener", bias: "bias", briefings: "briefings", news: "calendar", indicator: "indicator", library: "library", glossary: "glossary", track: "track", health: "health"};
 let exKey = null;
 function openExplain(key){
   const h = HELP[key]; if(!h) return;
@@ -1723,6 +1757,7 @@ setInterval(loadQuotes, STATIC ? 5 * 60 * 1000 : 60 * 1000);   // the hosted cop
 setInterval(load, STATIC ? 60000 : 20000);
 setInterval(loadPosts, 2 * 60 * 1000);                     // the service itself re-fetches at most every 5 min
 setInterval(loadNews, 10 * 60 * 1000);                      // the service itself re-fetches at most every 30 min
+loadSources(); setInterval(loadSources, 5 * 60 * 1000);   // keeps the red dot on Data health current
 setInterval(() => { if(page === "news") renderNews(); }, 60000);   // keep countdowns current
 setInterval(() => { if(page === "briefings") loadBriefings(); }, STATIC ? 5 * 60 * 1000 : 60000);
 setInterval(() => { if(page === "indicator") loadIndicator(); }, STATIC ? 5 * 60 * 1000 : 15000);   // pick up code edits

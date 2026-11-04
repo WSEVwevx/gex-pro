@@ -78,6 +78,41 @@ class FeedsComponent:
                 "/api/positioning": lambda q: (200, self.positioning.get()),
                 "/api/screener/chart": self._chart}
 
+    def sources(self) -> list:
+        """One row per outside source for the Data health page (see gexpro/health.py)."""
+        cal, posts, quotes, pos = self.calendar.get(), self.posts.get(), self.quotes.get(), self.positioning.get()
+        qs = quotes.get("quotes") or []
+        q_bad = sum(bool(q.get("stale")) for q in qs)
+        rows = [{"name": "Economic calendar", "provider": "ForexFactory", "pages": ["News", "Levels"],
+                 "last_ok": cal.get("fetched_at"), "error": cal.get("error"), "fresh_h": 3},
+                {"name": "Posts", "provider": posts.get("source") or "Truth Social", "pages": ["News", "Briefings"],
+                 "last_ok": posts.get("fetched_at"), "error": posts.get("error"), "fresh_h": 2,
+                 "note": "Truth Social did not answer, so the backup archive is in use"
+                 if posts.get("source") and posts["source"] != "Truth Social" else None},
+                {"name": "Ticker quotes", "provider": "Yahoo Finance", "pages": ["Top ticker"], "last_ok": quotes.get("ok_at"),
+                 "error": "every quote failed on the last try" if qs and q_bad == len(qs) else None,
+                 "note": f"{q_bad} of {len(qs)} quotes failed on the last try" if 0 < q_bad < len(qs) else None, "fresh_h": 1}]
+        scr = self.screener.peek()
+        if scr is None:
+            rows.append({"name": "Screener prices", "provider": "Yahoo Finance", "pages": ["Screener", "Briefings"],
+                         "last_ok": None, "error": None, "note": "first load in progress (about 30 seconds after start)"})
+        else:
+            st = scr.get("stocks") or []
+            bad = sum(bool(s.get("stale")) for s in st)
+            rows.append({"name": "Screener prices", "provider": "Yahoo Finance", "pages": ["Screener", "Briefings"],
+                         "last_ok": scr.get("fetched") if st and bad < len(st) else None,
+                         "error": "no stock prices came back" if not st or bad == len(st) else None,
+                         "note": f"{bad} of {len(st)} stocks failed on the last try" if 0 < bad < len(st) else None, "fresh_h": 1})
+            src = scr.get("weights_source") or ""
+            rows.append({"name": "Index weights", "provider": "slickcharts.com", "pages": ["Screener", "Weekly recap"],
+                         "last_ok": scr.get("weights_asof"), "error": None if src else "no index weights", "fresh_h": 36,
+                         "note": "slickcharts did not answer, so the copy saved with the app is in use" if "fallback" in src else None})
+        asof = max((m.get("asof") or "" for m in (pos.get("markets") or {}).values()), default="")
+        rows.append({"name": "Big trader positioning", "provider": "CFTC", "pages": ["Bias"], "last_ok": asof or None,
+                     "error": pos.get("error"), "fresh_h": 11 * 24,
+                     "detail": "weekly report: Tuesday's positions, published Friday"})
+        return rows
+
     def _chart(self, q):
         c = self.screener.charts((q.get("symbol") or [""])[0].upper())
         return (200, c) if c else (404, {"error": "not a stock on the screener"})

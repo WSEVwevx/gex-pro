@@ -106,6 +106,25 @@ class GexComponent:
             return 404, {"error": "unknown market or timeframe"}
         return 200, self.heat.get(w, tf)
 
+    def sources(self) -> list:
+        """One row per outside source for the Data health page (see gexpro/health.py)."""
+        rows = []
+        for w in self.workers.values():
+            h = w.health()
+            ok = datetime.fromtimestamp(w.last_success, timezone.utc).isoformat() if w.last_success else None
+            calc = h.get("calc_status")
+            rows.append({"name": f"{w.cfg.market} options chain", "provider": f"{w.label} ({w.cfg.source}, 15-min delayed)",
+                         "pages": ["Levels", "Live table", "Heatmap", "Bias", "TradingView paste"], "last_ok": ok,
+                         "error": w.last_error if w.failures and h["status"] in ("down", "degraded") else None, "fresh_h": 2,
+                         "note": "first refresh in progress" if not ok and not w.failures
+                         else f"the last calculation was {calc}" if calc and calc != "OK" else None})
+        for m in dict.fromkeys(w.cfg.market for w in self.workers.values()):
+            s = self.heat.status.get(m) or {}
+            rows.append({"name": f"{m} futures candles", "provider": "Yahoo Finance", "pages": ["Heatmap"],
+                         "last_ok": s.get("ok"), "error": s.get("error"), "fresh_h": 2,
+                         "note": None if s else "checked the first time the Heatmap opens"})
+        return rows
+
     def _worker(self, q) -> Optional[MarketWorker]:
         if q.get("key"):
             return self.workers.get(q["key"][0].upper())
@@ -168,8 +187,10 @@ class GexComponent:
             for tf in RANGE:
                 try:
                     hm = build_heatmap(w, tf)
+                    self.heat.note(w.cfg.market)
                 except Exception as e:                        # candles unavailable: the GEX history alone
                     log.warning("heatmap %s %s: %s", w.key, tf, e)
+                    self.heat.note(w.cfg.market, f"{type(e).__name__}: {e}")
                     hm = build_heatmap(w, tf, candles=[])
                 _write(data / f"heatmap-{w.cfg.market}-{tf}.json", json.dumps(hm, separators=(",", ":")))
         for which, pick in (("latest", lambda w: w.result and w.result.get("pine")),
