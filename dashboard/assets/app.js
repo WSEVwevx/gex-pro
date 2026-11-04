@@ -1464,6 +1464,9 @@ function renderHeatmap(){
   if(fresh){
     hmChart = LC.createChart($("hmChart"), Object.assign({autoSize: true, handleScale: {axisPressedMouseMove: true}}, hmColors()));
     hmChart.applyOptions(hmTimeOpts());
+    // two days of 1-minute bars (~2,700) must fit the width: below the library's default minimum bar spacing
+    // (0.5 px) it ignores the requested range and falls back to its default zoom
+    hmChart.applyOptions({timeScale: {minBarSpacing: 0.05}});
     hmCandles = hmChart.addCandlestickSeries({upColor: cssVar("--good"), downColor: cssVar("--bad"), borderVisible: false, wickUpColor: cssVar("--good"), wickDownColor: cssVar("--bad"),
       priceLineVisible: true, priceLineStyle: LC.LineStyle.Dotted, priceLineWidth: 1});
     hmPrim = new HeatPrimitive(); hmCandles.attachPrimitive(hmPrim);

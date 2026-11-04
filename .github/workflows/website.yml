@@ -31,6 +31,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    outputs:
+      artifact_id: ${{ steps.upload.outputs.artifact_id }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -87,7 +89,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh cache list -R "${{ github.repository }}" -L 100 --key gex-state- --sort created_at --order desc --json id -q '.[].id' | tail -n +4 | xargs -r -n1 gh cache delete -R "${{ github.repository }}" || true
-      - uses: actions/upload-pages-artifact@v3
+      - id: upload
+        uses: actions/upload-pages-artifact@v3
         with:
           path: _site
 
@@ -98,12 +101,29 @@ jobs:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
+      # The same request actions/deploy-pages makes, with one change: that action always uses the commit as
+      # the build version, and Pages skips a deployment whose version it has already published (it "succeeds"
+      # in seconds and nothing changes). Every run here rebuilds the same commit with fresh data, so each run
+      # deploys under its own version and waits until Pages reports the files live.
       - id: deploy
-        uses: actions/deploy-pages@v4
-        # Pages publishes only the first deployment of each build version, and the action uses the commit
-        # as the version; every run here rebuilds the same commit with fresh data, so give each run its own
+        uses: actions/github-script@v7
         env:
-          GITHUB_SHA: ${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          ARTIFACT_ID: ${{ needs.build.outputs.artifact_id }}
+        with:
+          script: |
+            const repo = {owner: context.repo.owner, repo: context.repo.repo};
+            const {data: d} = await github.request("POST /repos/{owner}/{repo}/pages/deployments", {...repo,
+              artifact_id: Number(process.env.ARTIFACT_ID), oidc_token: await core.getIDToken(),
+              pages_build_version: `${context.sha}-${context.runId}-${process.env.GITHUB_RUN_ATTEMPT}`});
+            core.setOutput("page_url", d.page_url);
+            const bad = ["deployment_failed", "deployment_content_failed", "deployment_cancelled", "deployment_lost", "deployment_attempt_error"];
+            for (let i = 0; i < 120; i++) {
+              const {data: st} = await github.request("GET /repos/{owner}/{repo}/pages/deployments/{id}", {...repo, id: d.id});
+              if (st.status === "succeed") { core.info(`deployed ${d.id}`); return; }
+              if (bad.includes(st.status)) { core.setFailed(`Pages deployment ${d.id}: ${st.status}`); return; }
+              await new Promise(r => setTimeout(r, 5000));
+            }
+            core.setFailed(`Pages deployment ${d.id} did not finish in 10 minutes`);
 
   # Start the next run while futures trade. Runs that overlap collapse into one (concurrency above keeps
   # at most one waiting), so a scheduled or push run joining in never doubles the chain.
