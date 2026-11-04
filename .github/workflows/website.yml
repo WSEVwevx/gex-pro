@@ -100,6 +100,10 @@ jobs:
     steps:
       - id: deploy
         uses: actions/deploy-pages@v4
+        # Pages publishes only the first deployment of each build version, and the action uses the commit
+        # as the version; every run here rebuilds the same commit with fresh data, so give each run its own
+        env:
+          GITHUB_SHA: ${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
 
   # Start the next run while futures trade. Runs that overlap collapse into one (concurrency above keeps
   # at most one waiting), so a scheduled or push run joining in never doubles the chain.
