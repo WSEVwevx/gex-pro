@@ -281,7 +281,7 @@ const buildLag = iso => STATIC && (Date.now() - Date.parse(iso)) / 60000 > (sess
 async function loadSources(){
   try { sources = await (await fetchFresh(API.sources)).json(); }
   catch(e) { sources = sources || {sources: [], error: OFFLINE}; }
-  const bad = (sources.sources || []).some(r => r.status === "failing" || r.status === "down") || (sources.now && buildLag(sources.now));
+  const bad = (sources.sources || []).some(r => r.status === "failing" || r.status === "down");     // red = failed; late stays amber
   document.querySelector('#pages button[data-p="health"]').classList.toggle("alert", !!bad);
   if(page === "health") renderSources();
 }

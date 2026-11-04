@@ -115,7 +115,7 @@ class GexComponent:
             calc = h.get("calc_status")
             rows.append({"name": f"{w.cfg.market} options chain", "provider": f"{w.label} ({w.cfg.source}, 15-min delayed)",
                          "pages": ["Levels", "Live table", "Heatmap", "Bias", "TradingView paste"], "last_ok": ok,
-                         "error": w.last_error if w.failures and h["status"] in ("down", "degraded") else None, "fresh_h": 2,
+                         "error": w.last_error if w.failures else None, "fresh_h": 2,
                          "note": "first refresh in progress" if not ok and not w.failures
                          else f"the last calculation was {calc}" if calc and calc != "OK" else None})
         for m in dict.fromkeys(w.cfg.market for w in self.workers.values()):

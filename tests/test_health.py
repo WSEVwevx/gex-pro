@@ -57,5 +57,55 @@ class TestCollect(unittest.TestCase):
             self.assertTrue(callable(getattr(c, "sources", None)), f"{c.name} has no sources()")
 
 
+class Peek:
+    def __init__(self, out):
+        self.out = out
+
+    def peek(self):
+        return self.out
+
+    def get(self):
+        raise AssertionError("the health check must not fetch")
+
+
+class TestFeedRows(unittest.TestCase):
+    def rows(self, **kw):
+        from feeds.component import FeedsComponent
+        parts = dict(calendar=Peek(None), posts=Peek(None), quotes=Peek(None), screener=Peek(None), positioning=Peek(None))
+        parts.update({k: Peek(v) for k, v in kw.items()})
+        return {r["name"]: r for r in FeedsComponent(**parts).sources()}
+
+    def test_never_fetches_and_waits_before_first_load(self):
+        r = self.rows()
+        self.assertEqual(status(r["Economic calendar"], NOW), "waiting")
+        self.assertEqual(status(r["Big trader positioning"], NOW), "waiting")
+
+    def test_quotes_that_never_arrived_are_down(self):
+        r = self.rows(quotes={"fetched": ago(0), "ok_at": None, "quotes": []})
+        self.assertEqual(status(r["Ticker quotes"], NOW), "down")
+
+    def test_oldest_positioning_report_counts(self):
+        r = self.rows(positioning={"markets": {"ES": {"asof": "2026-10-27"}, "NQ": {"asof": "2026-10-13"}}})
+        self.assertEqual(status(r["Big trader positioning"], NOW), "late")
+
+    def test_bundled_weights_are_a_backup_not_late(self):
+        scr = {"fetched": ago(0), "stocks": [{"stale": False}], "weights_asof": "2026-10-25", "weights_source": "slickcharts.com (bundled fallback)"}
+        self.assertEqual(status(self.rows(screener=scr)["Index weights"], NOW), "partial")
+
+
+class TestGexRow(unittest.TestCase):
+    def test_failing_chain_stays_red_after_stale(self):
+        import time
+        from types import SimpleNamespace
+        from gexsys.component import GexComponent
+        w = SimpleNamespace(cfg=SimpleNamespace(market="NQ", source="NDX"), label="CBOE", last_success=time.time() - 3600,
+                            failures=4, last_error="URLError: timed out", health=lambda: {"status": "stale", "calc_status": "OK"})
+        g = GexComponent([])
+        g.workers = {"NQ-CBOE": w}
+        row = g.sources()[0]
+        self.assertEqual(row["error"], "URLError: timed out")
+        self.assertEqual(status(row, datetime.now(timezone.utc)), "failing")
+
+
 if __name__ == "__main__":
     unittest.main()

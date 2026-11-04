@@ -188,6 +188,10 @@ class Posts:
                 self._refresh()
             return dict(self._data or {"posts": [], "fetched_at": None, "source": None})
 
+    def peek(self) -> Optional[dict]:
+        """The last copy without fetching (None before the first load)."""
+        return dict(self._data) if self._data else None
+
     def _fetch(self, url: str) -> bytes:
         with self.opener(urllib.request.Request(url, headers=UA), timeout=20) as r:
             return r.read()

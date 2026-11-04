@@ -80,18 +80,23 @@ class FeedsComponent:
 
     def sources(self) -> list:
         """One row per outside source for the Data health page (see gexpro/health.py)."""
-        cal, posts, quotes, pos = self.calendar.get(), self.posts.get(), self.quotes.get(), self.positioning.get()
-        qs = quotes.get("quotes") or []
-        q_bad = sum(bool(q.get("stale")) for q in qs)
-        rows = [{"name": "Economic calendar", "provider": "ForexFactory", "pages": ["News", "Levels"],
-                 "last_ok": cal.get("fetched_at"), "error": cal.get("error"), "fresh_h": 3},
-                {"name": "Posts", "provider": posts.get("source") or "Truth Social", "pages": ["News", "Briefings"],
-                 "last_ok": posts.get("fetched_at"), "error": posts.get("error"), "fresh_h": 2,
-                 "note": "Truth Social did not answer, so the backup archive is in use"
-                 if posts.get("source") and posts["source"] != "Truth Social" else None},
-                {"name": "Ticker quotes", "provider": "Yahoo Finance", "pages": ["Top ticker"], "last_ok": quotes.get("ok_at"),
-                 "error": "every quote failed on the last try" if qs and q_bad == len(qs) else None,
-                 "note": f"{q_bad} of {len(qs)} quotes failed on the last try" if 0 < q_bad < len(qs) else None, "fresh_h": 1}]
+        # peek, never fetch: checking health must not trigger (or wait on) the network
+        first = lambda page: {"last_ok": None, "error": None, "note": f"checked the first time the {page} loads"}
+        cal, posts, quotes, pos = self.calendar.peek(), self.posts.peek(), self.quotes.peek(), self.positioning.peek()
+        rows = [{"name": "Economic calendar", "provider": "ForexFactory", "pages": ["News", "Levels"], "fresh_h": 3,
+                 **({"last_ok": cal.get("fetched_at"), "error": cal.get("error")} if cal else first("News page"))},
+                {"name": "Posts", "provider": (posts or {}).get("source") or "Truth Social", "pages": ["News", "Briefings"], "fresh_h": 2,
+                 **({"last_ok": posts.get("fetched_at"), "error": posts.get("error"),
+                     "note": "Truth Social did not answer, so the backup archive is in use"
+                     if posts.get("source") and posts["source"] != "Truth Social" else None} if posts else first("News page"))}]
+        if quotes is None:
+            rows.append({"name": "Ticker quotes", "provider": "Yahoo Finance", "pages": ["Top ticker"], **first("page")})
+        else:
+            qs = quotes.get("quotes") or []
+            q_bad = sum(bool(q.get("stale")) for q in qs)
+            rows.append({"name": "Ticker quotes", "provider": "Yahoo Finance", "pages": ["Top ticker"], "last_ok": quotes.get("ok_at"),
+                         "error": "every quote failed on the last try" if not qs or q_bad == len(qs) else None,
+                         "note": f"{q_bad} of {len(qs)} quotes failed on the last try" if 0 < q_bad < len(qs) else None, "fresh_h": 1})
         scr = self.screener.peek()
         if scr is None:
             rows.append({"name": "Screener prices", "provider": "Yahoo Finance", "pages": ["Screener", "Briefings"],
@@ -104,13 +109,18 @@ class FeedsComponent:
                          "error": "no stock prices came back" if not st or bad == len(st) else None,
                          "note": f"{bad} of {len(st)} stocks failed on the last try" if 0 < bad < len(st) else None, "fresh_h": 1})
             src = scr.get("weights_source") or ""
+            backup = "fallback" in src                 # the copy bundled with the app: old by design, so not "late"
             rows.append({"name": "Index weights", "provider": "slickcharts.com", "pages": ["Screener", "Weekly recap"],
-                         "last_ok": scr.get("weights_asof"), "error": None if src else "no index weights", "fresh_h": 36,
-                         "note": "slickcharts did not answer, so the copy saved with the app is in use" if "fallback" in src else None})
-        asof = max((m.get("asof") or "" for m in (pos.get("markets") or {}).values()), default="")
-        rows.append({"name": "Big trader positioning", "provider": "CFTC", "pages": ["Bias"], "last_ok": asof or None,
-                     "error": pos.get("error"), "fresh_h": 11 * 24,
-                     "detail": "weekly report: Tuesday's positions, published Friday"})
+                         "last_ok": scr.get("weights_asof"), "error": None if src else "no index weights", "fresh_h": None if backup else 36,
+                         "note": "slickcharts did not answer, so the copy saved with the app is in use" if backup else None})
+        if pos is None:
+            rows.append({"name": "Big trader positioning", "provider": "CFTC", "pages": ["Bias"], **first("Bias page")})
+        else:
+            # the OLDEST market's report: one contract that stops updating must not hide behind the other
+            dates = [m.get("asof") or "" for m in (pos.get("markets") or {}).values()]
+            rows.append({"name": "Big trader positioning", "provider": "CFTC", "pages": ["Bias"], "last_ok": min(dates) if dates and all(dates) else None,
+                         "error": pos.get("error") or (None if len(dates) == 2 else "a market's report is missing"), "fresh_h": 11 * 24,
+                         "detail": "weekly report: Tuesday's positions, published Friday"})
         return rows
 
     def _chart(self, q):

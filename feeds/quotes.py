@@ -76,8 +76,15 @@ class Quotes:
                         self._last[label] = dict(got[sym], stale=False)
                     elif label in self._last:
                         self._last[label]["stale"] = True
-            quotes = [dict(self._last[label], label=label, symbol=sym, dp=dp, kind=kind)
-                      for label, sym, dp, kind in self.symbols if label in self._last]
-            return {"fetched": datetime.fromtimestamp(self._fetched, timezone.utc).isoformat() if self._fetched > 0 else None,
-                    "ok_at": datetime.fromtimestamp(self._ok, timezone.utc).isoformat() if self._ok > 0 else None,
-                    "source": "Yahoo Finance (exchange data delayed)", "quotes": quotes}
+            return self._payload()
+
+    def peek(self) -> Optional[dict]:
+        """The last result without fetching (None before the first fetch)."""
+        return self._payload() if self._fetched > 0 else None
+
+    def _payload(self) -> dict:
+        quotes = [dict(self._last[label], label=label, symbol=sym, dp=dp, kind=kind)
+                  for label, sym, dp, kind in self.symbols if label in self._last]
+        return {"fetched": datetime.fromtimestamp(self._fetched, timezone.utc).isoformat() if self._fetched > 0 else None,
+                "ok_at": datetime.fromtimestamp(self._ok, timezone.utc).isoformat() if self._ok > 0 else None,
+                "source": "Yahoo Finance (exchange data delayed)", "quotes": quotes}

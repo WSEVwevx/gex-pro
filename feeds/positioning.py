@@ -80,6 +80,10 @@ class Positioning:
         q = urllib.parse.urlencode({"cftc_contract_market_code": CONTRACTS[market][0], "$order": "report_date_as_yyyy_mm_dd DESC", "$limit": WEEKS + 1})
         return summarize(market, parse_rows(json.loads(self._fetch(f"{URL}?{q}"))))
 
+    def peek(self) -> Optional[dict]:
+        """The last result without fetching (None before the first load)."""
+        return self._out
+
     def get(self) -> dict:
         """{"markets": {"ES": summary, "NQ": summary}}; the last good copy when the source fails."""
         with self._lock:

@@ -67,6 +67,10 @@ class Calendar:
             return dict(self._data or {"events": [], "fetched_at": None},
                         source="ForexFactory calendar (faireconomy.media weekly export)")
 
+    def peek(self) -> Optional[dict]:
+        """The last copy without fetching (None before the first load)."""
+        return dict(self._data) if self._data else None
+
     def _refresh(self) -> None:
         req = urllib.request.Request(FEED_URL, headers={"User-Agent": "Mozilla/5.0 (gexsys personal use)",
                                                         "Accept": "application/json"})

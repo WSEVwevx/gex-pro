@@ -277,15 +277,19 @@ class TrackRecordComponent:
                 "stats": stats, "sessions": ss, "backtest": bt}
 
     def sources(self) -> list:
-        """The Data health page's row: sessions still waiting for a final price 3 hours after the close."""
+        """The Data health page's row: sessions still waiting for a final price 3 hours after the close, or
+        given up on (no_prices) in the last 10 days."""
         now = self.clock()
         ss = self.sessions()
         waiting = [s for s in ss if s.get("status") == "pending"
                    and now > self.session_close(date.fromisoformat(s["session"])) + timedelta(hours=3)]
+        recent = (now - timedelta(days=10)).date().isoformat()
+        lost = [s for s in ss if s.get("status") == "no_prices" and s["session"] >= recent]
         graded = [s["graded_at"] for s in ss if s.get("graded_at")]
+        why = ([f"{len(waiting)} session(s) past the close still waiting for a final price"] if waiting else []) + \
+              ([f"{len(lost)} session(s) could not be graded: no final price was found"] if lost else [])
         return [{"name": "Closing prices for grading", "provider": "Cboe (same evening), Yahoo Finance (daily)",
-                 "pages": ["Track record"], "last_ok": max(graded, default=None),
-                 "error": f"{len(waiting)} session(s) past the close still waiting for a final price" if waiting else None}]
+                 "pages": ["Track record"], "last_ok": max(graded, default=None), "error": "; ".join(why) or None}]
 
     # ---------------------------------------------------------------- component contract
     def routes(self) -> dict:
