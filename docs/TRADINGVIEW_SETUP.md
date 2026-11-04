@@ -56,9 +56,11 @@ The dialog's separate Style tab has nothing to change.
 
 ### On the chart
 
-* **Lines** run across the chart's history and end at the current bar by default ("Across the chart,
-  end at price"), with the level's price written on top of the line where it ends (plain digits, e.g. `29885`); nothing is drawn over the
-  space right of price except the tags. Other choices: from the session open, the full chart, or right
+* **Lines** run across the chart's history and on past the current bar to the zone column by default
+  ("Across the chart, end at price"), with the level's price written on top of the line where it ends (plain
+  digits, e.g. `29885`). The zone column starts 11 bars right of price and the tags 16 bars right ("Label
+  offset"), so the last candles stay clear; with the GEX profile on, everything starts at "Profile gap"
+  (13 bars). Other choices: from the session open, the full chart, or right
   of price only. Key levels and max pain are 2 px, others 1 px. The GEX profile is off by default.
 * **Colours, style and width**: each level type has its colour, line style and thickness side by side in
   settings, picked from drawn previews: `────` solid, `╌╌╌╌` dashed, `┈┈┈┈` dotted; `───` 1 px up to `███` 4 px. Defaults: calls green, puts red, absolute gamma violet, zero gamma

@@ -5,13 +5,17 @@ cd /d "%~dp0"
 title GEX PRO - keep this window open
 set "PY=%LOCALAPPDATA%\Programs\Python\Python312\python.exe"
 if not exist "%PY%" set "PY=py"
-echo Checking dependencies...
-"%PY%" -m pip install --disable-pip-version-check -q --user -r requirements.txt
+rem The one dependency (time zone data) is installed once; after that GEX PRO starts without the internet.
+"%PY%" -c "import tzdata" >nul 2>&1
 if errorlevel 1 (
-  echo.
-  echo Could not install dependencies. Is Python 3.12 installed?  winget install Python.Python.3.12 --scope user
-  pause
-  exit /b 1
+  echo Installing dependencies...
+  "%PY%" -m pip install --disable-pip-version-check -q --user -r requirements.txt
+  if errorlevel 1 (
+    echo.
+    echo Could not install dependencies. Is Python 3.12 installed?  winget install Python.Python.3.12 --scope user
+    pause
+    exit /b 1
+  )
 )
 start "" http://127.0.0.1:8765
 "%PY%" -m gexpro --log-level WARNING serve --auto

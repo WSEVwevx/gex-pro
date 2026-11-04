@@ -173,7 +173,7 @@ class TrackRecordComponent:
         """Cached 30 minutes; refetched when the cached copy is older than fresh_after (a partial day's bar)."""
         got = self._daily.get(underlying)
         if not got or now - got[0] > timedelta(minutes=30) or (fresh_after and got[0] < fresh_after):
-            got = (now, self.src.daily(underlying, since=date.today() - timedelta(days=30)))
+            got = (now, self.src.daily(underlying, since=now.astimezone(NY).date() - timedelta(days=30)))
             self._daily[underlying] = got
         return got[1]
 

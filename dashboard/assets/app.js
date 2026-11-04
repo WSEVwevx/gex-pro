@@ -1595,7 +1595,8 @@ async function openStockChart(sym){
   try {
     if(STATIC){ scCharts = scCharts || await (await fetchFresh("data/screener-charts.json")).json(); c = scCharts[sym]; }
     else c = await (await fetchFresh(`/api/screener/chart?symbol=${encodeURIComponent(sym)}`)).json();
-  } catch(e){ $("scMsg").textContent = OFFLINE; return; }
+  } catch(e){ if(sym === scSym) $("scMsg").textContent = OFFLINE; return; }
+  if(sym !== scSym) return;                              // another stock was clicked while this one loaded
   if(!c || !c.symbol){ $("scMsg").textContent = "No chart data for this stock yet."; return; }
   renderStockChart(c);
 }
