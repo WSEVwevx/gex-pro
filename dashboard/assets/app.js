@@ -746,7 +746,7 @@ const HELP = {
   ladder_activity: {title: "Chain activity", tldr: "Who is positioned, and what is trading today.",
     body: `<p>Put/call ratios over the selected expirations and the rows shown: above 1 means more puts. Open interest is from yesterday's close; volume is today's.</p>`},
   heatmap: {title: "GEX heatmap", tldr: "Futures candles with dealer gamma painted behind them, snapshot by snapshot.",
-    body: `<p>Each column behind the candles is one GEX PRO snapshot; each cell is the net dealer gamma in that price band at that time. <b>Blue</b> = positive gamma (hedging leans against moves, so price tends to stall or pin there); <b>orange</b> = negative gamma (hedging adds to moves). Brighter = more gamma.</p><p>The lines are the call wall (blue) and put wall (orange) wherever they held for an hour or more; the ZG, CW and PW labels on the price axis are where zero gamma and the walls are now. Times are New York time; a dashed line marks each 9:30 cash open.</p><p>The space right of the last candle shows <b>GEX now</b>: the latest snapshot as bars (right = more gamma, blue or orange by sign), with today's key levels from the first expiry: C1 / C2, P1 / P2, Ab1 and the 0DTE flip, the same levels the TradingView indicator draws. <b>Today / 2 days / All</b> sets how much history is in view; the colour scale under the chart says how much gamma the brightest colour means. Watch how price reacts when it reaches a bright band, and how the bands move during the day. Hover anywhere for the numbers.</p><p>Candles: Yahoo Finance, delayed. Gamma: Cboe options, 15-min delayed, mapped to futures with today's basis. History builds up as snapshots are saved (about 12 days in the app, 5 on the hosted site).</p>`,
+    body: `<p>Behind the candles is the net dealer gamma from every GEX PRO snapshot, each one shown from the moment it was taken until the next, with neighbouring price bands blended into soft zones (hover for the exact value at any price and time). <b>Today</b>, <b>2 days</b> (the default) and <b>All</b> (about a week) pick how much price action is shown. <b>Blue</b> = positive gamma (hedging leans against moves, so price tends to stall or pin there); <b>orange</b> = negative gamma (hedging adds to moves). Brighter = more gamma.</p><p>The lines are the call wall (blue) and put wall (orange) wherever they held for an hour or more; the ZG, CW and PW labels on the price axis are where zero gamma and the walls are now. Times are New York time; a dashed line marks each 9:30 cash open.</p><p>The space right of the last candle shows <b>GEX now</b>: the latest snapshot as bars (right = more gamma, blue or orange by sign), with today's key levels from the first expiry: C1 / C2, P1 / P2, Ab1 and the 0DTE flip, the same levels the TradingView indicator draws. <b>Today / 2 days / All</b> sets how much history is in view; the colour scale under the chart says how much gamma the brightest colour means. Watch how price reacts when it reaches a bright band, and how the bands move during the day. Hover anywhere for the numbers.</p><p>Candles: Yahoo Finance, delayed. Gamma: Cboe options, 15-min delayed, mapped to futures with today's basis. History builds up as snapshots are saved (about 12 days in the app, 5 on the hosted site).</p>`,
     watch: ["Price stalling at a bright blue band = positive-gamma support or resistance", "Price slicing through orange = negative gamma, moves can extend"]},
   paste: {title: "The hourly paste", tldr: "One text block that carries all levels to TradingView.",
     body: `<p>Published every hour on the hour (ET). One paste holds NQ and ES; each chart draws only its own market. The indicator marks levels stale after 90 minutes.</p>`},
@@ -1236,7 +1236,7 @@ function renderTape(){
 
 // ---------- GEX heatmap: futures candles (Lightweight Charts) with the gamma history painted underneath
 let hm = null, hmChart = null, hmCandles = null, hmLines = {}, hmPrim = null, hmMarket = null;
-let hmSpan = store.get("gex.hmspan", "today");      // visible range: today's session, two sessions, or everything loaded
+let hmSpan = store.get("gex.hmspan2", "2d");        // visible range: today's session, two sessions (default), or everything loaded
 let hmReset = true;          // next draw starts at the latest candles with auto-scaled prices (open, market or timeframe change)
 let hmTf = store.get("gex.hmtf", "5m"), hmOpacity = Number(store.get("gex.hmop", "50")), hmShowLv = store.get("gex.hmlv", "1") === "1";
 const hmUrl = () => STATIC ? `data/heatmap-${market}-${hmTf}.json` : `/api/heatmap?market=${encodeURIComponent(market)}&tf=${hmTf}`;
@@ -1249,7 +1249,7 @@ async function loadHeatmap(){
   try { got = await (await fetchFresh(hmUrl())).json(); }
   catch(e){ $("hmMsg").textContent = OFFLINE; $("hmMsg").hidden = false; return; }
   if(want !== market + hmTf) return;                       // the market or timeframe changed while loading
-  hm = got;
+  hm = got; hm._key = want;                                 // which market and timeframe this data is for
   renderHeatmap();
 }
 // a level's path through the snapshots without short flickers: median of 7, then a change only
@@ -1308,6 +1308,33 @@ function hmSmooth(cols, k = 3){
     return {...c, v: c.v.map((_, b) => (sum.get(Math.round((c.base + b * c.w) * 100)) || 0) / n.length)};
   });
 }
+// the heat as one image over the whole chart: a pixel per candle across and per price band down (top = highest).
+// Each candle shows the latest snapshot at or before it; one smoothed stretch blends bands and snapshots into
+// each other, with no seams between columns
+function hmAtlas(pos, neg, maxA){
+  const C = hm._cols, times = hm._times, N = times.length;
+  if(!C.length || !N) return null;
+  const ws = {}; C.forEach(c => ws[c.w] = (ws[c.w] || 0) + 1);
+  const w = Number(Object.keys(ws).sort((a, b) => ws[b] - ws[a])[0]);        // the usual band width
+  const lo = Math.min(...C.map(c => c.base)), hi = Math.max(...C.map(c => c.base + (c.v.length - 1) * c.w));
+  const H = Math.min(2000, Math.round((hi - lo) / w) + 1);
+  const cv = document.createElement("canvas"); cv.width = N; cv.height = H;
+  const g = cv.getContext("2d"), img = g.createImageData(N, H), d = img.data;
+  let ci = -1;
+  for(let k = 0; k < N; k++){
+    while(ci + 1 < C.length && (C[ci + 1]._bar == null || C[ci + 1]._bar <= times[k])) ci++;
+    if(ci < 0) continue;                                   // before the first snapshot: no heat
+    const c = C[ci], scale = c.rel ? 99 : hm._scale;
+    for(let r = 0; r < H; r++){
+      const v = c.v[Math.round((hi - r * w - c.base) / c.w)], a0 = v ? Math.min(1, Math.abs(v) / scale) : 0;
+      if(a0 < 0.12) continue;                              // noise floor: only bands with real gamma get colour
+      const a = Math.pow((a0 - 0.12) / 0.88, 0.8) * maxA, rgb = v > 0 ? pos : neg, q = (r * N + k) * 4;
+      d[q] = rgb[0]; d[q + 1] = rgb[1]; d[q + 2] = rgb[2]; d[q + 3] = Math.round(a * 255);
+    }
+  }
+  g.putImageData(img, 0, 0);
+  return {cv, lo, hi, w, N, H};
+}
 // bar time at or before t (columns snap to the candle they fall in)
 function hmSnap(times, t){ let lo = 0, hi = times.length - 1; if(hi < 0 || t < times[0]) return null; while(lo < hi){ const m = (lo + hi + 1) >> 1; times[m] <= t ? lo = m : hi = m - 1; } return times[lo]; }
 class HeatPrimitive {
@@ -1324,29 +1351,21 @@ class HeatPrimitive {
       const ctx = sc.context, hr = sc.horizontalPixelRatio, vr = sc.verticalPixelRatio, W = sc.bitmapSize.width;
       // a snapshot before the first candle has no bar: it sits at the left edge
       const xOf = bt => bt == null ? 0 : ts.timeToCoordinate(bt);
-      // the clear space right of the last candle holds the latest profile: heat stops at the last bar
+      // the clear space right of the last candle holds the latest profile (the heat image ends at the last bar)
       const lastX = times.length ? ts.timeToCoordinate(times[times.length - 1]) : null, bar = ts.options().barSpacing || 6;
-      const edge = lastX == null ? W / hr : Math.min(W / hr, lastX + bar / 2);
-      hm._cols.forEach((c, i) => {
-        const x0 = xOf(hmSnap(times, c.t)), nx = hm._cols[i + 1];
-        let x1 = nx ? xOf(hmSnap(times, nx.t)) : null;
-        if(x0 == null) return;
-        if(nx && x1 != null && x1 <= x0) return;            // shares its candle with the next column: that one is drawn
-        if(x1 == null) x1 = edge;
-        const scale = c.rel ? 99 : hm._scale;
-        c.v.forEach((v, j) => {
-          if(!v) return;
-          const p = (c.base + j * c.w) * fac + off, ya = this.series.priceToCoordinate(p + c.w * fac / 2), yb = this.series.priceToCoordinate(p - c.w * fac / 2);
-          if(ya == null || yb == null) return;
-          const r = Math.min(1, Math.abs(v) / scale);
-          if(r < 0.12) return;                              // noise floor: only bands with real gamma get colour
-          const a = Math.pow((r - 0.12) / 0.88, 0.8) * maxA, rgb = v > 0 ? pos : neg;
-          ctx.fillStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${a.toFixed(3)})`;
-          // every edge rounded the same way, so neighbours meet exactly: no gaps, no doubled overlaps
-          const X0 = Math.round(x0 * hr), Y0 = Math.round(ya * vr);
-          ctx.fillRect(X0, Y0, Math.max(1, Math.round(x1 * hr) - X0), Math.max(1, Math.round(yb * vr) - Y0));
-        });
-      });
+      const key = [hmOpacity, pos, neg].join();
+      if(hm._atlasKey !== key){ hm._atlas = hmAtlas(pos, neg, maxA); hm._atlasKey = key; }
+      const A = hm._atlas;
+      if(A){
+        // first and last bar centres (the library returns 0 for half-bar positions), widened by half a bar
+        const x0 = ts.logicalToCoordinate(0), xn = ts.logicalToCoordinate(A.N - 1), half = A.N > 1 ? (xn - x0) / (A.N - 1) / 2 : bar / 2;
+        const xa = x0 == null ? null : x0 - half, xb = xn == null ? null : xn + half;
+        const ya = this.series.priceToCoordinate((A.hi + A.w / 2) * fac + off), yb = this.series.priceToCoordinate((A.lo - A.w / 2) * fac + off);
+        if(xa != null && xb != null && ya != null && yb != null){
+          ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
+          ctx.drawImage(A.cv, 0, 0, A.N, A.H, xa * hr, ya * vr, (xb - xa) * hr, (yb - ya) * vr);
+        }
+      }
       // session markers: a faint line at each 09:30 ET cash open, with the day on top
       const Hpx = sc.bitmapSize.height, fs = Math.round(10.5 * vr);
       ctx.font = `600 ${fs}px ${cssVar("--mono") || "monospace"}`;
@@ -1414,9 +1433,9 @@ function hmColors(){
 }
 function renderHeatmap(){
   $("hmSpan").innerHTML = [["today", "Today"], ["2d", "2 days"], ["all", "All"]].map(([k, t]) => `<button role="tab" aria-selected="${hmSpan === k}" data-k="${k}">${t}</button>`).join("");
-  [...$("hmSpan").children].forEach(b => b.onclick = () => { hmSpan = b.dataset.k; store.set("gex.hmspan", hmSpan); hmReset = true; renderHeatmap(); });
+  [...$("hmSpan").children].forEach(b => b.onclick = () => { hmSpan = b.dataset.k; store.set("gex.hmspan2", hmSpan); hmReset = true; renderHeatmap(); });
   $("hmTf").innerHTML = [["1m", "1m"], ["5m", "5m"], ["15m", "15m"]].map(([k, t]) => `<button role="tab" aria-selected="${hmTf === k}" data-k="${k}">${t}</button>`).join("");
-  [...$("hmTf").children].forEach(b => b.onclick = () => { hmTf = b.dataset.k; store.set("gex.hmtf", hmTf); hmMarket = null; loadHeatmap(); });
+  [...$("hmTf").children].forEach(b => b.onclick = () => { hmTf = b.dataset.k; store.set("gex.hmtf", hmTf); hmReset = true; loadHeatmap(); });
   $("hmOpacity").value = hmOpacity; $("hmLevels").checked = hmShowLv;
   if(!hm || !window.LightweightCharts) return;
   const LC = window.LightweightCharts;
@@ -1426,6 +1445,7 @@ function renderHeatmap(){
   const vals = hm.columns.filter(c => !c.rel).flatMap(c => c.v.map(Math.abs)).filter(v => v > 0).sort((a, b) => a - b);
   hm._scale = vals.length ? vals[Math.floor(vals.length * 0.97)] || 1 : 1;
   hm._cols = hmSmooth(hmPerBar(hm.columns, hm._times), hmTf === "1m" ? 3 : hmTf === "5m" ? 2 : 1);
+  hm._atlasKey = null;                                     // the heat image is rebuilt from these columns on the next draw
   const ses = hmSessions(hm._times);
   hm._opens = ses.opens; hm._starts = ses.starts;
   hm._profile = [...hm.columns].reverse().find(c => !c.rel) || null;
@@ -1457,7 +1477,9 @@ function renderHeatmap(){
   // room right of the last candle for the latest profile: about 190 px, whatever the zoom
   const ro = Math.max(16, Math.ceil(190 / (hmChart.timeScale().options().barSpacing || 6)));
   hmChart.timeScale().applyOptions({rightOffset: ro});
-  const keep = !hmReset && hmMarket === market + hmTf ? hmChart.timeScale().getVisibleLogicalRange() : null;
+  // keep the user's zoom only for a redraw of the same data's market and timeframe (a range picked while
+  // another timeframe loads applies when that data arrives)
+  const keep = !hmReset && hmMarket === hm._key ? hmChart.timeScale().getVisibleLogicalRange() : null;
   hmCandles.setData(hm.candles.map(c => ({time: c[0], open: c[1], high: c[2], low: c[3], close: c[4]})));
   // level paths (steadied) as [from bar, to bar, price] per snapshot; today's values as axis labels only
   hm._lv = {};
@@ -1482,7 +1504,7 @@ function renderHeatmap(){
     hmChart.timeScale().applyOptions({rightOffset: ro2});
     hmChart.timeScale().setVisibleLogicalRange({from, to: n + ro2});
   }
-  hmMarket = market + hmTf;
+  if(hm._key === market + hmTf) hmMarket = hm._key;
   const rel = hm.columns.filter(c => c.rel).length;
   $("hmSub").textContent = `${market} futures · ${hm.columns.length} GEX snapshot${hm.columns.length === 1 ? "" : "s"} · candles ${hmTf}, delayed`;
   $("hmNote").textContent = rel ? `${rel} older snapshot${rel === 1 ? "" : "s"} shown at relative strength` : "";

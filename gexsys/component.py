@@ -168,7 +168,7 @@ class GexComponent:
         return 200, w.result["pine"]
 
     # ---------------------------------------------------------------- hosted site
-    def build_static(self, data: Path, state: Path, keep_days: int = 5) -> dict:
+    def build_static(self, data: Path, state: Path, keep_days: int = 7) -> dict:
         """One refresh of every market (like START.bat), written as files. `state` keeps the last good
         result, the scheduled payload and recent history between runs."""
         snaps = state / "snapshots"

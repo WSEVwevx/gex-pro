@@ -51,6 +51,10 @@ class TestHeatmap(unittest.TestCase):
             self.assertEqual((c["base"], c["w"], c["v"]), (h["base"], h["w"], h["v"]))
             self.assertNotIn("rel", c)
             self.assertIsNotNone(c["zg"] if s.get("zero_gamma") else 0)
+            # candles long before the GEX history are dropped, but the last two days of price action stay
+            bar = lambda h: [int((t0 + timedelta(hours=h)).timestamp()), 1, 2, 0.5, 1.5]
+            trimmed = heatmap.build(w, "5m", candles=[bar(-72), bar(-40), bar(-2), bar(1)])
+            self.assertEqual([c[0] for c in trimmed["candles"]], [bar(-40)[0], bar(-2)[0], bar(1)[0]])
             # a snapshot older than the first candle is left out
             later = heatmap.build(w, "5m", candles=[[int((t0 + timedelta(hours=3)).timestamp()), 1, 2, 0.5, 1.5]])
             self.assertEqual(later["columns"], [])

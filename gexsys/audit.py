@@ -96,9 +96,12 @@ def audit(cfg, provider) -> list[tuple[str, str, str]]:
     add("levels: put wall at/below price", pw is None or pw <= ref + 1e-6, f"put wall {pw} vs price {ref:.2f}")
     add("levels: zero gamma", zg is not None or sm["zero_gamma_status"].startswith("NO CROSSING"),
         f"{zg} ({sm['zero_gamma_status']})")
-    far = [(k, _p(L[k])) for k in ("zero_gamma", "call_wall", "put_wall", "max_positive", "max_negative", "abs_gamma")
-           if _p(L.get(k)) is not None and abs(_p(L[k]) / ref - 1) > 0.08]
-    add("levels: all within the indicator's 8% safety distance", not far, f"too far: {far}" if far else "all key levels within 8%")
+    keys = [k for k in ("zero_gamma", "call_wall", "put_wall", "max_positive", "max_negative", "abs_gamma") if _p(L.get(k)) is not None]
+    far = [(k, _p(L[k])) for k in keys if abs(_p(L[k]) / ref - 1) > 0.08]
+    # a broken price mapping moves every level at once; one big strike far away (a 7000 put wall with ES at
+    # 7700 after a selloff) is real data that the indicator simply leaves off the chart
+    add("levels: within the indicator's 8% safety distance", not far,
+        f"too far (the indicator hides these): {far}" if far else "all key levels within 8%", warn_only=len(far) * 2 < max(1, len(keys)))
     ex = L.get("extras") or {}
     mp = (ex.get("max_pain") or [{}])[0].get("price")
     add("levels: nearest max pain within 5%", mp is None or abs(mp / ref - 1) <= 0.05, f"{mp}", warn_only=True)

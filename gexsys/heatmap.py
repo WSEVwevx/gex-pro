@@ -22,7 +22,7 @@ from typing import Optional
 log = logging.getLogger("gexsys.heatmap")
 YAHOO = "https://query1.finance.yahoo.com/v8/finance/chart/{sym}?interval={tf}&range={rng}"
 SYMBOL = {"NQ": "NQ%3DF", "ES": "ES%3DF"}
-RANGE = {"1m": "2d", "5m": "5d", "15m": "10d"}
+RANGE = {"1m": "5d", "5m": "5d", "15m": "10d"}     # 1m: a full 2-session view even on Mondays
 MAX_COLUMNS = 700
 
 
@@ -114,6 +114,11 @@ def build(worker, tf: str = "5m", candles: Optional[list] = None) -> dict:
     m = (r.get("mapped") or {}).get("mapping") or {}
     since = datetime.fromtimestamp(candles[0][0], timezone.utc) - timedelta(hours=1) if candles else datetime.now(timezone.utc) - timedelta(days=5)
     cols = columns_from(worker.store.root / worker.key, since)
+    if cols and candles:
+        # candles from before the saved GEX history would sit on an empty background: start an hour before the
+        # first snapshot, but always keep at least the last two days of price action
+        cut = min(cols[0]["t"] - 3600, candles[-1][0] - 2 * 86400)
+        candles = [c for c in candles if c[0] >= cut]
     return {"market": market, "tf": tf, "factor": m.get("factor") or 1.0, "offset": m.get("offset") or 0.0,
             "built": datetime.now(timezone.utc).isoformat(), "candles": candles, "columns": cols,
             "unit": "$M of dealer gamma per 1% move", "source": "candles: Yahoo Finance (delayed); GEX: Cboe options, 15-min delayed"}
