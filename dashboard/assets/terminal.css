@@ -384,6 +384,7 @@ td.m{font-family:var(--mono)}
 .trk-table th:last-child{text-align:left}
 .trk-table .trk-mean{text-align:left;color:var(--ink3);max-width:46ch;line-height:1.45}
 .trk-log{overflow-x:auto}
+#trkScore,#trkSplit,#btVol{overflow-x:auto}           /* tables wider than a phone scroll in their own card */
 .trk-log table{min-width:860px}
 .trk-disclaimer{margin:12px 0 0;max-width:none}
 
