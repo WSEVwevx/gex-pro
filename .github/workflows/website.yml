@@ -102,9 +102,10 @@ jobs:
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
       # The same request actions/deploy-pages makes, with one change: that action always uses the commit as
-      # the build version, and Pages skips a deployment whose version it has already published (it "succeeds"
-      # in seconds and nothing changes). Every run here rebuilds the same commit with fresh data, so each run
-      # deploys under its own version and waits until Pages reports the files live.
+      # the build version, and Pages skips a version it has already published (it "succeeds" in seconds and
+      # nothing changes). Every run here rebuilds the same commit with fresh data, so each run deploys under
+      # its own version. The version must be a commit in this repository (anything else is a 404), so each
+      # run makes a commit object with the same files and no branch pointing at it: history stays as it is.
       - id: deploy
         uses: actions/github-script@v7
         env:
@@ -112,9 +113,12 @@ jobs:
         with:
           script: |
             const repo = {owner: context.repo.owner, repo: context.repo.repo};
+            const {data: head} = await github.rest.git.getCommit({...repo, commit_sha: context.sha});
+            const {data: ver} = await github.rest.git.createCommit({...repo, tree: head.tree.sha, parents: [context.sha],
+              message: `Pages deployment for run ${context.runId}`});
             const {data: d} = await github.request("POST /repos/{owner}/{repo}/pages/deployments", {...repo,
-              artifact_id: Number(process.env.ARTIFACT_ID), oidc_token: await core.getIDToken(),
-              pages_build_version: `${context.sha}-${context.runId}-${process.env.GITHUB_RUN_ATTEMPT}`});
+              artifact_id: Number(process.env.ARTIFACT_ID), oidc_token: await core.getIDToken(), pages_build_version: ver.sha});
+            core.info(`deployment ${d.id} as ${ver.sha}`);
             core.setOutput("page_url", d.page_url);
             const bad = ["deployment_failed", "deployment_content_failed", "deployment_cancelled", "deployment_lost", "deployment_attempt_error"];
             for (let i = 0; i < 120; i++) {
