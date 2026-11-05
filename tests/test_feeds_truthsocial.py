@@ -68,6 +68,16 @@ class TestParsing(unittest.TestCase):
         self.assertEqual((img["text"], img["media"]), ("", [{"type": "image", "preview": "https://archive.example/a.jpg"}]))
         self.assertEqual((vid["text"], vid["media"]), ("Stocks are up", []))
 
+    def test_video_files_are_not_pictures(self):
+        # an <img> cannot show an .mp4: a video post keeps its text, with no broken picture
+        xml = ('<rss xmlns:media="http://search.yahoo.com/mrss/"><channel><item><title>t</title><link>https://www.trumpstruth.org/statuses/3</link>'
+               '<pubDate>Tue, 03 Nov 2026 23:51:00 +0000</pubDate><description><![CDATA[<p>Watch</p>]]></description>'
+               '<media:content url="https://archive.example/clip.mp4" medium="video"/></item></channel></rss>').encode()
+        self.assertEqual(from_rss(xml)[0]["media"], [])
+        api = [{"id": "9", "created_at": "2026-11-03T23:51:00.000Z", "content": "<p>Watch</p>", "url": "https://truthsocial.com/x/9",
+                "media_attachments": [{"type": "video", "url": "https://static-assets-1.truthsocial.com/v.mp4"}]}]
+        self.assertEqual(from_api(api)[0]["media"], [])
+
     def test_text_helpers(self):
         self.assertEqual(html_to_text("<p>a</p><p>b &amp; c</p>"), "a\nb & c")
         self.assertEqual(market_words("Fed, rates and stocks"), ["fed", "rate", "stock"])

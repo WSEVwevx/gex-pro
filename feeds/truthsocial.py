@@ -116,6 +116,14 @@ def _https(u) -> Optional[str]:
     return u if isinstance(u, str) and u.startswith("https://") else None
 
 
+VIDEO_FILE = re.compile(r"\.(mp4|m4v|mov|webm|m3u8|avi)$", re.I)   # not a picture: an <img> cannot show it
+
+
+def _picture(u) -> Optional[str]:
+    u = _https(u)
+    return u if u and not VIDEO_FILE.search(u.split("?")[0]) else None
+
+
 def from_api(statuses) -> list[dict]:
     out = []
     for s in statuses if isinstance(statuses, list) else []:
@@ -127,8 +135,8 @@ def from_api(statuses) -> list[dict]:
         src = rb or s
         text = html_to_text(src.get("content", ""))
         kind = "retruth" if rb else ("quote" if s.get("quote_id") or "quote-inline" in (s.get("content") or "") else "post")
-        media = [{"type": m.get("type", "image"), "preview": _https(m.get("preview_url") or m.get("url"))}
-                 for m in (src.get("media_attachments") or []) if _https(m.get("preview_url") or m.get("url"))][:1]
+        media = [{"type": m.get("type", "image"), "preview": _picture(m.get("preview_url") or m.get("url"))}
+                 for m in (src.get("media_attachments") or []) if _picture(m.get("preview_url") or m.get("url"))][:1]
         card = src.get("card") or {}
         out.append({"id": str(s.get("id")), "time": t.astimezone(timezone.utc).isoformat(), "kind": kind,
                     "author": ((rb or {}).get("account") or {}).get("acct") if rb else None,
@@ -157,10 +165,10 @@ def from_rss(xml_bytes: bytes) -> list[dict]:
         desc = html_to_text(ATTACHMENT.sub("", raw))
         title = (it.findtext("title") or "").strip()
         text = desc or ("" if title.lower().startswith(("image post", "video post")) else title)
-        media = [{"type": kind.lower(), "preview": _https(u)} for u, kind in files if kind.lower() == "image" and _https(u)]
+        media = [{"type": "image", "preview": _picture(u)} for u, kind in files if kind.lower() == "image" and _picture(u)]
         for el in it:
             if el.tag.endswith("content") or el.tag.endswith("thumbnail"):
-                u = _https(el.attrib.get("url"))
+                u = _picture(el.attrib.get("url"))               # a video attachment has no picture to show
                 if u:
                     media.append({"type": "image", "preview": u})
         out.append({"id": it.findtext("guid") or it.findtext("link") or t.isoformat(), "time": t.astimezone(timezone.utc).isoformat(),
