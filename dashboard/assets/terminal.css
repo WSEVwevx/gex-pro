@@ -549,6 +549,7 @@ b.good,.drv-chg .good{color:var(--good)}b.bad,.drv-chg .bad{color:var(--bad)}
   .hero,.ihero{grid-template-columns:1fr}
   .toast{left:14px;right:14px;bottom:14px;max-width:none}
   .ev{grid-template-columns:58px 56px 1fr}.ev .cur,.ev .fp{display:none}
+  .bev{grid-template-columns:80px 40px minmax(0,1fr)}.bev .fp{grid-column:3;white-space:normal}   /* forecast / previous under the event name */
   .side-label{display:none}
   .lib-article{padding:18px}.gl-row{grid-template-columns:1fr}
 }
