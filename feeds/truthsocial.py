@@ -140,6 +140,10 @@ def from_api(statuses) -> list[dict]:
     return out
 
 
+# the archive writes each attachment as a link: <a href="...jpg">View image</a> (or "View video")
+ATTACHMENT = re.compile(r'<a\s[^>]*href="([^"]+)"[^>]*>\s*View (image|video)\s*</a>', re.I)
+
+
 def from_rss(xml_bytes: bytes) -> list[dict]:
     out = []
     root = ET.fromstring(xml_bytes)
@@ -148,10 +152,12 @@ def from_rss(xml_bytes: bytes) -> list[dict]:
             t = parsedate_to_datetime(it.findtext("pubDate"))
         except (TypeError, ValueError):
             continue
-        desc = html_to_text(html.unescape(it.findtext("description") or ""))
+        raw = html.unescape(it.findtext("description") or "")
+        files = ATTACHMENT.findall(raw)                       # pictures, not text: shown as the post's image
+        desc = html_to_text(ATTACHMENT.sub("", raw))
         title = (it.findtext("title") or "").strip()
         text = desc or ("" if title.lower().startswith(("image post", "video post")) else title)
-        media = []
+        media = [{"type": kind.lower(), "preview": _https(u)} for u, kind in files if kind.lower() == "image" and _https(u)]
         for el in it:
             if el.tag.endswith("content") or el.tag.endswith("thumbnail"):
                 u = _https(el.attrib.get("url"))

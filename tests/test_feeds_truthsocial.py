@@ -57,6 +57,17 @@ class TestParsing(unittest.TestCase):
         self.assertEqual((p[1]["text"], p[1]["market_words"]), ("Oil prices are coming DOWN", ["oil"]))
         self.assertEqual(p[1]["time"], "2026-10-21T17:20:53+00:00")
 
+    def test_rss_attachment_links_are_media_not_text(self):
+        # the archive writes pictures as "View image" links; they become the post's image, never its text
+        xml = ('<rss><channel><item><title>Image post from November 4, 2026</title><link>https://www.trumpstruth.org/statuses/2</link>'
+               '<pubDate>Wed, 04 Nov 2026 17:05:32 +0000</pubDate><description><![CDATA[<p></p><p><a href="https://archive.example/a.jpg">View image</a></p>'
+               '<p><a href="https://archive.example/b.jpg">View image</a></p>]]></description></item>'
+               '<item><title>t</title><link>https://www.trumpstruth.org/statuses/1</link><pubDate>Wed, 04 Nov 2026 18:05:32 +0000</pubDate>'
+               '<description><![CDATA[<p>Stocks are up</p><p><a href="https://archive.example/v.mp4">View video</a></p>]]></description></item></channel></rss>').encode()
+        img, vid = from_rss(xml)
+        self.assertEqual((img["text"], img["media"]), ("", [{"type": "image", "preview": "https://archive.example/a.jpg"}]))
+        self.assertEqual((vid["text"], vid["media"]), ("Stocks are up", []))
+
     def test_text_helpers(self):
         self.assertEqual(html_to_text("<p>a</p><p>b &amp; c</p>"), "a\nb & c")
         self.assertEqual(market_words("Fed, rates and stocks"), ["fed", "rate", "stock"])
