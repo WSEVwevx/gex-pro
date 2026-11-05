@@ -259,11 +259,11 @@ window.GEX_LIBRARY = (() => {
     L({id: "gamma-zones", chapter: "levels", title: "Gamma zones and confluence", minutes: 4,
       oneLiner: "The ranked levels and the gamma flip divide the chart into zones with different hedging behaviour.",
       body: `{{d:zones}}<ul><li><b>Positive Gamma Zone</b>: from the gamma flip up to C1. Call-dominated gamma; hedging dampens moves.</li><li><b>Positive Gamma Extension Zone</b>: from C1 up to the next call level. Above C1 hedging pressure eases.</li><li><b>Negative Gamma Zone</b>: from P1 up to the gamma flip. Put-dominated gamma; hedging adds to moves.</li><li><b>Negative Gamma Extension Zone</b>: from P1 down to the next put level. Below P1 hedging adds to selling.</li></ul>
-        <p>A level on the edge between two zones is a <b>boundary</b>, and the hover box says so. When several levels sit at or near the same price, that is <b>confluence</b>, shown as ●● dots: two levels is moderate, three strong, four or more very strong. Stacked levels make a more significant reaction zone.</p>`,
-      points: ["Zones are measured from the gamma flip, C1 and P1.", "Boundaries between zones are natural decision points.", "More ● dots = more levels stacked = a stronger zone."],
+        <p>A level on the edge between two zones is a <b>boundary</b>, and the hover box says so. When several levels sit at or near the same price, that is <b>confluence</b>, shown as •• dots: two levels is moderate, three strong, four or more very strong. Stacked levels make a more significant reaction zone.</p>`,
+      points: ["Zones are measured from the gamma flip, C1 and P1.", "Boundaries between zones are natural decision points.", "More • dots = more levels stacked = a stronger zone."],
       example: `C1 and Ab2 at 29,800 with the flip at 29,470: 29,800 is a boundary between the Positive Gamma Zone below it and the Positive Gamma Extension Zone above it, with two-level confluence.`,
       gex: ["indicator", "Hover any tag on the chart for its zone"],
-      quiz: {q: "A tag shows ●●●. What does it mean?", choices: ["Three levels converge there", "The level is three days old", "Three trades occurred there"], answer: 0, why: "The dots count the levels at or near that price; three is strong confluence."}}),
+      quiz: {q: "A tag shows •••. What does it mean?", choices: ["Three levels converge there", "The level is three days old", "Three trades occurred there"], answer: 0, why: "The dots count the levels at or near that price; three is strong confluence."}}),
     // ---------------------------------------------------------------- 6. using GEX PRO
     L({id: "indicator-setup", chapter: "use", title: "Setting up the TradingView indicator", minutes: 3,
       oneLiner: "Install the script once, then paste fresh levels from the website when you want an update.",
@@ -359,7 +359,7 @@ window.GEX_LIBRARY = (() => {
     ["Ab levels (Ab1-Ab3)", "The strikes with the most total gamma (calls + puts combined), strongest first. Often magnets.", "ranked-levels", "Indicator levels", "Indicator tags, Live table chips"],
     ["First expiry", "The nearest expiration: today's (0DTE) during the session, otherwise the next one. The indicator's default source for C / P / Ab levels.", "first-expiry", "Indicator levels", "Indicator 'Ranked from', hover header"],
     ["Standalone (ETF only)", "Levels from the ETF's own options at its own strikes (QQQ for NQ, SPY for ES), not folded into the index. QQQ $1 strikes land about 41 NQ points apart.", "first-expiry", "Indicator levels", "Hover header, 'Ranked from'"],
-    ["Confluence", "Several levels at or very near the same price. More levels stacked (shown as ●● dots) = a stronger potential reaction zone.", "gamma-zones", "Indicator levels", "● dots on tags, hover box"],
+    ["Confluence", "Several levels at or very near the same price. More levels stacked (shown as •• dots) = a stronger potential reaction zone.", "gamma-zones", "Indicator levels", "• dots on tags, hover box"],
     ["Positive Gamma Zone", "From the gamma flip up to C1: call-dominated gamma, so dealer hedging dampens moves.", "gamma-zones", "Indicator levels", "Hover box zone context, green zone column"],
     ["Positive Gamma Extension Zone", "From C1 up to the next call level: above C1 hedging pressure eases off.", "gamma-zones", "Indicator levels", "Hover box zone context"],
     ["Negative Gamma Zone", "From P1 up to the gamma flip: put-dominated gamma, so dealer hedging adds to moves.", "gamma-zones", "Indicator levels", "Hover box zone context, red zone column"],

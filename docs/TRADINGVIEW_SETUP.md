@@ -70,7 +70,7 @@ The dialog's separate Style tab has nothing to change.
   it to 100 for fully solid lines), and tag and price text always stay at full strength. Largest +/- GEX,
   concentrations, volume walls and max pain are off by default (the ranked levels cover them).
 * **Tags + hover info** (the default label style): each level gets a short tag right of price with a
-  strength bar, e.g. `▬▬▬▬▬▬ C1  Ab2`. Ranked levels: `C1`-`C7` (most positive net GEX), `P1`-`P7` (most
+  strength bar, e.g. `━━━━ C1  Ab2`. Ranked levels: `C1`-`C7` (most positive net GEX), `P1`-`P7` (most
   negative net GEX), `Ab1`-`Ab3` (most total gamma). **Ranked from** picks their source. *First expiry*
   means today's expiring options (the next expiry when none expire today): their gamma sits close to
   price, so many nearby levels for intraday trading. *auto* (default) ranks whichever chain holds most of
@@ -78,7 +78,7 @@ The dialog's separate Style tab has nothing to change.
   0DTE GEX tools draw NQ); for ES usually SPX with SPY, neighbouring strikes folded 10 points apart. *ETF
   only* and *index + ETF* force one; *All expirations* ranks every expiry out to 45 days (fewer, bigger
   levels further out). The hover header names the chain, e.g. `QQQ standalone · first expiry 0DTE`.
-  The bar's length is the level's share of gamma, relative to the strongest. `●●` dots mark confluence
+  The bar's length is the level's share of gamma, relative to the strongest. `••` dots mark confluence
   (that many levels at or within 0.10% of the price, set in "Confluence within").
 * **Hover a tag** for its analysis, laid out like this: the expiry it comes from; the price and its
   distance from price; the confluence count and strength; each level stacked there with its rank and
@@ -92,7 +92,7 @@ The dialog's separate Style tab has nothing to change.
   (a hold = no close beyond the level within an hour; 70%+ reliable, 50-69% mixed, below 50% often breaks;
   fewer than 3 touches is too few to judge).
 * **Tag colours:** each name in a tag has its own colour (C and CW green, P and PW red, Ab violet, ZG amber,
-  IV bands grey), with the strength bar drawn as a thick line before them.
+  IV bands grey), with the strength bar drawn as a slim line before them.
 * **Levels at the 9:30 open:** when C1, P1, Ab1 or the gamma flip has moved since the cash open, a faint dashed
   line marks where it stood at 9:30 ("C1 open  29,800"), so you can see how the map has shifted.
 * **Past sessions' levels** (default 3 days, up to 5; 0 = off): zero gamma and the call and put walls at the close

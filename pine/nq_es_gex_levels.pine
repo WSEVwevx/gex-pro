@@ -831,31 +831,31 @@ renderTags() =>
             // the price sits ON TOP of the line where it ends (anchored by its bottom-right corner), plain digits like a
             // price-scale mark: 29885, 29914.75
             array.push(gLabels, label.new(bar_index + zoneX, p, str.tostring(p, "#.##"), style = label.style_label_lower_right, color = color.new(#0b0e13, 100),
-                 textcolor = color.new(array.get(tgCol, i), 0), size = lSz, textalign = text.align_right, tooltip = tip))
+                 textcolor = color.new(array.get(tgCol, i), 35), size = lSz, textalign = text.align_right, tooltip = tip))
         float st = array.get(tgStr, i)
         color lc = array.get(tgCol, i)
         if not na(st)
             int tp = math.round((1 - math.min(1.0, st)) * maxFade)
             line.set_color(array.get(gLines, i), color.new(lc, tp))
             // the tag text stays at full strength; only the line fades
-        // the strength bar is a thick line; then each name as its own label in its own colour. A monospace font
-        // and figure-space padding ( ) put the names side by side exactly, e.g. "C1  Ab2"
+        // a slim strength bar (up to 6 bars long); then each name as its own label in its own colour. A monospace
+        // font and figure-space padding ( ) put the names side by side exactly, e.g. "C1  Ab2"
         int x0 = bar_index + lblX
         if not na(st)
-            int bl = math.max(1, math.round(st * 8))
-            array.push(gLines, line.new(x0, p, x0 + bl, p, color = color.new(lc, 0), width = 4))
+            int bl = math.max(1, math.round(st * 6))
+            array.push(gLines, line.new(x0, p, x0 + bl, p, color = color.new(lc, 15), width = 2))
             x0 += bl + 1
         array<string> nms = str.split(array.get(tgName, i), "·")
         string pad = ""
         for [k, nmx] in nms
-            string txt = pad + nmx + (k == array.size(nms) - 1 and nConf > 1 ? "  " + str.repeat("●", math.min(nConf, 5)) : "")
+            string txt = pad + nmx + (k == array.size(nms) - 1 and nConf > 1 ? " " + str.repeat("•", math.min(nConf, 5)) : "")
             array.push(gLabels, label.new(x0, p, txt, style = label.style_label_left, color = color.new(#0b0e13, 100), textcolor = nameCol(nmx, lc),
                  size = lSz, textalign = text.align_left, tooltip = tip, text_font_family = font.family_monospace))
             pad += str.repeat(" ", str.length(nmx) + 2)
     // the zones as a narrow column just left of the labels, clear of price (extensions fainter)
     if zoneShade
         for z in zs
-            color zc = color.new(z.pos ? cPos : cNeg, z.ext ? 91 : 82)
+            color zc = color.new(z.pos ? cPos : cNeg, z.ext ? 94 : 88)
             array.push(gBoxes, box.new(bar_index + zoneX, z.hi, bar_index + math.max(2, lblX - 1), z.lo, border_width = 0,
                  border_color = color.new(zc, 100), bgcolor = zc))
     true
@@ -943,11 +943,12 @@ if barstate.islast
 // =====================================================================================================
 tPos = tabPos == "Top right" ? position.top_right : tabPos == "Top left" ? position.top_left : tabPos == "Bottom right" ? position.bottom_right : position.bottom_left
 tSz  = tabSize == "Tiny" ? size.tiny : tabSize == "Small" ? size.small : size.normal
-var table tab = showTab ? table.new(tPos, 3, 18, bgcolor = color.new(#0b0e13, 12), frame_color = color.new(#2a313c, 0), frame_width = 1, border_width = 0) : table(na)
+var table tab = showTab ? table.new(tPos, 3, 18, bgcolor = color.new(#0b0e13, 10), frame_color = color.new(#232a35, 0), frame_width = 1, border_width = 0) : table(na)
 cTxt  = color.new(#e3e7ee, 0)
 cDim  = color.new(#7d8796, 0)
 cWarn = color.new(#e6c35c, 0)
-cHead = color.new(#171c25, 0)
+cHead = color.new(#161b23, 0)
+cZebra = color.new(#ffffff, 97)          // every other row, faintly, so a row is easy to follow across
 
 ps(float p) =>
     na(p) ? "-" : fmtPx(p)
@@ -1010,7 +1011,7 @@ valOf(string k, Snap s, float f, float o, bool ok, string mst) =>
     else
         switch k
             "reg" =>
-                t := s.reg == "POS" ? "+ Positive" : s.reg == "NEG" ? "- Negative" : s.reg == "IND" ? "~ Balanced" : "-"
+                t := s.reg == "POS" ? "● Positive" : s.reg == "NEG" ? "● Negative" : s.reg == "IND" ? "● Balanced" : "-"
                 t := t + (s.preg != "" and s.preg != s.reg ? " (new)" : "")
                 c := s.reg == "POS" ? cPos : s.reg == "NEG" ? cNeg : cTxt
             "prs" =>
@@ -1084,12 +1085,13 @@ if showTab and barstate.islast
         if hasB
             cell(2, 0, srcTxt(sB), cTxt, cHead)
         for [i, k] in rowKeys
-            cell(0, i + 1, rowName(k), cDim)
+            color zb = i % 2 == 1 ? cZebra : na
+            cell(0, i + 1, rowName(k), cDim, zb)
             [t1, c1] = valOf(k, sA, facA, offA, okA, mstA)
-            cell(1, i + 1, t1, c1)
+            cell(1, i + 1, t1, c1, zb)
             if hasB
                 [t2, c2] = valOf(k, sB, facB, offB, okB, mstB)
-                cell(2, i + 1, t2, c2)
+                cell(2, i + 1, t2, c2, zb)
 
 // =====================================================================================================
 // Alerts (real-time only, per-type cooldown) on the first drawable source.
