@@ -105,6 +105,13 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
           <div class="card" data-help="by_expiry"><div class="head"><h2>Gamma by expiration</h2></div><div id="byExpiry"></div></div>
         </div>
       </section>
+      <section class="card" data-help="level_history" style="margin-top:12px">
+        <div class="head"><h2>Level history</h2><span class="sub" id="lhSub"></span></div>
+        <div class="chartwrap" id="lhWrap"><svg id="lhChart" role="img" aria-label="Each past session's range and close against its zero gamma, call wall and put wall"></svg></div>
+        <div class="legend"><span><i class="sw" style="background:var(--pos)"></i>Call wall</span><span><i class="sw" style="background:var(--neg)"></i>Put wall</span><span><i class="sw" style="background:var(--zg)"></i>Zero gamma</span><span><i class="sw" style="background:rgba(var(--fg-rgb),.12)"></i>±1σ expected move</span><span><i class="sw" style="background:var(--ink3)"></i>Day's range and close</span></div>
+        <div class="trk-log" id="lhTable"></div>
+        <div class="expl" id="lhNote"></div>
+      </section>
       <p class="foot" id="foot"></p>
     </div>
 

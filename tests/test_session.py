@@ -18,6 +18,26 @@ T0 = datetime(2026, 10, 27, 9, 0, tzinfo=NY)          # a Tuesday
 
 
 class TestSession(unittest.TestCase):
+    def test_prior_levels_take_each_sessions_close(self):
+        import tempfile
+        from pathlib import Path
+        from gexsys.storage import SnapshotStore
+        with tempfile.TemporaryDirectory() as tmp:
+            st = SnapshotStore(tmp)
+            mon, tue = datetime(2026, 10, 26, tzinfo=NY), datetime(2026, 10, 27, tzinfo=NY)
+            for day, zg in ((mon, 95.0), (tue, 97.0)):
+                st.save("NQ-CBOE", dict(snap(day.replace(hour=11), zg=zg - 1), status="OK"))
+                st.save("NQ-CBOE", dict(snap(day.replace(hour=16, minute=10), zg=zg), status="OK"))      # the session's last
+                st.save("NQ-CBOE", dict(snap(day.replace(hour=19), zg=zg + 5), status="OK"))             # evening: not the close
+            folder = Path(tmp) / "NQ-CBOE"
+            # Tuesday 12:00: only Monday has closed
+            pr = session.prior_levels(folder, tue.replace(hour=12))
+            self.assertEqual([(d.isoformat(), lv["ZG"]) for d, lv in pr], [("2026-10-26", 95.0)])
+            pr = session.prior_levels(folder, tue.replace(hour=20), n=5)                                 # newest first
+            self.assertEqual([(d.isoformat(), lv["ZG"]) for d, lv in pr], [("2026-10-27", 97.0), ("2026-10-26", 95.0)])
+            self.assertEqual(session.history_token(pr), "20261027:97.0:110.0:80.0,20261026:95.0:110.0:80.0")
+            self.assertEqual(session.prior_levels(folder, tue.replace(hour=20), n=1), pr[:1])
+
     def test_key_levels_follow_the_auto_chain(self):
         lv = session.key_levels(snap(T0))
         self.assertEqual((lv["C1"], lv["C2"], lv["P1"], lv["Ab1"], lv["flip"], lv["ZG"], lv["CW"]), (100.0, 105.0, 90.0, 100.0, 96.0, 95.0, 110.0))

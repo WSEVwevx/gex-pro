@@ -147,7 +147,10 @@ your browser, and the first visit follows your system setting.
   - market stats: put/call OI and volume, ATM IV, nearest-expiration share, changes since the last update;
   - a level ladder with explanations;
   - a GEX-by-price chart;
-  - max pain and gamma by expiration.
+  - max pain and gamma by expiration;
+  - level history: every session since the track record started, with its zero gamma, walls, abs gamma and
+    ±1σ band from before the open, the day's range and close, and whether each wall held, broke or was not
+    reached (a chart and a table).
 * **Briefings** (the local app also copies in the ones the hosted site wrote while your PC was off): a NY AM briefing at 9:00 AM ET on trading days and an Asia session briefing at 7:00 PM ET
   the evening before each trading day: both markets' regime, levels, expected range, bias and game plan, the
   relevant calendar (overnight Asia/Europe events for the Asia one) and market-moving posts. A Windows

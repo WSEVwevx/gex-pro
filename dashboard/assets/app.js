@@ -338,6 +338,7 @@ function render(){
   const ref = L.futures_equiv_of_ref ?? s.ref_price;
   renderHero(w, s, L, X, ref);
   renderPlan(w);
+  loadLevelHistory();
   renderLadder(L, X, ref, !!w.result.mapped);
   renderChart(w, s, L, ref);
   renderMaxPain(X);
@@ -702,6 +703,9 @@ const HELP = {
   screener: {title: "Index drivers", tldr: "The handful of stocks that move NQ and ES, and how many points each is worth today.",
     body: `<p>A few giant companies make up most of the Nasdaq-100 and a big share of the S&P 500, so their moves <b>are</b> the futures' moves. This page shows the biggest weights in the index for the market you pick (NQ or ES at the top).</p><p><b>Index pts</b> = the stock's weight × its % move today × the futures price: roughly how many points of NQ or ES that stock explains. The bars show who is lifting and who is dragging. <b>Pre / after</b> is the latest pre-market or after-hours move, and the line above it says what those moves imply for the future before the cash open. <b>Rel vol</b> is today's volume against the 3-month average (1.5× or more is highlighted).</p><p>Watch the <b>earnings</b> dates: when a top-five name reports after the close, NQ and ES often gap on it overnight.</p>`,
     watch: ["Top names all red but the future green = narrow, fragile move", "A mega cap reporting AMC = overnight gap risk for NQ / ES"]},
+  level_history: {title: "Level history", tldr: "Each past session's key levels and how that day traded around them.",
+    body: `<p>For every session since the track record started: zero gamma, the call and put walls and the absolute-gamma strike from the last calculation before the 9:30 ET open, the ±1σ expected-move band, and the day's range and close. A wall <b>held</b> when price reached it and closed back on its side, <b>broke</b> when it closed through, and was <b>not reached</b> otherwise.</p><p>The chart puts each day side by side: the grey column is the expected-move band, the line is the day's range with a tick at the close, and the coloured dashes are that day's levels. A level far outside every day's range is left off the chart (it is still in the table).</p><p>Levels are calculated on the index (NDX / SPX) and converted to NQ / ES with today's basis, so they line up with a back-adjusted continuous chart.</p>`,
+    watch: ["A wall that keeps holding day after day is a level the market respects", "Days that closed outside the grey band were bigger than the options priced in"]},
   plan: {title: "Today's plan", tldr: "The regime, the key levels and what each side of them means, built from the latest data.",
     body: `<p>The plan uses the first expiry's levels (the same C / P / Ab as the TradingView indicator) and the gamma flip. Each line is a zone: <b>above C1</b> (positive-gamma extension), <b>between the flip and C1</b> (positive gamma: two-way trade), <b>between P1 and the flip</b> (negative gamma: moves extend) and <b>below P1</b>. The highlighted line is where price is now.</p><p><b>Day range ±1σ</b> is the range the options market prices in from the previous close. <b>Data today</b> lists the medium- and high-impact US releases still ahead; <b>Earnings ahead</b> lists drivers reporting before the next open, with the move their options price in and what that is worth in index points.</p>`},
   changes: {title: "What changed today", tldr: "Every level that moved since the 6 pm ET session start, and when.",
@@ -1686,6 +1690,62 @@ function planEarnings(k){
   return ((planScr && planScr.stocks) || []).filter(r => r["w_" + k] && r.earn_move && r.earnings)
     .sort((a, b) => Math.abs(b["earn_pts_" + k] || 0) - Math.abs(a["earn_pts_" + k] || 0)).slice(0, 4);
 }
+// ---------- level history (Levels page): each past session's levels from the last calculation before its 9:30 ET
+// open, frozen by the track record, with how that day traded. Index levels are converted with today's basis, so
+// they line up with a back-adjusted continuous chart (NQ1! / ES1!) the same way the indicator's past levels do
+let lhAt = 0;
+function loadLevelHistory(){
+  if(trk && trk.sessions && Date.now() - lhAt < 10 * 60e3) return renderLevelHistory();
+  lhAt = Date.now();
+  fetchFresh(API.track).then(r => r.json()).then(d => { trk = d; renderLevelHistory(); if(page === "track") renderTrack(); }).catch(() => { lhAt = 0; });
+}
+function renderLevelHistory(){
+  const w = curW(), mp = w && w.result && w.result.mapped && w.result.mapped.mapping;
+  if(!trk || !trk.sessions){ $("lhTable").innerHTML = `<div class="expl">Loading the saved sessions...</div>`; return; }
+  const f = (mp && mp.factor) || 1, o = (mp && mp.offset) || 0, fut = p => p == null ? null : Math.round((p * f + o) * 4) / 4;
+  const ss = trk.sessions.filter(s => s.market === market && s.plan).sort((a, b) => b.session.localeCompare(a.session));
+  $("lhSub").textContent = ss.length ? `${market} · ${ss.length} session${ss.length === 1 ? "" : "s"} since ${new Date(ss[ss.length - 1].session + "T12:00:00Z").toLocaleDateString("en-US", {month: "short", day: "numeric", timeZone: "UTC"})}` : "";
+  $("lhNote").textContent = `Levels from the last calculation before each 9:30 ET open (the same plan the Track record grades), converted to ${market} with today's basis so they match a back-adjusted continuous chart (${market}1!). The TradingView indicator draws the last few sessions' closing levels on the chart ("Past sessions' levels" in its settings).`;
+  if(!ss.length){ $("lhTable").innerHTML = `<div class="expl">No sessions saved for ${market} yet.</div>`; $("lhChart").innerHTML = ""; return; }
+  const day = s => new Date(s + "T12:00:00Z").toLocaleDateString("en-US", {weekday: "short", month: "short", day: "numeric", timeZone: "UTC"});
+  const wl = x => !x ? `<span class="dim">-</span>` : x.held ? `<span class="trk-tag good">held</span>` : x.closed_beyond ? `<span class="trk-tag bad">broke</span>` : `<span class="dim">not reached</span>`;
+  const px = v => v == null ? "-" : num(fut(v), 2);
+  $("lhTable").innerHTML = `<table class="trk-table"><tr><th>Session</th><th>Regime</th><th>Zero gamma</th><th>Call wall</th><th>Put wall</th><th>Abs gamma</th><th>±1σ band</th><th>Range</th><th>Close</th></tr>${ss.map(s => {
+    const p = s.plan, oc = s.outcome, reg = (p.regime || "").toLowerCase(), col = p.regime === "POSITIVE" ? "var(--pos)" : p.regime === "NEGATIVE" ? "var(--neg)" : "var(--zg)";
+    return `<tr><td>${esc(day(s.session))}</td><td><span style="color:${col}">${esc(reg || "-")}</span></td><td class="m">${px(p.zg)}</td>
+      <td class="m">${px(p.cw)} ${oc ? wl(oc.cw) : ""}</td><td class="m">${px(p.pw)} ${oc ? wl(oc.pw) : ""}</td><td class="m">${px(p.ag)}</td>
+      <td class="m">${p.ref && p.em ? `${px(p.ref - p.em)} – ${px(p.ref + p.em)}` : "-"}</td>
+      <td class="m">${oc ? `${px(oc.low)} – ${px(oc.high)}` : `<span class="dim">${esc(s.status === "pending" ? "waiting for the close" : s.status)}</span>`}</td>
+      <td class="m">${oc ? px(oc.close) : "-"}</td></tr>`; }).join("")}</table>`;
+  renderLevelHistoryChart(ss.slice(0, 20).reverse(), fut);
+}
+// oldest left: a column per session with its ±1σ band, the day's range and close, and dashes at its levels
+function renderLevelHistoryChart(ss, fut){
+  const svg = $("lhChart"), W = Math.max(280, $("lhWrap").clientWidth || 600), H = 230, pl = 8, pr = 64, pt = 10, pb = 26;
+  const done = ss.filter(s => s.outcome);
+  const ranges = done.flatMap(s => [s.outcome.low, s.outcome.high]).concat(ss.flatMap(s => [s.plan.ref - s.plan.em, s.plan.ref + s.plan.em]));
+  if(!ranges.length){ svg.innerHTML = ""; return; }
+  // the y range covers every day's range and band; a level far outside it (a wall 9% away) is left off
+  let lo = Math.min(...ranges), hi = Math.max(...ranges); const padY = (hi - lo) * 0.06; lo -= padY; hi += padY;
+  const bw = (W - pl - pr) / ss.length, x = i => pl + bw * (i + 0.5), y = v => pt + (hi - v) / (hi - lo) * (H - pt - pb);
+  const inside = v => v != null && v >= lo && v <= hi;
+  const ticks = [0, 1, 2, 3, 4].map(k => lo + (hi - lo) * k / 4);
+  let g = ticks.map(t => `<line x1="${pl}" x2="${W - pr}" y1="${y(t)}" y2="${y(t)}" stroke="rgba(var(--fg-rgb),.06)"/><text x="${W - pr + 6}" y="${y(t) + 4}" fill="var(--ink4)" font-size="10.5" font-family="var(--mono)">${num(fut(t), 0)}</text>`).join("");
+  ss.forEach((s, i) => {
+    const p = s.plan, oc = s.outcome, cx = x(i), half = Math.max(3, Math.min(14, bw * 0.32));
+    const tip = `${day0(s.session)} · ZG ${num(fut(p.zg), 0)} · CW ${num(fut(p.cw), 0)} · PW ${num(fut(p.pw), 0)}` + (oc ? ` · range ${num(fut(oc.low), 0)}-${num(fut(oc.high), 0)} · close ${num(fut(oc.close), 0)}` : "");
+    g += `<g><title>${esc(tip)}</title><rect x="${cx - half - 3}" y="${y(p.ref + p.em)}" width="${2 * half + 6}" height="${Math.max(1, y(p.ref - p.em) - y(p.ref + p.em))}" fill="rgba(var(--fg-rgb),.07)"/>`;
+    if(oc) g += `<line x1="${cx}" x2="${cx}" y1="${y(oc.high)}" y2="${y(oc.low)}" stroke="var(--ink3)" stroke-width="2"/><line x1="${cx - 4}" x2="${cx + 4}" y1="${y(oc.close)}" y2="${y(oc.close)}" stroke="var(--ink)" stroke-width="2"/>`;
+    for(const [k, c] of [["cw", "var(--pos)"], ["pw", "var(--neg)"], ["zg", "var(--zg)"]])
+      if(inside(p[k])) g += `<line x1="${cx - half}" x2="${cx + half}" y1="${y(p[k])}" y2="${y(p[k])}" stroke="${c}" stroke-width="2.5"${k === "zg" ? ` stroke-dasharray="3 2"` : ""}/>`;
+    g += `<rect x="${cx - bw / 2}" y="${pt}" width="${bw}" height="${H - pt - pb}" fill="transparent"/></g>`;
+    if(i % Math.max(1, Math.ceil(ss.length / Math.max(2, Math.floor((W - pl - pr) / 70)))) === 0 || i === ss.length - 1)
+      g += `<text x="${cx}" y="${H - 8}" text-anchor="middle" fill="var(--ink4)" font-size="10.5" font-family="var(--mono)">${esc(new Date(s.session + "T12:00:00Z").toLocaleDateString("en-US", {month: "numeric", day: "numeric", timeZone: "UTC"}))}</text>`;
+  });
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.setAttribute("width", W); svg.setAttribute("height", H);
+  svg.innerHTML = g;
+}
+const day0 = s => new Date(s + "T12:00:00Z").toLocaleDateString("en-US", {weekday: "short", month: "short", day: "numeric", timeZone: "UTC"});
 function renderPlan(w){
   const S = w && w.result && w.result.session;
   if(!S || !S.levels){ $("planCard").innerHTML = `<div class="eyebrow">Today's plan</div><div class="expl">The plan appears with the next refresh.</div>`; $("chgFeed").innerHTML = ""; return; }

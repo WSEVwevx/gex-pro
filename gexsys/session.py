@@ -7,6 +7,7 @@ price has reacted at each kind of level.
   changes(snaps)          the day's steady changes, e.g. C1 29800 -> 29885 at 10:42 ET; a change counts once
                           it holds for two snapshots, so one-snapshot flickers are ignored
   open_levels(snaps)      the levels in the first snapshot at or after today's 09:30 ET cash open
+  prior_levels(folder)    zero gamma and the walls at the close of each of the last few sessions (paste field H)
   reaction_stats(...)     every past touch of each level kind, replayed on futures candles: did price hold
                           (no close beyond it within an hour) and how far it moved back away (the bounce)
 
@@ -17,7 +18,7 @@ from __future__ import annotations
 
 import json
 import statistics
-from datetime import datetime, timedelta, time
+from datetime import datetime, timedelta, time, timezone
 from pathlib import Path
 from typing import Iterable, Optional
 
@@ -155,6 +156,53 @@ def reaction_stats(snaps: list, candles: list, factor: float, offset: float = 0.
 def stats_token(stats: dict) -> str:
     """S token for the paste: kind:touches:held:median bounce, e.g. C1:10:7:18.5,P1:6:4:22"""
     return ",".join(f"{k}:{v['n']}:{v['held']}:{'' if v['bounce'] is None else v['bounce']}" for k, v in stats.items())
+
+
+def _session_snapshot(folder: Path, lo: datetime, hi: datetime) -> Optional[dict]:
+    """The last usable saved summary with lo <= asof <= hi. Files are named by their UTC asof (HHMMSS_us), so
+    only the folders of those UTC days are listed and only the chosen file is read."""
+    a, b = lo.astimezone(timezone.utc), hi.astimezone(timezone.utc)
+    days = sorted({a.date(), b.date()}, reverse=True)
+    for day in days:
+        for f in sorted((folder / day.strftime("%Y%m%d")).glob("*.json"), reverse=True):
+            if f.name.endswith(".chain.json"):
+                continue
+            try:
+                s = json.loads(f.read_text(encoding="utf-8"))
+                t = datetime.fromisoformat(s["asof"])
+            except (OSError, ValueError, KeyError):
+                continue
+            if t < a:
+                break                                        # older than the window: nothing earlier in this folder fits
+            if t <= b and s.get("status") != "UNAVAILABLE":
+                return s
+    return None
+
+
+def prior_levels(folder: Path, now: datetime, n: int = 5) -> list:
+    """[(date, {"ZG", "CW", "PW"}), ...] newest first for the last n cash sessions that have closed: each from the
+    last usable snapshot of that session (09:30 ET to 20 minutes after its close, for the 15-minute-delayed data)."""
+    out, d = [], now.astimezone(marketcal.NY).date()
+    for _ in range(16):
+        if len(out) >= n:
+            break
+        if marketcal.is_trading_day(d):
+            close = datetime.combine(d, marketcal.rth_close(d), marketcal.NY)
+            if close <= now:
+                s = _session_snapshot(folder, datetime.combine(d, time(9, 30), marketcal.NY), close + timedelta(minutes=20))
+                lv = key_levels(s) if s else {}
+                keep = {k: lv[k] for k in ("ZG", "CW", "PW") if lv.get(k) is not None}
+                if keep:
+                    out.append((d, keep))
+        d -= timedelta(days=1)
+    return out
+
+
+def history_token(prior: list) -> str:
+    """H token: past sessions' closing levels in index prices, newest first, "yyyymmdd:zg:cw:pw" (a level that
+    was missing is left empty), e.g. 20261104:29293.0:28810.0:28100.0,20261103:29120.5:28800.0:27900.0"""
+    f = lambda v: "" if v is None else f"{v:.1f}"
+    return ",".join(f"{d:%Y%m%d}:{f(lv.get('ZG'))}:{f(lv.get('CW'))}:{f(lv.get('PW'))}" for d, lv in prior)
 
 
 def open_token(lv: dict) -> str:

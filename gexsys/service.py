@@ -148,7 +148,8 @@ class MarketWorker(threading.Thread):
                         "stats": stats,
                         "levels": {k: (fut(v) if isinstance(v, (int, float)) else v) for k, v in session.key_levels(r["summary"]).items()}}
         if r.get("pine"):
-            r["pine"] = add_tokens(r["pine"], {"O": session.open_token(opened) if opened else "", "S": session.stats_token(stats)})
+            r["pine"] = add_tokens(r["pine"], {"O": session.open_token(opened) if opened else "", "S": session.stats_token(stats),
+                                               "H": session.history_token(session.prior_levels(folder, now))})
 
     def _stats(self, folder: Path, now: datetime, f: float, o: float) -> dict:
         """Reaction stats, recomputed at most hourly (cached beside the snapshots, so hosted builds share it)."""

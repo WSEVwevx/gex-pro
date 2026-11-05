@@ -119,6 +119,8 @@ zoneShade = input.bool(true, "Shade gamma zones next to price", group = G4,
      tooltip = "A narrow column right of the last bar: green = positive gamma zone (gamma flip to C1) and its extension (C1 to the next call level up), red = negative gamma zone (P1 to the gamma flip) and its extension (P1 to the next put level down). Hover a tag for the zone it sits in.", display = display.none)
 showOpen = input.bool(true, "Levels at the 9:30 open", group = G4, display = display.none,
      tooltip = "When C1, P1, Ab1 or the gamma flip has moved since the 9:30 ET cash open, a faint dashed line marks where it stood at the open, so you can see how the map has shifted.")
+prevDays = input.int(3, "Past sessions' levels (days)", minval = 0, maxval = 5, group = G4, display = display.none,
+     tooltip = "Where zero gamma and the call and put walls stood at the close of each of the last few sessions: a faint dotted line across that day's 9:30-16:00 ET session. 0 = off.")
 regimeBg = input.bool(false, "Tint today's session by gamma side", group = G4,
      tooltip = "Faint blue while price is above zero gamma (modeled positive gamma: calmer, mean-reverting), faint orange below it (negative gamma: bigger, trending moves). Today's session only.", display = display.none)
 
@@ -226,6 +228,7 @@ type Snap
     string x0d = ""
     string sstat = ""
     string opn = ""
+    string hist = ""
     bool   complete = false
 
 strOf(map<string, string> m, string k) =>
@@ -256,7 +259,7 @@ parseOne(string txt) =>
              vc = numOf(m, "vc"), vp = numOf(m, "vp"), oc = numOf(m, "oc"), op = numOf(m, "op"), xp = strOf(m, "xp"),
              ema = numOf(m, "ema"), emd = numOf(m, "emd"), emw = numOf(m, "emw"), emx = strOf(m, "emx"), emm = numOf(m, "emm"), emmx = strOf(m, "emmx"),
              ivd = numOf(m, "ivd"), ivw = numOf(m, "ivw"), ivm = numOf(m, "ivm"),
-             prof = strOf(m, "P"), ag = numOf(m, "ag"), vxm = numOf(m, "vxm"), chm = numOf(m, "chm"), rk = strOf(m, "R"), rk0 = strOf(m, "R0"), rk0e = strOf(m, "R0e"), g0e = numOf(m, "g0e"), x0d = strOf(m, "x0d"), sstat = strOf(m, "S"), opn = strOf(m, "O"), complete = str.trim(array.get(toks, array.size(toks) - 1)) == "END")
+             prof = strOf(m, "P"), ag = numOf(m, "ag"), vxm = numOf(m, "vxm"), chm = numOf(m, "chm"), rk = strOf(m, "R"), rk0 = strOf(m, "R0"), rk0e = strOf(m, "R0e"), g0e = numOf(m, "g0e"), x0d = strOf(m, "x0d"), sstat = strOf(m, "S"), opn = strOf(m, "O"), hist = strOf(m, "H"), complete = str.trim(array.get(toks, array.size(toks) - 1)) == "END")
     s
 
 fam(string s) =>
@@ -907,6 +910,31 @@ if barstate.islast
                         array.push(gLines, line.new(ts0, pOpen, time, pOpen, xloc = xloc.bar_time, color = gc, width = 1, style = line.style_dashed))
                         array.push(gLabels, label.new(ts0, pOpen, (kd == "flip" ? "flip" : kd) + " open  " + fmtPx(pOpen), xloc = xloc.bar_time, style = label.style_label_lower_left,
                              color = color.new(#0b0e13, 100), textcolor = gc, size = size.tiny))
+    // each past session's zero gamma and walls at its close, across that day's 9:30-16:00 ET (paste field H,
+    // newest first: "yyyymmdd:zg:cw:pw"), mapped with today's basis like every level
+    if prevDays > 0 and (okA or okB)
+        Snap sh = okA ? sA : sB
+        float fh = okA ? facA : facB
+        float oh = okA ? offA : offB
+        if sh.hist != ""
+            for [i, item] in str.split(sh.hist, ",")
+                if i >= prevDays
+                    break
+                array<string> f = str.split(item, ":")
+                if array.size(f) == 4 and str.length(array.get(f, 0)) == 8
+                    string ds = array.get(f, 0)
+                    int yy = int(str.tonumber(str.substring(ds, 0, 4)))
+                    int mm = int(str.tonumber(str.substring(ds, 4, 6)))
+                    int dd = int(str.tonumber(str.substring(ds, 6, 8)))
+                    int t0 = timestamp("America/New_York", yy, mm, dd, 9, 30)
+                    int t1 = timestamp("America/New_York", yy, mm, dd, 16, 0)
+                    for k = 1 to 3
+                        float ph = mapP(str.tonumber(array.get(f, k)), fh, oh)
+                        if not na(ph) and sane(ph)
+                            color hc = color.new(k == 1 ? cZG : k == 2 ? cPos : cNeg, 55)
+                            array.push(gLines, line.new(t0, ph, t1, ph, xloc = xloc.bar_time, color = hc, width = 1, style = line.style_dotted))
+                            array.push(gLabels, label.new(t1, ph, (k == 1 ? "ZG " : k == 2 ? "CW " : "PW ") + fmtPx(ph), xloc = xloc.bar_time,
+                                 style = label.style_label_left, color = color.new(#0b0e13, 100), textcolor = hc, size = size.tiny))
     if tagMode
         renderTags()
 

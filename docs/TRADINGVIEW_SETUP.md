@@ -95,6 +95,10 @@ The dialog's separate Style tab has nothing to change.
   IV bands grey), with the strength bar drawn as a thick line before them.
 * **Levels at the 9:30 open:** when C1, P1, Ab1 or the gamma flip has moved since the cash open, a faint dashed
   line marks where it stood at 9:30 ("C1 open  29,800"), so you can see how the map has shifted.
+* **Past sessions' levels** (default 3 days, up to 5; 0 = off): zero gamma and the call and put walls at the close
+  of each earlier session, as faint dotted lines across that day's 9:30-16:00 ET session ("CW 29,793"). They come
+  in the paste (field `H`) and are converted with today's basis, so they line up with a back-adjusted continuous
+  chart (NQ1! / ES1!).
 * **Pressure** (info panel): a small five-block meter, e.g. `▰▰▰▱▱ Calming`. Above the gamma flip modeled dealer
   hedging leans calming, below it amplifying; each block is 0.2 daily expected moves from the flip, and within 0.1
   it reads Neutral. It is an estimate from price and the flip, not measured flow.
