@@ -1308,32 +1308,37 @@ function hmSmooth(cols, k = 3){
     return {...c, v: c.v.map((_, b) => (sum.get(Math.round((c.base + b * c.w) * 100)) || 0) / n.length)};
   });
 }
-// the heat as one image over the whole chart: a pixel per candle across and per price band down (top = highest).
-// Each candle shows the latest snapshot at or before it; one smoothed stretch blends bands and snapshots into
-// each other, with no seams between columns
+// the heat as one image over the whole chart: a pixel per candle across, and 4 per price band down (top = highest).
+// Each candle shows the latest snapshot at or before it. A band's middle rows keep its own value and only its edge
+// rows blend a quarter of the neighbouring band, so bands stay crisp with soft edges when the image is stretched
+const HM_ROWS = 4, HM_FLOOR = 0.18;
 function hmAtlas(pos, neg, maxA){
   const C = hm._cols, times = hm._times, N = times.length;
   if(!C.length || !N) return null;
   const ws = {}; C.forEach(c => ws[c.w] = (ws[c.w] || 0) + 1);
   const w = Number(Object.keys(ws).sort((a, b) => ws[b] - ws[a])[0]);        // the usual band width
   const lo = Math.min(...C.map(c => c.base)), hi = Math.max(...C.map(c => c.base + (c.v.length - 1) * c.w));
-  const H = Math.min(2000, Math.round((hi - lo) / w) + 1);
+  const B = Math.min(500, Math.round((hi - lo) / w) + 1), H = B * HM_ROWS;
   const cv = document.createElement("canvas"); cv.width = N; cv.height = H;
   const g = cv.getContext("2d"), img = g.createImageData(N, H), d = img.data;
-  let ci = -1;
+  const band = new Float64Array(B + 2);                    // this candle's values per band, with an empty band each side
+  let ci = -1, done = -1;
   for(let k = 0; k < N; k++){
     while(ci + 1 < C.length && (C[ci + 1]._bar == null || C[ci + 1]._bar <= times[k])) ci++;
     if(ci < 0) continue;                                   // before the first snapshot: no heat
     const c = C[ci], scale = c.rel ? 99 : hm._scale;
+    if(done !== ci){ for(let b = 0; b < B; b++) band[b + 1] = c.v[Math.round((hi - b * w - c.base) / c.w)] || 0; done = ci; }
     for(let r = 0; r < H; r++){
-      const v = c.v[Math.round((hi - r * w - c.base) / c.w)], a0 = v ? Math.min(1, Math.abs(v) / scale) : 0;
-      if(a0 < 0.12) continue;                              // noise floor: only bands with real gamma get colour
-      const a = Math.pow((a0 - 0.12) / 0.88, 0.8) * maxA, rgb = v > 0 ? pos : neg, q = (r * N + k) * 4;
+      const b = Math.floor(r / HM_ROWS) + 1, sub = r % HM_ROWS;
+      const v = sub === 0 ? .75 * band[b] + .25 * band[b - 1] : sub === HM_ROWS - 1 ? .75 * band[b] + .25 * band[b + 1] : band[b];
+      const a0 = Math.min(1, Math.abs(v) / scale);
+      if(a0 < HM_FLOOR) continue;                          // noise floor: only bands with real gamma get colour
+      const a = Math.pow((a0 - HM_FLOOR) / (1 - HM_FLOOR), 0.8) * maxA, rgb = v > 0 ? pos : neg, q = (r * N + k) * 4;
       d[q] = rgb[0]; d[q + 1] = rgb[1]; d[q + 2] = rgb[2]; d[q + 3] = Math.round(a * 255);
     }
   }
   g.putImageData(img, 0, 0);
-  return {cv, lo, hi, w, N, H};
+  return {cv, lo: hi - (B - 1) * w, hi, w, N, H};            // lo as drawn (the band count is capped)
 }
 // bar time at or before t (columns snap to the candle they fall in)
 function hmSnap(times, t){ let lo = 0, hi = times.length - 1; if(hi < 0 || t < times[0]) return null; while(lo < hi){ const m = (lo + hi + 1) >> 1; times[m] <= t ? lo = m : hi = m - 1; } return times[lo]; }
