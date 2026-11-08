@@ -194,7 +194,7 @@ def main():
         # futures mapping: payload factor x index level = mapped level (tick-rounded)
         m = res["mapped"]
         fac = m["mapping"].get("factor") if m else None
-        if m and fac:
+        if m and fac and p(s["zero_gamma"]) is not None:          # no crossing (both sides agree on None): nothing to map
             zg_f = p(m["zero_gamma"])
             ok = abs(zg_f - p(s["zero_gamma"]) * fac) <= 0.25
             bad += not ok

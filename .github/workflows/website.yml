@@ -135,9 +135,9 @@ jobs:
     needs: [build, deploy]
     if: ${{ !cancelled() && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 370             # may wait up to 6 h for the Sunday open
+    timeout-minutes: 75              # waits at most an hour
     steps:
-      - name: Wait, then start the next run (while futures trade, or at the Sunday open)
+      - name: Wait, then start the next run (every few minutes while futures trade, hourly while they are closed)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -151,17 +151,18 @@ jobs:
           d, t = now.weekday(), now.time()                    # Monday = 0
           # Sunday 6 pm ET to Friday 5 pm ET; the daily 5-6 pm break keeps the chain going
           futures = (d == 6 and t >= time(18)) or d <= 3 or (d == 4 and t < time(17))
+          ran = (datetime.now(timezone.utc) - datetime.fromisoformat(sys.argv[1].replace("Z", "+00:00"))).total_seconds()
           if futures:
               cash = d <= 4 and time(9, 15) <= t < time(16, 15)
-              ran = (datetime.now(timezone.utc) - datetime.fromisoformat(sys.argv[1].replace("Z", "+00:00"))).total_seconds()
               print(max(0, int((180 if cash else 360) - ran)))   # ~45 Yahoo calls a run: faster risks its limits
           else:
+              # closed: hourly (GitHub's own hourly schedule skips hours, e.g. every 4-5 h on 2026-11-07), and
+              # exactly at the Sunday open when that is less than an hour away
               sunday = (now + timedelta(days=(6 - d) % 7)).replace(hour=18, minute=1, second=0, microsecond=0)
               until = (sunday - now).total_seconds()
-              print(int(until) if 0 < until < 6 * 3600 - 600 else -1)   # wait for the open only if it is near
+              print(int(until) if 0 < until < 3600 else max(0, int(3600 - ran)))
           PY
           )
-          if [ "$wait" -lt 0 ]; then echo "futures closed: the hourly schedule takes over"; exit 0; fi
           echo "next run in ${wait}s"
           sleep "$wait"
           gh workflow run website.yml --ref main -R "${{ github.repository }}"

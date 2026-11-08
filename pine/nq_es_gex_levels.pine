@@ -229,6 +229,7 @@ type Snap
     string sstat = ""
     string opn = ""
     string hist = ""
+    string bt = ""
     bool   complete = false
 
 strOf(map<string, string> m, string k) =>
@@ -259,7 +260,7 @@ parseOne(string txt) =>
              vc = numOf(m, "vc"), vp = numOf(m, "vp"), oc = numOf(m, "oc"), op = numOf(m, "op"), xp = strOf(m, "xp"),
              ema = numOf(m, "ema"), emd = numOf(m, "emd"), emw = numOf(m, "emw"), emx = strOf(m, "emx"), emm = numOf(m, "emm"), emmx = strOf(m, "emmx"),
              ivd = numOf(m, "ivd"), ivw = numOf(m, "ivw"), ivm = numOf(m, "ivm"),
-             prof = strOf(m, "P"), ag = numOf(m, "ag"), vxm = numOf(m, "vxm"), chm = numOf(m, "chm"), rk = strOf(m, "R"), rk0 = strOf(m, "R0"), rk0e = strOf(m, "R0e"), g0e = numOf(m, "g0e"), x0d = strOf(m, "x0d"), sstat = strOf(m, "S"), opn = strOf(m, "O"), hist = strOf(m, "H"), complete = str.trim(array.get(toks, array.size(toks) - 1)) == "END")
+             prof = strOf(m, "P"), ag = numOf(m, "ag"), vxm = numOf(m, "vxm"), chm = numOf(m, "chm"), rk = strOf(m, "R"), rk0 = strOf(m, "R0"), rk0e = strOf(m, "R0e"), g0e = numOf(m, "g0e"), x0d = strOf(m, "x0d"), sstat = strOf(m, "S"), opn = strOf(m, "O"), hist = strOf(m, "H"), bt = strOf(m, "bt"), complete = str.trim(array.get(toks, array.size(toks) - 1)) == "END")
     s
 
 fam(string s) =>
@@ -378,9 +379,13 @@ ageOf(Snap s) =>
         if not na(s.ts)
             a := (timenow - s.ts) / 60000.0
     a
+// a backtest paste (bt=yyyymmdd, from the website's 9:30 pastes) is old on purpose: never stale
 staleOf(Snap s) =>
     float a = ageOf(s)
-    na(a) or a > staleMin
+    s.bt != "" ? false : na(a) or a > staleMin
+
+btDay(Snap s) =>
+    str.length(s.bt) == 8 ? str.substring(s.bt, 4, 6) + "/" + str.substring(s.bt, 6, 8) : ""
 
 // Primary (alerts, data window): first drawable source. If-blocks so a missing slot's fields are never read.
 float zgF = na
@@ -800,7 +805,8 @@ renderTags() =>
         hdr := "🗓 " + md + " · " + chain + " · " + (first ? "first expiry " + s.x0 : "all expirations" + (str.length(s.bk) >= 10 ? " to " + str.substring(s.bk, str.length(s.bk) - 5) : ""))
         float a = ageOf(s)
         string ageS = na(a) ? "?" : a < 60 ? str.tostring(math.round(a)) + "m" : str.tostring(math.floor(a / 60)) + "h " + str.tostring(math.round(a % 60)) + "m"
-        foot := "⏳ Updated " + ageS + " ago " + (staleOf(s) ? "⚠ STALE: copy a fresh paste from the GEX PRO website." : "✓")
+        foot := (s.bt != "" ? "🗓 Backtest: the levels at the 9:30 open on " + btDay(s) + ". Alerts are off; paste a current update to trade live."
+             : "⏳ Updated " + ageS + " ago " + (staleOf(s) ? "⚠ STALE: copy a fresh paste from the GEX PRO website." : "✓"))
              + "\nRegime: " + (s.reg == "POS" ? "positive" : s.reg == "NEG" ? "negative" : "mixed") + " gamma, net " + (s.net >= 0 ? "+$" : "-$") + str.tostring(math.abs(s.net), "0.00") + "B per 1% move."
              + "\n" + s.prov + " " + s.src + (s.etf != "" ? "+" + s.etf : "") + " options, 15-min delayed. The website publishes a new paste every hour; paste it again for fresher levels."
     string rule = "\n━━━━━━━━━━━━━━━━━━━━\n"
@@ -1003,7 +1009,7 @@ valOf(string k, Snap s, float f, float o, bool ok, string mst) =>
     color c = cTxt
     if k == "data"
         bool bad = staleOf(s) or not s.complete or (s.st != "OK" and s.st != "")
-        t := (s.q == "RT" ? "RT " : s.q == "SYN" ? "SYN " : "DL ") + ageTxt(ageOf(s)) + (staleOf(s) ? " STALE" : "") + (s.complete ? "" : " CUT OFF") + (s.st != "OK" and s.st != "" ? " " + s.st : "")
+        t := s.bt != "" ? "Backtest " + btDay(s) + " 9:30" : (s.q == "RT" ? "RT " : s.q == "SYN" ? "SYN " : "DL ") + ageTxt(ageOf(s)) + (staleOf(s) ? " STALE" : "") + (s.complete ? "" : " CUT OFF") + (s.st != "OK" and s.st != "" ? " " + s.st : "")
         c := bad ? cWarn : cDim
     else if not ok
         t := k == "reg" ? "BLOCKED" : "-"
@@ -1118,12 +1124,14 @@ nearest = na(cwF) and na(pwF) and na(zgF) ? na : array.min(array.from(nz(math.ab
 xCW = ta.cross(close, cwF)
 xPW = ta.cross(close, pwF)
 xZG = ta.cross(close, zgF)
-crossedMajor = canDraw and (xCW or xPW)
-crossedZG    = canDraw and xZG
+crossedMajor = canDraw and (xCW or xPW) and not ((hasA and sA.bt != "") or (hasB and sB.bt != ""))
+crossedZG    = canDraw and xZG and not ((hasA and sA.bt != "") or (hasB and sB.bt != ""))
 approaching  = canDraw and not na(nearest) and nearest <= alApproachTicks * syminfo.mintick and nz(nearest[1], 1e12) > alApproachTicks * syminfo.mintick
 anyStale     = (hasA and staleOf(sA)) or (hasB and staleOf(sB))
+// a backtest paste's levels are from another day: no alerts against today's prices
+btMode       = (hasA and sA.bt != "") or (hasB and sB.bt != "")
 
-if barstate.isrealtime
+if barstate.isrealtime and not btMode
     if alApproach and approaching and cool(lastAp)
         alert(syminfo.ticker + " within " + str.tostring(alApproachTicks) + " ticks of a GEX level (call " + ps(cwF) + " / put " + ps(pwF) + " / ZG " + ps(zgF) + ").", alert.freq_once_per_bar)
         lastAp := timenow

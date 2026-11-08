@@ -10,7 +10,7 @@ import json
 from datetime import date, datetime, time, timedelta, timezone
 
 from feeds import weekinfo
-from gexsys import bias, marketcal
+from gexsys import bias, export, marketcal, session
 from trackrecord import prices
 
 
@@ -96,6 +96,18 @@ def plan_input(market: str, s: dict, bias: dict | None) -> dict:
             "ag": _p(s.get("abs_gamma")), "bias": bias}
 
 
+def open_paste(w, s: dict, d: date, open_: datetime) -> str | None:
+    """The TradingView paste as it stood at d's 09:30 open, for backtesting: built from the same snapshot as the
+    plan, marked bt=yyyymmdd (the indicator then labels it a backtest instead of stale and stays silent), with the
+    closing levels of the sessions before it (H). No futures factor: the chart maps it live, like any paste."""
+    try:
+        p = export.pine_payload(s, w.cfg.market, w.cfg.source, w.cfg.method, provider=s.get("provider", ""))
+    except (KeyError, TypeError, ValueError):
+        return None
+    prior = session.prior_levels(w.store.root / w.key, open_)
+    return export.add_tokens(p, {"bt": f"{d:%Y%m%d}", "H": session.history_token(prior)})
+
+
 def pre_open(gex, d: date) -> dict:
     """{market: plan input or None} from the last saved calculation timestamped before d's 09:30 ET open.
 
@@ -124,7 +136,7 @@ def pre_open(gex, d: date) -> dict:
                     best = (t, s)
         if best:
             s = best[1]
-            out[m] = plan_input(m, s, bias.compute(s, open_ - timedelta(minutes=1)))
+            out[m] = dict(plan_input(m, s, bias.compute(s, open_ - timedelta(minutes=1))), paste=open_paste(w, s, d, open_))
         else:
             out.setdefault(m, None)
     return out

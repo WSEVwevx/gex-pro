@@ -351,6 +351,11 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
           <div class="actions"><button class="btn" id="indPaste">Copy levels for TradingView</button></div>
         </div>
       </section>
+      <section class="card" data-help="pastes" style="margin-top:12px">
+        <div class="head"><h2>9:30 pastes for backtesting</h2><span class="sub" id="pastesSub"></span></div>
+        <div class="expl">The levels exactly as they stood at each past session's 9:30 ET open. Copy one, paste it into the indicator's <b>Levels payload</b>, and scroll your chart back to that day to see how price traded around them. The indicator shows "Backtest" with the date and turns its alerts off; paste a current update to go back to live levels.</div>
+        <div class="trk-log" id="pastesList"></div>
+      </section>
       <section class="card" style="margin-top:12px">
         <div class="codehead"><h2>Source code</h2><span class="fname" id="indFile">GEX_PRO.pine</span><span class="spacer"></span>
           <button class="linkbtn" id="indCopy2">Copy</button></div>

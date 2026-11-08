@@ -95,6 +95,9 @@ The dialog's separate Style tab has nothing to change.
   IV bands grey), with the strength bar drawn as a slim line before them.
 * **Levels at the 9:30 open:** when C1, P1, Ab1 or the gamma flip has moved since the cash open, a faint dashed
   line marks where it stood at 9:30 ("C1 open  29,800"), so you can see how the map has shifted.
+* **Backtesting an earlier day:** the website's Indicator page lists "9:30 pastes" for every past session. Paste
+  one into **Levels payload** and scroll back to that day: the panel's Data row reads `Backtest 11/04 9:30`,
+  nothing is marked stale and alerts stay off. Paste a current update to return to live levels.
 * **Past sessions' levels** (default 3 days, up to 5; 0 = off): zero gamma and the call and put walls at the close
   of each earlier session, as faint dotted lines across that day's 9:30-16:00 ET session ("CW 29,793"). They come
   in the paste (field `H`) and are converted with today's basis, so they line up with a back-adjusted continuous

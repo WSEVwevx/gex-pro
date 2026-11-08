@@ -8,8 +8,8 @@ const store = { get(k, d){ try { return localStorage.getItem(k) ?? d; } catch(e)
 // Static mode: the hosted copy (python -m gexsys build-site) reads files that a scheduled job rewrites,
 // instead of the local service's /api endpoints.
 const STATIC = !!window.GEX_STATIC;
-const API = STATIC ? {all: "data/all.json", news: "data/news.json", posts: "data/posts.json", indicator: "data/indicator.json", briefings: "data/briefings.json", track: "data/trackrecord.json", quotes: "data/quotes.json", positioning: "data/positioning.json", sources: "data/sources.json"}
-                   : {all: "/api/all", news: "/api/news", posts: "/api/posts", indicator: "/api/indicator", briefings: "/api/briefings", track: "/api/trackrecord", quotes: "/api/quotes", positioning: "/api/positioning", sources: "/api/sources"};
+const API = STATIC ? {all: "data/all.json", news: "data/news.json", posts: "data/posts.json", indicator: "data/indicator.json", briefings: "data/briefings.json", track: "data/trackrecord.json", quotes: "data/quotes.json", positioning: "data/positioning.json", sources: "data/sources.json", pastes: "data/pastes.json"}
+                   : {all: "/api/all", news: "/api/news", posts: "/api/posts", indicator: "/api/indicator", briefings: "/api/briefings", track: "/api/trackrecord", quotes: "/api/quotes", positioning: "/api/positioning", sources: "/api/sources", pastes: "/api/pastes"};
 const pineUrl = m => STATIC ? `data/pine-published${m ? "-" + m : ""}.txt`
                             : `/api/pine/all?which=published${m ? "&market=" + encodeURIComponent(m) : ""}`;
 // every data request skips the browser cache; on the hosted copy a unique query also skips GitHub's
@@ -44,6 +44,26 @@ async function copyText(text, done){
 }
 $("copyClose").onclick = () => { $("copyBox").hidden = true; };
 $("copyBox").onclick = e => { if(e.target === $("copyBox")) $("copyBox").hidden = true; };
+// ---------- 9:30 pastes (Indicator page): each past session's paste as it stood at the open, for backtesting
+let pastes = null;
+async function loadPastes(){
+  try { pastes = (await (await fetchFresh(API.pastes)).json()).pastes || []; }
+  catch(e){ if(!pastes){ $("pastesList").innerHTML = `<div class="expl">${esc(OFFLINE)}</div>`; return; } }
+  const days = [...new Set(pastes.map(p => p.session))].sort().reverse();
+  const get = (d, m) => (pastes.find(p => p.session === d && p.market === m) || {}).paste;
+  $("pastesSub").textContent = days.length ? `${days.length} session${days.length === 1 ? "" : "s"}` : "";
+  if(!days.length){ $("pastesList").innerHTML = `<div class="expl">The first one is saved at the next 9:30 open.</div>`; return; }
+  const btn = (d, which, label) => `<button class="linkbtn" data-d="${esc(d)}" data-w="${which}">${label}</button>`;
+  $("pastesList").innerHTML = `<table class="trk-table"><tr><th>Session</th><th>NQ</th><th>ES</th><th>Both</th></tr>${days.map(d => `<tr>
+    <td>${esc(new Date(d + "T12:00:00Z").toLocaleDateString("en-US", {weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "UTC"}))}</td>
+    <td>${get(d, "NQ") ? btn(d, "NQ", "Copy NQ") : `<span class="dim">-</span>`}</td><td>${get(d, "ES") ? btn(d, "ES", "Copy ES") : `<span class="dim">-</span>`}</td>
+    <td>${get(d, "NQ") && get(d, "ES") ? btn(d, "both", "Copy both") : `<span class="dim">-</span>`}</td></tr>`).join("")}</table>`;
+  $("pastesList").querySelectorAll("button[data-d]").forEach(b => b.onclick = () => {
+    const d = b.dataset.d, w = b.dataset.w, when = new Date(d + "T12:00:00Z").toLocaleDateString("en-US", {month: "short", day: "numeric", timeZone: "UTC"});
+    const text = w === "both" ? [get(d, "NQ"), get(d, "ES")].join("|") : get(d, w);     // one paste for both charts, like the hourly one
+    copyText(text, `Copied the ${w === "both" ? "NQ + ES" : w} levels from the ${when} 9:30 open. Paste them into Levels payload.`);
+  });
+}
 async function copyFrom(url, what){
   let text;
   try { text = (await (await fetchFresh(url)).text()).trim(); } catch(e){ toast(OFFLINE); return; }
@@ -73,7 +93,7 @@ function setPage(p){
   $("explain").classList.contains("open") && openExplain(PAGE_HELP[p] || "regime");
   if(p === "briefings") loadBriefings();
   if(p === "news") renderNews();
-  if(p === "indicator") loadIndicator();
+  if(p === "indicator"){ loadIndicator(); loadPastes(); }
   if(p === "library") renderLibrary();
   if(p === "glossary") renderGlossary();
   if(p === "track") loadTrack();
@@ -703,6 +723,9 @@ const HELP = {
   screener: {title: "Index drivers", tldr: "The handful of stocks that move NQ and ES, and how many points each is worth today.",
     body: `<p>A few giant companies make up most of the Nasdaq-100 and a big share of the S&P 500, so their moves <b>are</b> the futures' moves. This page shows the biggest weights in the index for the market you pick (NQ or ES at the top).</p><p><b>Index pts</b> = the stock's weight × its % move today × the futures price: roughly how many points of NQ or ES that stock explains. The bars show who is lifting and who is dragging. <b>Pre / after</b> is the latest pre-market or after-hours move, and the line above it says what those moves imply for the future before the cash open. <b>Rel vol</b> is today's volume against the 3-month average (1.5× or more is highlighted).</p><p>Watch the <b>earnings</b> dates: when a top-five name reports after the close, NQ and ES often gap on it overnight.</p>`,
     watch: ["Top names all red but the future green = narrow, fragile move", "A mega cap reporting AMC = overnight gap risk for NQ / ES"]},
+  pastes: {title: "9:30 pastes for backtesting", tldr: "The exact levels from each past session's open, ready to paste into the indicator.",
+    body: `<p>Every session, the paste from the last calculation before 9:30 ET is saved, the same one the Track record grades. Copy a day, paste it into the indicator's <b>Levels payload</b>, then scroll your chart back to that day: every level, tag, zone and IV band is drawn as it was at that open, plus the closing levels of the sessions before it.</p><p>The indicator marks it "Backtest" with the date instead of "stale", and its alerts stay off. Paste a current update from the top of this page to go back to live levels.</p><p>The website keeps these permanently from now on; days before this feature go back as far as the saved snapshots did (about a week).</p>`,
+    watch: ["Compare where price reacted with the C / P tags and the walls that day", "Use Copy both on a layout with NQ and ES charts"]},
   level_history: {title: "Level history", tldr: "Each past session's key levels and how that day traded around them.",
     body: `<p>For every session since the track record started: zero gamma, the call and put walls and the absolute-gamma strike from the last calculation before the 9:30 ET open, the ±1σ expected-move band, and the day's range and close. A wall <b>held</b> when price reached it and closed back on its side, <b>broke</b> when it closed through, and was <b>not reached</b> otherwise.</p><p>The chart puts each day side by side: the grey column is the expected-move band, the line is the day's range with a tick at the close, and the coloured dashes are that day's levels. A level far outside every day's range is left off the chart (it is still in the table).</p><p>Levels are calculated on the index (NDX / SPX) and converted to NQ / ES with today's basis, so they line up with a back-adjusted continuous chart.</p>`,
     watch: ["A wall that keeps holding day after day is a level the market respects", "Days that closed outside the grey band were bigger than the options priced in"]},

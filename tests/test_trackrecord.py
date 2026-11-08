@@ -183,6 +183,22 @@ class TestSchedule(unittest.TestCase):
             self.assertEqual(p["stats"]["NQ"]["sessions"], 1)
             self.assertEqual([x["status"] for x in p["sessions"]], ["missed", "graded"])
 
+    def test_open_paste_saved_once(self):
+        inp = {"market": "NQ", "underlying": "NDX", "ref": 100.0, "em": 10.0, "paste": "GEX1;mkt=NQ;bt=20261022;END"}
+        with tempfile.TemporaryDirectory() as tmp:
+            c = self.make(tmp, datetime(2026, 10, 22, 10, 5, tzinfo=NY), lambda d: {"NQ": dict(inp)} if d == date(2026, 10, 22) else {"NQ": None})
+            self.assertIn("2026-10-22_NQ paste", c.tick())
+            inp["paste"] = "GEX1;mkt=NQ;changed;END"                  # a later rebuild never replaces the saved paste
+            c.tick()
+            self.assertEqual(c.pastes(), [{"session": "2026-10-22", "market": "NQ", "paste": "GEX1;mkt=NQ;bt=20261022;END"}])
+            self.assertIn("/api/pastes", c.routes())
+            # the local app copies in the public site's pastes it does not have
+            pub = {"pastes": [{"session": "2026-10-21", "market": "ES", "paste": "GEX1;mkt=ES;bt=20261021;END"},
+                              {"session": "2026-10-21", "market": "../x", "paste": "GEX1;END"}]}
+            fetch = lambda u: json.dumps(pub if u.endswith("pastes.json") else {"sessions": []}).encode()
+            self.assertEqual(c.mirror(url="https://x/trackrecord.json", fetch=fetch), ["2026-10-21_ES paste"])
+            self.assertEqual([x["session"] + x["market"] for x in c.pastes()], ["2026-10-22NQ", "2026-10-21ES"])
+
     def test_partial_daily_bar_is_never_used(self):
         inp = {"market": "ES", "underlying": "SPX", "ref": 100.0, "em": 10.0}
         with tempfile.TemporaryDirectory() as tmp:

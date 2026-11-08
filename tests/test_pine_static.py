@@ -203,6 +203,10 @@ class TestPineStatic(unittest.TestCase):
         start = svc.index("add_tokens(r[")
         call = svc[start:svc.index("})", start)]
         emitted |= set(re.findall(r'"(\w+)": [^,}]*_token\(', call))
+        # the 9:30 backtest pastes (gexpro/context.py, open_paste) add the bt mark too
+        ctx = (Path(__file__).resolve().parent.parent / "gexpro" / "context.py").read_text(encoding="utf-8")
+        start = ctx.index("export.add_tokens(p, {")
+        emitted |= set(re.findall(r'"(\w+)":', ctx[start:ctx.index("})", start)]))
         missing = read - emitted
         self.assertFalse(missing, f"Pine reads keys the service never sends: {sorted(missing)}")
 

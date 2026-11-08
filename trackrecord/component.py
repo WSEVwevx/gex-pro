@@ -19,6 +19,7 @@ It is graded when that session's final bar is available. Sessions the app could 
 
 The record is kept forever, apart from the snapshots (which are pruned after 12 days):
   sessions/*.json   one file per session, never deleted
+  pastes/*.txt      the TradingView paste as it stood at each session's 09:30 open (for backtesting), never changed
   history.csv       every session in one permanent table, rewritten whenever a session changes
   public copy       the hosted site commits the folder to the repository's track-record branch, so it
                     keeps growing on GitHub while this PC is off; the local app copies in every session
@@ -78,6 +79,20 @@ class TrackRecordComponent:
     # ---------------------------------------------------------------- storage
     def _path(self, d: date, market: str) -> Path:
         return self.dir / "sessions" / f"{d.isoformat()}_{market}.json"
+
+    def _paste_path(self, d: date, market: str) -> Path:
+        return self.dir / "pastes" / f"{d.isoformat()}_{market}.txt"
+
+    def pastes(self) -> list[dict]:
+        """Every saved 9:30 paste, newest first: [{"session", "market", "paste"}]."""
+        out = []
+        for f in sorted((self.dir / "pastes").glob("*.txt"), reverse=True):
+            day, _, m = f.stem.partition("_")
+            try:
+                out.append({"session": day, "market": m, "paste": f.read_text(encoding="utf-8").strip()})
+            except OSError:
+                continue
+        return out
 
     def _write(self, path: Path, obj: dict) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -160,6 +175,15 @@ class TrackRecordComponent:
                     continue
                 self._write(path, dict(s, mirrored_from=url))
                 copied.append(f"{d}_{m} {s.get('status')}")
+        try:
+            for x in json.loads((fetch or get)(url.replace("trackrecord.json", "pastes.json"))).get("pastes") or []:
+                d, m, text = date.fromisoformat(x["session"]), str(x["market"]), str(x["paste"])
+                if m.isalnum() and text.startswith("GEX1;") and not self._paste_path(d, m).exists():
+                    self._paste_path(d, m).parent.mkdir(parents=True, exist_ok=True)
+                    self._paste_path(d, m).write_text(text, encoding="utf-8")
+                    copied.append(f"{d}_{m} paste")
+        except Exception as e:
+            log.warning("track record pastes mirror failed: %s", e)
         if copied:
             self.write_history()
         return copied
@@ -201,6 +225,10 @@ class TrackRecordComponent:
                 if not self.is_trading_day(d) or now < datetime.combine(d, OPEN, NY) + FREEZE_AFTER:
                     continue
                 for m, inp in (self._pre_open(d) or {}).items():
+                    if inp and inp.get("paste") and not self._paste_path(d, m).exists():
+                        self._paste_path(d, m).parent.mkdir(parents=True, exist_ok=True)
+                        self._paste_path(d, m).write_text(inp["paste"], encoding="utf-8")
+                        changed.append(f"{d}_{m} paste")
                     p = self._path(d, m)
                     if p.exists():
                         continue
@@ -296,7 +324,7 @@ class TrackRecordComponent:
         def get(q):
             self.tick()
             return 200, self.payload()
-        return {"/api/trackrecord": get}
+        return {"/api/trackrecord": get, "/api/pastes": lambda q: (200, {"pastes": self.pastes()})}
 
     def start(self) -> None:
         def loop():
@@ -327,4 +355,5 @@ class TrackRecordComponent:
         data.mkdir(parents=True, exist_ok=True)
         p = self.payload()
         (data / "trackrecord.json").write_text(json.dumps(p), encoding="utf-8")
+        (data / "pastes.json").write_text(json.dumps({"pastes": self.pastes()}), encoding="utf-8")
         return {}
