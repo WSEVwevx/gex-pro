@@ -64,6 +64,8 @@ async function loadPastes(){
     copyText(text, `Copied the ${w === "both" ? "NQ + ES" : w} levels from the ${when} 9:30 open. Paste them into Levels payload.`);
   });
 }
+function showPastes(){ setPage("indicator"); setTimeout(() => $("pastesCard").scrollIntoView({behavior: "smooth", block: "start"}), 50); }
+$("indPastesJump").onclick = showPastes;
 async function copyFrom(url, what){
   let text;
   try { text = (await (await fetchFresh(url)).text()).trim(); } catch(e){ toast(OFFLINE); return; }
@@ -841,6 +843,7 @@ const COMMANDS = [
   {code: "LIGHT", desc: "Light mode", run: () => setTheme("light")}, {code: "DARK", desc: "Dark (night) mode", run: () => setTheme("dark")},
   {code: "LEARN", desc: "Start the beginner course", run: () => openLesson(LIB.lessons[0].id)},
   {code: "GLOSSARY", desc: "Open the A-Z glossary", run: () => setPage("glossary")},
+  {code: "PASTES", desc: "Past days' 9:30 level pastes, for backtesting", run: showPastes},
 ];
 let cmdSel = 0;
 function cmdMatches(q){ q = q.trim().toUpperCase(); return q ? COMMANDS.filter(c => c.code.startsWith(q) || c.desc.toUpperCase().includes(q)) : COMMANDS; }
