@@ -44,7 +44,7 @@ async function copyText(text, done){
 }
 $("copyClose").onclick = () => { $("copyBox").hidden = true; };
 $("copyBox").onclick = e => { if(e.target === $("copyBox")) $("copyBox").hidden = true; };
-// ---------- 9:30 pastes (Indicator page): each past session's paste as it stood at the open, for backtesting
+// ---------- 9:30 pastes (Backtesting page): each past session's paste as it stood at the open, for backtesting
 let pastes = null;
 async function loadPastes(){
   try { pastes = (await (await fetchFresh(API.pastes)).json()).pastes || []; }
@@ -64,7 +64,7 @@ async function loadPastes(){
     copyText(text, `Copied the ${w === "both" ? "NQ + ES" : w} levels from the ${when} 9:30 open. Paste them into Levels payload.`);
   });
 }
-function showPastes(){ setPage("indicator"); setTimeout(() => $("pastesCard").scrollIntoView({behavior: "smooth", block: "start"}), 50); }
+function showPastes(){ setPage("backtest"); }
 $("indPastesJump").onclick = showPastes;
 async function copyFrom(url, what){
   let text;
@@ -82,7 +82,7 @@ try { localStorage.removeItem("gex.page"); } catch(e) {}
 let impactF = store.get("gex.impact", "med");       // high | med | all
 let curF = store.get("gex.cur", "USD");             // USD | all
 let news = null;
-const VIEW_IDS = ["levels", "ladder", "heatmap", "screener", "bias", "track", "briefings", "news", "indicator", "library", "glossary", "health"];
+const VIEW_IDS = ["levels", "ladder", "heatmap", "screener", "bias", "track", "backtest", "briefings", "news", "indicator", "library", "glossary", "health"];
 function setPage(p){
   if(!VIEW_IDS.includes(p)) p = "levels";
   if(p !== page){ const ar = document.querySelector(".area"); if(ar) ar.scrollTop = 0; window.scrollTo(0, 0); }   // a new page opens at its top
@@ -95,7 +95,8 @@ function setPage(p){
   $("explain").classList.contains("open") && openExplain(PAGE_HELP[p] || "regime");
   if(p === "briefings") loadBriefings();
   if(p === "news") renderNews();
-  if(p === "indicator"){ loadIndicator(); loadPastes(); }
+  if(p === "indicator") loadIndicator();
+  if(p === "backtest") loadPastes();
   if(p === "library") renderLibrary();
   if(p === "glossary") renderGlossary();
   if(p === "track") loadTrack();
@@ -639,9 +640,9 @@ function renderMaxPain(X){
 // =====================================================================================================
 const PAGES = [
   ["levels", "Levels", "LVL"], ["ladder", "Live table", "LIVE"], ["heatmap", "Heatmap", "HEAT"], ["screener", "Screener", "SCRN"],
-  ["bias", "Bias", "BIAS"], ["track", "Track record", "TRK"], ["briefings", "Briefings", "BRF"], ["news", "News", "NEWS"], ["indicator", "Indicator", "IND"],
+  ["bias", "Bias", "BIAS"], ["track", "Track record", "TRK"], ["backtest", "Backtesting", "BT"], ["briefings", "Briefings", "BRF"], ["news", "News", "NEWS"], ["indicator", "Indicator", "IND"],
   ["library", "Library", "LIB"], ["glossary", "Glossary", "GLOS"], ["health", "Data health", "DATA"]];
-const NO_MARKET_PAGES = ["news", "indicator", "briefings", "library", "glossary", "track", "health"];
+const NO_MARKET_PAGES = ["news", "indicator", "briefings", "library", "glossary", "track", "backtest", "health"];
 const pickP = v => v && typeof v === "object" ? v.price : v;
 const curW = () => data && (data.workers.find(x => x.market === market && x.result) || data.workers.find(x => x.market === market));
 
@@ -726,7 +727,7 @@ const HELP = {
     body: `<p>A few giant companies make up most of the Nasdaq-100 and a big share of the S&P 500, so their moves <b>are</b> the futures' moves. This page shows the biggest weights in the index for the market you pick (NQ or ES at the top).</p><p><b>Index pts</b> = the stock's weight × its % move today × the futures price: roughly how many points of NQ or ES that stock explains. The bars show who is lifting and who is dragging. <b>Pre / after</b> is the latest pre-market or after-hours move, and the line above it says what those moves imply for the future before the cash open. <b>Rel vol</b> is today's volume against the 3-month average (1.5× or more is highlighted).</p><p>Watch the <b>earnings</b> dates: when a top-five name reports after the close, NQ and ES often gap on it overnight.</p>`,
     watch: ["Top names all red but the future green = narrow, fragile move", "A mega cap reporting AMC = overnight gap risk for NQ / ES"]},
   pastes: {title: "9:30 pastes for backtesting", tldr: "The exact levels from each past session's open, ready to paste into the indicator.",
-    body: `<p>Every session, the paste from the last calculation before 9:30 ET is saved, the same one the Track record grades. Copy a day, paste it into the indicator's <b>Levels payload</b>, then scroll your chart back to that day: every level, tag, zone and IV band is drawn as it was at that open, plus the closing levels of the sessions before it.</p><p>The indicator marks it "Backtest" with the date instead of "stale", and its alerts stay off. Paste a current update from the top of this page to go back to live levels.</p><p>The website keeps these permanently from now on; days before this feature go back as far as the saved snapshots did (about a week).</p>`,
+    body: `<p>Every session, the paste from the last calculation before 9:30 ET is saved, the same one the Track record grades. Copy a day, paste it into the indicator's <b>Levels payload</b>, then scroll your chart back to that day: every level, tag, zone and IV band is drawn as it was at that open, plus the closing levels of the sessions before it.</p><p>The indicator marks it "Backtest" with the date instead of "stale", and its alerts stay off. Click <b>Copy for TradingView</b> at the top of any page and paste that to go back to live levels.</p><p>The website keeps these permanently from now on; days before this feature go back as far as the saved snapshots did (about a week).</p>`,
     watch: ["Compare where price reacted with the C / P tags and the walls that day", "Use Copy both on a layout with NQ and ES charts"]},
   level_history: {title: "Level history", tldr: "Each past session's key levels and how that day traded around them.",
     body: `<p>For every session since the track record started: zero gamma, the call and put walls and the absolute-gamma strike from the last calculation before the 9:30 ET open, the ±1σ expected-move band, and the day's range and close. A wall <b>held</b> when price reached it and closed back on its side, <b>broke</b> when it closed through, and was <b>not reached</b> otherwise.</p><p>The chart puts each day side by side: the grey column is the expected-move band, the line is the day's range with a tick at the close, and the coloured dashes are that day's levels. A level far outside every day's range is left off the chart (it is still in the table).</p><p>Levels are calculated on the index (NDX / SPX) and converted to NQ / ES with today's basis, so they line up with a back-adjusted continuous chart.</p>`,
@@ -780,7 +781,7 @@ const HELP = {
   paste: {title: "The hourly paste", tldr: "One text block that carries all levels to TradingView.",
     body: `<p>Published every hour on the hour (ET). One paste holds NQ and ES; each chart draws only its own market. The indicator marks levels stale after 90 minutes.</p>`},
 };
-const PAGE_HELP = {levels: "regime", ladder: "livetable", heatmap: "heatmap", screener: "screener", bias: "bias", briefings: "briefings", news: "calendar", indicator: "indicator", library: "library", glossary: "glossary", track: "track", health: "health"};
+const PAGE_HELP = {levels: "regime", ladder: "livetable", heatmap: "heatmap", screener: "screener", bias: "bias", briefings: "briefings", news: "calendar", indicator: "indicator", library: "library", glossary: "glossary", track: "track", backtest: "pastes", health: "health"};
 let exKey = null;
 function openExplain(key){
   const h = HELP[key]; if(!h) return;

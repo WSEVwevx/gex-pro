@@ -55,6 +55,7 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
     <div class="side-label">Insight</div>
     <button role="tab" data-p="bias" aria-selected="false"><svg viewBox="0 0 20 20"><path d="M10 3v14M5 8l5-5 5 5"/></svg><span>Bias</span><kbd>BIAS</kbd></button>
     <button role="tab" data-p="track" aria-selected="false"><svg viewBox="0 0 20 20"><path d="M3 16h14M5 16V9M9 16V5M13 16v-5M17 16V7"/></svg><span>Track record</span><kbd>TRK</kbd></button>
+    <button role="tab" data-p="backtest" aria-selected="false"><svg viewBox="0 0 20 20"><path d="M4 4v12h12M7 13l3-4 3 2 3-5"/><path d="M4 4l-1.5 1.5M4 4l1.5 1.5" opacity=".6"/></svg><span>Backtesting</span><kbd>BT</kbd></button>
     <button role="tab" data-p="briefings" aria-selected="false"><svg viewBox="0 0 20 20"><path d="M5 3h10v14H5zM8 7h4M8 10h4M8 13h2"/></svg><span>Briefings</span><kbd>BRF</kbd></button>
     <button role="tab" data-p="news" aria-selected="false"><svg viewBox="0 0 20 20"><path d="M3 5h11v11H3zM14 8h3v8h-3M6 8h5M6 11h5"/></svg><span>News</span><kbd>NEWS</kbd></button>
     <div class="side-label">Resources</div>
@@ -313,6 +314,15 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
       </section>
     </div>
 
+    <!-- BACKTESTING: each past session's 9:30 paste -->
+    <div id="backtestView" hidden>
+      <section class="card" data-help="pastes" id="pastesCard">
+        <div class="head"><h2>9:30 pastes for backtesting</h2><span class="sub" id="pastesSub"></span></div>
+        <div class="expl">The levels exactly as they stood at each past session's 9:30 ET open. Copy one, paste it into the indicator's <b>Levels payload</b>, and scroll your chart back to that day to see how price traded around them. The indicator shows "Backtest" with the date and turns its alerts off; click <b>Copy for TradingView</b> at the top to go back to live levels.</div>
+        <div class="trk-log" id="pastesList"></div>
+      </section>
+    </div>
+
     <!-- DATA HEALTH: every outside source, when it last worked, whether its last try failed -->
     <div id="healthView" hidden>
       <section class="card" data-help="health">
@@ -350,11 +360,6 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
           <div class="expl" style="margin-top:6px">A new paste every hour on the hour (ET). Click below, then in TradingView: indicator settings &gt; <b>Levels payload</b> &gt; Ctrl+A, Ctrl+V &gt; OK.</div>
           <div class="actions"><button class="btn" id="indPaste">Copy levels for TradingView</button><button class="btn ghost" id="indPastesJump">Past days' 9:30 levels</button></div>
         </div>
-      </section>
-      <section class="card" data-help="pastes" id="pastesCard" style="margin-top:12px">
-        <div class="head"><h2>9:30 pastes for backtesting</h2><span class="sub" id="pastesSub"></span></div>
-        <div class="expl">The levels exactly as they stood at each past session's 9:30 ET open. Copy one, paste it into the indicator's <b>Levels payload</b>, and scroll your chart back to that day to see how price traded around them. The indicator shows "Backtest" with the date and turns its alerts off; paste a current update to go back to live levels.</div>
-        <div class="trk-log" id="pastesList"></div>
       </section>
       <section class="card" style="margin-top:12px">
         <div class="codehead"><h2>Source code</h2><span class="fname" id="indFile">GEX_PRO.pine</span><span class="spacer"></span>
