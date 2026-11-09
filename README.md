@@ -165,10 +165,10 @@ your browser, and the first visit follows your system setting.
   build itself): when it last worked, and whether its last try failed or it is running late or on a backup. A red
   dot on the menu item means something failed.
 * **Indicator:** the GEX PRO TradingView script, always the current version, with Copy / Download
-  buttons, install steps, version and last-updated time, and the script's recent changes; and **9:30 pastes
-  for backtesting**: the paste exactly as it stood at each past session's open (NQ, ES or both), saved
-  permanently with the track record. Pasted in, the indicator draws that day's levels, marks the panel
-  "Backtest" with the date and keeps its alerts off.
+  buttons, install steps, version and last-updated time, and the script's recent changes.
+* **Backtesting** (under Insight, `BT` or the `PASTES` command): the 9:30 paste exactly as it stood at each
+  past session's open (NQ, ES or both), saved permanently with the track record. Pasted in, the indicator
+  draws that day's levels, marks the panel "Backtest" with the date and keeps its alerts off.
 * **Bias:** a transparent, rule-based reading of today's positioning:
   - bias and confidence, day type (range / trend / pivot), base case and expected range;
   - a session chart with an illustrative path, ±1σ cone and key levels;

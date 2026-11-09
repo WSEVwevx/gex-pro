@@ -4,11 +4,12 @@ indicator("GEX PRO - NQ / ES", shorttitle = "GEX PRO", overlay = true,
      max_lines_count = 200, max_labels_count = 200, max_boxes_count = 300)
 
 // =====================================================================================================
-// GEX PRO draws options levels computed by the gexsys service (open START.bat, then the website at
-// http://127.0.0.1:8765) and pasted into "Levels payload". Pine cannot download data, so the levels
-// change when you paste a new update (every hour on the hour). Levels come from index + ETF options
+// GEX PRO draws options levels computed by GEX PRO (the website, or START.bat at http://127.0.0.1:8765)
+// and pasted into "Levels payload". Pine cannot download data, so the levels change when you paste a
+// new update (every hour on the hour while the futures trade). Levels come from index + ETF options
 // (SPX + SPY for ES, NDX + QQQ for NQ), are expressed in index prices and are mapped live to this futures
-// chart. Levels are model estimates for the current session; nothing is back-plotted.
+// chart. Levels are model estimates for the current session; only the closing levels of the last few
+// sessions (and a pasted 9:30 backtest day) reach back in time.
 // =====================================================================================================
 
 // ---------- 1 - Data
@@ -283,6 +284,10 @@ if barstate.isfirst
             if mktOK and provOK
                 if na(sA)
                     sA := s
+                else if s.prov == sA.prov
+                    // the same source twice (an old paste left in the box): keep the newer one, never draw both
+                    if nz(s.ts) > nz(sA.ts)
+                        sA := s
                 else if na(sB)
                     sB := s
             else if not mktOK and not str.contains(otherMkts, s.mkt)
@@ -387,6 +392,11 @@ staleOf(Snap s) =>
 btDay(Snap s) =>
     str.length(s.bt) == 8 ? str.substring(s.bt, 4, 6) + "/" + str.substring(s.bt, 6, 8) : ""
 
+// the paste is from a later day than the chart's last bar (bar replay, or a backtest paste for a day still ahead)
+aheadOf(Snap s) =>
+    int barDay = year(time, "America/New_York") * 10000 + month(time, "America/New_York") * 100 + dayofmonth(time, "America/New_York")
+    s.bt != "" ? nz(str.tonumber(s.bt)) > barDay : not na(s.ts) and not na(time_close) and s.ts > time_close + 86400000
+
 // Primary (alerts, data window): first drawable source. If-blocks so a missing slot's fields are never read.
 float zgF = na
 float cwF = na
@@ -437,7 +447,9 @@ lSz = lblSize == "Tiny" ? size.tiny : lblSize == "Small" ? size.small : size.nor
 lblX = showProf ? profOffset + profWidth + 2 : lblOff
 zoneX = showProf ? profOffset : math.max(1, lblX - 5)      // bars right of price where the zone column starts
 // "end at price" lines run on to the zone column; lines are placed by time, so count the bars in milliseconds
-lineEndT = time + zoneX * timeframe.in_seconds() * 1000
+// tick charts have no fixed bar length: use the last bar's spacing (at least a second)
+barMs = timeframe.isticks or na(timeframe.in_seconds()) ? math.max(1000, nz(time - time[1], 1000)) : timeframe.in_seconds() * 1000
+lineEndT = time + zoneX * barMs
 lblBgCol = lblBg ? color.new(#0b0e13, 25) : color.new(#0b0e13, 100)
 twoSrc = okA and okB
 
@@ -1008,8 +1020,9 @@ valOf(string k, Snap s, float f, float o, bool ok, string mst) =>
     string t = "-"
     color c = cTxt
     if k == "data"
-        bool bad = staleOf(s) or not s.complete or (s.st != "OK" and s.st != "")
+        bool bad = staleOf(s) or not s.complete or (s.st != "OK" and s.st != "") or aheadOf(s)
         t := s.bt != "" ? "Backtest " + btDay(s) + " 9:30" : (s.q == "RT" ? "RT " : s.q == "SYN" ? "SYN " : "DL ") + ageTxt(ageOf(s)) + (staleOf(s) ? " STALE" : "") + (s.complete ? "" : " CUT OFF") + (s.st != "OK" and s.st != "" ? " " + s.st : "")
+        t := t + (aheadOf(s) ? " NEWER THAN CHART" : "")
         c := bad ? cWarn : cDim
     else if not ok
         t := k == "reg" ? "BLOCKED" : "-"
@@ -1083,8 +1096,10 @@ if showTab and barstate.islast
     table.clear(tab, 0, 0, 2, 17)
     if not hasA
         cell(0, 0, "GEX PRO", cDim, cHead)
-        cell(1, 0, nParsed == 0 ? "no payload" : "no " + chartFam + " payload", cWarn, cHead)
-        cell(0, 1, nParsed == 0 ? "Copy from 127.0.0.1:8765" : "Pasted: " + otherMkts, cDim)
+        bool typed = str.length(str.trim(payload)) > 0
+        cell(1, 0, nParsed == 0 ? (typed ? "paste not recognised" : "no payload") : "no " + chartFam + " levels", cWarn, cHead)
+        cell(0, 1, nParsed == 0 ? (typed ? "Copy it again from the GEX PRO website" : "Copy from the GEX PRO website")
+             : otherMkts != "" ? "Pasted: " + otherMkts + " (this chart is " + chartFam + ")" : "Check the provider filter", cDim)
     else
         cell(0, 0, syminfo.ticker, cDim, cHead)
         cell(1, 0, srcTxt(sA), cTxt, cHead)

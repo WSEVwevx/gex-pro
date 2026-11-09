@@ -124,7 +124,7 @@ class GexComponent:
             rows.append({"name": f"{w.cfg.market} TradingView paste", "provider": "GEX PRO (hourly, from the options chain)",
                          "pages": ["Copy for TradingView", "Indicator"], "last_ok": pub.get("published_at"),
                          "error": None, "fresh_h": 1.5 if trading else None,
-                         "detail": f"slot {pub['slot_et']} ET" if pub.get("slot_et") else None})
+                         "detail": f"the paste on the site is the {pub['slot_et']} ET one" if pub.get("slot_et") else None})
         for m in dict.fromkeys(w.cfg.market for w in self.workers.values()):
             s = self.heat.status.get(m) or {}
             rows.append({"name": f"{m} futures candles", "provider": "Yahoo Finance", "pages": ["Heatmap"],

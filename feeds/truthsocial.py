@@ -149,6 +149,8 @@ def from_api(statuses) -> list[dict]:
 
 
 # the archive writes each attachment as a link: <a href="...jpg">View image</a> (or "View video")
+RT_LINE = re.compile(r"^RT:?\s+(https?://\S+)\s*$", re.M)
+QUOTED_LINE = re.compile(r"^Quoted (.{1,80})$", re.M)
 ATTACHMENT = re.compile(r'<a\s[^>]*href="([^"]+)"[^>]*>\s*View (image|video)\s*</a>', re.I)
 
 
@@ -165,6 +167,11 @@ def from_rss(xml_bytes: bytes) -> list[dict]:
         desc = html_to_text(ATTACHMENT.sub("", raw))
         title = (it.findtext("title") or "").strip()
         text = desc or ("" if title.lower().startswith(("image post", "video post")) else title)
+        # a repost or quote arrives as "RT: <truthsocial url>" plus "Quoted <name>": shown as a link, not as text
+        ptype = (it.findtext("{https://www.trumpstruth.org/rss-extensions}postType") or "").lower()
+        rt, quoted = RT_LINE.search(text), QUOTED_LINE.search(text)
+        link = {"url": rt.group(1), "title": f"Quoted post{' by ' + quoted.group(1).strip() if quoted else ''}"} if rt else None
+        text = QUOTED_LINE.sub("", RT_LINE.sub("", text)).strip()
         media = [{"type": "image", "preview": _picture(u)} for u, kind in files if kind.lower() == "image" and _picture(u)]
         for el in it:
             if el.tag.endswith("content") or el.tag.endswith("thumbnail"):
@@ -172,8 +179,8 @@ def from_rss(xml_bytes: bytes) -> list[dict]:
                 if u:
                     media.append({"type": "image", "preview": u})
         out.append({"id": it.findtext("guid") or it.findtext("link") or t.isoformat(), "time": t.astimezone(timezone.utc).isoformat(),
-                    "kind": "retruth" if text.startswith("RT ") else "post", "author": None, "text": text,
-                    "media": media[:1], "url": _https(it.findtext("link")), "link": None, "counts": None,
+                    "kind": "quote" if ptype == "quote" else "retruth" if ptype in ("retruth", "reblog") or text.startswith("RT ") else "post",
+                    "author": None, "text": text, "media": media[:1], "url": _https(it.findtext("link")), "link": link, "counts": None,
                     "market_words": market_words(text), "tone": market_tone(text)})
     return out
 

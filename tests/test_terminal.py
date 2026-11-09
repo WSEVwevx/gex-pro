@@ -63,6 +63,8 @@ class TestAssets(unittest.TestCase):
             self.assertLess(html.index("window.GEX_STATIC = true"), html.index("assets/app.js"))   # flag first
             self.assertTrue((out / "assets" / "app.js").exists() and (out / "data" / "all.json").exists())
             self.assertTrue((out / "manifest.webmanifest").exists() and (out / "sw.js").exists() and (out / "assets" / "app-512.png").exists())
+            # the build stamp the open pages poll before downloading all.json again
+            self.assertRegex((out / "data" / "stamp.txt").read_text(encoding="utf-8"), r"^\d{4}-\d\d-\d\dT")
 
 
 

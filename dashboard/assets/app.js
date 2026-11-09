@@ -290,8 +290,17 @@ function renderNews(){
   $("newsFoot").innerHTML = `Source: <a href="https://www.forexfactory.com/calendar" target="_blank" rel="noopener" style="color:var(--ink2)">ForexFactory calendar</a> (weekly export feed), checked every 30 min${news.fetched_at ? `, last updated ${ago(news.fetched_at)}` : ""}. Times in ET. F = forecast, P = previous; the feed has no actual results - see ForexFactory for those.${news.error ? ` <span style="color:var(--warn)">${esc(news.error)}</span>` : ""}`;
 }
 
+let stamp = null;
 async function load(){
-  try{ data = await (await fetchFresh(API.all)).json(); render(); if(page === "indicator") renderIndicator(); }
+  try{
+    // hosted: the site rebuilds every few minutes, so check its build stamp (a few bytes) before the full data file
+    const st = STATIC ? await fetchFresh("data/stamp.txt").then(r => r.ok ? r.text() : null).catch(() => null) : null;
+    if(!st || st !== stamp || !data){
+      data = await (await (st ? fetch(`${API.all}?b=${encodeURIComponent(st)}`) : fetchFresh(API.all))).json();
+      stamp = st;
+    }
+    render(); if(page === "indicator") renderIndicator();
+  }
   catch(e){ $("banner").innerHTML = `<div class="banner bad">${OFFLINE}</div>`; }
 }
 
@@ -316,6 +325,8 @@ function renderSources(){
   const n = rows.filter(r => !["ok", "waiting"].includes(r.status)).length, wait = rows.filter(r => r.status === "waiting").length;
   $("hlSub").textContent = sources.error || (n ? `${n} of ${rows.length} need attention` : wait ? `${rows.length - wait} working, ${wait} not checked yet`
     : `All ${rows.length} working`) + (sources.now ? ` · checked ${ago(sources.now)}` : "");
+  const rank = {down: 0, failing: 1, late: 2, partial: 3, waiting: 4, ok: 5};          // problems first, otherwise the order stays
+  rows.sort((a, b) => (rank[a.status] ?? 5) - (rank[b.status] ?? 5));
   $("hlList").innerHTML = rows.map(r => {
     const [cls, word] = HL[r.status] || ["", r.status], msg = r.error || r.note || r.detail || "";
     const when = r.last_ok ? `worked ${Date.now() - Date.parse(r.last_ok) < 60000 ? "just now" : dur(Date.now() - Date.parse(r.last_ok)) + " ago"}` : "no good copy yet";
@@ -439,13 +450,21 @@ function renderLadder(L, X, ref){
   [...$("filters").children].forEach(b => b.onclick = () => { view = b.dataset.v; store.set("gex.view", view); render(); });
   const all = levels(L, X);
   const rows = all.filter(x => view === "all" || x[0] === view).sort((a, b) => b[3] - a[3]);
+  // levels at the same price share one row: the first key level names it, the rest are listed under it
+  const merged = [];
+  for(const r of rows){
+    const same = merged.find(m => Math.abs(m[0][3] - r[3]) < 0.005);
+    if(same) same.push(r); else merged.push([r]);
+  }
   let html = "", placed = false;
-  for(const [g, kind, name, price, desc] of rows){
+  for(const grp of merged){
+    grp.sort((a, b) => (b[0] === "key") - (a[0] === "key"));
+    const [g, kind, name, price] = grp[0], isKey = grp.some(x => x[0] === "key");
     if(!placed && price < ref){ html += nowRow(ref); placed = true; }
-    const isKey = g === "key";
+    const also = grp.slice(1).map(x => x[2]);
     html += `<div class="row${isKey ? " key" : ""}"><div class="rule" style="background:${KIND_COLOR[kind]}"></div>
-      <div><div class="name">${esc(name)} ${isKey ? '<span class="badge">KEY</span>' : `<span class="kind">${esc(GROUPS.find(x => x[0] === g)[1])}</span>`}</div><div class="desc">${desc}</div></div>
-      <div class="px"><div class="p">${num(price)}</div><div class="d">${signed(price - ref)} pts</div></div></div>`;
+      <div><div class="name">${esc(name)} ${isKey ? '<span class="badge">KEY</span>' : `<span class="kind">${esc(GROUPS.find(x => x[0] === g)[1])}</span>`}</div>${also.length ? `<div class="also">also ${also.map(esc).join(" · ")}</div>` : ""}<div class="desc">${grp.map(x => x[4]).join(" ")}</div></div>
+      <div class="px"><span class="p">${num(price)}</span><span class="d">${signed(price - ref)}</span></div></div>`;
   }
   if(!placed) html += nowRow(ref);
   const missing = view === "all" || view === "key" ? KEY_NAMES.filter(n => !all.some(x => x[2] === n)) : [];
@@ -459,8 +478,7 @@ const nowRow = ref => `<div class="now"><span>PRICE ${num(ref)}</span></div>`;
 function renderChart(w, s, L, ref){
   const m = w.result.mapped, f = m ? (p => p*m.mapping.factor + m.mapping.offset) : (p => p);
   // window: +/-3% of price, widened to include zero gamma and both walls (up to +/-8%)
-  const pr0 = v => v && typeof v === "object" ? v.price : v;
-  const keys = [pr0(L.zero_gamma), pr0(L.call_wall), pr0(L.put_wall)].filter(p => p != null && Math.abs(p / ref - 1) <= 0.08);
+  const keys = [pickP(L.zero_gamma), pickP(L.call_wall), pickP(L.put_wall)].filter(p => p != null && Math.abs(p / ref - 1) <= 0.08);
   const win = ref * 0.03, pad = ref * 0.004;
   const lo = Math.min(ref - win, ...keys.map(p => p - pad)), hi = Math.max(ref + win, ...keys.map(p => p + pad));
   const bars =w.result.by_strike.map(b => ({p:f(b.strike), k:b.strike, net:b.net})).filter(b => b.p >= lo && b.p <= hi);
@@ -483,10 +501,9 @@ function renderChart(w, s, L, ref){
     const len = Math.abs(b.net) / mx * xs, x = b.net >= 0 ? cx : cx - len;
     g += `<rect data-i="${i}" x="${x}" y="${y(b.p) - bh/2}" width="${Math.max(len, 1)}" height="${bh}" rx="${Math.min(3, bh / 2)}" fill="${b.net>=0?"var(--pos)":"var(--neg)"}" fill-opacity=".9"/>`;
   });
-  const pr = v => v && typeof v === "object" ? v.price : v;
-  const marks = [[ref, "Price", "var(--ink)", ""], [pr(L.zero_gamma), "Zero gamma", "var(--zg)", "5 4"],
-                 [pr(L.call_wall), "Call wall", "var(--pos)", "2 3"], [pr(L.put_wall), "Put wall", "var(--neg)", "2 3"],
-                 [pr(L.abs_gamma), "Abs gamma", "var(--ag)", "1 3"]]
+  const marks = [[ref, "Price", "var(--ink)", ""], [pickP(L.zero_gamma), "Zero gamma", "var(--zg)", "5 4"],
+                 [pickP(L.call_wall), "Call wall", "var(--pos)", "2 3"], [pickP(L.put_wall), "Put wall", "var(--neg)", "2 3"],
+                 [pickP(L.abs_gamma), "Abs gamma", "var(--ag)", "1 3"]]
     .filter(m => m[0] != null && m[0] >= lo && m[0] <= hi);
   marks.forEach(([p, , color, dash]) => { g += `<line x1="${padL}" x2="${W-padR}" y1="${y(p)}" y2="${y(p)}" stroke="${color}" stroke-width="1.5" ${dash ? `stroke-dasharray="${dash}"` : ""}/>`; });
   // labels sorted top to bottom and pushed apart so they never overlap
@@ -562,7 +579,7 @@ function renderBias(w){
     <div class="kv"><span>Score</span><b>${b.score >= 0 ? "+" : ""}${num(b.score)}</b></div>`;
   $("targetCard").innerHTML = `<div class="eyebrow">Base case by the close</div>
     <div class="big" style="color:${col}">${num(b.target)}</div>
-    <div class="kv"><span>From ${num(ref)}</span><b>${signed(b.target - ref)} pts</b></div>
+    <div class="kv"><span>From ${num(ref)}</span><b>${Math.abs(b.target - ref) < 0.5 ? "no change" : signed(b.target - ref) + " pts"}</b></div>
     <div class="expl">Where the positioning factors point by 4 pm ET if nothing else intervenes.</div>`;
   $("rangeCard").innerHTML = `<div class="eyebrow">Expected range</div>
     <div class="big sm">${num(b.range[0])} – ${num(b.range[1])}</div>
@@ -607,6 +624,7 @@ function drawBias(b, col){
   svg.setAttribute("width", W); svg.setAttribute("height", H); svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
   svg.innerHTML = g;
   $("pathSw").style.background = col;
+  document.querySelectorAll("#biasLegend [data-lv]").forEach(el => { el.style.display = lv.some(([n]) => n === el.dataset.lv) ? "" : "none"; });   // only what is drawn
   const tip = $("biasTip");
   svg.onmousemove = e => {
     const r = svg.getBoundingClientRect(), mx = (e.clientX - r.left - padL) / (W - padL - padR) * T;
@@ -678,10 +696,7 @@ function renderTicker(){
       <span><em>PW</em> <b style="color:var(--neg)">${num(pickP(L.put_wall), 0)}</b></span><span><em>EM</em> <b>±${num(emd, 0)}</b></span>
       <span><em>NET</em> <b style="color:${s.net >= 0 ? "var(--pos)" : "var(--neg)"}">${money(s.net)}</b></span></div>`;
   }).join("");
-  const w = curW(), s = w && w.result && w.result.summary;
-  const info = s ? `<div class="tk info"><span><em>DATA</em> <b>${esc(s.provider || w.provider)}</b></span><span><em>AS OF</em> <b>${ago(s.asof)}</b></span>
-    <span><em>NEXT PASTE</em> <b>${w.health.next_publish_et ? esc(w.health.next_publish_et.slice(11)) + " ET" : "-"}</b></span></div>` : "";
-  $("ticker").innerHTML = cells + info;
+  $("ticker").innerHTML = cells;          // data source, age and next paste are on each market page's header
   [...$("ticker").querySelectorAll(".tk[data-m]")].forEach(el => el.onclick = () => setMarket(el.dataset.m));
 }
 function setMarket(m){ market = m; store.set("gex.market", m); render(); }
@@ -1187,15 +1202,15 @@ function renderLiveTable(){
   const mx = {dex: col(1), gex: col(0), oi: col(2), vol: col(4)};
   // levels, in futures prices, placed on the nearest row
   const lv = [];
-  const addL = (p, code, name, cls) => { if(p != null && isFinite(p)) lv.push({p, code, name, cls}); };
+  const addL = (p, code, name, cls, share) => { if(p != null && isFinite(p)) lv.push({p, code, name, cls, share}); };
   addL(pickP(L.zero_gamma), "ZG", "Zero gamma", "zg"); addL(pickP(L.call_wall), "CW", "Call wall", "pos"); addL(pickP(L.put_wall), "PW", "Put wall", "neg");
   const rk = s.ranked || {};
-  (rk.call || []).forEach((x, i) => addL(fut(x.price), "C" + (i + 1), `Call wall #${i + 1}: ${num(100 * x.share, 1)}% of gamma`, "pos"));
-  (rk.put || []).forEach((x, i) => addL(fut(x.price), "P" + (i + 1), `Put wall #${i + 1}: ${num(100 * x.share, 1)}% of gamma`, "neg"));
-  (rk.abs || []).forEach((x, i) => addL(fut(x.price), "Ab" + (i + 1), `Absolute gamma #${i + 1}: ${num(100 * x.share, 1)}% of gamma`, "ag"));
+  (rk.call || []).forEach((x, i) => addL(fut(x.price), "C" + (i + 1), `Call wall ${i + 1}`, "pos", x.share));
+  (rk.put || []).forEach((x, i) => addL(fut(x.price), "P" + (i + 1), `Put wall ${i + 1}`, "neg", x.share));
+  (rk.abs || []).forEach((x, i) => addL(fut(x.price), "Ab" + (i + 1), `Abs gamma ${i + 1}`, "ag", x.share));
   const X = (L.extras || {}).expected_move || {};
   const emd = X.daily_points_fut || X.daily_points, ema = X.anchor_fut || X.anchor;
-  if(emd && ema){ addL(ema + emd, "EM+", "Expected high today", "em"); addL(ema - emd, "EM-", "Expected low today", "em"); }
+  if(emd && ema){ addL(ema + emd, "EM+", "Expected high", "em"); addL(ema - emd, "EM-", "Expected low", "em"); }
   const at = new Map();
   lv.forEach(l => { const i = rows.reduce((b, x, j) => Math.abs(x.f - l.p) < Math.abs(rows[b].f - l.p) ? j : b, 0);
     if(Math.abs(rows[i].f - l.p) <= LD.width * fac * 0.75) (at.get(i) || at.set(i, []).get(i)).push(l); });
@@ -1218,7 +1233,7 @@ function renderLiveTable(){
       const x = rows[Number(el.dataset.i)], v = x.v, ls = at.get(Number(el.dataset.i)) || [];
       tip.innerHTML = `<b>${num(x.f, 2)}</b> <span style="color:var(--ink3)">(${esc(s.options_source || w.source)} ${num(x.k, 0)})</span>
         <br>Net GEX <b style="color:${v[0] >= 0 ? "var(--pos)" : "var(--neg)"}">${money(v[0])}</b> per 1% · net DEX ${compact(v[1])}
-        <br>OI calls ${num(v[2], 0)} / puts ${num(v[3], 0)} · volume calls ${num(v[4], 0)} / puts ${num(v[5], 0)}${ls.length ? `<br>${ls.map(l => esc(l.code + " " + l.name)).join("<br>")}` : ""}`;
+        <br>OI calls ${num(v[2], 0)} / puts ${num(v[3], 0)} · volume calls ${num(v[4], 0)} / puts ${num(v[5], 0)}${ls.length ? `<br>${ls.map(l => esc(l.code + " " + l.name + (l.share ? ` (${num(100 * l.share, 1)}% of gamma)` : ""))).join("<br>")}` : ""}`;
       tip.style.opacity = 1; tip.style.left = "170px"; tip.style.top = (el.offsetTop + el.offsetHeight + 40) + "px";
     };
     el.onmouseleave = () => { tip.style.opacity = 0; };
@@ -1233,7 +1248,7 @@ function renderLiveTable(){
       <div><div class="eyebrow">Net DEX</div><b style="color:${dT >= 0 ? "var(--pos)" : "var(--neg)"}">${compact(dT)}</b><span>dealer delta, $</span></div></div>
     <div class="expl" style="margin-top:8px">${all ? "All expirations" : "Selected expirations only"}. Regime (all expirations): <b>${esc((s.regime || "").toLowerCase())}</b>.</div>`;
   const lvs = lv.filter((l, i, a) => a.findIndex(z => z.code === l.code) === i).sort((a, b) => b.p - a.p);
-  $("ldLevels").innerHTML = `<div class="ld-list">${lvs.map(l => `<div><b class="ld-chip ${l.cls}">${esc(l.code)}</b><span>${esc(l.name)}</span><em>${num(l.p, 2)}</em><i style="color:${l.p >= ref ? "var(--pos)" : "var(--neg)"}">${signed((l.p / ref - 1) * 100, 2)}%</i></div>`).join("")}
+  $("ldLevels").innerHTML = `<div class="ld-list">${lvs.map(l => `<div><b class="ld-chip ${l.cls}">${esc(l.code)}</b><span${l.share ? ` title="${num(100 * l.share, 1)}% of gamma"` : ""}>${esc(l.name)}</span><em>${num(l.p, 2)}</em><i style="color:${l.p >= ref ? "var(--pos)" : "var(--neg)"}">${signed((l.p / ref - 1) * 100, 2)}%</i></div>`).join("")}
     <div class="now"><b class="ld-chip now">PX</b><span>${esc(w.market)} price</span><em>${num(ref, 2)}</em><i></i></div></div>`;
   const pcOI = T[2] ? T[3] / T[2] : null, pcV = T[4] ? T[5] / T[4] : null;
   const act = rows.reduce((b, x) => x.v[4] + x.v[5] > b.v[4] + b.v[5] ? x : b, rows[0]);

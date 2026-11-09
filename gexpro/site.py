@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import shutil
+from datetime import datetime, timezone
 from pathlib import Path
 
 from .server import DASHBOARD
@@ -25,6 +26,8 @@ def build(components, out: str | Path, state: str | Path) -> dict:
     status: dict = {}
     for c in components:
         status.update(c.build_static(data, state) or {})
+    # a few bytes the open pages poll each minute: they download all.json again only when this changes
+    (data / "stamp.txt").write_text(datetime.now(timezone.utc).isoformat(), encoding="utf-8")
     html = (DASHBOARD / "index.html").read_text(encoding="utf-8")
     assets = out / "assets"                           # the page's stylesheet and script
     assets.mkdir(exist_ok=True)

@@ -74,7 +74,6 @@ a{color:var(--ink2)}
 .tk .rg.POSITIVE{color:var(--pos);background:rgba(57,135,229,.12)} .tk .rg.NEGATIVE{color:var(--neg);background:rgba(217,89,38,.12)}
 .tk .rg.INDETERMINATE{color:var(--zg);background:rgba(185,190,199,.1)}
 .tk em{font-style:normal;color:var(--ink4)} .tk b{font-weight:600;color:var(--ink2)}
-.tk.info{cursor:default;margin-left:auto}
 
 /* sidebar */
 .side{grid-area:side;display:flex;flex-direction:column;gap:2px;padding:10px 8px;background:var(--bar);border-right:1px solid var(--line);overflow-y:auto}
@@ -154,7 +153,7 @@ a{color:var(--ink2)}
 
 /* level ladder */
 .ladder{display:flex;flex-direction:column;margin:0 -8px}
-.row{display:grid;grid-template-columns:3px 1fr auto;gap:12px;padding:9px 8px;border-radius:3px}
+.row{display:grid;grid-template-columns:3px 1fr auto;gap:12px;padding:7px 8px;border-radius:3px;align-items:center}
 .row:hover{background:rgba(var(--fg-rgb),.025)}
 .row+.row{box-shadow:0 -1px 0 var(--line)}
 .rule{border-radius:3px}
@@ -162,10 +161,11 @@ a{color:var(--ink2)}
 .row.key .name{font-size:13.5px}
 .kind{font-size:10px;color:var(--ink3);font-weight:650;text-transform:uppercase;letter-spacing:.09em}
 .desc{color:var(--ink3);font-size:12px;margin-top:2px;line-height:1.5}
-.px{text-align:right;white-space:nowrap}
+.px{display:flex;align-items:baseline;justify-content:flex-end;gap:10px;white-space:nowrap}
+.also{color:var(--ink3);font-size:11.5px;margin-top:1px}
 .px .p{font:600 15px var(--mono)}
 .row.key .px .p{font-size:16.5px}
-.px .d{display:inline-block;font:500 11px var(--mono);color:var(--ink2);margin-top:3px;padding:0 7px;border-radius:2px;background:var(--panel2);border:1px solid var(--line)}
+.px .d{order:-1;min-width:64px;text-align:right;font:500 11px var(--mono);color:var(--ink3)}
 .now{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px;padding:7px 8px}
 .now:before{content:"";height:1px;background:var(--line3)}
 .now:after{content:"";height:1px;background:var(--line3)}
@@ -420,7 +420,7 @@ td.m{font-family:var(--mono)}
 .ld-bar i.p{background:var(--pos)}.ld-bar i.n{background:var(--neg)}
 .ld-gex i{opacity:.95}.ld-bar:not(.ld-gex) i{opacity:.7}
 .ld-gex em{position:absolute;top:-1px;font:600 10px var(--mono);font-style:normal;pointer-events:none}
-.ld-gex em.p{right:2px;color:var(--pos)}.ld-gex em.n{left:2px;color:var(--neg)}
+.ld-gex em.p{right:calc(50% + 4px);color:var(--pos)}.ld-gex em.n{left:calc(50% + 4px);color:var(--neg)}
 .ld-k{font:600 11.5px var(--mono);color:var(--ink2)}
 .ld-row.px .ld-k{color:var(--ink)}
 .ld-lv{display:flex;gap:3px;justify-content:flex-end;overflow:hidden;white-space:nowrap}
@@ -432,7 +432,7 @@ td.m{font-family:var(--mono)}
 .ld-cards{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
 .ld-cards>div{padding:9px 10px;border:1px solid var(--line);border-radius:3px;background:var(--panel2)}
 .ld-cards b{display:block;font:600 15px var(--mono);margin-top:3px}.ld-cards span{font-size:11px;color:var(--ink3)}
-.ld-list>div{display:grid;grid-template-columns:44px 1fr auto 58px;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);font-size:12px;color:var(--ink2)}
+.ld-list>div{display:grid;grid-template-columns:36px minmax(0,1fr) auto 50px;gap:6px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);font-size:12px;color:var(--ink2)}
 .ld-list>div:last-child{border-bottom:0}
 .ld-list em{font:600 12px var(--mono);font-style:normal;color:var(--ink)}.ld-list i{font:11px var(--mono);font-style:normal;text-align:right}
 .ld-list span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -538,7 +538,7 @@ b.good,.drv-chg .good{color:var(--good)}b.bad,.drv-chg .bad{color:var(--bad)}
   .term{grid-template-columns:1fr;grid-template-rows:var(--mq) auto auto auto 1fr;grid-template-areas:"mq" "top" "tick" "side" "area";height:auto;min-height:100vh}
   .topbar{flex-wrap:wrap;padding:10px 14px;gap:8px}
   .brand{width:auto}
-  .cmd{order:5;max-width:none;flex-basis:100%}
+  .cmd{display:none}                     /* typed commands are a keyboard feature; the page tabs below do the same on a phone */
   .clock{display:none}
   #copyMarket,#copyAll{padding:6px 10px;font-size:12px}
   .side{flex-direction:row;overflow-x:auto;padding:6px 8px;border-right:0;border-bottom:1px solid var(--line)}

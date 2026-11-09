@@ -68,6 +68,18 @@ class TestParsing(unittest.TestCase):
         self.assertEqual((img["text"], img["media"]), ("", [{"type": "image", "preview": "https://archive.example/a.jpg"}]))
         self.assertEqual((vid["text"], vid["media"]), ("Stocks are up", []))
 
+    def test_quote_post_is_a_link_not_a_raw_url(self):
+        # 2026-11-08: the archive sends a quote as "RT: <url>" + "Quoted <name>"; the page showed the raw URL as the post
+        xml = ('<rss xmlns:archive="https://www.trumpstruth.org/rss-extensions"><channel><item><title>Quote post from November 8, 2026</title>'
+               '<link>https://www.trumpstruth.org/statuses/43530</link><pubDate>Sun, 08 Nov 2026 23:41:05 +0000</pubDate>'
+               '<description><![CDATA[<p><span><br />RT: https://truthsocial.com/users/realDonaldTrump/statuses/117583459253586462</span></p>'
+               '<p>Quoted <a href="https://www.trumpstruth.org/statuses/43529">Donald J. Trump</a></p>]]></description>'
+               '<archive:postType>quote</archive:postType></item></channel></rss>').encode()
+        p = from_rss(xml)[0]
+        self.assertEqual((p["kind"], p["text"]), ("quote", ""))
+        self.assertEqual(p["link"], {"url": "https://truthsocial.com/users/realDonaldTrump/statuses/117583459253586462",
+                                     "title": "Quoted post by Donald J. Trump"})
+
     def test_video_files_are_not_pictures(self):
         # an <img> cannot show an .mp4: a video post keeps its text, with no broken picture
         xml = ('<rss xmlns:media="http://search.yahoo.com/mrss/"><channel><item><title>t</title><link>https://www.trumpstruth.org/statuses/3</link>'
