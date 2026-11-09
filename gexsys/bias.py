@@ -7,7 +7,11 @@ Factors (score > 0 leans up, < 0 leans down)
   gamma side     price vs zero gamma in daily expected moves (sigma):  > +0.3 positive gamma (range day),
                  < -0.3 negative gamma (trend day), otherwise a pivot day. Sets the day TYPE, not direction.
   magnet         positive gamma: pull toward the absolute-gamma / largest +GEX strike   weight 1.0 (0.5 otherwise)
-  charm          sign of dealer hedge flow from time decay (strongest into the close)    weight 1.0
+  charm          sign of dealer hedge flow from time decay                               weight 0.25
+                 A tie-breaker only. Index option books make this flow a dealer BUY almost every day, so it
+                 is a standing tilt, not a daily signal: at weight 1.0 it alone turned nearly every read
+                 Bullish (every graded call from 2026-10-21 to 11-06 was Bullish, 5 of 14 right), and over
+                 49 sessions to 2026-11-06 the afternoon closed higher only 41-49% of the time.
   walls          within 0.25 sigma under the call wall -0.5; within 0.25 sigma over the put wall +0.5
   vanna          hedge flow if IV eases (positive gamma) or rises (negative gamma)        weight 0.5
   0DTE max pain  late-day pull toward today's max pain when within one expected move      weight up to 0.5
@@ -50,6 +54,9 @@ def session_window(now: datetime) -> tuple[datetime, datetime, datetime, bool]:
     return o, c, (t if live else o), live
 
 
+CHARM_WEIGHT = 0.25
+
+
 def compute(L: dict, now: datetime, step_min: int = 10) -> Optional[dict]:
     if not L or L.get("status") == "UNAVAILABLE":
         return None
@@ -88,8 +95,9 @@ def compute(L: dict, now: datetime, step_min: int = 10) -> Optional[dict]:
             + ("in positive gamma price tends to drift toward it" if side == "positive" else "its pull is weaker outside positive gamma"))
     flow = g.get("charm_flow_usd_per_day")
     if flow:
-        add("Charm flow", 1.0 if flow > 0 else -1.0,
-            f"time decay alone has dealers {'buying' if flow > 0 else 'selling'} about ${abs(flow) / 1e6:,.0f}M of exposure today, mostly in the last 2 hours")
+        add("Charm flow", CHARM_WEIGHT if flow > 0 else -CHARM_WEIGHT,
+            f"time decay alone has dealers {'buying' if flow > 0 else 'selling'} about ${abs(flow) / 1e6:,.0f}M of exposure today, "
+            "mostly in the last 2 hours; it points the same way most days, so it only tips a close call")
     if cw is not None and 0 <= cw - ref < 0.25 * emd:
         add("Call wall overhead", -0.5, f"price is only {cw - ref:,.1f} pts under the call wall {cw:,.2f}; rallies often stall there")
     if pw is not None and 0 <= ref - pw < 0.25 * emd:

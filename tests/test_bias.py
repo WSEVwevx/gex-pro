@@ -25,17 +25,17 @@ class TestBiasScenarios(unittest.TestCase):
         self.assertEqual(b["side"], "positive")                        # (20000 - 19800) / 200 = 1.0 sigma above
         self.assertEqual(b["day_type"], "Range / mean reversion")
         self.assertEqual(b["bias"], "Bullish")
-        # magnet +0.4*... : (20100-20000)/(100) = 1 -> +1.0; charm +1; vanna +0.5 (IV eases, v>0); max pain +0.25
-        self.assertAlmostEqual(b["score"], 1.0 + 1.0 + 0.5 + 0.25)
+        # magnet (20100-20000)/(100) = 1 -> +1.0; charm +0.25; vanna +0.5 (IV eases, v>0); max pain +0.25
+        self.assertAlmostEqual(b["score"], 1.0 + 0.25 + 0.5 + 0.25)
         self.assertEqual(b["confidence"], "High")
         self.assertEqual(b["target"], 20100.0)                         # settles on the magnet
         self.assertEqual(b["range"], [19860.0, 20140.0])               # +/-0.7 sigma; walls are outside it
 
     def test_negative_gamma_with_selling_is_bearish_trend_day(self):
-        b = compute(levels(ref=19600.0, zg=19800.0, ag=19650.0, charm=-5e8, vanna=1e8, near="next 10-21"), TUE_1100)
+        b = compute(levels(ref=19600.0, zg=19800.0, cw=19640.0, ag=19650.0, charm=-5e8, vanna=1e8, near="next 10-21"), TUE_1100)
         self.assertEqual(b["side"], "negative")                        # 1 sigma below zero gamma
         self.assertEqual(b["day_type"], "Trend / expansion")
-        self.assertEqual(b["bias"], "Bearish")                         # magnet +0.25, charm -1, vanna (IV rises) -0.5
+        self.assertEqual(b["bias"], "Bearish")                         # magnet +0.25, charm -0.25, call wall -0.5, vanna (IV rises) -0.5
         self.assertAlmostEqual(b["target"], 19600.0 - 0.8 * 200)
         self.assertEqual(b["range"], [19600.0 - 240.0, 19600.0 + 160.0])
 
@@ -47,8 +47,8 @@ class TestBiasScenarios(unittest.TestCase):
         self.assertIn("losing it", b["summary"])
 
     def test_base_case_always_agrees_with_the_bias(self):
-        # pivot day just above zero gamma, but charm buying + put-wall support = bullish: path must not fall to ZG
-        b = compute(levels(ref=19820.0, zg=19800.0, pw=19790.0, ag=19700.0, vanna=0, mp=19820.0), TUE_1100)
+        # pivot day just above zero gamma, but put-wall support + a magnet above = bullish: path must not fall to ZG
+        b = compute(levels(ref=19820.0, zg=19800.0, pw=19790.0, ag=19900.0, vanna=0, mp=19820.0), TUE_1100)
         self.assertEqual((b["side"], b["bias"]), ("pivot", "Bullish"))
         self.assertGreater(b["target"], 19820.0)
         # range day whose magnet sits above, outvoted by selling flows: bearish, so the target is below price
@@ -57,6 +57,11 @@ class TestBiasScenarios(unittest.TestCase):
         self.assertLess(b["target"], 20000.0)
         for p in (b["path"][i][1] for i in range(1, len(b["path"]))):
             self.assertLessEqual(p, 20000.0)
+
+    def test_charm_alone_never_makes_a_call(self):
+        # index charm flow is a dealer buy almost every day; at full weight it made nearly every read Bullish
+        b = compute(levels(ref=19600.0, zg=19700.0, ag=None, vanna=0, near="next 10-21"), TUE_1100)
+        self.assertEqual(({f["name"]: f["score"] for f in b["factors"]}["Charm flow"], b["bias"]), (0.25, "Neutral"))
 
     def test_walls_close_by_count(self):
         b = compute(levels(ref=20260.0, zg=19800.0, cw=20300.0, ag=20100.0, charm=0, vanna=0), TUE_1100)

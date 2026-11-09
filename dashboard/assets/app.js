@@ -706,7 +706,7 @@ const HELP = {
   by_expiry: {title: "Gamma by expiration", tldr: "Which expirations hold the gamma.",
     body: `<p>A big share in today's or this week's expirations means the levels are driven by short-dated options and can shift quickly, often around the open, after data releases and into the close.</p>`},
   bias: {title: "Daily bias", tldr: "A transparent, rule-based read of direction and day type.",
-    body: `<p>Adds up a few positioning factors (magnet strike, charm flow, walls, vanna, 0DTE max pain) into a score. The gamma side decides the <b>day type</b> (range, trend or pivot), not the direction. It's a starting scenario, not a forecast.</p>`},
+    body: `<p>Adds up a few positioning factors (magnet strike, walls, vanna, 0DTE max pain, and charm flow as a small tie-breaker) into a score. With no real lean it says Neutral rather than guess. The gamma side decides the <b>day type</b> (range, trend or pivot), not the direction. It's a starting scenario, not a forecast.</p>`},
   base_case: {title: "Base case", tldr: "Where the factors point by the close if nothing else intervenes.",
     body: `<p>In positive gamma it's usually the magnet strike; in negative gamma it's a move in the direction of the bias; near the flip it's zero gamma itself. News and flows can override it.</p>`},
   bias_range: {title: "Expected range", tldr: "The likely range for the session given the gamma side.",

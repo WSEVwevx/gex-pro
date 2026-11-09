@@ -204,7 +204,7 @@ reason is shown.
 |---|---|
 | Gamma side | σ = (price − zero gamma) ÷ daily expected move. Above +0.3 is a range day, below −0.3 a trend day, otherwise a pivot day. Sets the day **type**, not direction. |
 | Magnet | Range days: +1/−1 × min(1, distance to the absolute-gamma strike ÷ 0.5σ). Other days: half weight. |
-| Charm | ±1 by the sign of the dealer hedge flow from time decay |
+| Charm | ±0.25 by the sign of the dealer hedge flow from time decay. A tie-breaker only: for index options this flow is a dealer buy almost every day, so at ±1 it made nearly every read Bullish (5 of 14 graded calls right, 2026-10-21 to 11-06). |
 | Walls | −0.5 within 0.25σ under the call wall; +0.5 within 0.25σ over the put wall |
 | Vanna | ±0.5: hedge flow if IV eases (range day) or rises (trend day) |
 | 0DTE max pain | up to ±0.5 toward today's max pain if it is within 1σ |
