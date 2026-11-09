@@ -20,6 +20,9 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))      # the project's packages, for the market calendar
+from gexsys import marketcal  # noqa: E402
+
 ROOT = Path(__file__).resolve().parent.parent
 PACKAGES = ["gexsys", "feeds", "briefings", "trackrecord", "gexpro"]
 SITE = "https://wsevwevx.github.io/gex-pro/data/"
@@ -61,6 +64,14 @@ def site() -> tuple[bool, str]:
             good = age_h < 3
             ok &= good
             lines.append(f"{'OK  ' if good else 'FAIL'} levels {w['market']}: {age_h:.1f} h old")
+            # the paste people copy: a new one every hour while the futures trade
+            pub = w.get("published") or {}
+            if marketcal.session_state(datetime.now(timezone.utc)) in ("RTH", "ETH"):
+                at = pub.get("published_at")
+                p_h = (datetime.now(timezone.utc) - datetime.fromisoformat(at)).total_seconds() / 3600 if at else 99
+                good = p_h < 1.5
+                ok &= good
+                lines.append(f"{'OK  ' if good else 'FAIL'} paste {w['market']}: slot {pub.get('slot_et')} ET, published {p_h:.1f} h ago")
         checks = {"quotes.json": lambda d: len(d["quotes"]), "screener.json": lambda d: len(d["stocks"]),
                   "news.json": lambda d: len(d.get("events") or d.get("items") or d) if d else 0,
                   "trackrecord.json": lambda d: 1 if d else 0, "sources.json": lambda d: len(d["sources"])}

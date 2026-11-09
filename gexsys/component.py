@@ -118,6 +118,13 @@ class GexComponent:
                          "error": w.last_error if w.failures else None, "fresh_h": 2,
                          "note": "first refresh in progress" if not ok and not w.failures
                          else f"the last calculation was {calc}" if calc and calc != "OK" else None})
+            # the hourly paste: late when it is more than 90 minutes old while the futures trade
+            pub = w.published or {}
+            trading = marketcal.session_state(datetime.now(timezone.utc)) in ("RTH", "ETH")
+            rows.append({"name": f"{w.cfg.market} TradingView paste", "provider": "GEX PRO (hourly, from the options chain)",
+                         "pages": ["Copy for TradingView", "Indicator"], "last_ok": pub.get("published_at"),
+                         "error": None, "fresh_h": 1.5 if trading else None,
+                         "detail": f"slot {pub['slot_et']} ET" if pub.get("slot_et") else None})
         for m in dict.fromkeys(w.cfg.market for w in self.workers.values()):
             s = self.heat.status.get(m) or {}
             rows.append({"name": f"{m} futures candles", "provider": "Yahoo Finance", "pages": ["Heatmap"],

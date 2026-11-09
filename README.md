@@ -190,8 +190,9 @@ prints "GEX PRO is ALREADY RUNNING" and exits. To pick up updates, close the old
 
 ## Scheduled updates (every hour)
 
-The service publishes a TradingView payload every hour on the hour, around the clock (00:00 to
-23:00 ET) on trading days; weekends and market holidays have none. It sends a
+The service publishes a TradingView payload every hour on the hour while the futures trade, from the
+Sunday 6 pm ET open to the Friday 5 pm close (including Sunday evening and the evening reopen after a
+holiday); none while they are halted. It sends a
 Windows notification (and an optional Discord/webhook message), and the dashboard's **Copy** button
 puts the payload on your clipboard. See [REALTIME_SETUP](docs/REALTIME_SETUP.md).
 

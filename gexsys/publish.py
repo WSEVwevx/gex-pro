@@ -6,10 +6,12 @@ a payload, notifies the user (Windows toast and/or webhook), and exposes it at
 /api/pine?market=X&which=published and on the dashboard's Copy button.
 The user pastes it into the indicator (about 10 seconds).
 
-Publish slots are ET wall-clock times on trading days. Default: every hour on the hour, around
-the clock (all_day=True), since the futures trade overnight. With all_day=False, slots at or after
-the cash close (16:00, or an early close) are skipped. Weekends and holidays have no slots: the
-options data doesn't change then. zoneinfo handles DST.
+Publish slots are ET wall-clock times. Default (all_day=True): every hour on the hour while the futures
+trade, from the Sunday 18:00 open to the Friday 17:00 close, including the evening reopen after a
+holiday; none while they are halted (the daily 17:00 break, weekends, early-close afternoons). Slots
+used to need a trading DATE, which left the Sunday-evening session (Monday's trading day) with no paste
+until Monday; that is why they follow the futures session now. With all_day=False: only slots before
+the cash close (16:00, or an early close) on trading days. zoneinfo handles DST.
 """
 from __future__ import annotations
 
@@ -53,10 +55,15 @@ class PublishConfig:
 
 
 def _day_slots(d, cfg: PublishConfig) -> list[datetime]:
-    if not marketcal.is_trading_day(d):
-        return []
-    close = marketcal.rth_close(d)
-    return [datetime.combine(d, s, marketcal.NY) for s in cfg.slots() if cfg.all_day or s < close]
+    out = []
+    for s in cfg.slots():
+        t = datetime.combine(d, s, marketcal.NY)
+        if cfg.all_day:
+            if marketcal.session_state(t) in ("RTH", "ETH"):            # the futures are trading at that hour
+                out.append(t)
+        elif marketcal.is_trading_day(d) and s < marketcal.rth_close(d):
+            out.append(t)
+    return out
 
 
 def latest_slot(now: datetime, cfg: PublishConfig) -> Optional[datetime]:

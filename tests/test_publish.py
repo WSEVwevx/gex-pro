@@ -27,17 +27,24 @@ class TestSchedule(unittest.TestCase):
         self.assertEqual(pub.latest_slot(et(2026, 10, 20, 3, 10), C), et(2026, 10, 20, 3, 0))      # overnight
         self.assertEqual(pub.next_slot(et(2026, 10, 20, 23, 30), C), et(2026, 10, 21, 0, 0))       # midnight
         self.assertEqual(pub.latest_slot(et(2026, 10, 20, 18, 5), C), et(2026, 10, 20, 18, 0))     # after the cash close
+        self.assertEqual(pub.latest_slot(et(2026, 10, 20, 17, 30), C), et(2026, 10, 20, 16, 0))    # no slot in the 17:00 halt
 
     def test_weekend(self):
         sat = et(2026, 10, 24, 12, 0)
-        self.assertEqual(pub.latest_slot(sat, C), et(2026, 10, 23, 23, 0))
-        self.assertEqual(pub.next_slot(sat, C), et(2026, 10, 26, 0, 0))
+        self.assertEqual(pub.latest_slot(sat, C), et(2026, 10, 23, 16, 0))         # the futures stop Friday 17:00
+        self.assertEqual(pub.next_slot(sat, C), et(2026, 10, 25, 18, 0))           # and reopen Sunday 18:00
+
+    def test_sunday_evening_publishes(self):
+        # 2026-11-08: the Sunday session had no paste at all (slots needed a trading date); Friday's was served
+        sun = et(2026, 11, 8, 23, 45)
+        self.assertEqual(pub.latest_slot(sun, C), et(2026, 11, 8, 23, 0))
+        self.assertEqual(pub.due(et(2026, 11, 6, 23, 0), sun, C), et(2026, 11, 8, 23, 0))
 
     def test_holiday_and_early_close(self):
-        # Thanksgiving Thu 2026-11-26 closed: no slots. Fri 11-27 closes early, but hourly slots run all day
-        self.assertEqual(pub.next_slot(et(2026, 11, 25, 23, 30), C), et(2026, 11, 27, 0, 0))
+        # Thanksgiving Thu 2026-11-26: no slots until the 18:00 reopen. Fri 11-27: the futures halt at 13:15
+        self.assertEqual(pub.next_slot(et(2026, 11, 25, 23, 30), C), et(2026, 11, 26, 18, 0))
         self.assertEqual(pub.next_slot(et(2026, 11, 27, 12, 30), C), et(2026, 11, 27, 13, 0))
-        self.assertEqual(pub.latest_slot(et(2026, 11, 27, 23, 59), C), et(2026, 11, 27, 23, 0))
+        self.assertEqual(pub.latest_slot(et(2026, 11, 27, 23, 59), C), et(2026, 11, 27, 13, 0))
         # cash-hours-only mode still skips slots at or after an early close
         rth = pub.PublishConfig(times_et=["09:45", "13:45", "15:30"], all_day=False)
         self.assertEqual(pub.next_slot(et(2026, 11, 27, 12, 0), rth), et(2026, 11, 30, 9, 45))

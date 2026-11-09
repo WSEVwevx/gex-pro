@@ -99,12 +99,30 @@ class TestGexRow(unittest.TestCase):
         from types import SimpleNamespace
         from gexsys.component import GexComponent
         w = SimpleNamespace(cfg=SimpleNamespace(market="NQ", source="NDX"), label="CBOE", last_success=time.time() - 3600,
-                            failures=4, last_error="URLError: timed out", health=lambda: {"status": "stale", "calc_status": "OK"})
+                            failures=4, last_error="URLError: timed out", health=lambda: {"status": "stale", "calc_status": "OK"}, published=None)
         g = GexComponent([])
         g.workers = {"NQ-CBOE": w}
         row = g.sources()[0]
         self.assertEqual(row["error"], "URLError: timed out")
         self.assertEqual(status(row, datetime.now(timezone.utc)), "failing")
+
+
+class TestPasteRow(unittest.TestCase):
+    def test_old_paste_is_late_while_the_futures_trade(self):
+        import time
+        from types import SimpleNamespace
+        from unittest import mock
+        from gexsys.component import GexComponent
+        old = (datetime.now(timezone.utc) - timedelta(hours=44)).isoformat()      # 2026-11-08: Friday's paste on Sunday night
+        w = SimpleNamespace(cfg=SimpleNamespace(market="NQ", source="NDX"), label="CBOE", last_success=time.time(), failures=0,
+                            last_error=None, health=lambda: {"status": "ok", "calc_status": "OK"},
+                            published={"slot_et": "2026-11-06 23:00", "published_at": old})
+        g = GexComponent([])
+        g.workers = {"NQ-CBOE": w}
+        for state, want in (("ETH", "late"), ("CLOSED", "ok")):
+            with mock.patch("gexsys.marketcal.session_state", return_value=state):
+                row = next(r for r in g.sources() if r["name"] == "NQ TradingView paste")
+            self.assertEqual(status(row, datetime.now(timezone.utc)), want, state)
 
 
 if __name__ == "__main__":
