@@ -305,7 +305,7 @@ td.m{font-family:var(--mono)}
 .lib-fig svg text{font-size:11px}
 .lib-ex{margin:18px 0;padding:14px 16px;border-left:2px solid var(--mp);background:rgba(201,133,0,.06);border-radius:0 3px 3px 0}
 .lib-ex p{margin:6px 0 0;font:13px/1.6 var(--mono);color:var(--ink)}
-.lib-try{margin:4px 0 18px}
+.lib-try{margin:4px 0 18px;white-space:normal;text-align:left;max-width:100%}   /* a long lesson link wraps on phones */
 .lib-key{margin:16px 0;padding:12px 16px;border:1px solid var(--line2);border-left:3px solid var(--pos);border-radius:3px;background:var(--panel2)}
 .lib-key ul{margin:6px 0 0;padding-left:18px;display:grid;gap:4px;font-size:13.5px;color:var(--ink)}
 .lib-formula{font:600 13px var(--mono);color:var(--ink);background:var(--page);border:1px solid var(--line2);border-radius:3px;padding:8px 12px;display:inline-block}
