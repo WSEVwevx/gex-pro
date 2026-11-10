@@ -15,7 +15,7 @@ from gexsys.export import pine_payload
 PINE = (Path(__file__).resolve().parent.parent / "pine" / "nq_es_gex_levels.pine").read_text(encoding="utf-8")
 CODE = "\n".join(l.split("//")[0] if not l.strip().startswith("//") else "" for l in PINE.splitlines())
 NO_STRINGS = re.sub(r'"(?:[^"\\]|\\.)*"', '""', CODE)
-BUILTINS = {"open", "high", "low", "close", "volume", "time", "time_close", "year", "month", "weekofyear", "dayofmonth",
+BUILTINS = {"ta", "math", "str", "array", "map", "color", "line", "label", "box", "table", "request", "timeframe", "syminfo", "barstate", "open", "high", "low", "close", "volume", "time", "time_close", "year", "month", "weekofyear", "dayofmonth",
             "dayofweek", "hour", "minute", "second", "na", "bar_index", "last_bar_index", "timenow", "hl2", "hlc3",
             "ohlc4", "hlcc4", "location", "shape", "size", "color", "line", "label", "box", "table", "array", "map",
             "math", "str", "ta", "request", "input", "timeframe", "syminfo", "barstate", "session", "strategy", "display"}
@@ -86,7 +86,7 @@ class TestPineStatic(unittest.TestCase):
             "line.new": {"color", "extend", "style", "width", "xloc"},
             "map.contains": set(), "map.get": set(), "map.put": set(),
             "math.abs": set(), "math.floor": set(), "math.max": set(), "math.min": set(), "math.round": set(), "math.round_to_mintick": set(),
-            "request.security": {"gaps", "ignore_invalid_symbol", "lookahead"},
+            "request.security": {"gaps", "ignore_invalid_symbol", "lookahead"}, "request.security_lower_tf": {"ignore_invalid_symbol"},
             "str.contains": set(), "str.length": set(), "str.pos": set(), "str.repeat": set(), "str.split": set(), "str.startswith": set(),
             "str.substring": set(), "str.tonumber": set(), "str.tostring": set(), "str.trim": set(), "str.upper": set(),
             "ta.cross": set(), "timeframe.change": set(), "timeframe.in_seconds": set(),

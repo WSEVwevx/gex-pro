@@ -300,24 +300,76 @@ if hasA
     symA := refOverride != "" ? refOverride : sA.tv != "" ? sA.tv : syminfo.tickerid
 if hasB
     symB := refOverride != "" ? refOverride : sB.tv != "" ? sB.tv : syminfo.tickerid
-// one price request per source that exists, and none twice for the same symbol (requests are the costliest
-// per-bar work on a 1-minute chart)
+// The futures / reference ratio comes from the newest MINUTE in which both traded, on every timeframe, so the
+// levels sit at the same prices on 1m, 5m, 1h or daily. (Taking it from each timeframe's own last bar put them
+// 27-45 NQ points apart after the cash close: a daily bar's futures close is hours after the index's.)
+// Above 1 minute: the 1-minute closes inside the bar, matched by time. At 1 minute or below: the bar itself.
+useIntra = not timeframe.isticks and not timeframe.isseconds and timeframe.in_seconds() > 60
+// futures and reference at the newest minute both have (both arrays oldest first): [ratio, difference] or na
+matchPair(array<int> rt, array<float> rc, array<int> ct, array<float> cc) =>
+    float ratio = na
+    float diff = na
+    int i = array.size(rt) - 1
+    int j = array.size(ct) - 1
+    while i >= 0 and j >= 0 and na(ratio)
+        int a = array.get(rt, i)
+        int b = array.get(ct, j)
+        if a > b
+            i -= 1
+        else if a < b
+            j -= 1
+        else
+            float rv = array.get(rc, i)
+            if rv > 0
+                ratio := array.get(cc, j) / rv
+                diff := array.get(cc, j) - rv
+            i -= 1
+            j -= 1
+    [ratio, diff]
+// one request per source that exists, none twice for the same symbol (requests are the costliest per-bar work)
 float refCA = na
 float refCB = na
-if hasA
-    refCA := request.security(symA, timeframe.period, close, gaps = barmerge.gaps_on, lookahead = barmerge.lookahead_off, ignore_invalid_symbol = true)
-if hasB
-    refCB := hasA and symB == symA ? refCA : request.security(symB, timeframe.period, close, gaps = barmerge.gaps_on, lookahead = barmerge.lookahead_off, ignore_invalid_symbol = true)
+float pairA = na
+float pairB = na
+float diffA = na
+float diffB = na
+if useIntra and (hasA or hasB)
+    [chT, chC] = request.security_lower_tf(syminfo.tickerid, "1", [time, close])
+    if hasA
+        [rfTA, rfCA] = request.security_lower_tf(symA, "1", [time, close], ignore_invalid_symbol = true)
+        [ra, da] = matchPair(rfTA, rfCA, chT, chC)
+        pairA := ra
+        diffA := da
+    if hasB
+        if hasA and symB == symA
+            pairB := pairA
+            diffB := diffA
+        else
+            [rfTB, rfCB] = request.security_lower_tf(symB, "1", [time, close], ignore_invalid_symbol = true)
+            [rb, db] = matchPair(rfTB, rfCB, chT, chC)
+            pairB := rb
+            diffB := db
+else
+    if hasA
+        refCA := request.security(symA, timeframe.period, close, gaps = barmerge.gaps_on, lookahead = barmerge.lookahead_off, ignore_invalid_symbol = true)
+    if hasB
+        refCB := hasA and symB == symA ? refCA : request.security(symB, timeframe.period, close, gaps = barmerge.gaps_on, lookahead = barmerge.lookahead_off, ignore_invalid_symbol = true)
+    if not na(refCA) and refCA > 0
+        pairA := close / refCA
+        diffA := close - refCA
+    if not na(refCB) and refCB > 0
+        pairB := close / refCB
+        diffB := close - refCB
 var float lfA = na
 var float loA = na
 var float lfB = na
 var float loB = na
-if not na(refCA) and refCA > 0
-    lfA := close / refCA
-    loA := close - refCA
-if not na(refCB) and refCB > 0
-    lfB := close / refCB
-    loB := close - refCB
+if not na(pairA)
+    lfA := pairA
+    loA := diffA
+if not na(pairB)
+    lfB := pairB
+    loB := diffB
 
 // the status text is only built on the last bar (the info panel), not on every bar of history
 mapInfo(Snap s, float lf, float lo, float refNow, string sym, bool txt) =>
@@ -359,8 +411,8 @@ mapInfo(Snap s, float lf, float lo, float refNow, string sym, bool txt) =>
                     st := "UNAVAILABLE (no " + sym + " data)"
     [f, o, st]
 
-[facA, offA, mstA] = mapInfo(sA, lfA, loA, refCA, symA, barstate.islast)
-[facB, offB, mstB] = mapInfo(sB, lfB, loB, refCB, symB, barstate.islast)
+[facA, offA, mstA] = mapInfo(sA, lfA, loA, pairA, symA, barstate.islast)
+[facB, offB, mstB] = mapInfo(sB, lfB, loB, pairB, symB, barstate.islast)
 
 // transparency for a line, never fainter than "Weakest line opacity"
 maxFade = 100 - minOpac
