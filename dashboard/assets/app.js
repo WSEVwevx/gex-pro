@@ -90,7 +90,6 @@ async function copyFrom(url, what){
   await copyText(text, `Copied ${what}. In TradingView: indicator settings > Levels payload > Ctrl+A, Ctrl+V > OK.`);
 }
 $("copyAll").onclick = () => copyFrom(pineUrl(""), "the scheduled update for NQ and ES");
-$("copyMarket").onclick = () => copyFrom(pineUrl(market), `the scheduled update for ${market}`);
 $("tableToggle").onclick = () => { showTable = !showTable; render(); };
 
 // ---------- pages: Levels | News
@@ -360,7 +359,6 @@ function render(){
   if(!markets.includes(market)) market = markets[0];
   $("tabs").innerHTML = markets.map(m => `<button role="tab" aria-selected="${m===market}" data-m="${m}">${m}</button>`).join("");
   [...$("tabs").children].forEach(b => b.onclick = () => setMarket(b.dataset.m));
-  $("copyMarket").textContent = `Copy ${market} only`;
   const anyPub = ws.some(w => w.published);
   $("copyAll").disabled = !anyPub;
   $("copyAll").textContent = anyPub ? `Copy for TradingView · ${ws.find(w=>w.published).published.slot_et.slice(11)} ET` : "Copy for TradingView";

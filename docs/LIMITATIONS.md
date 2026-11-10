@@ -37,7 +37,9 @@ level as a *modeled concentration of option gamma*.
    and the service refuses basis mapping when the prices are more than `max_skew_s` apart.
 8. **TradingView is a snapshot.** Pine levels change only when you paste a new payload.
 9. **Calendar.** NYSE holiday rules are coded from 2022 on. Unscheduled closures have to be added
-   to `EXTRA_CLOSURES`. CME's abbreviated holiday sessions are treated as `HOLIDAY`.
+   to `EXTRA_CLOSURES`. CME's abbreviated holiday sessions are modeled as Globex trading until 13:00 ET on
+   every NYSE holiday except New Year's Day, Good Friday and Christmas (closed all day, with no session the
+   evening before); CME occasionally changes a holiday's hours, which is not picked up automatically.
 10. **Rollover.** `front_contract` uses the conventional roll (8 days before the third Friday).
     Futures-options payloads must name the same contract month as the chart, or use `calendar_offset`.
 11. **SPY/QQQ in index terms.** ETF options are converted with the live index/ETF price ratio. Dollar
@@ -65,6 +67,12 @@ level as a *modeled concentration of option gamma*.
 - **Price sources.** NDX daily bars come from Yahoo (unofficial); SPX from Cboe; same-day bars from Cboe 1-minute data.
 - **The backtest is a proxy.** It uses the 30-day VIX / VXN, not GEX PRO's own same-day IV, and only tests
   the expected-move band. Hypothetical results: no orders, costs or slippage.
+- **Level reactions need months.** The study measures only the first touch of each level per session, so a level
+  type gathers about one touch every few sessions; most types need 30+ sessions for 15 touches. The free 1-minute
+  source keeps about 30 days, so a session whose bars were not saved in time is left out for good. Levels are
+  converted to futures with the 9:30 ratio, so a basis change during the day shifts them by a few points.
+  Bounce, break and stall are fixed rules (a quarter of the move expected over the horizon), not a trading
+  strategy: no entries, stops, costs or slippage.
 
 ## Behaviour on bad data
 
@@ -80,4 +88,5 @@ level as a *modeled concentration of option gamma*.
 | Crossed quotes or negative OI | the field becomes missing, with a count |
 | Provider down | last good result is still served; health shows `degraded`, then `stale`; stale alert |
 | Bad credentials | `AUTH` error, retried hourly only |
-| Wrong market or implausible mapping in Pine | BLOCKED, nothing drawn |
+| Wrong market in Pine | nothing drawn; the panel names the market the paste was for |
+| Implausible mapping in Pine (a level over 8% from price) | BLOCKED, nothing drawn |

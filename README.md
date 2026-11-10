@@ -64,10 +64,12 @@ Other commands: `replay --market NQ` (level-stability statistics over stored sna
 1. Add the **GEX PRO** indicator: the website's **Indicator** page always has the current code (Copy
    code, or Download .pine), with install steps. It reads `pine/nq_es_gex_levels.pine` directly, so every
    edit to the script shows up there.
-2. Paste the `GEX1;…` payload from `snapshot` or from `/api/pine?market=NQ`.
+2. Click **Copy for TradingView** on the website and paste into the indicator's **Levels payload**: one paste
+   serves NQ and ES charts.
 
-Details, the repainting notes and the **manual validation checklist** (the script has not been
-compiled in TradingView yet) are in [TRADINGVIEW_SETUP](docs/TRADINGVIEW_SETUP.md).
+Details, the repainting notes and the **manual validation checklist** (the script shows no errors in
+TradingView's Pine Editor but has not been tested on a chart automatically) are in
+[TRADINGVIEW_SETUP](docs/TRADINGVIEW_SETUP.md).
 
 ## Configurations
 
@@ -133,6 +135,10 @@ your browser, and the first visit follows your system setting.
   where `history.csv` holds every session ever graded (kept forever; the local app syncs its copy from it). Plus a **historical backtest** of the expected-move
   band from VIX (S&P 500, since 1990) and VXN (Nasdaq-100, since 2009): by year, by vol level, and the
   distribution of daily moves against a normal curve. Hypothetical, not trading results.
+  **How price reacted at each level:** the first time price traded to each 9:30 level, whether it bounced, broke
+  or stalled 5, 15 and 60 minutes later on 1-minute futures, against random strikes at the same distance on
+  other days; a verdict only with 15+ touches and a 95% range (from resampling whole days) that excludes zero.
+  Each graded session's 1-minute bars are kept with the track record (`trackrecord/reactions.py`).
 * **Library:** a course in 26 short lessons in six chapters (options basics, dealers and the Greeks, GEX,
   volatility, the GEX PRO levels, using GEX PRO), each with key points, a worked example, diagrams, a
   link into the terminal and a quick check; search; progress saved in your browser. Every Explain panel
@@ -168,7 +174,8 @@ your browser, and the first visit follows your system setting.
   buttons, install steps, version and last-updated time, and the script's recent changes.
 * **Backtesting** (under Insight, `BT` or the `PASTES` command): the 9:30 paste exactly as it stood at each
   past session's open (NQ, ES or both), saved permanently with the track record. Pasted in, the indicator
-  draws that day's levels, marks the panel "Backtest" with the date and keeps its alerts off.
+  draws that day's levels, marks the panel "Backtest" with the date and keeps its alerts off. **Whole weeks**
+  puts a week in one paste, each day's levels drawn only across that day's session.
 * **Bias:** a transparent, rule-based reading of today's positioning:
   - bias and confidence, day type (range / trend / pivot), base case and expected range;
   - a session chart with an illustrative path, ±1σ cone and key levels;
@@ -183,7 +190,9 @@ your browser, and the first visit follows your system setting.
 **Hosted copy:** the same website can run for free on GitHub Pages, rebuilt about every 3 minutes in cash
 hours and every 6 minutes overnight while futures trade (hourly otherwise) with Cboe delayed data, so you
 can open it on any device without your PC. On a phone, "Add to Home Screen" installs it as an app
-(`python -m gexpro build-site`, `.github/workflows/website.yml`). Setup: [docs/HOSTING.md](docs/HOSTING.md).
+(`python -m gexpro build-site`, `.github/workflows/website.yml`). A watchdog (`watchdog.yml`) checks every
+15 minutes that it is still rebuilding, restarts it when a run gets stuck, and opens a GitHub issue (which
+notifies you) if it stays stale. Setup: [docs/HOSTING.md](docs/HOSTING.md).
 
 Only one copy of the service can run at a time. If START.bat is already open, a second copy
 prints "GEX PRO is ALREADY RUNNING" and exits. To pick up updates, close the old window first.
@@ -191,8 +200,9 @@ prints "GEX PRO is ALREADY RUNNING" and exits. To pick up updates, close the old
 ## Scheduled updates (every hour)
 
 The service publishes a TradingView payload every hour on the hour while the futures trade, from the
-Sunday 6 pm ET open to the Friday 5 pm close (including Sunday evening and the evening reopen after a
-holiday); none while they are halted. It sends a
+Sunday 6 pm ET open to the Friday 5 pm close (including Sunday evening, the evening reopen after a
+holiday, and holiday mornings such as Thanksgiving, when the futures trade until 1 pm ET); none while they are
+halted or on full closures (New Year's Day, Good Friday, Christmas). It sends a
 Windows notification (and an optional Discord/webhook message), and the dashboard's **Copy** button
 puts the payload on your clipboard. See [REALTIME_SETUP](docs/REALTIME_SETUP.md).
 

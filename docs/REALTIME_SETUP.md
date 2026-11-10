@@ -27,8 +27,9 @@ Double-click **START.bat**. It installs or updates the dependencies, starts the 
 ## Updates (every hour)
 
 **Every hour on the hour while NQ / ES futures trade**: from the Sunday 6 pm ET open to the Friday 5 pm
-close, Sunday evening and holiday-evening reopens included; none during the 5-6 pm daily break, on
-weekends, or after an early close's 1:15 pm halt:
+close, Sunday evening, holiday-evening reopens and holiday mornings (Thanksgiving and the like: futures trade
+until 1 pm ET) included; none during the 5-6 pm daily break, on weekends, after an early close's 1:15 pm halt,
+or on New Year's Day, Good Friday and Christmas:
 
 1. A **Windows notification** appears ("GEX PRO levels updated").
 2. On the website, click **Copy for TradingView**. One paste holds NQ and ES.

@@ -543,7 +543,7 @@ b.good,.drv-chg .good{color:var(--good)}b.bad,.drv-chg .bad{color:var(--bad)}
   .brand{width:auto}
   .cmd{display:none}                     /* typed commands are a keyboard feature; the page tabs below do the same on a phone */
   .clock{display:none}
-  #copyMarket,#copyAll{padding:6px 10px;font-size:12px}
+  #copyAll{padding:6px 10px;font-size:12px}
   .side{flex-direction:row;overflow-x:auto;padding:6px 8px;border-right:0;border-bottom:1px solid var(--line)}
   .side button{grid-template-columns:18px auto;padding:6px 10px;white-space:nowrap}
   .side button kbd,.side .spacer,.side .side-help{display:none}

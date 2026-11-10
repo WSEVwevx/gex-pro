@@ -64,8 +64,15 @@ Upload the changed files again the same way (**Add file > Upload files**). Each 
 - **Why runs start each other.** GitHub's own scheduler is unreliable: it ran an every-10-minutes schedule only a
   few times a day. A run may start another run of the same workflow, so the job keeps itself going while futures
   trade; the schedule only restarts it if it ever stops, and a Sunday run waits for the 6 pm ET open.
-- **Extra safety net (optional, free).** If the chain ever stops and you want it restarted on time instead of
-  whenever GitHub's scheduler gets to it, cron-job.org can start the job:
+- **Watchdog** (`.github/workflows/watchdog.yml`, `tools/watchdog.py`). Every 15 minutes it checks the site's build
+  time (`data/stamp.txt`). Older than 30 minutes while futures trade (100 when closed): it cancels runs that are
+  stuck and starts a fresh run in a new "lane", its own queue, so a run GitHub refuses to cancel cannot hold it
+  up (on 2026-11-09 one held the queue for 8 hours). Still stale after 90 minutes: it opens an issue titled
+  "Hosted site stopped updating" on the repository, which GitHub notifies you about, and closes it once the site
+  updates again. To test it: Actions > Watchdog > Run workflow, with "treat the site as this many minutes old"
+  set to 45 (starts a recovery run) or 120 (also opens the issue; the next real check closes it).
+- **Extra safety net (optional, free; the watchdog above usually makes it unnecessary).** GitHub's scheduler
+  also runs the watchdog late at times. If you want a restart on time regardless, cron-job.org can start the job:
   1. On GitHub: Settings > Developer settings > Personal access tokens > Fine-grained tokens > Generate new
      token. Repository access: only `gex-pro`. Permissions: **Actions: Read and write**. Nothing else.
   2. On cron-job.org (free account): Create cronjob. URL

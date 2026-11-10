@@ -48,55 +48,55 @@ styAG = input.string("╌╌╌╌", "", options = ["────", "╌╌╌�
 wAGPick = input.string("───", "", options = ["───", "━━━", "▬▬▬", "███"], inline = "ag", group = G2, display = display.none)
 wAG = pxOf(wAGPick)
 showRank = input.bool(true, "Ranked levels (C1-C7, P1-P7, Ab1-Ab3)", inline = "rk", group = G2,
-     tooltip = "The strongest price bands near price: C = most positive net GEX, P = most negative net GEX, Ab = most total gamma (call / put / absolute-gamma colours). 1 = strongest. Each line's opacity and its tag's bar show its share of gamma; ranks 1-2 use the style picked here, weaker ranks are dashed.", display = display.none)
-styRank = input.string("────", "", options = ["────", "╌╌╌╌", "┈┈┈┈"], inline = "rk", group = G2, display = display.none)
-wRankPick = input.string("───", "", options = ["───", "━━━", "▬▬▬", "███"], inline = "rk", group = G2, display = display.none)
+     tooltip = "The strongest price bands near price: C = most positive net GEX, P = most negative net GEX, Ab = most total gamma (call / put / absolute-gamma colours). 1 = strongest. Each line's opacity and its tag's bar show its share of gamma; ranks 1-2 are solid, weaker ranks dashed.", display = display.none)
+styRank = "────"
+wRankPick = "───"
 wRank = pxOf(wRankPick)
 rankSrc = input.string("First expiry: auto", "Ranked from", options = ["First expiry: auto", "First expiry: ETF only", "First expiry: index + ETF", "All expirations (45 days)"], group = G2,
      tooltip = "First expiry = today's expiring options (or the next expiry when none expire today): their gamma sits close to price, so many nearby levels for intraday trading.\nauto (recommended): whichever chain holds most of that gamma - for NQ usually QQQ alone (levels on QQQ's own strikes, about 41 NQ points apart), for ES usually SPX with SPY.\nETF only: QQQ / SPY strikes alone.\nindex + ETF: both chains on the index's strike grid.\nAll expirations: every expiry out to 45 days; fewer, bigger levels further out.", display = display.none)
-rankC = input.int(7, "Call levels", minval = 0, maxval = 7, group = G2, display = display.none)
-rankP = input.int(7, "Put levels", minval = 0, maxval = 7, group = G2, display = display.none)
+rankC = input.int(7, "Call and put levels", minval = 0, maxval = 7, group = G2, display = display.none)
+rankP = rankC
 rankA = input.int(3, "Absolute-gamma levels", minval = 0, maxval = 3, group = G2, tooltip = "How many call, put and absolute-gamma levels to draw (strongest first).", display = display.none)
-showMax  = input.bool(false, "Largest +/- GEX and concentrations", inline = "mx", group = G2, tooltip = "Strikes with the most positive / negative gamma, plus the extra concentrations below, in the call / put colours.", display = display.none)
-styMax = input.string("╌╌╌╌", "", options = ["────", "╌╌╌╌", "┈┈┈┈"], inline = "mx", group = G2, display = display.none)
-wMaxPick = input.string("───", "", options = ["───", "━━━", "▬▬▬", "███"], inline = "mx", group = G2, display = display.none)
+showMax  = input.bool(false, "Largest +/- GEX strikes", inline = "mx", group = G2, tooltip = "Strikes with the most positive / negative gamma, in the call / put colours.", display = display.none)
+styMax = "╌╌╌╌"
+wMaxPick = "───"
 wMax = pxOf(wMaxPick)
-nConc    = input.int(0, "Other concentrations", minval = 0, maxval = 6, group = G2, display = display.none)
-minShare = input.float(5.0, "Concentrations: min %", minval = 0, step = 0.5, group = G2,
-     tooltip = "Extra big-gamma strikes, labeled +G / -G with their share of total exposure. 0 = off.", display = display.none)
+nConc = 0
+minShare = 5.0
 
 // ---------- 3 - More levels: same clean rows
 G3 = "3 - More levels"
 show0   = input.bool(true, "0DTE zero gamma and walls", inline = "z0", group = G3,
      tooltip = "The same levels from today's expiring options only (\"next MM-DD\" when nothing expires today), in lighter key-level colours.", display = display.none)
-sty0 = input.string("────", "", options = ["────", "╌╌╌╌", "┈┈┈┈"], inline = "z0", group = G3, display = display.none)
-w0Pick = input.string("───", "", options = ["───", "━━━", "▬▬▬", "███"], inline = "z0", group = G3, display = display.none)
+sty0 = "────"
+w0Pick = "───"
 w0 = pxOf(w0Pick)
 showVol = input.bool(false, "Volume walls", inline = "vo", group = G3, display = display.none)
 cVol    = input.color(#2dd4bf, "", inline = "vo", group = G3, tooltip = "Strikes with the most calls / puts traded today. Moves during the session.", display = display.none)
-styVol = input.string("╌╌╌╌", "", options = ["────", "╌╌╌╌", "┈┈┈┈"], inline = "vo", group = G3, display = display.none)
-wVolPick = input.string("───", "", options = ["───", "━━━", "▬▬▬", "███"], inline = "vo", group = G3, display = display.none)
+styVol = "╌╌╌╌"
+wVolPick = "───"
 wVol = pxOf(wVolPick)
 showOI  = input.bool(false, "OI walls", inline = "oi", group = G3, display = display.none)
 cOI     = input.color(#9085e9, "", inline = "oi", group = G3, tooltip = "Strikes with the most open calls / puts as of yesterday's close.", display = display.none)
-styOI = input.string("╌╌╌╌", "", options = ["────", "╌╌╌╌", "┈┈┈┈"], inline = "oi", group = G3, display = display.none)
-wOIPick = input.string("───", "", options = ["───", "━━━", "▬▬▬", "███"], inline = "oi", group = G3, display = display.none)
+styOI = "╌╌╌╌"
+wOIPick = "───"
 wOI = pxOf(wOIPick)
 showMP  = input.bool(false, "Max pain", inline = "mp", group = G3, display = display.none)
 cMP     = input.color(#c98500, "", inline = "mp", group = G3, tooltip = "Price where option holders lose the most at expiration.", display = display.none)
-styMP = input.string("╌╌╌╌", "", options = ["────", "╌╌╌╌", "┈┈┈┈"], inline = "mp", group = G3, display = display.none)
-wMPPick = input.string("───", "", options = ["───", "━━━", "▬▬▬", "███"], inline = "mp", group = G3, display = display.none)
+styMP = "╌╌╌╌"
+wMPPick = "───"
 wMP = pxOf(wMPPick)
 mpCount = input.string("Nearest", "Max pain expirations", options = ["Nearest", "Nearest + next"], group = G3, display = display.none)
 showEM  = input.bool(true, "IV range bands", inline = "em", group = G3, display = display.none)
 cEM     = input.color(#8b95a5, "", inline = "em", group = G3, tooltip = "Price levels set by implied volatility: the range the options market prices in, from the previous close (the last close outside cash hours). +/-1σ: about 68% of the time price ends inside; +/-2σ: about 95%. Each horizon uses its own expiry's at-the-money IV. Weekly and monthly are slightly lighter, 2σ dashed.", display = display.none)
-styEM = input.string("╌╌╌╌", "", options = ["────", "╌╌╌╌", "┈┈┈┈"], inline = "em", group = G3, display = display.none)
-wEMPick = input.string("───", "", options = ["───", "━━━", "▬▬▬", "███"], inline = "em", group = G3, display = display.none)
+styEM = "╌╌╌╌"
+wEMPick = "───"
 wEM = pxOf(wEMPick)
-ivD = input.bool(true, "IV bands: day", group = G3, display = display.none)
-ivW = input.bool(true, "IV bands: week", group = G3, display = display.none)
-ivM = input.bool(false, "IV bands: month", group = G3, display = display.none)
-iv2 = input.bool(true, "IV bands: ±2σ too", group = G3, tooltip = "Which IV bands to draw: today's session, through this week's last expiry, through the monthly expiry (third Friday). ±2σ adds the outer bands.", display = display.none)
+ivSet = input.string("Day + week", "IV bands", options = ["Day", "Day + week", "Day + week + month"], group = G3, display = display.none)
+ivD = true
+ivW = ivSet != "Day"
+ivM = ivSet == "Day + week + month"
+iv2 = input.bool(true, "IV bands: ±2σ too", group = G3, tooltip = "Day: today's session. Week: through this week's last expiry. Month: through the monthly expiry (third Friday). ±2σ adds the outer bands.", display = display.none)
 
 // ---------- 4 - Lines & labels (shared by every level)
 G4 = "4 - Lines & labels"
@@ -107,14 +107,11 @@ lblMode  = input.string("Tags + hover info", "Labels", options = ["Tags + hover 
 lblSize  = input.string("Small", "", options = ["Tiny", "Small", "Normal"], inline = "lb", group = G4, display = display.none)
 lblBg    = input.bool(true, "Label background", group = G4, display = display.none)
 lblOff   = input.int(16, "Label offset (bars)", minval = 0, maxval = 200, group = G4, tooltip = "Used when the GEX profile is off; with the profile on, labels sit just right of it.", display = display.none)
-minOpac  = input.int(85, "Weakest line opacity %", minval = 20, maxval = 100, step = 5, group = G4,
-     tooltip = "How faint the weakest level may get. Lines fade with strength (and weekly / monthly / 2σ bands are lighter) but never below this. Raise it on grey or light chart backgrounds; 100 = every line fully solid.", display = display.none)
+minOpac = 85
 roundTo  = input.string("Whole points", "Level prices", options = ["Whole points", "5 points", "Exact (tick)"], group = G4,
      tooltip = "Options levels aren't precise to a tick, so each level is drawn and labelled at a round price: whole points (29885), the nearest 5 points (29885, 29890...) or the exact converted price (29884.75).", display = display.none)
-mergePct = input.float(0.03, "Merge levels within (%)", minval = 0, maxval = 0.2, step = 0.01, group = G4,
-     tooltip = "Levels closer than this (% of price; 0.03% is about 9 NQ / 2 ES points) share one line and one tag, e.g. P1 from QQQ and the put wall from NDX landing 3 points apart. 0 = only identical prices.", display = display.none)
-confPct  = input.float(0.10, "Confluence within (%)", minval = 0.01, step = 0.01, group = G4,
-     tooltip = "Tags + hover info: levels closer than this (% of price) count as one confluence zone in the hover text.", display = display.none)
+mergePct = 0.03
+confPct = 0.10
 emFill   = input.bool(false, "Shade daily expected-move band", group = G4, tooltip = "Faint fill between today's expected high and low (uses the expected-move colour).", display = display.none)
 zoneShade = input.bool(true, "Shade gamma zones next to price", group = G4,
      tooltip = "A narrow column right of the last bar: green = positive gamma zone (gamma flip to C1) and its extension (C1 to the next call level up), red = negative gamma zone (P1 to the gamma flip) and its extension (P1 to the next put level down). Hover a tag for the zone it sits in.", display = display.none)
@@ -129,7 +126,7 @@ regimeBg = input.bool(false, "Tint today's session by gamma side", group = G4,
 G5 = "5 - GEX profile"
 showProf   = input.bool(false, "Show profile", inline = "pf", group = G5,
      tooltip = "Gamma exposure by price, drawn right of the last bar. Blue extends right (positive), orange extends left (negative).", display = display.none)
-profSrc    = input.string("First source", "", options = ["First source", "Second source"], inline = "pf", group = G5, display = display.none)
+profSrc = "First source"
 profWidth  = input.int(40, "Profile width", minval = 10, maxval = 200, group = G5, display = display.none)
 profOffset = input.int(13, "Profile gap", minval = 1, maxval = 100, group = G5, display = display.none)
 profOpac   = input.int(65, "Opacity %", minval = 10, maxval = 100, group = G5, display = display.none)
@@ -157,13 +154,11 @@ alBand          = input.bool(true, "IV band touch (±1σ / ±2σ)", inline = "a5
 
 // ---------- 8 - Advanced
 G8 = "8 - Advanced"
-extFrom     = input.string("First source", "More levels from", options = ["First source", "Both sources"], group = G8,
-     tooltip = "Only matters when a paste holds two sources for this market.", display = display.none)
-provFilter  = input.string("", "Only this source", group = G8, tooltip = "Blank = all sources in the paste (e.g. CBOE).", display = display.none)
+extFrom = "First source"
+provFilter = ""
 refOverride = input.string("", "Reference symbol override", group = G8, tooltip = "Blank = the symbol in the paste (NASDAQ:NDX, SP:SPX, ...).", display = display.none)
-staleMin    = input.int(90, "Stale after (minutes)", minval = 1, group = G8, tooltip = "Default suits the hourly update schedule (one missed update plus slack).", display = display.none)
-maxDistPct  = input.float(8.0, "Ignore levels farther than (%)", minval = 1, group = G8,
-     tooltip = "Safety check: a level this far from price means the mapping is wrong; it is not drawn.", display = display.none)
+staleMin = 90
+maxDistPct = 8.0
 manualTxt   = input.string("", "Manual levels", group = G8, tooltip = "Your own chart prices: price:name, comma separated. Example: 29900:Weekly high, 29500:Gap", display = display.none)
 
 // =====================================================================================================

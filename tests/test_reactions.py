@@ -1,7 +1,7 @@
 """Level reaction study: touch / outcome rules on synthetic days with known answers, and the random baseline."""
 import json
 import unittest
-from datetime import date
+from datetime import date, datetime
 
 from trackrecord import reactions as R
 
@@ -45,7 +45,8 @@ class TestReact(unittest.TestCase):
         r = rec(walk((165, 1020), (30, 990)))                           # touch at about 12:15 on a 13:00 close
         r["close_min"] = 210
         self.assertEqual(sorted(R.react(r, 1020.0)["out"]), [5, 15])     # 12:00 + 60 min would pass the close
-        self.assertEqual((R.session_minutes(date(2026, 11, 27)), R.session_minutes(date(2026, 11, 25))), (210, 390))
+        close = lambda h: datetime(2026, 11, 27, h, 0, tzinfo=R.NY)
+        self.assertEqual((R.session_minutes(close(13)), R.session_minutes(close(16))), (210, 390))
 
     def test_futures_mapping_uses_the_open_ratio(self):
         r = rec(walk((10, 1022))); r["ratio"] = 1.002                  # futures 0.2% over the index

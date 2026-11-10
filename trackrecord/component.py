@@ -286,7 +286,8 @@ class TrackRecordComponent:
                 continue
             tried[key] = now.timestamp()
             try:
-                rec = self.src.minutes(s, recent=now - datetime.combine(d, OPEN, NY) <= MINUTES_KEPT_BY_SOURCE)
+                rec = self.src.minutes(s, recent=now - datetime.combine(d, OPEN, NY) <= MINUTES_KEPT_BY_SOURCE,
+                                       end=reactions.session_minutes(self.session_close(d)))
             except Exception as e:
                 log.warning("1-minute bars for %s failed: %s", key, e)
                 continue

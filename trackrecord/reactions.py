@@ -33,8 +33,6 @@ from datetime import date, datetime, time
 from typing import Iterable, Optional
 from zoneinfo import ZoneInfo
 
-from gexsys.marketcal import rth_close
-
 NY = ZoneInfo("America/New_York")
 HORIZONS = (5, 15, 60)
 TOUCH = 0.01            # a touch: within 1% of the daily expected move (well inside the 5-minute bounce distance)
@@ -90,18 +88,17 @@ def session_levels(plan: dict, paste: Optional[str] = None) -> list[tuple[str, f
 
 
 # ---------------------------------------------------------------------------- 1-minute futures bars
-def session_minutes(d: date) -> int:
-    """Minutes from 09:30 to the cash close: 390, or 210 on a 13:00 early close."""
-    c = rth_close(d)
+def session_minutes(close: datetime) -> int:
+    """Minutes from 09:30 to the cash close (the app shell's session_close): 390, or 210 on a 13:00 early close."""
+    c = close.astimezone(NY)
     return (c.hour * 60 + c.minute) - (9 * 60 + 30)
 
 
-def parse_minutes(raw: bytes, d: date) -> list[list]:
-    """[[minute after 09:30, open, high, low, close]] for session d, from 09:30 to the cash close (ET)."""
+def parse_minutes(raw: bytes, d: date, end: int = 390) -> list[list]:
+    """[[minute after 09:30, open, high, low, close]] for session d, from 09:30 to `end` minutes later (the close)."""
     res = json.loads(raw)["chart"]["result"][0]
     q = res["indicators"]["quote"][0]
     o = datetime.combine(d, time(9, 30), NY)
-    end = session_minutes(d)
     out = []
     for i, ts in enumerate(res.get("timestamp") or []):
         m = int((datetime.fromtimestamp(ts, NY) - o).total_seconds() // 60)
@@ -110,7 +107,7 @@ def parse_minutes(raw: bytes, d: date) -> list[list]:
     return out
 
 
-def fetch_minutes(market: str, d: date, get=None) -> list[list]:
+def fetch_minutes(market: str, d: date, end: int = 390, get=None) -> list[list]:
     """Yahoo keeps 1-minute bars for about 30 days, so each session is saved soon after its close."""
     o = int(datetime.combine(d, time(9, 0), NY).timestamp())
     url = YAHOO.format(sym=FUTURES[market].replace("=", "%3D"), p1=o, p2=o + 8 * 3600)
@@ -119,10 +116,10 @@ def fetch_minutes(market: str, d: date, get=None) -> list[list]:
             req = urllib.request.Request(u, headers={"User-Agent": "Mozilla/5.0 (GEX PRO track record)"})
             with urllib.request.urlopen(req, timeout=25) as r:
                 return r.read()
-    return parse_minutes(get(url), d)
+    return parse_minutes(get(url), d, end)
 
 
-def minutes_record(session: dict, bars: list[list]) -> Optional[dict]:
+def minutes_record(session: dict, bars: list[list], end: int = 390) -> Optional[dict]:
     """What is kept per session: the 09:30 ratio and the bars, in futures points (about 10 KB)."""
     out, plan = session.get("outcome") or {}, session.get("plan") or {}
     if not bars or bars[0][0] != 0 or not out.get("open") or not plan.get("em"):
@@ -130,7 +127,7 @@ def minutes_record(session: dict, bars: list[list]) -> Optional[dict]:
     ratio = bars[0][1] / out["open"]
     return {"session": session["session"], "market": session["market"], "underlying": plan.get("underlying"),
             "index_open": out["open"], "ratio": round(ratio, 6), "em": plan["em"],
-            "close_min": session_minutes(date.fromisoformat(session["session"])),
+            "close_min": end,
             "bars": [[m, round(h, 2), round(lo, 2), round(c, 2)] for m, _o, h, lo, c in bars]}
 
 

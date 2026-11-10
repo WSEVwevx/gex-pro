@@ -1,4 +1,4 @@
-# Feature status (2026-10-20)
+# Feature status (2026-11-10)
 
 Legend: **Working**: implemented, with automated tests passing in this build. **Partial**:
 implemented, with a known gap. **Unverified**: implemented but never run against the real external
@@ -17,18 +17,18 @@ system. **Awaiting credentials**: needs your provider account. **Simulated**: te
 | Data | SPY merged into SPX (ES) and QQQ into NDX (NQ): exact strikes x ratio (grouped at index strikes for levels), OI and volume / ratio | **Working with live data** (2026-10-23): dollar gamma identical before and after conversion; audit 18/18 for NQ and ES |
 | Math | Full audit 2026-10-23: pricing formulas vs finite differences and identities over 840 strike/time/vol/rate/dividend combinations; expected move moved to implied total variance (the old IV·√(1/252) overstated it 1.2-1.4x); calendar, roll, carry, payload parsing as Pine does it, and 61 website number/control checks | **All pass** |
 | Math | Independent recomputation from raw Cboe data (own BSM, IV solver, OCC parsing, zero-gamma search) | **Matches** (2026-10-23): net GEX within 0.006% / 0.002%, walls and abs-gamma identical, ZG within 0.001 / 1.2 pts; fixed: Cboe's rounded gamma no longer used for options without IV; rate/dividend now applied |
-| Pine | Panel header shows the folded-in ETF (`etf=` payload token, e.g. CBOE SPX+SPY); header text updated | Static tests pass; **not yet compiled in TradingView by me** - paste the updated script |
+| Pine | Panel header shows the folded-in ETF (`etf=` payload token, e.g. CBOE SPX+SPY); header text updated | Static tests pass; Pine Editor shows no errors (2026-11-10); not yet tested on a chart: see the checklist in TRADINGVIEW_SETUP.md |
 | Data | Tradier, Schwab, Databento adapters | **Removed** 2026-10-23 (free data only) |
 | Data | Cboe free delayed feed (SPX, NDX, SPY, QQQ) | **Working with live data** (checked 2026-10-21 overnight; RTH behaviour not yet observed) |
 | Data | Schwab Trader API | **Removed** 2026-10-23 (API access denied) |
 | Math | Vanna and charm exposure, absolute gamma strike, hedge size in contracts, zero-gamma distance in σ | Working: vanna/charm validated by finite differences; live numbers hand-checked |
 | Testing | `python -m gexsys audit`: live end-to-end checks (data, vendor Greeks vs independent recalculation, levels, accounting, payload) | Working: 36/36 checks passed on live Cboe NQ and ES data (2026-10-21) |
 | Testing | Pine static checks (define-before-use, built-in shadowing, unused inputs, brackets, panel size, payload keys) | Working: runs with the unit tests; not a substitute for TradingView's compiler |
-| Bias | Rule-based daily bias (factors, day type, range, base case) + session chart with cone and path | Working: scenario tests; checked live on NQ/ES. Not backtested, so it's a reading of positioning, not a validated signal |
+| Bias | Rule-based daily bias (factors, day type, range, base case) + session chart with cone and path | Working: scenario tests; checked live on NQ/ES. Charm made a tie-breaker 2026-11-09 (it had made every graded call Bullish, 5 of 14 right); intraday momentum tested over 2 years and rejected. Not a validated signal |
 | Alerts | Level-shift alerts compare like with like (index points) | Fixed 2026-10-21: before, the futures basis showed up as false ~600-tick "shifts" |
 | News | ForexFactory calendar via the faireconomy.media weekly export: 30-min cache, disk copy, last copy kept on failure | Working: checked live 2026-10-21; the feed has no "actual" values |
 | Trump posts | Truth Social public API, with the trumpstruth.org RSS as fallback: 5-min cache, disk copy, market-topic tags | Working: checked live 2026-10-21 in a browser (text, ReTruths, quotes, thumbnails) |
-| Hosted website | `build-site` writes static files; GitHub Actions rebuilds every ~15 min in market hours and deploys to Pages; state cached between runs | Working: live at https://wsevwevx.github.io/gex-pro/ (repo WSEVwevx/gex-pro). First GitHub run 2026-10-23: NQ and ES OK, calendar loaded. Truth Social blocks GitHub's servers, so the hosted feed uses the trumpstruth.org archive |
+| Hosted website | `build-site` writes static files; GitHub Actions rebuilds about every 3 min in cash hours, 6 min overnight while futures trade, hourly when closed, and deploys to Pages; a watchdog restarts it when a run gets stuck; state cached between runs | Working: live at https://wsevwevx.github.io/gex-pro/ (repo WSEVwevx/gex-pro). First GitHub run 2026-10-23: NQ and ES OK, calendar loaded. Truth Social blocks GitHub's servers, so the hosted feed uses the trumpstruth.org archive |
 | Briefings | NY AM (09:00 ET, trading days) and Asia (19:00 ET, evenings before trading days), catch-up when the app starts late, Windows notification, 40 kept, local copy filled hourly from the public site | Working: 7 tests; a live Asia briefing written 2026-10-22 and checked on the page |
 | Single instance | Exclusive port bind (SO_EXCLUSIVEADDRUSE); a second START.bat exits with "ALREADY RUNNING" | Working: tested (unit test plus a manual second start) |
 | Website | Market tape: 18 real quotes (Yahoo chart data, 60 s cache locally, each site build hosted), scrolling, pause on hover, stale marking | Working: 2 tests; checked live 2026-10-24 against the reference screenshot's prices |
@@ -40,8 +40,8 @@ system. **Awaiting credentials**: needs your provider account. **Simulated**: te
 | Website | START.bat; regime/price/net cards; level ladder with a short explanation per level and group filters; GEX-by-price chart with hover and table view; max pain table; Copy for TradingView | Working: checked in a browser against live Cboe data (2026-10-21, overnight) |
 | Levels | 0DTE/next-expiration ZG and walls, volume walls, OI walls, max pain per expiration, daily/weekly expected-move bands, GEX profile bins | Working (unit tests with hand-checked values; live Cboe check 2026-10-21) |
 | Service | Keeps the last good result when a refresh is unusable (free feeds can blank out overnight); restores it after a restart | Working (tested) |
-| Pine | New level groups, on-chart GEX profile, cut-off paste detection, info panel (Minimal/Compact/Full, hideable) | **Unverified**: not compiled in TradingView |
-| Pine | Level tags with strength bars and hover analysis (ranked C1-C7 / P1-P7 / Ab1-Ab3 from the first expiry or all expiries, confluence count, gamma zones, regime, data age); paste tokens `R`, `R0` | Static tests pass; **not compiled in TradingView by me** |
+| Pine | New level groups, on-chart GEX profile, cut-off paste detection, info panel (Minimal/Compact/Full, hideable) | Pine Editor shows no errors (2026-11-10); not yet tested on a chart: see the checklist in TRADINGVIEW_SETUP.md |
+| Pine | Level tags with strength bars and hover analysis (ranked C1-C7 / P1-P7 / Ab1-Ab3 from the first expiry or all expiries, confluence count, gamma zones, regime, data age); paste tokens `R`, `R0` | Static tests pass; Pine Editor shows no errors (2026-11-10); not yet tested on a chart: see the checklist in TRADINGVIEW_SETUP.md |
 | Data | CSV adapter (ES/NQ futures options, any vendor export) | Working (sample file is hand-made) |
 | Data | Synthetic provider | Simulated: labeled SYNTHETIC everywhere |
 | Data | Paid feeds (Databento, IBKR, Polygon/Massive) | Not built: free data only. Use CSV or add a `Provider` subclass |
@@ -53,9 +53,13 @@ system. **Awaiting credentials**: needs your provider account. **Simulated**: te
 | Publish | Scheduled publish slots (ET, holidays, early closes, DST), Windows toast, json/discord webhook, `/api/pine?which=published` | Working (toast fires without error, but on-screen display not confirmed; webhook tested with stubs) |
 | Dashboard | Copy-to-clipboard of the scheduled payload | Working (not yet clicked in a browser) |
 | Dashboard | Local web dashboard | Working: checked visually against the synthetic service in a browser |
-| Pine | v6 indicator: payload parser, live/snapshot mapping, levels, dashboard, alerts, safety blocks | **Unverified**: not compiled in TradingView; see the checklist in TRADINGVIEW_SETUP.md |
+| Pine | v6 indicator: payload parser, live/snapshot mapping, levels, dashboard, alerts, safety blocks | Pine Editor shows no errors (2026-11-10); not yet tested on a chart: see the checklist in TRADINGVIEW_SETUP.md |
 | Replay | Stability metrics, sensitivity across models | Working (stored summaries / synthetic) |
 | Replay | Strategy evaluation | Not built: methodology only (METHODOLOGY.md §12) |
 | Math | Overnight expected move: outside RTH the variance now runs from the quote time (the close), not from the current time. The free quotes and IVs stay frozen overnight, so the band used to shrink all night (NQ 2026-10-22: ~507 at the close to 425 by 23:08) | Fixed 2026-10-23, with a test. Plans frozen before the fix keep the narrower band they showed |
 | Track record | Plans frozen from the last snapshot before 09:30 ET, graded after the close (expected move, walls, zero gamma, bias, regime range, magnet) with Wilson 95% ranges; missed sessions kept; hosted copy committed to the `track-record` branch | Working: 12 tests; seeded 2026-10-23 from the snapshots saved 2026-10-21 to 10-23 (4 graded, marked "rebuilt"). The workflow's branch push has not run on GitHub yet |
 | Backtest | Expected-move band from VIX (SPX, 1990-) and VXN (NDX, 2009-), same IV x sqrt(days/365) convention | Working: checked live 2026-10-23 (SPX 9,264 sessions, close inside 78%; NDX 4,303, 75%). A proxy: 30-day vol index, not GEX PRO's same-day IV |
+| Track record | Level reactions: first touch of each 9:30 level on 1-minute futures, bounce / break / stall at 5, 15, 60 min vs random strikes at the same distance, day-bootstrap 95% ranges; 1-minute bars saved per session | Working: 10 tests with known answers; 14 sessions so far (2026-10-21 to 11-06), no level type with enough touches for a verdict yet |
+| Backtesting | Every 9:30 paste, and whole weeks in one paste (token W: each day's levels drawn on its own session only) | Working: tests for the week paste; Pine side checked in the editor, not yet on a chart |
+| Hosted website | Watchdog (every 15 min): restarts a stuck site in a fresh concurrency lane, opens / closes a GitHub issue | Working: tested live 2026-11-10 (simulated stale site: recovery run started; simulated outage: issue opened, then closed by the next real check) |
+| Calendar | Holiday futures sessions: Globex until 13:00 ET on most cash holidays (Thanksgiving, MLK, ...), none before New Year's Day / Good Friday | Working: dry run of the Thanksgiving and Christmas 2026 weeks against publish, track record, bias and briefing schedules |

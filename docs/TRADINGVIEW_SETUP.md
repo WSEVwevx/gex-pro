@@ -1,8 +1,8 @@
 # TradingView setup and validation
 
-> **Not compiled here.** There is no automated access to the TradingView compiler from this build
-> environment. `pine/nq_es_gex_levels.pine` was written for Pine v6 and reviewed by hand. Run the
-> checklist below before you rely on it.
+> **Checked in the Pine Editor, not yet on a chart.** `pine/nq_es_gex_levels.pine` (Pine v6) shows no errors in
+> TradingView's editor (last checked 2026-11-10) and passes the project's static checks. How it behaves on a
+> live chart has not been tested automatically: run the checklist below before you rely on it.
 
 ## Install
 
@@ -11,10 +11,10 @@
 2. Open **Pine Editor**, choose **New → Indicator**, and replace the contents with
    `pine/nq_es_gex_levels.pine`.
 3. **Save**, then **Add to chart**.
-4. Get a payload, either:
-   - `python -m gexsys snapshot --config configs/free_nq_cboe.json` (last block of the output), or
-   - `http://127.0.0.1:8765/api/pine?market=NQ` while the service runs.
-5. In the indicator settings, paste the whole `GEX1;...` line into **Levels payload**.
+4. On the GEX PRO website (hosted, or START.bat's http://127.0.0.1:8765) click **Copy for TradingView**. One
+   paste serves both NQ and ES charts: the indicator picks its own market. A new paste is published every
+   hour while the futures trade.
+5. In the indicator settings, paste the whole `GEX1;...` text into **Levels payload**.
 
 ## Mapping modes
 
@@ -33,26 +33,25 @@ need TradingView exchange add-ons. Without them, quotes are delayed.
 
 ### Settings
 
-Everything is on the **Inputs** tab, in eight numbered groups. Each level is **one clean row: an
-on/off switch and a colour swatch**. Line thickness and dash style are fixed per level type:
-- key levels 2 px;
-- zero gamma dashed;
-- walls solid;
-- ±GEX, OI walls and max pain dashed (dotted lines vanish on grey backgrounds);
-- volume walls and expected move dashed.
+Everything is on the **Inputs** tab, in eight numbered groups, one row per level type: an on/off switch and a
+colour swatch, plus line style and thickness for the four key levels (zero gamma, call wall, put wall, absolute
+gamma). The other level types use fixed styles: ranked levels solid for ranks 1-2 and dashed after, 0DTE levels
+solid, volume / OI walls, max pain, IV bands and ±GEX dashed. The dialog's separate Style tab has nothing to change.
 
-The dialog's separate Style tab has nothing to change.
+Fixed, no longer settings (2026-11-10): levels within 0.03% of each other merge; confluence dots count levels
+within 0.10%; the weakest ranked line is 85% opaque; an update is STALE after 90 minutes; a level more than 8%
+from price is never drawn; a paste with two sources draws extra levels and the profile from the first.
 
 | Group | Contents |
 |---|---|
 | 1 - Data | Levels payload, price mapping |
-| 2 - Key levels | Zero gamma, call wall, put wall, absolute gamma (on/off + colour each), largest ±GEX and concentrations (on/off), extra concentrations (count, min %) |
-| 3 - More levels | 0DTE levels (on/off), volume walls, OI walls, max pain, IV range bands (on/off + colour each), max-pain expirations, which IV bands (day / week / month, ±2σ) |
+| 2 - Key levels | Compact chart; zero gamma, call wall, put wall, absolute gamma (on/off, colour, style, width each); ranked levels (on/off, ranked from, call and put levels, absolute-gamma levels); largest ±GEX strikes (on/off) |
+| 3 - More levels | 0DTE levels, volume walls, OI walls, max pain, IV range bands (on/off + colour each), max-pain expirations, IV bands (day / day + week / day + week + month), ±2σ |
 | 4 - Lines & labels | Where lines start (session open / full chart / right of price), labels (short / full / off), label size, label background, label offset, expected-move band shading, session tint by gamma side |
-| 5 - GEX profile | On/off, source, width, gap, opacity |
+| 5 - GEX profile | On/off, width, gap, opacity |
 | 6 - Info panel | On/off, detail, position, text size |
 | 7 - Alerts | Approach (ticks), wall cross, zero-gamma cross, stale update, cooldown, touch of C1 / P1 / Ab1, gamma zone change, IV band touch |
-| 8 - Advanced | More levels from, source filter, reference override, stale time, safety distance, manual levels |
+| 8 - Advanced | Reference symbol override, manual levels |
 
 ### On the chart
 
@@ -62,13 +61,12 @@ The dialog's separate Style tab has nothing to change.
   offset"), so the last candles stay clear; with the GEX profile on, everything starts at "Profile gap"
   (13 bars). Other choices: from the session open, the full chart, or right
   of price only. Key levels and max pain are 2 px, others 1 px. The GEX profile is off by default.
-* **Colours, style and width**: each level type has its colour, line style and thickness side by side in
-  settings, picked from drawn previews: `────` solid, `╌╌╌╌` dashed, `┈┈┈┈` dotted; `───` 1 px up to `███` 4 px. Defaults: calls green, puts red, absolute gamma violet, zero gamma
-  amber (dashed), expected move grey, every line 1 px. Ranked levels fade with strength: the strongest
-  level is fully opaque and the weakest at the "Weakest line opacity" setting (85% by default); ranks 1-2 use the
-  picked style, weaker ranks are dashed. Lines never fade below "Weakest line opacity" (85% by default; raise
-  it to 100 for fully solid lines), and tag and price text always stay at full strength. Largest +/- GEX,
-  concentrations, volume walls and max pain are off by default (the ranked levels cover them).
+* **Colours, style and width**: every level type has its colour in settings; the four key levels also have line
+  style and thickness, picked from drawn previews: `────` solid, `╌╌╌╌` dashed, `┈┈┈┈` dotted; `───` 1 px up to
+  `███` 4 px. Defaults: calls green, puts red, absolute gamma violet, zero gamma amber (dashed), expected move
+  grey, every line 1 px. Ranked levels fade with strength, from fully opaque to 85% for the weakest; tag and price
+  text always stay at full strength. Largest +/- GEX, volume walls and max pain are off by default (the ranked
+  levels cover them).
 * **Tags + hover info** (the default label style): each level gets a short tag right of price with a
   strength bar, e.g. `━━━━ C1  Ab2`. Ranked levels: `C1`-`C7` (most positive net GEX), `P1`-`P7` (most
   negative net GEX), `Ab1`-`Ab3` (most total gamma). **Ranked from** picks their source. *First expiry*
@@ -79,7 +77,7 @@ The dialog's separate Style tab has nothing to change.
   only* and *index + ETF* force one; *All expirations* ranks every expiry out to 45 days (fewer, bigger
   levels further out). The hover header names the chain, e.g. `QQQ standalone · first expiry 0DTE`.
   The bar's length is the level's share of gamma, relative to the strongest. `••` dots mark confluence
-  (that many levels at or within 0.10% of the price, set in "Confluence within").
+  (that many levels at or within 0.10% of the price).
 * **Hover a tag** for its analysis, laid out like this: the expiry it comes from; the price and its
   distance from price; the confluence count and strength; each level stacked there with its rank and
   meaning; the **zone context**; and the regime, data age and how to refresh. Zones, measured from the
@@ -95,9 +93,12 @@ The dialog's separate Style tab has nothing to change.
   IV bands grey), with the strength bar drawn as a slim line before them.
 * **Levels at the 9:30 open:** when C1, P1, Ab1 or the gamma flip has moved since the cash open, a faint dashed
   line marks where it stood at 9:30 ("C1 open  29,800"), so you can see how the map has shifted.
-* **Backtesting an earlier day:** the website's Indicator page lists "9:30 pastes" for every past session. Paste
-  one into **Levels payload** and scroll back to that day: the panel's Data row reads `Backtest 11/04 9:30`,
-  nothing is marked stale and alerts stay off. Paste a current update to return to live levels.
+* **Backtesting an earlier day:** the website's **Backtesting** page (under Insight) lists the 9:30 paste of every
+  past session. Paste one into **Levels payload** and scroll back to that day: the panel's Data row reads
+  `Backtest 11/04 9:30`, nothing is marked stale and alerts stay off. **Whole weeks** copies a week at once: each
+  day's zero gamma, walls, abs gamma and top three call / put levels are drawn across that day's 9:30-16:00 ET
+  session only, and the Data row reads `Backtest week 11/02-11/06`. Click Copy for TradingView to return to live
+  levels. During Bar Replay, a paste from a later day than the replayed bar reads `NEWER THAN CHART`.
 * **Past sessions' levels** (default 3 days, up to 5; 0 = off): zero gamma and the call and put walls at the close
   of each earlier session, as faint dotted lines across that day's 9:30-16:00 ET session ("CW 29,793"). They come
   in the paste (field `H`) and are converted with today's basis, so they line up with a back-adjusted continuous
@@ -105,10 +106,10 @@ The dialog's separate Style tab has nothing to change.
 * **Pressure** (info panel): a small five-block meter, e.g. `▰▰▰▱▱ Calming`. Above the gamma flip modeled dealer
   hedging leans calming, below it amplifying; each block is 0.2 daily expected moves from the flip, and within 0.1
   it reads Neutral. It is an estimate from price and the flip, not measured flow.
-* **Merged levels:** levels within "Merge levels within (%)" of each other (0.03% by default, about 9 NQ / 2 ES
-  points) share one line and one tag, e.g. P1 from QQQ and the put wall from NDX converting 3 points apart.
+* **Merged levels:** levels within 0.03% of each other (about 9 NQ / 2 ES points) share one line and one tag,
+  e.g. P1 from QQQ and the put wall from NDX converting 3 points apart.
 * **Compact chart** (first setting under Key levels): only C1-C3, P1-P3, Ab1 and the gamma flip the zones use;
-  walls, 0DTE walls, IV bands, max pain, volume / OI walls and concentrations are hidden until you turn it off.
+  walls, 0DTE walls, IV bands, max pain and volume / OI walls are hidden until you turn it off.
 * **Labels** ("Short" / "Full") sit right of the GEX profile on a dark pill: short code plus price with separators,
   e.g. `CW  29,883.25`. Codes: `ZG`, `CW`, `PW`, `+GEX`, `-GEX`, `+G 12%`, `0D ZG` / `0D CW` / `0D PW`,
   `VOL C` / `VOL P`, `OI C` / `OI P`, `MP 10-21`, IV bands `D+1σ` / `D-1σ` / `D+2σ` / `D-2σ` (`W` week, `M` month).
@@ -120,8 +121,8 @@ The dialog's separate Style tab has nothing to change.
   "Full" spells them out.
 * **Shared prices:** levels at the same price share one line, e.g. `CW · +GEX  29,883.25`.
 * **Source names** appear in labels only when two sources are drawn. `STALE` is added once the update
-  is older than the stale time.
-* **Safety:** a level more than "Ignore levels farther than" from price is skipped, not drawn.
+  is older than 90 minutes (one missed hourly paste plus slack).
+* **Safety:** a level more than 8% from price is skipped, not drawn.
 * **GEX profile**: boxes right of the last bar, one per price bin. Positive exposure extends right of
   the centre line, negative extends left.
 * **Info panel** (top right by default): one column per source, headed with the source and its options
@@ -139,10 +140,13 @@ The dialog's separate Style tab has nothing to change.
   Level rows show the price and its distance from the last close in points (`29883.25  +186`).
   The **Data** row reads like `DL 12m`: delayed quotes, snapshot 12 minutes old. It adds **STALE**
   when old, and **CUT OFF** when a payload lacks its `END` marker (TradingView shortened the paste;
-  use the website's per-market copy button).
-* Nothing is drawn, and the panel says **BLOCKED**, if:
-  - the payload belongs to another market (an ES payload on an NQ chart), or
-  - any mapped level is more than 8% from price, which almost always means the mapping is wrong.
+  copy one market only: type `COPYNQ` or `COPYES` in the website's command box).
+* Nothing is drawn if:
+  - the paste has no levels for this chart's market: the panel reads `no NQ levels` and `Pasted: ES (this chart
+    is NQ)`; a paste it cannot read at all reads `paste not recognised`;
+  - any mapped level is more than 8% from price, which almost always means the mapping is wrong: the panel
+    says **BLOCKED**.
+* Two copies of the same market's paste in the box (an old one left behind) draw once, from the newer.
 
 ## Repainting and execution model
 
@@ -170,23 +174,27 @@ The dialog's separate Style tab has nothing to change.
 Record pass/fail for each item:
 
 1. The script compiles in the Pine Editor with no errors. Note any warnings.
-2. With an empty payload, the panel shows "no payload" and no lines are drawn. Turning off "Show info
-   panel" hides the panel completely.
+2. With an empty payload, the panel shows "no payload" and no lines are drawn; with random text, "paste not
+   recognised". Turning off "Show panel" hides the panel completely.
 3. Paste the output of `python -m gexsys demo --market NQ` onto an NQ1! chart:
    - the Data row starts with "SYN";
    - lines are drawn (or BLOCKED appears if the synthetic prices sit more than 8% from the real NQ
-     price; raise "Reject mapped levels farther than" to test the drawing itself);
+     price, which is the safety check working);
    - the label prices equal payload price × mapping factor, rounded to 0.25.
-4. Paste an NQ payload on an ES chart. Expect BLOCKED and no lines.
+4. Paste an NQ-only payload on an ES chart. Expect `no ES levels`, `Pasted: NQ (this chart is ES)` and no lines.
 5. Switch Mapping to "Snapshot factor" with a payload that has `fac=0`. Expect the Mapping row (Detail: Full) to
    read UNAVAILABLE and no lines.
 6. Watch the mapping row cross 09:30 and 16:00 ET. It should read `live …` in RTH and `held …`
    outside RTH.
-7. Lines and labels stay ≤ 20 when all modules are on. Check the object count in the Pine logs or
-   by eye.
-8. Change the timeframe (1m, 5m, 1h). The levels stay the same and the factor stays consistent.
-9. Run Bar Replay. The GEX lines show only on the latest replayed bar.
-10. Set alerts and let a real-time approach or cross happen. Exactly one alert fires per cooldown
+7. With every module on, nothing disappears: the worst case is about 110 lines and 60 labels, under
+   TradingView's 200 / 200 limits (it silently deletes the oldest past them).
+8. Change the timeframe (1s, 1m, 5m, 1h, D) and try a tick chart. The levels stay the same, the factor stays
+   consistent, and lines and labels sit right of price.
+9. Run Bar Replay with today's paste: the Data row adds `NEWER THAN CHART`. With a Backtesting paste of the
+   replayed day it does not.
+10. Copy a whole week from the Backtesting page onto NQ1!: each day's levels sit only over that day's session.
+11. Set alerts and let a real-time approach or cross happen. Exactly one alert fires per cooldown
     window.
-11. Set "Snapshot stale after" to 1 minute. Labels gain `[STALE]` and the stale alert fires.
-12. Check MNQ and MES charts. Tick distances use a 0.25 tick.
+12. Leave a paste un-updated for 90 minutes while the futures trade: the Data row reads `STALE` and the stale
+    alert fires.
+13. Check MNQ and MES charts. Tick distances use a 0.25 tick.
