@@ -2,6 +2,7 @@
 # Every run fetches fresh Cboe (15-min delayed) data, ForexFactory and Truth Social, rebuilds the
 # site and publishes it. See docs/HOSTING.md.
 name: Website
+run-name: ${{ inputs.lane && format('Website (lane {0})', inputs.lane) || 'Website' }}
 
 on:
   # How often: while futures trade, each run starts the next one when it finishes (the "next" job at the
@@ -14,6 +15,11 @@ on:
     - cron: "4-59/10 0-21 * * 5"   # every 10 min Friday until the futures close
     - cron: "7 * * * *"            # every hour otherwise (weekend news, posts, the hourly paste)
   workflow_dispatch:                # "Run workflow" button on the Actions tab
+    inputs:
+      lane:
+        description: "Concurrency lane (the watchdog starts a fresh one when a stuck run holds the queue)"
+        required: false
+        default: ""
   push:
     branches: [main]
 
@@ -24,9 +30,10 @@ permissions:
   actions: write                    # only to start the next run (the "next" job)
 
 concurrency:
-  # renamed 2026-11-10: a run GitHub left "waiting" forever (it can't be cancelled) held the old "website"
-  # group, so every later run queued behind it and the site stopped updating
-  group: website-2
+  # one run at a time per lane. On 2026-11-09 GitHub left a run "waiting" forever (it could not be cancelled)
+  # and every later run queued behind it for 8 hours; the watchdog (watchdog.yml) now starts a fresh lane
+  # when that happens, and the chain carries on there
+  group: website-${{ inputs.lane || '2' }}
   cancel-in-progress: false
 
 jobs:
@@ -167,4 +174,8 @@ jobs:
           )
           echo "next run in ${wait}s"
           sleep "$wait"
-          gh workflow run website.yml --ref main -R "${{ github.repository }}"
+          # another chain already running (a newer run that has started, in another lane): leave it to that one
+          created=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}" --jq .created_at)
+          newer=$(gh api "repos/${{ github.repository }}/actions/workflows/website.yml/runs?status=in_progress&per_page=20"                     --jq "[.workflow_runs[] | select(.id != ${{ github.run_id }} and .created_at > \"$created\")] | length")
+          if [ "$newer" -gt 0 ]; then echo "a newer run is already going: not starting another"; exit 0; fi
+          gh workflow run website.yml --ref main -R "${{ github.repository }}" -f lane="${{ inputs.lane }}"

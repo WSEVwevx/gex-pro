@@ -1,0 +1,38 @@
+# Watchdog for the hosted site (tools/watchdog.py): every 15 minutes, checks that the site rebuilt recently;
+# if not, cancels stuck website runs and starts a fresh one in a new lane, and opens an issue (which notifies
+# the repository owner) when the site stays stale for over 90 minutes. Closes that issue once it recovers.
+name: Watchdog
+
+on:
+  schedule:
+    - cron: "2-59/15 * * * *"
+  workflow_dispatch:
+    inputs:
+      simulate_stale:
+        description: "Test: treat the site as this many minutes old (0 = real check)"
+        required: false
+        default: "0"
+
+permissions:
+  contents: read
+  actions: write          # cancel stuck runs, start the website workflow
+  issues: write           # the alert issue
+
+concurrency:
+  group: watchdog
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -q tzdata
+      - name: Check the site and recover if it is stuck
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python tools/watchdog.py --simulate-stale "${{ inputs.simulate_stale || 0 }}"
