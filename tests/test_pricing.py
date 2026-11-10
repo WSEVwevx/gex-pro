@@ -64,6 +64,15 @@ class TestPricing(unittest.TestCase):
         # an out-of-the-money call loses delta as time passes: negative charm
         self.assertLess(p.bsm_charm(100, 110, 0.05, 0.0, 0.0, 0.2, True), 0)
 
+    def test_tail_and_near_zero_precision(self):
+        # 2026-11-10 stress test A1: 0.5 * (1 + erf) cancelled in the far tail, and d1 - vs cancelled near the money
+        self.assertAlmostEqual(p.norm_cdf(-10) / 7.619853024160527e-24, 1.0, places=12)
+        self.assertAlmostEqual(p.norm_cdf(-5) / 2.866515718791939e-07, 1.0, places=12)
+        # far out-of-the-money call (K = 1.5 S, 3 months, 10% vol): 50-digit value 1.0523821977803324e-14
+        self.assertAlmostEqual(p.bsm_price(20000, 30000, 0.25, 0.0, 0.03, 0.1, True) / 1.0523821977803324e-14, 1.0, places=6)
+        # at the money with r - q = vol^2 / 2: d2 ~ 0, vanna ~ 0 (50-digit value -2.1e-17), not rounding noise
+        self.assertLess(abs(p.bsm_vanna(20000, 20000, 2.0, 0.05, 0.03, 0.2)), 1e-16)
+
     def test_zero_dte_time_floor(self):
         self.assertTrue(math.isfinite(p.bsm_gamma(100, 100, 0.0, 0, 0, 0.2)))
 

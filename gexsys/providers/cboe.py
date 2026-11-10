@@ -167,7 +167,7 @@ def merge_etf(index_contracts: list[OptionContract], etf_contracts: list[OptionC
             yrs = (c.expiration - asof).total_seconds() / (365.0 * 86400)
             if yrs > 0:
                 iv = pricing.implied_vol(c.mid, etf_spot, c.strike, yrs, risk_free_rate(), etf_q,
-                                         c.option_type == OptionType.CALL)
+                                         c.option_type == OptionType.CALL, pricing.QUOTE_TOL, pricing.QUOTE_MAX_VOL_ERR)
                 if iv and iv <= 5.0:
                     c = replace(c, iv=iv)
         k = c.strike * ratio

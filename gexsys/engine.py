@@ -181,7 +181,8 @@ def _solve_iv(c: OptionContract, s: float, t: float, snap: ChainSnapshot) -> Opt
     if mid is None:
         return None
     q = snap.rate if _is_futures(snap) else snap.div_yield
-    return pricing.implied_vol(mid, s, c.strike, t, snap.rate, q, c.option_type == OptionType.CALL)
+    return pricing.implied_vol(mid, s, c.strike, t, snap.rate, q, c.option_type == OptionType.CALL,
+                               pricing.QUOTE_TOL, pricing.QUOTE_MAX_VOL_ERR)
 
 
 def select_basket(snap: ChainSnapshot, cfg: EngineConfig, asof: datetime) -> list[datetime]:
