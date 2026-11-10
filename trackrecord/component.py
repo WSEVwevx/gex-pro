@@ -41,7 +41,7 @@ from pathlib import Path
 from typing import Callable, Optional
 from zoneinfo import ZoneInfo
 
-from . import backtest, prices, reactions
+from . import backtest, prices, reactions, weeks
 from .score import grade, make_plan, summarize
 
 log = logging.getLogger("trackrecord")
@@ -99,6 +99,11 @@ class TrackRecordComponent:
             except OSError:
                 continue
         return out
+
+    def pastes_payload(self) -> dict:
+        """The Backtesting page: every day's 9:30 paste, and each week's as one paste (trackrecord/weeks.py)."""
+        ps = self.pastes()
+        return {"pastes": ps, "weeks": weeks.weeks(ps)}
 
     def _write(self, path: Path, obj: dict) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -382,7 +387,7 @@ class TrackRecordComponent:
         def get(q):
             self.tick()
             return 200, self.payload()
-        return {"/api/trackrecord": get, "/api/pastes": lambda q: (200, {"pastes": self.pastes()})}
+        return {"/api/trackrecord": get, "/api/pastes": lambda q: (200, self.pastes_payload())}
 
     def start(self) -> None:
         def loop():
@@ -413,5 +418,5 @@ class TrackRecordComponent:
         data.mkdir(parents=True, exist_ok=True)
         p = self.payload()
         (data / "trackrecord.json").write_text(json.dumps(p), encoding="utf-8")
-        (data / "pastes.json").write_text(json.dumps({"pastes": self.pastes()}), encoding="utf-8")
+        (data / "pastes.json").write_text(json.dumps(self.pastes_payload()), encoding="utf-8")
         return {}

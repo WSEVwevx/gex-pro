@@ -322,10 +322,15 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
 
     <!-- BACKTESTING: each past session's 9:30 paste -->
     <div id="backtestView" hidden>
-      <section class="card" data-help="pastes" id="pastesCard">
+      <section class="card" data-help="pastes_week">
+        <div class="head"><h2>Whole weeks</h2><span class="sub" id="weeksSub"></span></div>
+        <div class="expl">A week's 9:30 levels in one paste: the indicator draws each day's levels across that day's session only (9:30 to 4 pm ET), so you can scroll through the whole week. Zero gamma, the walls, abs gamma and the top three call and put levels of each day.</div>
+        <div id="weeksList"></div>
+      </section>
+      <section class="card" data-help="pastes" id="pastesCard" style="margin-top:12px">
         <div class="head"><h2>9:30 pastes for backtesting</h2><span class="sub" id="pastesSub"></span></div>
         <div class="expl">The levels exactly as they stood at each past session's 9:30 ET open. Copy one, paste it into the indicator's <b>Levels payload</b>, and scroll your chart back to that day to see how price traded around them. The indicator shows "Backtest" with the date and turns its alerts off; click <b>Copy for TradingView</b> at the top to go back to live levels.</div>
-        <div class="trk-log" id="pastesList"></div>
+        <div id="pastesList"></div>
       </section>
     </div>
 

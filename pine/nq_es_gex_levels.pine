@@ -231,6 +231,7 @@ type Snap
     string opn = ""
     string hist = ""
     string bt = ""
+    string wk = ""
     bool   complete = false
 
 strOf(map<string, string> m, string k) =>
@@ -261,7 +262,7 @@ parseOne(string txt) =>
              vc = numOf(m, "vc"), vp = numOf(m, "vp"), oc = numOf(m, "oc"), op = numOf(m, "op"), xp = strOf(m, "xp"),
              ema = numOf(m, "ema"), emd = numOf(m, "emd"), emw = numOf(m, "emw"), emx = strOf(m, "emx"), emm = numOf(m, "emm"), emmx = strOf(m, "emmx"),
              ivd = numOf(m, "ivd"), ivw = numOf(m, "ivw"), ivm = numOf(m, "ivm"),
-             prof = strOf(m, "P"), ag = numOf(m, "ag"), vxm = numOf(m, "vxm"), chm = numOf(m, "chm"), rk = strOf(m, "R"), rk0 = strOf(m, "R0"), rk0e = strOf(m, "R0e"), g0e = numOf(m, "g0e"), x0d = strOf(m, "x0d"), sstat = strOf(m, "S"), opn = strOf(m, "O"), hist = strOf(m, "H"), bt = strOf(m, "bt"), complete = str.trim(array.get(toks, array.size(toks) - 1)) == "END")
+             prof = strOf(m, "P"), ag = numOf(m, "ag"), vxm = numOf(m, "vxm"), chm = numOf(m, "chm"), rk = strOf(m, "R"), rk0 = strOf(m, "R0"), rk0e = strOf(m, "R0e"), g0e = numOf(m, "g0e"), x0d = strOf(m, "x0d"), sstat = strOf(m, "S"), opn = strOf(m, "O"), hist = strOf(m, "H"), bt = strOf(m, "bt"), wk = strOf(m, "W"), complete = str.trim(array.get(toks, array.size(toks) - 1)) == "END")
     s
 
 fam(string s) =>
@@ -391,6 +392,13 @@ staleOf(Snap s) =>
 
 btDay(Snap s) =>
     str.length(s.bt) == 8 ? str.substring(s.bt, 4, 6) + "/" + str.substring(s.bt, 6, 8) : ""
+
+// a backtest week (W): its first and last day, "mm/dd-mm/dd"
+wkSpan(Snap s) =>
+    array<string> ds = str.split(s.wk, ",")
+    string a = str.substring(array.get(ds, 0), 4, 8)
+    string b = str.substring(array.get(ds, array.size(ds) - 1), 4, 8)
+    str.substring(a, 0, 2) + "/" + str.substring(a, 2, 4) + "-" + str.substring(b, 0, 2) + "/" + str.substring(b, 2, 4)
 
 // the paste is from a later day than the chart's last bar (bar replay, or a backtest paste for a day still ahead)
 aheadOf(Snap s) =>
@@ -953,6 +961,34 @@ if barstate.islast
                             array.push(gLines, line.new(t0, ph, t1, ph, xloc = xloc.bar_time, color = hc, width = 1, style = line.style_dotted))
                             array.push(gLabels, label.new(t1, ph, (k == 1 ? "ZG " : k == 2 ? "CW " : "PW ") + fmtPx(ph), xloc = xloc.bar_time,
                                  style = label.style_label_left, color = color.new(#0b0e13, 100), textcolor = hc, size = size.tiny))
+    // a backtest week (paste field W, from the website's Backtesting page): each day's 9:30 levels across that
+    // day's 09:30-16:00 ET only, "yyyymmdd:zg:cw:pw:ag:C1/C2/C3:P1/P2/P3", mapped with today's basis
+    if okA or okB
+        Snap sw = okA ? sA : sB
+        float fw = okA ? facA : facB
+        float ow = okA ? offA : offB
+        if sw.wk != ""
+            for item in str.split(sw.wk, ",")
+                array<string> f = str.split(item, ":")
+                if array.size(f) == 7 and str.length(array.get(f, 0)) == 8
+                    string ds = array.get(f, 0)
+                    int yy = int(str.tonumber(str.substring(ds, 0, 4)))
+                    int mm = int(str.tonumber(str.substring(ds, 4, 6)))
+                    int dd = int(str.tonumber(str.substring(ds, 6, 8)))
+                    int t0 = timestamp("America/New_York", yy, mm, dd, 9, 30)
+                    int t1 = timestamp("America/New_York", yy, mm, dd, 16, 0)
+                    array<float> done = array.new<float>()
+                    for k = 1 to 6
+                        for [j, v] in str.split(array.get(f, k), "/")
+                            float pw2 = mapP(str.tonumber(v), fw, ow)
+                            if not na(pw2) and sane(pw2) and not array.includes(done, pw2)
+                                array.push(done, pw2)
+                                string wn = k == 1 ? "ZG" : k == 2 ? "CW" : k == 3 ? "PW" : k == 4 ? "Ab" : (k == 5 ? "C" : "P") + str.tostring(j + 1)
+                                color wc = color.new(k == 1 ? cZG : k == 2 or k == 5 ? cPos : k == 3 or k == 6 ? cNeg : cAG, k <= 4 ? 10 : 40)
+                                array.push(gLines, line.new(t0, pw2, t1, pw2, xloc = xloc.bar_time, color = wc, width = k <= 3 ? 2 : 1,
+                                     style = k <= 4 ? line.style_solid : line.style_dashed))
+                                array.push(gLabels, label.new(t1, pw2, wn, xloc = xloc.bar_time, style = label.style_label_left,
+                                     color = color.new(#0b0e13, 100), textcolor = wc, size = size.tiny))
     if tagMode
         renderTags()
 
@@ -1021,7 +1057,7 @@ valOf(string k, Snap s, float f, float o, bool ok, string mst) =>
     color c = cTxt
     if k == "data"
         bool bad = staleOf(s) or not s.complete or (s.st != "OK" and s.st != "") or aheadOf(s)
-        t := s.bt != "" ? "Backtest " + btDay(s) + " 9:30" : (s.q == "RT" ? "RT " : s.q == "SYN" ? "SYN " : "DL ") + ageTxt(ageOf(s)) + (staleOf(s) ? " STALE" : "") + (s.complete ? "" : " CUT OFF") + (s.st != "OK" and s.st != "" ? " " + s.st : "")
+        t := s.wk != "" ? "Backtest week " + wkSpan(s) : s.bt != "" ? "Backtest " + btDay(s) + " 9:30" : (s.q == "RT" ? "RT " : s.q == "SYN" ? "SYN " : "DL ") + ageTxt(ageOf(s)) + (staleOf(s) ? " STALE" : "") + (s.complete ? "" : " CUT OFF") + (s.st != "OK" and s.st != "" ? " " + s.st : "")
         t := t + (aheadOf(s) ? " NEWER THAN CHART" : "")
         c := bad ? cWarn : cDim
     else if not ok

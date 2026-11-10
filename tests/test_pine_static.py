@@ -76,7 +76,7 @@ class TestPineStatic(unittest.TestCase):
         # (or a typo, or a v5 leftover like transp / when) must be checked there too before it joins the list
         inp = {"display", "group", "inline", "tooltip"}
         known = {
-            "array.clear": set(), "array.from": set(), "array.get": set(), "array.min": set(), "array.push": set(),
+            "array.clear": set(), "array.from": set(), "array.get": set(), "array.includes": set(), "array.min": set(), "array.push": set(),
             "array.set": set(), "array.size": set(), "box.delete": set(), "label.delete": set(), "line.delete": set(),
             "box.new": {"bgcolor", "border_color", "border_width", "extend", "xloc"},
             "color.new": set(), "label.set_text": set(), "line.set_color": set(),
@@ -207,6 +207,9 @@ class TestPineStatic(unittest.TestCase):
         ctx = (Path(__file__).resolve().parent.parent / "gexpro" / "context.py").read_text(encoding="utf-8")
         start = ctx.index("export.add_tokens(p, {")
         emitted |= set(re.findall(r'"(\w+)":', ctx[start:ctx.index("})", start)]))
+        # the week paste of the Backtesting page (trackrecord/weeks.py) adds W
+        from trackrecord.weeks import week_paste
+        emitted |= {kv.split("=", 1)[0] for kv in week_paste(["GEX1;mkt=NQ;bt=20261102;zg=1;R=C1:1;END"]).split(";")[1:] if "=" in kv}
         missing = read - emitted
         self.assertFalse(missing, f"Pine reads keys the service never sends: {sorted(missing)}")
 

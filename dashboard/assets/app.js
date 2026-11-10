@@ -45,23 +45,40 @@ async function copyText(text, done){
 $("copyClose").onclick = () => { $("copyBox").hidden = true; };
 $("copyBox").onclick = e => { if(e.target === $("copyBox")) $("copyBox").hidden = true; };
 // ---------- 9:30 pastes (Backtesting page): each past session's paste as it stood at the open, for backtesting
-let pastes = null;
+let pastes = null, pasteWeeks = [];
 async function loadPastes(){
-  try { pastes = (await (await fetchFresh(API.pastes)).json()).pastes || []; }
+  try { const j = await (await fetchFresh(API.pastes)).json(); pastes = j.pastes || []; pasteWeeks = j.weeks || []; renderWeeks(); }
   catch(e){ if(!pastes){ $("pastesList").innerHTML = `<div class="expl">${esc(OFFLINE)}</div>`; return; } }
   const days = [...new Set(pastes.map(p => p.session))].sort().reverse();
   const get = (d, m) => (pastes.find(p => p.session === d && p.market === m) || {}).paste;
   $("pastesSub").textContent = days.length ? `${days.length} session${days.length === 1 ? "" : "s"}` : "";
   if(!days.length){ $("pastesList").innerHTML = `<div class="expl">The first one is saved at the next 9:30 open.</div>`; return; }
   const btn = (d, which, label) => `<button class="linkbtn" data-d="${esc(d)}" data-w="${which}">${label}</button>`;
-  $("pastesList").innerHTML = `<table class="trk-table"><tr><th>Session</th><th>NQ</th><th>ES</th><th>Both</th></tr>${days.map(d => `<tr>
-    <td>${esc(new Date(d + "T12:00:00Z").toLocaleDateString("en-US", {weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "UTC"}))}</td>
-    <td>${get(d, "NQ") ? btn(d, "NQ", "Copy NQ") : `<span class="dim">-</span>`}</td><td>${get(d, "ES") ? btn(d, "ES", "Copy ES") : `<span class="dim">-</span>`}</td>
-    <td>${get(d, "NQ") && get(d, "ES") ? btn(d, "both", "Copy both") : `<span class="dim">-</span>`}</td></tr>`).join("")}</table>`;
+  $("pastesList").innerHTML = `<table class="trk-table paste-table"><tr><th>Session</th><th>NQ</th><th>ES</th><th>Both</th></tr>${days.map(d => `<tr>
+    <td>${esc(new Date(d + "T12:00:00Z").toLocaleDateString("en-US", {weekday: "short", month: "short", day: "numeric", ...(d.slice(0, 4) === String(new Date().getFullYear()) ? {} : {year: "numeric"}), timeZone: "UTC"}))}</td>
+    <td>${get(d, "NQ") ? btn(d, "NQ", "Copy") : `<span class="dim">-</span>`}</td><td>${get(d, "ES") ? btn(d, "ES", "Copy") : `<span class="dim">-</span>`}</td>
+    <td>${get(d, "NQ") && get(d, "ES") ? btn(d, "both", "Copy") : `<span class="dim">-</span>`}</td></tr>`).join("")}</table>`;
   $("pastesList").querySelectorAll("button[data-d]").forEach(b => b.onclick = () => {
     const d = b.dataset.d, w = b.dataset.w, when = new Date(d + "T12:00:00Z").toLocaleDateString("en-US", {month: "short", day: "numeric", timeZone: "UTC"});
     const text = w === "both" ? [get(d, "NQ"), get(d, "ES")].join("|") : get(d, w);     // one paste for both charts, like the hourly one
     copyText(text, `Copied the ${w === "both" ? "NQ + ES" : w} levels from the ${when} 9:30 open. Paste them into Levels payload.`);
+  });
+}
+function renderWeeks(){
+  const wks = [...new Set(pasteWeeks.map(w => w.week))];          // newest first
+  const get = (wk, m) => pasteWeeks.find(w => w.week === wk && w.market === m);
+  const thisMon = (() => { const t = new Date(new Date().toLocaleString("en-US", ET)); t.setDate(t.getDate() - ((t.getDay() + 6) % 7));
+    return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`; })();
+  const label = wk => wk === thisMon ? "This week" : "Week of " + new Date(wk + "T12:00:00Z").toLocaleDateString("en-US", {month: "short", day: "numeric", timeZone: "UTC"});
+  $("weeksSub").textContent = wks.length ? `${wks.length} week${wks.length === 1 ? "" : "s"}` : "";
+  if(!wks.length){ $("weeksList").innerHTML = `<div class="expl">The first week appears after the next 9:30 open.</div>`; return; }
+  const btn = (wk, which, txt) => `<button class="linkbtn" data-wk="${esc(wk)}" data-w="${which}">${txt}</button>`;
+  $("weeksList").innerHTML = `<table class="trk-table paste-table"><tr><th>Week</th><th>Days</th><th>NQ</th><th>ES</th><th>Both</th></tr>${wks.map(wk => { const n = get(wk, "NQ"), e = get(wk, "ES");
+    return `<tr><td>${esc(label(wk))}</td><td class="m">${Math.max((n || {}).days || 0, (e || {}).days || 0)}</td><td>${n ? btn(wk, "NQ", "Copy") : `<span class="dim">-</span>`}</td>
+      <td>${e ? btn(wk, "ES", "Copy") : `<span class="dim">-</span>`}</td><td>${n && e ? btn(wk, "both", "Copy") : `<span class="dim">-</span>`}</td></tr>`; }).join("")}</table>`;
+  $("weeksList").querySelectorAll("button[data-wk]").forEach(b => b.onclick = () => {
+    const wk = b.dataset.wk, w = b.dataset.w, text = w === "both" ? [get(wk, "NQ").paste, get(wk, "ES").paste].join("|") : get(wk, w).paste;
+    copyText(text, `Copied ${label(wk).toLowerCase()}'s ${w === "both" ? "NQ + ES" : w} levels. Paste them into Levels payload, then scroll through the week.`);
   });
 }
 function showPastes(){ setPage("backtest"); }
@@ -745,6 +762,9 @@ const HELP = {
   pastes: {title: "9:30 pastes for backtesting", tldr: "The exact levels from each past session's open, ready to paste into the indicator.",
     body: `<p>Every session, the paste from the last calculation before 9:30 ET is saved, the same one the Track record grades. Copy a day, paste it into the indicator's <b>Levels payload</b>, then scroll your chart back to that day: every level, tag, zone and IV band is drawn as it was at that open, plus the closing levels of the sessions before it.</p><p>The indicator marks it "Backtest" with the date instead of "stale", and its alerts stay off. Click <b>Copy for TradingView</b> at the top of any page and paste that to go back to live levels.</p><p>The website keeps these permanently from now on; days before this feature go back as far as the saved snapshots did (about a week).</p>`,
     watch: ["Compare where price reacted with the C / P tags and the walls that day", "Use Copy both on a layout with NQ and ES charts"]},
+  pastes_week: {title: "Whole weeks", tldr: "A week of 9:30 levels in one paste, each day drawn on its own day.",
+    body: `<p>One paste holds every day of the week. On the chart, each day's zero gamma, call wall, put wall, abs gamma and top three call and put levels are drawn only across that day's 9:30 to 4 pm ET session, so Monday's levels never run into Tuesday's.</p><p>The panel reads "Backtest week" with the dates and alerts stay off. Click <b>Copy for TradingView</b> at the top to go back to live levels.</p>`,
+    watch: ["Scroll day by day and note which levels price respected", "Compare with the reaction stats on the Track record page"]},
   level_history: {title: "Level history", tldr: "Each past session's key levels and how that day traded around them.",
     body: `<p>For every session since the track record started: zero gamma, the call and put walls and the absolute-gamma strike from the last calculation before the 9:30 ET open, the ±1σ expected-move band, and the day's range and close. A wall <b>held</b> when price reached it and closed back on its side, <b>broke</b> when it closed through, and was <b>not reached</b> otherwise.</p><p>The chart puts each day side by side: the grey column is the expected-move band, the line is the day's range with a tick at the close, and the coloured dashes are that day's levels. A level far outside every day's range is left off the chart (it is still in the table).</p><p>Levels are calculated on the index (NDX / SPX) and converted to NQ / ES with today's basis, so they line up with a back-adjusted continuous chart.</p>`,
     watch: ["A wall that keeps holding day after day is a level the market respects", "Days that closed outside the grey band were bigger than the options priced in"]},
