@@ -20,6 +20,8 @@ It is graded when that session's final bar is available. Sessions the app could 
 The record is kept forever, apart from the snapshots (which are pruned after 12 days):
   sessions/*.json   one file per session, never deleted
   pastes/*.txt      the TradingView paste as it stood at each session's 09:30 open (for backtesting), never changed
+  minutes/*.json    each graded session's 1-minute futures bars (09:30-16:00), for the level reaction stats
+                    (see reactions.py); saved within a few days of the close, as the free source keeps ~30 days
   history.csv       every session in one permanent table, rewritten whenever a session changes
   public copy       the hosted site commits the folder to the repository's track-record branch, so it
                     keeps growing on GitHub while this PC is off; the local app copies in every session
@@ -39,7 +41,7 @@ from pathlib import Path
 from typing import Callable, Optional
 from zoneinfo import ZoneInfo
 
-from . import backtest, prices
+from . import backtest, prices, reactions
 from .score import grade, make_plan, summarize
 
 log = logging.getLogger("trackrecord")
@@ -48,6 +50,7 @@ OPEN = time(9, 30)
 FREEZE_AFTER = timedelta(minutes=30)
 GIVE_UP = timedelta(days=7)          # no final bar after a week: graded as "no prices"
 LOOKBACK_DAYS = 10
+MINUTES_KEPT_BY_SOURCE = timedelta(days=28)    # Yahoo serves 1-minute bars for about 30 days
 BACKTEST_MAX_AGE = timedelta(hours=20)
 MIRROR_URL = "https://wsevwevx.github.io/gex-pro/data/trackrecord.json"      # the public record ($GEXPRO_TRACK_MIRROR)
 HISTORY_COLUMNS = ["session", "market", "status", "data_asof", "frozen_at", "ref", "em", "regime", "zero_gamma", "call_wall",
@@ -82,6 +85,9 @@ class TrackRecordComponent:
 
     def _paste_path(self, d: date, market: str) -> Path:
         return self.dir / "pastes" / f"{d.isoformat()}_{market}.txt"
+
+    def _minutes_path(self, d: date, market: str) -> Path:
+        return self.dir / "minutes" / f"{d.isoformat()}_{market}.json"
 
     def pastes(self) -> list[dict]:
         """Every saved 9:30 paste, newest first: [{"session", "market", "paste"}]."""
@@ -255,7 +261,59 @@ class TrackRecordComponent:
                 changed.append(f"{d}_{s['market']} {s['status']}")
             if changed or not (self.dir / "history.csv").exists():
                 self.write_history()
+        changed += self.save_minutes()
         return changed
+
+    # ---------------------------------------------------------------- level reactions
+    def save_minutes(self) -> list[str]:
+        """Save the 1-minute futures bars of every graded session that has none yet, while the free source
+        still has them (it keeps about 30 days). One try per session per hour; a failure just waits."""
+        now, done = self.clock(), []
+        tried = getattr(self, "_minutes_tried", {})
+        self._minutes_tried = tried
+        for s in self.sessions():
+            if s.get("status") != "graded" or s["market"] not in reactions.FUTURES:
+                continue
+            d = date.fromisoformat(s["session"])
+            path = self._minutes_path(d, s["market"])
+            key = path.name
+            if path.exists() or not hasattr(self.src, "minutes") or now.timestamp() - tried.get(key, 0) < 3600:
+                continue
+            tried[key] = now.timestamp()
+            try:
+                rec = self.src.minutes(s, recent=now - datetime.combine(d, OPEN, NY) <= MINUTES_KEPT_BY_SOURCE)
+            except Exception as e:
+                log.warning("1-minute bars for %s failed: %s", key, e)
+                continue
+            if rec and len(rec["bars"]) >= 300:                  # a full session, not a partial download
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(json.dumps(rec, separators=(",", ":")), encoding="utf-8")
+                done.append(f"{d}_{s['market']} minutes")
+        return done
+
+    def reaction_stats(self) -> Optional[dict]:
+        """The level reaction study over every saved session (cached until a session is added)."""
+        files = sorted((self.dir / "minutes").glob("*.json"))
+        sig = [f.name for f in files] + [f.name for f in sorted((self.dir / "pastes").glob("*.txt"))]
+        if getattr(self, "_rx", None) and self._rx[0] == sig:
+            return self._rx[1]
+        recs, levels = [], {}
+        plans = {(s["session"], s["market"]): s["plan"] for s in self.sessions() if s.get("plan")}
+        for f in files:
+            rec = self._read(f)
+            key = (rec or {}).get("session"), (rec or {}).get("market")
+            if not rec or key not in plans:
+                continue
+            pp = self._paste_path(date.fromisoformat(key[0]), key[1])
+            recs.append(rec)
+            levels[key] = reactions.session_levels(plans[key], pp.read_text(encoding="utf-8") if pp.exists() else None)
+        out = reactions.summarize(reactions.observations(recs, levels)) if recs else None
+        if out:                                                 # how far back each kind of level goes
+            out["since"] = min(r["session"] for r in recs)
+            full = [r["session"] for r in recs if self._paste_path(date.fromisoformat(r["session"]), r["market"]).exists()]
+            out["full_since"] = min(full) if full else None
+        self._rx = (sig, out)
+        return out
 
     def _pre_open(self, d: date) -> dict:
         try:
@@ -302,7 +360,7 @@ class TrackRecordComponent:
             st["walls_held"]["baseline"] = backtest.wall_baseline([s for s in graded if m == "ALL" or s["market"] == m], bt.get("markets") or {})
         return {"now": self.clock().isoformat(), "started": self._started(), "proof_url": self.proof_url,
                 "rules": {"touch_em": 0.05, "min_sample": 20, "freeze": "levels from the last calculation timestamped before 09:30 ET"},
-                "stats": stats, "sessions": ss, "backtest": bt}
+                "stats": stats, "sessions": ss, "backtest": bt, "reactions": self.reaction_stats()}
 
     def sources(self) -> list:
         """The Data health page's row: sessions still waiting for a final price 3 hours after the close, or

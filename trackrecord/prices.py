@@ -112,6 +112,23 @@ def intraday(underlying: str) -> Optional[dict]:
         return None
 
 
+PUBLIC_MINUTES = "https://raw.githubusercontent.com/WSEVwevx/gex-pro/track-record/minutes/{name}"
+
+
+def minutes(session: dict, recent: bool = True) -> Optional[dict]:
+    """A graded session's 1-minute futures record (trackrecord/reactions.py): the public track record's saved
+    copy first (so the local app matches the hosted site), else Yahoo while it still has the day (~30 days)."""
+    from . import reactions
+    d = date.fromisoformat(session["session"])
+    try:
+        rec = json.loads(_get(PUBLIC_MINUTES.format(name=f"{session['session']}_{session['market']}.json"), timeout=15))
+        if rec.get("bars"):
+            return rec
+    except Exception:
+        pass                                                     # not saved there (yet)
+    return reactions.minutes_record(session, reactions.fetch_minutes(session["market"], d)) if recent else None
+
+
 def parse_cboe_vol_csv(raw: bytes) -> dict[str, float]:
     out = {}
     for r in csv.DictReader(io.StringIO(raw.decode("utf-8", "replace"))):

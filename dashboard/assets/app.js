@@ -768,6 +768,9 @@ const HELP = {
     body: `<p>From the CFTC's weekly Traders in Financial Futures report. <b>Leveraged funds</b> are hedge funds and similar traders. <b>Asset managers</b> are pensions, mutual funds and insurers.</p><p><b>Net</b> is long contracts minus short contracts. <b>3-year rank</b> is the share of the last 3 years' reports with a lower net position: 90% means longer than 90% of the time. Read the rank, not the sign. Leveraged funds are often short ES as part of hedged trades, so a big short can be completely normal.</p><p>Extreme readings show how crowded a position is, not when it will turn. Positions are from Tuesday and published Friday.</p>`},
   track_moves: {title: "Daily move vs the expected band", tldr: "How far each session moved, measured in expected moves.",
     body: `<p>Each bar is one session's move from the plan price to the close, divided by the plan's expected move. The shaded strip is ±1σ. Bars that closed outside it are amber. A fair band has about a third of bars outside, roughly evenly up and down.</p>`},
+  track_reactions: {title: "How price reacted at each level", tldr: "Do GEX levels actually stop or attract price more than any other strike?",
+    body: `<p>For every level in the 9:30 plan, the first time price traded to it after the open, the page checks where price was 5, 15 and 60 minutes later: back on the side it came from (<b>bounced</b>), through the level (<b>broke</b>), or close to it (<b>stalled</b>). The bar is a quarter of the move normally expected over that time, so a few ticks of noise don't count.</p><p>The comparison that matters is the grey number: what <b>random strikes at the same distance</b> from the open did on the other days. Strikes are round numbers and price often pauses at round numbers anyway, so a level only has an edge if it beats them.</p><p>A verdict appears only with ${15}+ touches and when the gap from random holds up after resampling whole days. Until then, treat the rates as anecdotes.</p>`,
+    watch: ["Bounced well above random = a level worth fading", "Broke well above random = a level that tends to give way, not hold", "No edge = trade it like any other strike"]},
   track_split: {title: "Where it worked", tldr: "The same results split by gamma regime and plan confidence.",
     body: `<p>Shows whether the band and the bias did better on some kinds of day. Groups here are small, so a big gap between them can easily be chance until there are many more sessions.</p>`},
   track_log: {title: "Every session", tldr: "The plan and its grade, one row per market per day.",
@@ -1031,7 +1034,7 @@ function renderTrack(){
   </table>` : `<div class="expl">Nothing graded yet. The first plan is graded after its session closes.</div>`;
   // every session
   const ss = (trk.sessions || []).filter(s => trkM === "ALL" || s.market === trkM);
-  renderTrackMoves(ss); renderTrackSplit(ss);
+  renderTrackMoves(ss); renderTrackSplit(ss); renderReactions();
   $("trkCsv").onclick = () => trackCsv(ss);
   $("trkLogSub").textContent = `${ss.length} session${ss.length === 1 ? "" : "s"} · newest first`;
   const wall = w => !w ? `<span class="dim">-</span>` : !w.touched ? `<span class="dim" title="${num(w.level, 2)}">not reached</span>`
@@ -1081,6 +1084,23 @@ function renderTrackMoves(ss){
   svg.onmouseleave = () => { tip.style.opacity = 0; };
 }
 // the same results split by gamma regime and by the plan's confidence, counted from the sessions in view
+// level reactions (trackrecord/reactions.py): first touch of each level vs random strikes at the same distance
+let rxH = store.get("gex.rxh", "15");
+function renderReactions(){
+  const R = trk && trk.reactions;
+  $("trkRxH").innerHTML = ["5", "15", "60"].map(h => `<button role="tab" aria-selected="${rxH === h}" data-h="${h}">${h} min</button>`).join("");
+  [...$("trkRxH").children].forEach(b => b.onclick = () => { rxH = b.dataset.h; store.set("gex.rxh", rxH); renderReactions(); });
+  if(!R || !R.types){ $("trkRxSub").textContent = ""; $("trkRx").innerHTML = `<div class="expl">Starts once a graded session's 1-minute prices are saved.</div>`; return; }
+  const need = R.rules.min_touches;
+  $("trkRxSub").textContent = `${R.days} session${R.days === 1 ? "" : "s"} · NQ and ES together · after ${rxH} min`;
+  const rate = c => c.rate == null ? `<span class="dim">-</span>` : `<b title="${c.ci ? `95% range ${pct(c.ci[0])} to ${pct(c.ci[1])} (${c.k} of ${c.n})` : `${c.k} of ${c.n}`}">${pct(c.rate)}</b> <span class="dim" style="white-space:nowrap">vs ${pct(c.random)}</span>`;
+  const VERDICT = {bounce: ["good", "bounces more"], break: ["warn", "breaks more"], fewer_bounces: ["bad", "bounces less"], none: ["", "no edge"]};
+  const rows = R.types.map(t => { const c = t.h[rxH]; if(!c) return "";
+    const [cls, word] = c.verdict === "few" ? ["", `too few (${c.touches}/${need})`] : VERDICT[c.verdict] || ["", c.verdict];
+    return `<tr><td>${esc(t.name)}</td><td class="m">${c.touches}</td><td class="m">${rate(c.bounce)}</td><td class="m">${rate(c.break)}</td><td style="text-align:left"><span class="trk-tag ${cls}" style="margin-left:0">${word}</span></td></tr>`; }).join("");
+  $("trkRx").innerHTML = `<table class="trk-table rx-table"><tr><th>Level</th><th>Touches</th><th>Bounced</th><th>Broke</th><th title="Compared with random strikes at the same distance">Vs random</th></tr>${rows}</table>
+    <div class="expl" style="margin-top:8px">A bounce or break means price moved at least a quarter of the move normally expected in ${rxH} minutes, back from or through the level; anything less is a stall. A verdict needs ${need}+ touches, and the 95% range of the difference from random strikes (from resampling whole days, as NQ and ES move together) must exclude zero. The four key levels go back to ${esc(R.since || "the start")}${R.full_since && R.full_since !== R.since ? `; the other level types to ${esc(R.full_since)}, when full 9:30 pastes began to be saved` : ""}.</div>`;
+}
 function renderTrackSplit(ss){
   const done = ss.filter(s => s.plan && s.outcome), tally = (rows, f) => { const v = rows.map(f).filter(x => x != null); return {k: v.filter(Boolean).length, n: v.length}; };
   const cell = t => t.n ? `<td class="m"><b>${pct(t.k / t.n)}</b> <span class="dim">${t.k}/${t.n}</span></td>` : `<td class="m dim">-</td>`;

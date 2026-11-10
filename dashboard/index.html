@@ -208,6 +208,12 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
         <div class="head"><h2>Scorecard</h2><span class="sub" id="trkScoreSub"></span></div>
         <div id="trkScore"></div>
       </section>
+      <section class="card" data-help="track_reactions" style="margin-top:12px">
+        <div class="head"><h2>How price reacted at each level</h2><span class="sub" id="trkRxSub"></span><span class="spacer"></span>
+          <div class="filters" id="trkRxH" role="tablist" aria-label="Minutes after the touch"></div></div>
+        <div class="expl">The first time price traded to each level after the 9:30 open: did it bounce, break or stall? Next to each rate, what random strikes the same distance away did on other days. Hover a rate for its 95% range.</div>
+        <div id="trkRx"></div>
+      </section>
       <section class="card" data-help="track_moves" style="margin-top:12px">
         <div class="head"><h2>Daily move vs the expected band</h2><span class="sub" id="trkMoveSub"></span></div>
         <div class="chartwrap" id="trkMoveWrap"><svg id="trkMove" role="img" aria-label="Each session's move from the plan price, in expected moves, against the plus and minus one band"></svg><div class="tip" id="trkMoveTip"></div></div>
