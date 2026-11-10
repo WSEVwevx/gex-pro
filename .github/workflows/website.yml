@@ -24,7 +24,9 @@ permissions:
   actions: write                    # only to start the next run (the "next" job)
 
 concurrency:
-  group: website
+  # renamed 2026-11-10: a run GitHub left "waiting" forever (it can't be cancelled) held the old "website"
+  # group, so every later run queued behind it and the site stopped updating
+  group: website-2
   cancel-in-progress: false
 
 jobs:
