@@ -20,14 +20,15 @@ Baseline    for every real level, a strike at the same distance from the open (i
             round numbers, so the baseline must be too) and dropped when it sits on one of that day's real
             levels. Same touch and outcome rules.
 Uncertainty NQ and ES trade together, and one day's levels share that day's tape, so touches are not
-            independent. The 95% ranges come from resampling whole days (bootstrap, fixed seed), and a
-            level type has an edge only when the range of (level rate - random rate) excludes zero.
+            independent: standard errors are clustered by day, with Student's t on (days - 1) degrees of
+            freedom. The page tests every level type x horizon at once, so verdicts use Holm's correction:
+            the chance that ANY verdict on the page is a false edge stays at 5% (checked on random-walk days by
+            tools/stress/reaction_null.py; with per-test 95% ranges, 52% of pure-noise pages showed a false edge).
 """
 from __future__ import annotations
 
 import json
 import math
-import random
 import urllib.request
 from datetime import date, datetime, time
 from typing import Iterable, Optional
@@ -38,7 +39,6 @@ HORIZONS = (5, 15, 60)
 TOUCH = 0.01            # a touch: within 1% of the daily expected move (well inside the 5-minute bounce distance)
 MOVE = 0.25             # a bounce or break: a quarter of the move expected over the horizon
 MIN_TOUCHES = 15        # below this the page says "too few touches" whatever the numbers
-BOOT = 2000
 GRID = {"NDX": 10.0, "SPX": 5.0}                     # index strike spacing near the money
 FUTURES = {"NQ": "NQ=F", "ES": "ES=F"}
 TYPES = [("zg", "Zero gamma"), ("cw", "Call wall"), ("pw", "Put wall"), ("ag", "Abs gamma"),
@@ -195,11 +195,91 @@ def observations(records: Iterable[dict], levels: dict) -> list[dict]:
     return obs
 
 
+ALPHA = 0.05            # chance that ANY verdict on the page is a false edge (Holm across every test shown)
+
+
+def _betacf(a: float, b: float, x: float) -> float:
+    """Lentz's continued fraction for the regularised incomplete beta function."""
+    tiny, qab, qap, qam = 1e-300, a + b, a + 1, a - 1
+    c, d = 1.0, 1 - qab * x / qap
+    d = 1 / (d if abs(d) > tiny else tiny)
+    h = d
+    for m in range(1, 400):
+        m2 = 2 * m
+        for aa in (m * (b - m) * x / ((qam + m2) * (a + m2)), -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2))):
+            d = 1 + aa * d
+            d = 1 / (d if abs(d) > tiny else tiny)
+            c = 1 + aa / c
+            c = c if abs(c) > tiny else tiny
+            h *= d * c
+        if abs(d * c - 1) < 1e-15:
+            break
+    return h
+
+
+def _t_sf2(t: float, df: int) -> float:
+    """Two-sided p-value of Student's t with df degrees of freedom: I_{df/(df+t^2)}(df/2, 1/2)."""
+    if df <= 0 or math.isnan(t):
+        return 1.0
+    x = df / (df + t * t)
+    a, b = df / 2.0, 0.5
+    if x <= 0:
+        return 0.0
+    if x >= 1:
+        return 1.0
+    front = math.exp(math.lgamma(a + b) - math.lgamma(a) - math.lgamma(b) + a * math.log(x) + b * math.log(1 - x))
+    if x < (a + 1) / (a + b + 2):
+        return min(1.0, front * _betacf(a, b, x) / a)
+    return min(1.0, max(0.0, 1 - front * _betacf(b, a, 1 - x) / b))
+
+
+def _t_quantile(conf: float, df: int) -> float:
+    """t such that the two-sided p-value is 1 - conf (bisection)."""
+    lo, hi = 0.0, 200.0
+    for _ in range(100):
+        mid = (lo + hi) / 2
+        if _t_sf2(mid, df) > 1 - conf:
+            lo = mid
+        else:
+            hi = mid
+    return (lo + hi) / 2
+
+
+def _cluster(per: list) -> dict:
+    """Level rate, random-strike rate and their difference with day-clustered (linearised) standard errors.
+    per: one [level hits, level touches, random hits, random touches] per day."""
+    k, n, k0, n0 = (sum(c[i] for c in per) for i in range(4))
+    out = {"k": k, "n": n, "k0": k0, "n0": n0}
+    if n:
+        out["p1"] = k / n
+    if n0:
+        out["p0"] = k0 / n0
+    if not n or not n0:
+        return out                                      # a rate without its comparison: no test
+    p1, p0 = out["p1"], out["p0"]
+    used = [c for c in per if c[1] or c[3]]
+    D = len(used)
+    if D < 2:
+        return out
+    f = D / (D - 1)
+    e1 = [(c[0] - p1 * c[1]) / n for c in used]           # each day's contribution to the level rate's error
+    e0 = [(c[2] - p0 * c[3]) / n0 for c in used]
+    out.update(se1=math.sqrt(f * sum(x * x for x in e1)),
+               sed=math.sqrt(f * sum((x - y) ** 2 for x, y in zip(e1, e0))),   # same days: their covariance counts
+               df=D - 1)
+    return out
+
+
 def summarize(obs: list[dict], seed: int = 7) -> dict:
     """{"types": [...], "days": n} with, per type and horizon, the level's and the random strikes' rates of
-    bounce / break / stall, a day-bootstrap 95% range for the level's rate and for the difference, and a verdict."""
+    bounce / break / stall, a 95% range for the level's rate, a p-value for the difference, and a verdict.
+
+    Inference: day-clustered standard errors (NQ and ES share a day's tape, and one day's levels share it too)
+    and Student's t with (days - 1) degrees of freedom. Every bounce and break test on the page (each level
+    type x horizon with enough touches) is one family; Holm's correction keeps the chance of any false
+    verdict on the page at ALPHA. Checked by tools/stress/reaction_null.py on random-walk days.
+    `seed` is unused (the method has no randomness); kept so callers need not change."""
     days = sorted({o["day"] for o in obs})
-    # per day: counts[day][(type, h, what)] = [level hits, level touches, random hits, random touches]
     counts: dict = {d: {} for d in days}
     for o in obs:
         for hz, res in o["out"].items():
@@ -208,42 +288,42 @@ def summarize(obs: list[dict], seed: int = 7) -> dict:
                 j = 0 if o["real"] else 2
                 c[j] += res == what
                 c[j + 1] += 1
-    rng = random.Random(seed)
-    samples = [[rng.randrange(len(days)) for _ in days] for _ in range(BOOT)] if days else []
-    ci = lambda xs: [round(xs[int(0.025 * (len(xs) - 1))], 3), round(xs[int(0.975 * (len(xs) - 1))], 3)] if len(xs) > 50 else None
-    out = []
+    out, tests = [], []
     for typ, name in TYPES:
         row = {"type": typ, "name": name, "h": {}}
         for hz in HORIZONS:
             cell = {}
             for what in ("bounce", "break", "stall"):
-                per = [counts[d].get((typ, hz, what), [0, 0, 0, 0]) for d in days]
-                k, n, k0, n0 = (sum(c[i] for c in per) for i in range(4))
-                rates, diffs = [], []
-                for smp in samples:
-                    a = an = b = bn = 0
-                    for i in smp:
-                        c = per[i]
-                        a, an, b, bn = a + c[0], an + c[1], b + c[2], bn + c[3]
-                    if an and bn:
-                        rates.append(a / an)
-                        diffs.append(a / an - b / bn)
-                rates.sort()
-                diffs.sort()
-                cell[what] = {"k": k, "n": n, "rate": round(k / n, 3) if n else None, "ci": ci(rates),
-                              "random": round(k0 / n0, 3) if n0 else None, "random_n": n0, "diff_ci": ci(diffs)}
-            n = cell["bounce"]["n"]
-            verdict = "few"
-            if n >= MIN_TOUCHES:
-                verdict = "none"
-                for what in ("bounce", "break"):
-                    d = cell[what]["diff_ci"]
-                    if d and d[0] > 0:
-                        verdict = what               # reliably more bounces (or breaks) than random strikes
-                if verdict == "none" and cell["bounce"]["diff_ci"] and cell["bounce"]["diff_ci"][1] < 0:
-                    verdict = "fewer_bounces"
-            cell["touches"], cell["verdict"] = n, verdict
+                st = _cluster([counts[d].get((typ, hz, what), [0, 0, 0, 0]) for d in days])
+                rate, ci, p = st.get("p1"), None, None
+                if st.get("se1") is not None:
+                    q = _t_quantile(0.95, st["df"])
+                    ci = [round(max(0.0, rate - q * st["se1"]), 3), round(min(1.0, rate + q * st["se1"]), 3)]
+                if st.get("sed") is not None:
+                    diff = st["p1"] - st["p0"]
+                    p = (1.0 if diff == 0 else 0.0) if st["sed"] == 0 else _t_sf2(diff / st["sed"], st["df"])
+                cell[what] = {"k": st["k"], "n": st["n"], "rate": round(rate, 3) if rate is not None else None, "ci": ci,
+                              "random": round(st["p0"], 3) if st.get("p0") is not None else None, "random_n": st["n0"],
+                              "p": round(p, 6) if p is not None else None}
+                if what != "stall" and p is not None and st["n"] >= MIN_TOUCHES:
+                    tests.append((p, typ, hz, what, st["p1"] - st["p0"]))
+            cell["touches"] = cell["bounce"]["n"]
+            cell["verdict"] = "few" if cell["touches"] < MIN_TOUCHES else "none"
             row["h"][str(hz)] = cell
         out.append(row)
-    return {"days": len(days), "types": out,
-            "rules": {"touch_em": TOUCH, "move": MOVE, "horizons": list(HORIZONS), "min_touches": MIN_TOUCHES, "boot": BOOT}}
+    tests.sort(key=lambda t: t[0])
+    best: dict = {}
+    for i, (p, typ, hz, what, diff) in enumerate(tests):     # Holm: stop at the first test that fails
+        if p > ALPHA / (len(tests) - i):
+            break
+        if (typ, hz) not in best:
+            best[(typ, hz)] = (what, diff)
+    for row in out:
+        for hz in HORIZONS:
+            hit = best.get((row["type"], hz))
+            if hit:
+                what, diff = hit
+                row["h"][str(hz)]["verdict"] = what if diff > 0 else ("fewer_bounces" if what == "bounce" else "fewer_breaks")
+    return {"days": len(days), "types": out, "tests": len(tests),
+            "rules": {"touch_em": TOUCH, "move": MOVE, "horizons": list(HORIZONS), "min_touches": MIN_TOUCHES,
+                      "alpha": ALPHA, "method": "day-clustered t test, Holm across the page"}}

@@ -137,7 +137,8 @@ your browser, and the first visit follows your system setting.
   distribution of daily moves against a normal curve. Hypothetical, not trading results.
   **How price reacted at each level:** the first time price traded to each 9:30 level, whether it bounced, broke
   or stalled 5, 15 and 60 minutes later on 1-minute futures, against random strikes at the same distance on
-  other days; a verdict only with 15+ touches and a 95% range (from resampling whole days) that excludes zero.
+  other days; a verdict only with 15+ touches and a difference that survives a Holm correction across the
+  whole page (day-clustered t tests), so at most 5% of pages show any false verdict (`tools/stress/reaction_null.py`).
   Each graded session's 1-minute bars are kept with the track record (`trackrecord/reactions.py`).
 * **Library:** a course in 26 short lessons in six chapters (options basics, dealers and the Greeks, GEX,
   volatility, the GEX PRO levels, using GEX PRO), each with key points, a worked example, diagrams, a
