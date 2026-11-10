@@ -658,8 +658,9 @@ function renderMaxPain(X){
 // =====================================================================================================
 const PAGES = [
   ["levels", "Levels", "LVL"], ["ladder", "Live table", "LIVE"], ["heatmap", "Heatmap", "HEAT"], ["screener", "Screener", "SCRN"],
-  ["bias", "Bias", "BIAS"], ["track", "Track record", "TRK"], ["backtest", "Backtesting", "BT"], ["briefings", "Briefings", "BRF"], ["news", "News", "NEWS"], ["indicator", "Indicator", "IND"],
-  ["library", "Library", "LIB"], ["glossary", "Glossary", "GLOS"], ["health", "Data health", "DATA"]];
+  ["bias", "Bias", "BIAS"], ["track", "Track record", "TRK"], ["briefings", "Briefings", "BRF"], ["news", "News", "NEWS"], ["indicator", "Indicator", "IND"],
+  ["library", "Library", "LIB"], ["glossary", "Glossary", "GLOS"], ["health", "Data health", "DATA"],
+  ["backtest", "Backtesting", "BT"]];          // last, so number keys 1-9, 0 keep opening the same pages as before it existed
 const NO_MARKET_PAGES = ["news", "indicator", "briefings", "library", "glossary", "track", "backtest", "health"];
 const pickP = v => v && typeof v === "object" ? v.price : v;
 const curW = () => data && (data.workers.find(x => x.market === market && x.result) || data.workers.find(x => x.market === market));
