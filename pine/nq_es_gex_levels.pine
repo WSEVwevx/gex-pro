@@ -305,8 +305,14 @@ if hasA
     symA := refOverride != "" ? refOverride : sA.tv != "" ? sA.tv : syminfo.tickerid
 if hasB
     symB := refOverride != "" ? refOverride : sB.tv != "" ? sB.tv : syminfo.tickerid
-refCA = request.security(symA, timeframe.period, close, gaps = barmerge.gaps_on, lookahead = barmerge.lookahead_off, ignore_invalid_symbol = true)
-refCB = request.security(symB, timeframe.period, close, gaps = barmerge.gaps_on, lookahead = barmerge.lookahead_off, ignore_invalid_symbol = true)
+// one price request per source that exists, and none twice for the same symbol (requests are the costliest
+// per-bar work on a 1-minute chart)
+float refCA = na
+float refCB = na
+if hasA
+    refCA := request.security(symA, timeframe.period, close, gaps = barmerge.gaps_on, lookahead = barmerge.lookahead_off, ignore_invalid_symbol = true)
+if hasB
+    refCB := hasA and symB == symA ? refCA : request.security(symB, timeframe.period, close, gaps = barmerge.gaps_on, lookahead = barmerge.lookahead_off, ignore_invalid_symbol = true)
 var float lfA = na
 var float loA = na
 var float lfB = na
@@ -318,7 +324,8 @@ if not na(refCB) and refCB > 0
     lfB := close / refCB
     loB := close - refCB
 
-mapInfo(Snap s, float lf, float lo, float refNow, string sym) =>
+// the status text is only built on the last bar (the info panel), not on every bar of history
+mapInfo(Snap s, float lf, float lo, float refNow, string sym, bool txt) =>
     float f = na
     float o = 0.0
     string st = "n/a"
@@ -337,24 +344,28 @@ mapInfo(Snap s, float lf, float lo, float refNow, string sym) =>
             if not na(s.fac) and s.fac > 0
                 f := s.mapm == "ratio" ? s.fac : 1.0
                 o := s.mapm == "offset" ? s.off : 0.0
-                st := "snapshot " + s.mapm
+                if txt
+                    st := "snapshot " + s.mapm
             else
                 st := "UNAVAILABLE (no snapshot factor)"
         else
             if not na(lf)
                 f := s.mapm == "ratio" ? lf : 1.0
                 o := s.mapm == "offset" ? lo : 0.0
-                st := (na(refNow) ? "held " : "live ") + s.mapm + " vs " + sym
+                if txt
+                    st := (na(refNow) ? "held " : "live ") + s.mapm + " vs " + sym
             else if not na(s.fac) and s.fac > 0
                 f := s.mapm == "ratio" ? s.fac : 1.0
                 o := s.mapm == "offset" ? s.off : 0.0
-                st := "snapshot (no " + sym + " data)"
+                if txt
+                    st := "snapshot (no " + sym + " data)"
             else
-                st := "UNAVAILABLE (no " + sym + " data)"
+                if txt
+                    st := "UNAVAILABLE (no " + sym + " data)"
     [f, o, st]
 
-[facA, offA, mstA] = mapInfo(sA, lfA, loA, refCA, symA)
-[facB, offB, mstB] = mapInfo(sB, lfB, loB, refCB, symB)
+[facA, offA, mstA] = mapInfo(sA, lfA, loA, refCA, symA, barstate.islast)
+[facB, offB, mstB] = mapInfo(sB, lfB, loB, refCB, symB, barstate.islast)
 
 // transparency for a line, never fainter than "Weakest line opacity"
 maxFade = 100 - minOpac
@@ -1029,7 +1040,7 @@ srcTxt(Snap s) =>
 cell(int c, int r, string t, color col, color bg = na) =>
     table.cell(tab, c, r, t, text_color = col, text_halign = c == 0 ? text.align_left : text.align_right, text_size = tSz, bgcolor = bg)
 
-rowKeys = tabDetail == "Minimal" ? array.from("reg", "prs", "zg", "data") : tabDetail == "Compact" ? array.from("reg", "prs", "zg", "cw", "pw", "data")
+var rowKeys = tabDetail == "Minimal" ? array.from("reg", "prs", "zg", "data") : tabDetail == "Compact" ? array.from("reg", "prs", "zg", "cw", "pw", "data")
      : array.from("reg", "prs", "net", "hedge", "charm", "zg", "cw", "pw", "ag", "mx", "x0", "vol", "mp", "em", "map", "data")
 
 rowName(string k) =>
@@ -1170,7 +1181,7 @@ canDraw = okA or okB
 // Optional tint of today's session: above zero gamma = modeled positive gamma, below = negative
 bgcolor(regimeBg and canDraw and time >= sessStartTime and not na(zgF) ? (close >= zgF ? color.new(cPos, 93) : color.new(cNeg, 93)) : na,
      title = "Gamma side tint", editable = false)
-nearest = na(cwF) and na(pwF) and na(zgF) ? na : array.min(array.from(nz(math.abs(close - cwF), 1e12), nz(math.abs(close - pwF), 1e12), nz(math.abs(close - zgF), 1e12)))
+nearest = na(cwF) and na(pwF) and na(zgF) ? na : math.min(nz(math.abs(close - cwF), 1e12), nz(math.abs(close - pwF), 1e12), nz(math.abs(close - zgF), 1e12))
 // ta.cross must run on every bar (v6 `and` is lazy), so evaluate first and combine afterwards
 xCW = ta.cross(close, cwF)
 xPW = ta.cross(close, pwF)
