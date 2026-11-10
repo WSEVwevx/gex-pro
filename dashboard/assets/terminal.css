@@ -383,6 +383,7 @@ td.m{font-family:var(--mono)}
 .trk-table td{vertical-align:top}
 .paste-table{width:auto}.paste-table th,.paste-table td{text-align:left;padding-right:28px}.paste-table td{vertical-align:middle}.paste-table td:first-child{white-space:nowrap}
 @media(max-width:640px){.paste-table th,.paste-table td{padding-right:12px}}
+.rx-table{width:auto}.rx-table th,.rx-table td{padding-right:32px}
 @media(max-width:640px){.rx-table td,.rx-table th{padding-left:4px;padding-right:4px}.rx-table .trk-tag{white-space:normal}}
 .trk-table th:last-child{text-align:left}
 .trk-table .trk-mean{text-align:left;color:var(--ink3);max-width:46ch;line-height:1.45}
