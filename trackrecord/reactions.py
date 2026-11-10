@@ -33,6 +33,8 @@ from datetime import date, datetime, time
 from typing import Iterable, Optional
 from zoneinfo import ZoneInfo
 
+from gexsys.marketcal import rth_close
+
 NY = ZoneInfo("America/New_York")
 HORIZONS = (5, 15, 60)
 TOUCH = 0.01            # a touch: within 1% of the daily expected move (well inside the 5-minute bounce distance)
@@ -88,15 +90,22 @@ def session_levels(plan: dict, paste: Optional[str] = None) -> list[tuple[str, f
 
 
 # ---------------------------------------------------------------------------- 1-minute futures bars
+def session_minutes(d: date) -> int:
+    """Minutes from 09:30 to the cash close: 390, or 210 on a 13:00 early close."""
+    c = rth_close(d)
+    return (c.hour * 60 + c.minute) - (9 * 60 + 30)
+
+
 def parse_minutes(raw: bytes, d: date) -> list[list]:
-    """[[minute after 09:30, high, low, close]] for session d, 09:30 <= t < 16:00 ET (gaps carry nothing)."""
+    """[[minute after 09:30, open, high, low, close]] for session d, from 09:30 to the cash close (ET)."""
     res = json.loads(raw)["chart"]["result"][0]
     q = res["indicators"]["quote"][0]
     o = datetime.combine(d, time(9, 30), NY)
+    end = session_minutes(d)
     out = []
     for i, ts in enumerate(res.get("timestamp") or []):
         m = int((datetime.fromtimestamp(ts, NY) - o).total_seconds() // 60)
-        if 0 <= m < 390 and None not in (q["open"][i], q["high"][i], q["low"][i], q["close"][i]):
+        if 0 <= m < end and None not in (q["open"][i], q["high"][i], q["low"][i], q["close"][i]):
             out.append([m, q["open"][i], q["high"][i], q["low"][i], q["close"][i]])
     return out
 
@@ -121,6 +130,7 @@ def minutes_record(session: dict, bars: list[list]) -> Optional[dict]:
     ratio = bars[0][1] / out["open"]
     return {"session": session["session"], "market": session["market"], "underlying": plan.get("underlying"),
             "index_open": out["open"], "ratio": round(ratio, 6), "em": plan["em"],
+            "close_min": session_minutes(date.fromisoformat(session["session"])),
             "bars": [[m, round(h, 2), round(lo, 2), round(c, 2)] for m, _o, h, lo, c in bars]}
 
 
@@ -143,8 +153,8 @@ def react(rec: dict, level_idx: float) -> Optional[dict]:
     res["minute"] = t0
     at = {m: c for m, h, lo, c in bars}
     for hz in HORIZONS:
-        if t0 + hz >= 390:
-            continue                                # would run past 16:00
+        if t0 + hz >= rec.get("close_min", 390):
+            continue                                # would run past the close (16:00, or 13:00 on early closes)
         c = at.get(t0 + hz)
         if c is None:                               # a missing minute: the last close before it
             prior = [x for x in bars if x[0] <= t0 + hz]

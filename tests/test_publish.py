@@ -41,8 +41,12 @@ class TestSchedule(unittest.TestCase):
         self.assertEqual(pub.due(et(2026, 11, 6, 23, 0), sun, C), et(2026, 11, 8, 23, 0))
 
     def test_holiday_and_early_close(self):
-        # Thanksgiving Thu 2026-11-26: no slots until the 18:00 reopen. Fri 11-27: the futures halt at 13:15
-        self.assertEqual(pub.next_slot(et(2026, 11, 25, 23, 30), C), et(2026, 11, 26, 18, 0))
+        # Thanksgiving Thu 2026-11-26: the futures trade until a 13:00 halt (hourly pastes to 12:00), reopen at 18:00
+        self.assertEqual(pub.next_slot(et(2026, 11, 25, 23, 30), C), et(2026, 11, 26, 0, 0))
+        self.assertEqual(pub.next_slot(et(2026, 11, 26, 12, 30), C), et(2026, 11, 26, 18, 0))
+        # Christmas Fri 2026-12-25: nothing from the Christmas Eve halt to the Sunday reopen
+        self.assertEqual(pub.next_slot(et(2026, 12, 24, 13, 30), C), et(2026, 12, 27, 18, 0))
+        # Fri 11-27: the futures halt at 13:15
         self.assertEqual(pub.next_slot(et(2026, 11, 27, 12, 30), C), et(2026, 11, 27, 13, 0))
         self.assertEqual(pub.latest_slot(et(2026, 11, 27, 23, 59), C), et(2026, 11, 27, 13, 0))
         # cash-hours-only mode still skips slots at or after an early close

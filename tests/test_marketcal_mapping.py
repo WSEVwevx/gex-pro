@@ -35,6 +35,17 @@ class TestCalendar(unittest.TestCase):
         self.assertEqual(mc.session_state(datetime(2026, 11, 27, 18, 30, tzinfo=U)), "CLOSED")   # 13:30 ET, futures halted
         self.assertEqual(mc.session_state(datetime(2026, 12, 24, 23, 30, tzinfo=U)), "CLOSED")   # Christmas Eve evening
 
+    def test_holiday_globex_sessions(self):
+        # Thanksgiving: the futures trade from the evening before to a 13:00 ET halt, then reopen at 18:00
+        s = lambda y, m, d, hh, mm=0: mc.session_state(datetime(y, m, d, hh, mm, tzinfo=mc.NY))
+        self.assertEqual([s(2026, 11, 26, 8), s(2026, 11, 26, 12, 59), s(2026, 11, 26, 13), s(2026, 11, 26, 18, 30)],
+                         ["ETH", "ETH", "HOLIDAY", "ETH"])
+        self.assertEqual((s(2027, 1, 18, 10), s(2027, 1, 18, 14)), ("ETH", "HOLIDAY"))             # MLK Day: same
+        # full closures: Christmas, New Year's Day (and no session the evening before), Good Friday
+        self.assertEqual((s(2026, 12, 25, 10), s(2027, 1, 1, 10), s(2026, 12, 31, 18, 30)), ("HOLIDAY", "HOLIDAY", "CLOSED"))
+        self.assertEqual((s(2026, 4, 2, 18, 30), s(2026, 4, 3, 10)), ("CLOSED", "HOLIDAY"))
+        self.assertEqual(s(2027, 1, 3, 18, 30), "ETH")                                              # Sunday reopen
+
     def test_dst_transitions(self):
         # 2026-03-08 spring forward. 09:35 EST = 14:35Z (Fri); 09:35 EDT = 13:35Z (Mon)
         self.assertEqual(mc.session_state(datetime(2026, 3, 6, 14, 35, tzinfo=U)), "RTH")

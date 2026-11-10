@@ -290,7 +290,7 @@ class TrackRecordComponent:
             except Exception as e:
                 log.warning("1-minute bars for %s failed: %s", key, e)
                 continue
-            if rec and len(rec["bars"]) >= 300:                  # a full session, not a partial download
+            if rec and len(rec["bars"]) >= 0.75 * rec["close_min"]:   # a full session (early closes included), not a partial download
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(json.dumps(rec, separators=(",", ":")), encoding="utf-8")
                 done.append(f"{d}_{s['market']} minutes")

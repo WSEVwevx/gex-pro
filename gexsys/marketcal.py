@@ -99,6 +99,16 @@ def early_closes(year: int) -> dict[date, time]:
     return out
 
 
+FULL_CLOSURES = {"New Year's Day", "Good Friday", "Christmas Day"}    # CME equity futures closed all day
+
+
+def globex_morning(d: date) -> bool:
+    """A cash holiday on which CME equity index futures still trade until 13:00 ET (Thanksgiving, MLK Day, ...):
+    every NYSE holiday except New Year's Day, Good Friday, Christmas Day and the special closures."""
+    name = nyse_holidays(d.year).get(d)
+    return bool(name) and name not in FULL_CLOSURES and d not in EXTRA_CLOSURES
+
+
 def is_trading_day(d: date) -> bool:
     return d.weekday() < 5 and d not in nyse_holidays(d.year)
 
@@ -114,6 +124,8 @@ def session_state(dt: datetime) -> str:
     t = dt.astimezone(NY)
     d, clock, wd = t.date(), t.time(), t.weekday()
     if d in nyse_holidays(d.year):
+        if globex_morning(d) and clock < time(13, 0):          # the overnight session runs on to a 13:00 ET halt
+            return "ETH"
         # Globex reopens at 18:00 ET for the next trading day (not after Good Friday: that is the weekend)
         return "ETH" if clock >= time(18, 0) and is_trading_day(d + timedelta(days=1)) else "HOLIDAY"
     if wd < 5 and time(9, 30) <= clock < rth_close(d):
@@ -125,6 +137,9 @@ def session_state(dt: datetime) -> str:
         return "CLOSED"
     if time(17, 0) <= clock < time(18, 0):
         return "CLOSED"
+    nxt = d + timedelta(days=1)
+    if clock >= time(18, 0) and nxt in nyse_holidays(nxt.year) and not globex_morning(nxt):
+        return "CLOSED"                                        # no evening session before New Year's Day / Good Friday
     return "ETH"
 
 

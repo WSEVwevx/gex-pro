@@ -41,6 +41,12 @@ class TestReact(unittest.TestCase):
         self.assertIsNone(R.react(rec(walk((10, 1005))), 1000.5))       # within the touch distance at the open: no side
         self.assertFalse(R.react(rec(walk((10, 1005))), 1050.0)["touched"])
 
+    def test_early_close_ends_the_horizons_at_13_00(self):
+        r = rec(walk((165, 1020), (30, 990)))                           # touch at about 12:15 on a 13:00 close
+        r["close_min"] = 210
+        self.assertEqual(sorted(R.react(r, 1020.0)["out"]), [5, 15])     # 12:00 + 60 min would pass the close
+        self.assertEqual((R.session_minutes(date(2026, 11, 27)), R.session_minutes(date(2026, 11, 25))), (210, 390))
+
     def test_futures_mapping_uses_the_open_ratio(self):
         r = rec(walk((10, 1022))); r["ratio"] = 1.002                  # futures 0.2% over the index
         self.assertTrue(R.react(r, 1020.0)["touched"])                  # the level sits at 1022.04 in futures

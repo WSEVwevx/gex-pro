@@ -52,7 +52,11 @@ def _calendar(now: datetime) -> dict:
     """This year's and next year's market holidays and 13:00 closes, for the page's session clock."""
     y = now.astimezone(marketcal.NY).year
     days = lambda fn: sorted(d.isoformat() for yr in (y, y + 1) for d in fn(yr))
-    return {"holidays": days(marketcal.nyse_holidays), "early_closes": days(marketcal.early_closes)}
+    hol = [d for yr in (y, y + 1) for d in marketcal.nyse_holidays(yr)]
+    return {"holidays": days(marketcal.nyse_holidays), "early_closes": days(marketcal.early_closes),
+            # holidays when the futures still trade until 13:00, and evenings with no session (before New Year's Day...)
+            "globex_mornings": sorted(d.isoformat() for d in hol if marketcal.globex_morning(d)),
+            "no_evening": sorted((d - timedelta(days=1)).isoformat() for d in hol if not marketcal.globex_morning(d))}
 
 
 def _all(workers: Iterable[MarketWorker], **extra) -> dict:
