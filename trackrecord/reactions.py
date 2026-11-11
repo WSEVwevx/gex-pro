@@ -12,7 +12,7 @@ Prices      1-minute futures bars (NQ=F / ES=F, Yahoo, free), 09:30-16:00 ET. Le
 Touch       a level above the open is tested from below, one below from above; the first bar that trades
             within TOUCH (1%) of the daily expected move of it. Levels that close to the open are skipped.
 Outcome     h = 5, 15 and 60 minutes after the touch bar: price past the level by at least
-            MOVE x the move normally expected in h minutes (expected move x sqrt(h / 390)) is a BREAK; back on
+            MOVE x the move normally expected in h minutes (expected move x sqrt(h / session minutes): 390, or 210 on a 13:00 close) is a BREAK; back on
             the side it came from by as much is a BOUNCE; anything in between is a STALL. A horizon that
             would run past 16:00 is not counted.
 Baseline    for every real level, a strike at the same distance from the open (in expected moves, same
@@ -156,7 +156,7 @@ def react(rec: dict, level_idx: float) -> Optional[dict]:
         if c is None:                               # a missing minute: the last close before it
             prior = [x for x in bars if x[0] <= t0 + hz]
             c = prior[-1][3]
-        th = MOVE * em * math.sqrt(hz / 390.0)
+        th = MOVE * em * math.sqrt(hz / rec.get("close_min", 390))     # the day's band spans its own session
         through = (c - L) * side
         res["out"][hz] = "break" if through >= th else "bounce" if through <= -th else "stall"
     return res

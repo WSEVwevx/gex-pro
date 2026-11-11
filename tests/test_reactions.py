@@ -48,6 +48,16 @@ class TestReact(unittest.TestCase):
         close = lambda h: datetime(2026, 11, 27, h, 0, tzinfo=R.NY)
         self.assertEqual((R.session_minutes(close(13)), R.session_minutes(close(16))), (210, 390))
 
+    def test_early_close_scales_the_threshold_by_its_own_session(self):
+        # stress test E2: a 13:00 close's expected move covers 210 minutes, so a 60-minute move is judged against
+        # em x sqrt(60/210); scaling by 390 called a move a break that was a stall
+        mid = 1010 + R.MOVE * 100 * ((60 / 390) ** 0.5 + (60 / 210) ** 0.5) / 2
+        r = rec(walk((10, 1010))[:12] + [1010.0] * 57 + [mid] * 141)             # touched at minute 9: minute 69 decides
+        r["close_min"] = 210
+        self.assertEqual(R.react(r, 1010.0)["out"][60], "stall")
+        r["close_min"] = 390
+        self.assertEqual(R.react(r, 1010.0)["out"][60], "break")
+
     def test_futures_mapping_uses_the_open_ratio(self):
         r = rec(walk((10, 1022))); r["ratio"] = 1.002                  # futures 0.2% over the index
         self.assertTrue(R.react(r, 1020.0)["touched"])                  # the level sits at 1022.04 in futures
