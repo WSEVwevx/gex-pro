@@ -1,0 +1,27 @@
+{
+ "session": "2026-11-11",
+ "market": "ES",
+ "status": "pending",
+ "plan": {
+  "session": "2026-11-11",
+  "market": "ES",
+  "underlying": "SPX",
+  "asof": "2026-11-11T14:29:17.804247+00:00",
+  "frozen_at": "2026-11-11T15:02:54.774431+00:00",
+  "ref": 7520.93,
+  "em": 99.9,
+  "em_iv": 0.2551,
+  "regime": "NEGATIVE",
+  "net": -59142338969.0,
+  "zg": 7594.03,
+  "cw": 7700.0,
+  "pw": 7000.0,
+  "ag": 7000.0,
+  "bias": "Neutral",
+  "confidence": "Low",
+  "day_type": "Trend / expansion",
+  "side": "negative",
+  "target": 7520.93
+ },
+ "outcome": null
+}
