@@ -114,9 +114,15 @@ def main() -> int:
         age = timedelta(days=1)
     if a.simulate_stale:
         age = timedelta(minutes=a.simulate_stale)
-    runs = gh.call("GET", f"/actions/workflows/{WORKFLOW}/runs?per_page=30")["workflow_runs"]
-    jobs = {r["id"]: gh.call("GET", f"/actions/runs/{r['id']}/jobs")["jobs"] for r in runs if r["status"] != "completed"}
-    issues = [i for i in gh.call("GET", "/issues?state=open&per_page=50") if i["title"] == ISSUE_TITLE and "pull_request" not in i]
+    try:
+        runs = gh.call("GET", f"/actions/workflows/{WORKFLOW}/runs?per_page=30")["workflow_runs"]
+        jobs = {r["id"]: gh.call("GET", f"/actions/runs/{r['id']}/jobs")["jobs"] for r in runs if r["status"] != "completed"}
+        issues = [i for i in gh.call("GET", "/issues?state=open&per_page=50") if i["title"] == ISSUE_TITLE and "pull_request" not in i]
+    except (urllib.error.URLError, OSError, ValueError, KeyError, TypeError) as e:
+        # GitHub's API is down: nothing can be checked or started, and a failed run would only mail the owner
+        # every 15 minutes. The next run retries; a long outage still opens the stale-site issue once it is back.
+        print(f"GitHub API unavailable ({e}); trying again on the next run")
+        return 0
     d = decide(age, now, runs, jobs, bool(issues))
     print(json.dumps(d))
     if a.dry_run:
@@ -131,8 +137,11 @@ def main() -> int:
                 print(f"{how} {rid}: {e.code}")
     if d["dispatch"]:
         lane = f"w{os.environ.get('GITHUB_RUN_ID', int(now.timestamp()))}"
-        gh.call("POST", f"/actions/workflows/{WORKFLOW}/dispatches", {"ref": "main", "inputs": {"lane": lane}})
-        print(f"started a website run in lane {lane}")
+        try:
+            gh.call("POST", f"/actions/workflows/{WORKFLOW}/dispatches", {"ref": "main", "inputs": {"lane": lane}})
+            print(f"started a website run in lane {lane}")
+        except (urllib.error.URLError, OSError) as e:
+            print(f"could not start a website run ({e}); the next watchdog run tries again")
     if d["open_issue"]:
         gh.call("POST", "/issues", {"title": ISSUE_TITLE, "body": (
             f"The hosted site's last build is {int(age.total_seconds() // 60)} minutes old while it should rebuild "

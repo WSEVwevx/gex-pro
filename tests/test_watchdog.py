@@ -53,5 +53,32 @@ class TestWatchdog(unittest.TestCase):
         self.assertFalse(d["open_issue"])
 
 
+class TestGitHubOutage(unittest.TestCase):
+    def test_api_down_exits_quietly_without_acting(self):
+        # stress test F2: a GitHub API outage made every watchdog run fail (an email every 15 minutes)
+        import os
+        import urllib.error
+        calls = []
+
+        def down(self, method, path, body=None):
+            calls.append((method, path))
+            raise urllib.error.HTTPError(path, 503, "Service Unavailable", {}, None)
+        orig_call, orig_age = W.GitHub.call, W.stamp_age
+        env = {k: os.environ.get(k) for k in ("GITHUB_REPOSITORY", "GITHUB_TOKEN")}
+        try:
+            W.GitHub.call, W.stamp_age = down, lambda now: timedelta(hours=3)
+            os.environ.update(GITHUB_REPOSITORY="o/r", GITHUB_TOKEN="x")
+            sys.argv = ["watchdog.py"]
+            self.assertEqual(W.main(), 0)
+            self.assertEqual([m for m, _ in calls], ["GET"])               # one failed read, no cancel / dispatch / issue
+        finally:
+            W.GitHub.call, W.stamp_age = orig_call, orig_age
+            for k, v in env.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+
+
 if __name__ == "__main__":
     unittest.main()
