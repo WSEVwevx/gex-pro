@@ -172,15 +172,28 @@ def _is_futures(snap: ChainSnapshot) -> bool:
     return snap.source_kind == SourceKind.FUTURES
 
 
+MAX_IV = 5.0      # Cboe quotes 600-700% "IVs" for deep in-the-money SPX calls that are pure intrinsic value; gamma
+                  # at such a vol is invented, so they count as missing (stress test B1, 2026-11-10)
+
+
+def contract_q(c: OptionContract, snap: ChainSnapshot) -> float:
+    """The carry yield for this contract: futures options use the rate (Black-76); a converted ETF option keeps
+    its ETF's dividend yield (stress test B1, 2026-11-10: QQQ legs valued with NDX's 0.7% instead of QQQ's 0.6%
+    had their gamma 0.13% off, so the conversion did not conserve dollar gamma)."""
+    if _is_futures(snap):
+        return snap.rate
+    return c.div_yield if c.div_yield is not None else snap.div_yield
+
+
 def _contract_gamma_at(c: OptionContract, s: float, t: float, iv: float, snap: ChainSnapshot) -> float:
-    return pricing.model_gamma(s, c.strike, t, snap.rate, snap.div_yield, iv, _is_futures(snap))
+    return pricing.model_gamma(s, c.strike, t, snap.rate, contract_q(c, snap), iv, _is_futures(snap))
 
 
 def _solve_iv(c: OptionContract, s: float, t: float, snap: ChainSnapshot) -> Optional[float]:
     mid = c.mid
     if mid is None:
         return None
-    q = snap.rate if _is_futures(snap) else snap.div_yield
+    q = contract_q(c, snap)
     return pricing.implied_vol(mid, s, c.strike, t, snap.rate, q, c.option_type == OptionType.CALL,
                                pricing.QUOTE_TOL, pricing.QUOTE_MAX_VOL_ERR)
 
@@ -235,8 +248,9 @@ def compute(snap: ChainSnapshot, cfg: Optional[EngineConfig] = None, asof: Optio
     # solvable mid (typically deep in the money, where the mid sits below intrinsic value)
     smile: dict[datetime, list[tuple[float, float]]] = {}
     n_borrowed = 0
+    usable = lambda v: v is not None and 0 < v <= MAX_IV
     for c in snap.contracts:
-        if c.iv is not None and c.iv > 0 and c.expiration in basket_set:
+        if usable(c.iv) and c.expiration in basket_set:
             smile.setdefault(c.expiration, []).append((c.strike, c.iv))
     for c in snap.contracts:
         if c.expiration not in basket_set:
@@ -246,12 +260,14 @@ def compute(snap: ChainSnapshot, cfg: Optional[EngineConfig] = None, asof: Optio
             excluded["zero_or_missing_oi"] += 1
             continue
         t = (c.expiration - asof).total_seconds() / YEAR_SECONDS
-        iv = c.iv
+        iv = c.iv if usable(c.iv) else None      # a vendor IV above MAX_IV is a placeholder, not a vol
         gamma, gq = c.gamma, c.greeks_quality
         need = gamma is None or cfg.recompute_greeks == "always"
         if need:
             if iv is None:
-                iv = _solve_iv(c, s, t, snap)
+                # solve at the quote's own time (the feed is delayed: greeks_time), price it at asof
+                tq = t if c.greeks_time is None else (c.expiration - c.greeks_time).total_seconds() / YEAR_SECONDS
+                iv = _solve_iv(c, s, tq, snap) if tq > 0 else None
             if iv is None and smile.get(c.expiration):
                 iv = min(smile[c.expiration], key=lambda kv: abs(kv[0] - c.strike))[1]
                 n_borrowed += 1

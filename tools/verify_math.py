@@ -12,7 +12,7 @@ import math
 import re
 import sys
 import urllib.request
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 sys.path.insert(0, ".")
@@ -22,6 +22,7 @@ R = 0.04
 Q = {"SPX": 0.013, "SPY": 0.013, "NDX": 0.007, "QQQ": 0.006}
 EARLY = {date(2026, 11, 27): time(13, 0), date(2026, 12, 24): time(13, 0)}
 MAX_DTE = 45
+STANDARD = {"SPX": {"SPX", "SPXW"}, "NDX": {"NDX", "NDXP"}, "SPY": {"SPY"}, "QQQ": {"QQQ"}}
 
 
 def fetch(sym):
@@ -79,6 +80,8 @@ def rows_of(raw, key, asof, q_solve=None):
         if not p:
             continue
         root, d, cp, k = p
+        if root not in STANDARD.get(key, {root}):        # adjusted / special-settlement series are not the standard contract
+            continue
         if not (0 <= (d - today).days <= MAX_DTE):
             continue
         strikes.add(k)
@@ -90,14 +93,20 @@ def rows_of(raw, key, asof, q_solve=None):
         quoted = 0 < iv <= 5
         if quoted:
             smile.append((e, k, float(iv)))
-        if oi <= 0:
-            continue
+        if oi <= 0 and not (key in ("SPY", "QQQ") and not quoted):
+            continue                                   # (an ETF IV is solved even at zero OI: it can be a neighbour)
         if not quoted:                                 # Cboe IV missing/bad: solve it from the bid/ask mid
             b, a = o.get("bid"), o.get("ask")
             iv = None
             if b is not None and a is not None and a > 0 and b >= 0 and a >= b:
-                iv = solve_iv((a + b) / 2, float(raw["data"]["current_price"]), k, t, q_solve, cp == "C")
-        out.append({"root": root, "cp": cp, "k": k, "t": t, "e": e, "oi": float(oi), "iv": iv})
+                # the quote is 15 minutes old: solve at its own time
+                quoted_at = datetime.strptime(raw["timestamp"], "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc) - timedelta(minutes=15)
+                tq = (e - quoted_at).total_seconds() / YEAR
+                iv = solve_iv((a + b) / 2, float(raw["data"]["current_price"]), k, tq, q_solve, cp == "C") if tq > 0 else None
+                if iv and key in ("SPY", "QQQ"):         # a solved ETF IV is a usable neighbour too (the provider solves these)
+                    smile.append((e, k, float(iv)))
+        if oi > 0:
+            out.append({"root": root, "cp": cp, "k": k, "t": t, "e": e, "oi": float(oi), "iv": iv})
     return out, sorted(strikes), smile
 
 
@@ -120,7 +129,7 @@ def independent(raw_i, raw_e, idx, etf, asof):
     for e, k, v in ismile:
         smile.setdefault(e, []).append((k, v))
     for e, k, v in esmile:
-        smile.setdefault(e, []).append((snap_to(k * ratio, istrikes, tol), v))
+        smile.setdefault(e, []).append((k * ratio, v))           # the exact converted strike: borrowing picks the truly nearest
     def fill(r, k_idx):
         if r["iv"] is None and smile.get(r["e"]):
             r["iv"] = min(smile[r["e"]], key=lambda kv: abs(kv[0] - k_idx))[1]
@@ -131,7 +140,7 @@ def independent(raw_i, raw_e, idx, etf, asof):
             legs.append((r["k"], r["cp"], r["oi"], S, r["k"], Q[idx], r["t"], r["iv"]))
     for r in re_:
         k_idx = snap_to(r["k"] * ratio, istrikes, tol)
-        if fill(r, k_idx):
+        if fill(r, r["k"] * ratio):
             legs.append((k_idx, r["cp"], r["oi"], Se, r["k"], Q[etf], r["t"], r["iv"]))
 
     def dollar(leg, move=1.0):     # $ gamma per 1% for the leg, with the underlying scaled by `move`

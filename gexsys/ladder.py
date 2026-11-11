@@ -16,6 +16,7 @@ from datetime import date
 from typing import Optional
 
 from . import marketcal, pricing
+from .engine import contract_q
 from .models import OptionType
 
 WINDOW = 0.035                # rows cover price +/- 3.5%
@@ -57,10 +58,10 @@ def build_ladder(res, snap) -> Optional[dict]:
     idx = {e: i for i, e in enumerate(exps)}
     other = len(exps)                                   # everything else in the basket, pooled
     tot = [[0.0, 0.0] for _ in range(other + 1)]
-    q = snap.div_yield
     cells: dict[float, dict[int, list]] = {}
     for r in res.rows:
         c = r.contract
+        q = contract_q(c, snap)
         i = idx.get(c.expiration, other)
         is_call = c.option_type == OptionType.CALL
         delta = c.delta

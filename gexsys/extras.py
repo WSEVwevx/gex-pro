@@ -270,11 +270,10 @@ def greek_exposures(snap: ChainSnapshot, res: eng.GexResult) -> Optional[dict]:
     rows = [r for r in res.rows if r.iv]
     if not rows or not s:
         return None
-    futures = snap.source_kind.value == "FUT"
-    q = snap.rate if futures else snap.div_yield
     vex = cex = 0.0
     for r in rows:
         c = r.contract
+        q = eng.contract_q(c, snap)
         w = r.sign * c.open_interest * c.multiplier * s
         vex += w * pricing.bsm_vanna(s, c.strike, r.t_years, snap.rate, q, r.iv) * 0.01
         cex += w * pricing.bsm_charm(s, c.strike, r.t_years, snap.rate, q, r.iv, c.option_type == OptionType.CALL) / 365.0
@@ -300,6 +299,9 @@ def flow_ratios(snap: ChainSnapshot, basket: list[str]) -> dict:
 def compute_extras(snap: ChainSnapshot, cfg: eng.EngineConfig, res: eng.GexResult) -> dict:
     if res.status == "UNAVAILABLE":
         return {}
+    # only contracts still alive: on a monthly expiry day the AM-settled series settle at 09:30, and matching the
+    # basket by DATE kept them in max pain, the OI / volume walls and the ratios until 16:00 (stress test B1)
+    snap = dataclasses.replace(snap, contracts=[c for c in snap.contracts if c.expiration > res.asof])
     basket_cs = _basket_contracts(snap, res.basket)
     # IVs for the bands: the engine's own (vendor IV or solved), so contracts with solved IV count too
     with_iv = [r.contract if r.contract.iv else dataclasses.replace(r.contract, iv=r.iv) for r in res.rows if r.iv]

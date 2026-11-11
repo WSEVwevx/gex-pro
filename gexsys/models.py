@@ -64,6 +64,9 @@ class OptionContract:
     exercise_style: str = "european"   # european | american
     group_strike: Optional[float] = None   # strike used to GROUP levels when it differs from the exact
                                            # strike (ETF options converted to index terms); math uses `strike`
+    div_yield: Optional[float] = None      # this contract's own underlying yield when it differs from the
+                                           # snapshot's (a converted ETF option keeps the ETF's, so its dollar
+                                           # gamma is unchanged by the conversion)
 
     @property
     def level_strike(self) -> float:

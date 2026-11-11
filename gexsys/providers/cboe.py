@@ -82,11 +82,15 @@ class CboeProvider(Provider):
             except ValueError:
                 pass
         today = ts.astimezone(marketcal.NY).date()
-        contracts, bad = [], 0
+        contracts, bad, other = [], 0, 0
+        roots = STANDARD_ROOTS.get(source_key)
         for o in data.get("options") or []:
             p = parse_occ(str(o.get("option", "")))
             if p is None:
                 bad += 1
+                continue
+            if roots and p["root"] not in roots:
+                other += 1                           # adjusted or special-settlement series: not the standard contract
                 continue
             dte = (p["expiration"] - today).days
             if dte < 0 or dte > max_dte or (dte == 0 and not include_0dte):
@@ -109,7 +113,7 @@ class CboeProvider(Provider):
                 quote_quality=Quality.DELAYED, oi_quality=Quality.EOD,
                 greeks_quality=Quality.PROVIDER_CALC if gamma is not None else Quality.MISSING,
                 greeks_time=ts - DELAY, exercise_style=src.exercise))
-        return {"spot": spot, "spot_time": spot_time, "contracts": contracts, "bad": bad, "ts": ts,
+        return {"spot": spot, "spot_time": spot_time, "contracts": contracts, "bad": bad, "other": other, "ts": ts,
                 "prev_close": _f(data.get("prev_day_close"))}
 
     def fetch_snapshot(self, source_key: str, max_dte: float = 45, include_0dte: bool = True) -> ChainSnapshot:
@@ -119,6 +123,8 @@ class CboeProvider(Provider):
         warnings = ["Cboe free feed: quotes 15-min DELAYED, OI end-of-day"]
         if ch["bad"]:
             warnings.append(f"cboe: {ch['bad']} unparseable option symbols skipped")
+        if ch.get("other"):
+            warnings.append(f"cboe: {ch['other']} non-standard {source_key} options left out (adjusted or special-settlement series)")
         if not contracts:
             raise ProviderError(f"Cboe returned no usable {source_key} contracts within {max_dte} DTE")
         etf = ETF_FOR.get(source_key) if self.include_etf else None
@@ -131,7 +137,7 @@ class CboeProvider(Provider):
                 if ech["spot"] and ech["contracts"]:
                     r = spot / ech["spot"]
                     contracts = contracts + merge_etf(contracts, ech["contracts"], r, source_key, src.multiplier,
-                                                      etf_spot=ech["spot"], asof=ch["ts"], etf_q=dividend_yield(etf))
+                                                      etf_spot=ech["spot"], asof=ech["ts"] - DELAY, etf_q=dividend_yield(etf))   # the ETF chain's own quote time
                     warnings.append(f"includes {etf} options in {source_key} terms "
                                     f"({r:.2f} {etf} contracts = 1 {source_key} contract)")
         return ChainSnapshot(underlying=src.vendor_symbol, source_kind=src.kind, spot=spot,
@@ -139,6 +145,12 @@ class CboeProvider(Provider):
                              spot_quality=Quality.DELAYED if spot else Quality.MISSING, contracts=contracts,
                              source="cboe:delayed", fetched_at=datetime.now(timezone.utc), warnings=warnings,
                              prev_close=ch["prev_close"], rate=risk_free_rate(), div_yield=dividend_yield(source_key))
+
+
+# The standard series only. Cboe also lists e.g. B1SPY (an adjusted SPY series: a different deliverable, so its
+# gamma is not SPY's) and SPXO (Wednesday special-settlement SPX); counting them as standard contracts was wrong,
+# and B1SPY even became the paste's ETF label (stress test B1, 2026-11-10).
+STANDARD_ROOTS = {"SPX": {"SPX", "SPXW"}, "NDX": {"NDX", "NDXP"}, "SPY": {"SPY"}, "QQQ": {"QQQ"}}
 
 
 def risk_free_rate() -> float:
@@ -163,13 +175,15 @@ def merge_etf(index_contracts: list[OptionContract], etf_contracts: list[OptionC
     tol = 0.75 * (gaps[len(gaps) // 2] if gaps else 1.0)
     out: list[OptionContract] = []
     for c in etf_contracts:
-        if c.iv is None and c.mid is not None and etf_spot and asof:
+        # no IV, or a placeholder above 500% (stress test B1: the engine then dropped it, and with it the quote
+        # that could have given a real one): solve from the bid / ask, in the ETF's own terms
+        if (c.iv is None or c.iv > 5.0) and c.mid is not None and etf_spot and asof:
             yrs = (c.expiration - asof).total_seconds() / (365.0 * 86400)
+            iv = None
             if yrs > 0:
                 iv = pricing.implied_vol(c.mid, etf_spot, c.strike, yrs, risk_free_rate(), etf_q,
                                          c.option_type == OptionType.CALL, pricing.QUOTE_TOL, pricing.QUOTE_MAX_VOL_ERR)
-                if iv and iv <= 5.0:
-                    c = replace(c, iv=iv)
+            c = replace(c, iv=iv if iv and iv <= 5.0 else None)
         k = c.strike * ratio
         i = bisect.bisect_left(strikes, k)
         near = min((strikes[j] for j in (i - 1, i) if 0 <= j < len(strikes)), key=lambda s: abs(s - k), default=None)
@@ -178,5 +192,6 @@ def merge_etf(index_contracts: list[OptionContract], etf_contracts: list[OptionC
                            multiplier=index_multiplier,
                            open_interest=None if c.open_interest is None else c.open_interest / ratio,
                            volume=None if c.volume is None else c.volume / ratio,
-                           bid=None, ask=None, last=None, gamma=None, delta=None, greeks_quality=Quality.MISSING))
+                           bid=None, ask=None, last=None, gamma=None, delta=None, greeks_quality=Quality.MISSING,
+                           div_yield=etf_q))
     return out
