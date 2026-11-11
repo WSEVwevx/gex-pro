@@ -206,6 +206,7 @@ window.GEX_LIBRARY = (() => {
       oneLiner: "Implied volatility is the movement priced into options; the expected move translates it into points.",
       body: `<p>Option prices contain the market's estimate of future movement: <b>implied volatility (IV)</b>, quoted as an annual percentage. Higher IV means larger expected moves and more expensive options.</p>
         <p>The <b>expected move</b> is IV converted into price: the range that price stays within about <b>68% of the time</b> (one standard deviation, 1σ). A useful rule of thumb: IV ÷ 16 is roughly the one-day move in percent, because 16 ≈ √252 trading days.</p>
+        <p>Options usually price a little more movement than then happens: a daily band built from the VIX held 78% of S&amp;P 500 closes from 1990 to 2026, not 68%.</p>
         <p>GEX PRO calculates it precisely from the at-the-money IV of the expiration that closes the session, using the exact time remaining.</p>`,
       points: ["IV is quoted per year; divide by 16 for a rough daily %.", "±1σ contains price about 68% of the time, ±2σ about 95%.", "Higher IV = wider expected ranges."],
       example: `ES at 7,600 with IV of 16%: 16 ÷ 16 = 1% per day, about ±76 points. On roughly two sessions in three, ES closes within that range.`,
