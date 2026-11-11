@@ -100,7 +100,9 @@ def run_once(cfg: MarketConfig, provider, store: Optional[SnapshotStore] = None,
     summary["mapping_note"] = map_note
 
     store_key = f"{cfg.market}-{summary['provider']}"   # each source has its own history
-    prev = store.latest(store_key) if store else None
+    # compare with the last USABLE result: one blanked refresh must not make the next good one look like
+    # every level "appeared" and the regime changed from UNAVAILABLE (stress test F1)
+    prev = store.latest(store_key, usable=True) if store else None
     if prev and prev.get("seeded"):           # history restored from the state-seed branch: levels only, not a full result
         prev = None
     delta = eng.diff(prev, summary) if prev else None
@@ -114,7 +116,8 @@ def run_once(cfg: MarketConfig, provider, store: Optional[SnapshotStore] = None,
         store.save(store_key, summary, raw=snap)
     # compare like with like: the stored previous summary is in index points, so is `summary`
     # (comparing it with the futures-mapped levels reported the basis as a several-hundred-tick "shift")
-    fired = alerts.evaluate(cfg.market, prev, summary, FUTURES[cfg.market].tick_size) if alerts else []
+    # an outage is reported by the stale check, not as level alerts
+    fired = alerts.evaluate(cfg.market, prev, summary, FUTURES[cfg.market].tick_size) if alerts and res.status != "UNAVAILABLE" else []
     return {
         "summary": summary, "mapped": mapped, "delta": delta, "pine": payload, "alerts": fired,
         "bias": compute_bias(mapped or summary, datetime.now(timezone.utc)),

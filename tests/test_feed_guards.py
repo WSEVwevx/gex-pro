@@ -63,5 +63,21 @@ class TestFiniteQuotes(unittest.TestCase):
         self.assertEqual(drivers._bars(bars), [[1, 1.0, 1.0, 1.0, 1.0]])
 
 
+class TestStoreLatest(unittest.TestCase):
+    def test_latest_skips_unusable_results_and_reads_newest_first(self):
+        # stress test F1: after one blanked refresh, the next good one fired "regime changed from UNAVAILABLE" and
+        # "level appeared" alerts; and latest() read every saved file on every refresh
+        import tempfile
+        from gexsys.storage import SnapshotStore
+        with tempfile.TemporaryDirectory() as tmp:
+            st = SnapshotStore(tmp)
+            t0 = datetime(2026, 11, 10, 15, 0, tzinfo=timezone.utc)
+            st.save("NQ", {"asof": t0.isoformat(), "status": "OK", "n": 1})
+            st.save("NQ", {"asof": (t0 + timedelta(minutes=1)).isoformat(), "status": "UNAVAILABLE", "n": 2})
+            self.assertEqual(st.latest("NQ")["n"], 2)
+            self.assertEqual(st.latest("NQ", usable=True)["n"], 1)
+            self.assertIsNone(st.latest("ES"))
+
+
 if __name__ == "__main__":
     unittest.main()

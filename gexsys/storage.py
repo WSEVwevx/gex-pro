@@ -61,8 +61,19 @@ class SnapshotStore:
                 gone += 1
         return gone
 
-    def latest(self, market: str) -> Optional[dict]:
-        last = None
-        for s in self.iter_summaries(market):
-            last = s
-        return last
+    def latest(self, market: str, usable: bool = False) -> Optional[dict]:
+        """The newest summary (usable=True: the newest that is not UNAVAILABLE). Reads from the newest file
+        back: reading the whole history on every refresh slowed each one as the 12 days filled up (stress test F1)."""
+        base = self.root / market
+        if not base.exists():
+            return None
+        for p in sorted(base.glob("*/*.json"), reverse=True):
+            if p.name.endswith(".chain.json"):
+                continue
+            try:
+                s = json.loads(p.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            if not usable or s.get("status") != "UNAVAILABLE":
+                return s
+        return None
