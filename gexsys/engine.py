@@ -172,6 +172,8 @@ def _is_futures(snap: ChainSnapshot) -> bool:
     return snap.source_kind == SourceKind.FUTURES
 
 
+# warnings that make a result DEGRADED (the levels stand, but the inputs were not whole or not fresh)
+DEGRADING = ("stale", "may be corrupt", "options not used")
 MAX_IV = 5.0      # Cboe quotes 600-700% "IVs" for deep in-the-money SPX calls that are pure intrinsic value; gamma
                   # at such a vol is invented, so they count as missing (stress test B1, 2026-11-10)
 
@@ -356,7 +358,8 @@ def compute(snap: ChainSnapshot, cfg: Optional[EngineConfig] = None, asof: Optio
         warnings.append(f"{excluded['missing_greeks']} contracts excluded for missing Greeks/IV")
     if n_borrowed:
         warnings.append(f"{n_borrowed} contracts without a usable IV used the nearest strike's IV (same expiration)")
-    if any("stale" in w for w in warnings) or coverage < cfg.min_profile_coverage:
+    # stale prices, a damaged feed, or the ETF chain dropped because its price was wrong: say so
+    if any(m in w for w in warnings for m in DEGRADING) or coverage < cfg.min_profile_coverage:
         status = "DEGRADED"
 
     return GexResult(

@@ -72,6 +72,8 @@ class CboeProvider(Provider):
             ts = datetime.strptime(d["timestamp"], "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
         except (KeyError, ValueError) as e:
             raise ProviderError("Cboe response missing/invalid timestamp") from e
+        if ts > datetime.now(timezone.utc) + timedelta(minutes=10):    # a shifted clock would hide staleness
+            raise ProviderError(f"Cboe timestamp {d['timestamp']} UTC is in the future")
         spot = _f(data.get("current_price"))
         # the underlying's own last trade time (ET) is the honest timestamp for current_price;
         # fall back to snapshot time minus the 15-minute delay
@@ -134,8 +136,13 @@ class CboeProvider(Provider):
             except ProviderError as e:                   # the index chain alone is still valid
                 warnings.append(f"cboe: {etf} options unavailable ({e}); levels from {source_key} only")
             else:
-                if ech["spot"] and ech["contracts"]:
-                    r = spot / ech["spot"]
+                r = spot / ech["spot"] if ech["spot"] and ech["spot"] > 0 else None
+                lo, hi = ETF_RATIO.get(source_key, (0, float("inf")))
+                why = ("no usable contracts" if not ech["contracts"] else "no price" if r is None
+                       else None if lo <= r <= hi else f"price ratio {r:.2f} outside {lo:g}-{hi:g}")
+                if why:                                  # one of the two prices is wrong: never convert with it
+                    warnings.append(f"cboe: {etf} options not used ({why}); levels from {source_key} only")
+                else:
                     contracts = contracts + merge_etf(contracts, ech["contracts"], r, source_key, src.multiplier,
                                                       etf_spot=ech["spot"], asof=ech["ts"] - DELAY, etf_q=dividend_yield(etf))   # the ETF chain's own quote time
                     warnings.append(f"includes {etf} options in {source_key} terms "
@@ -151,6 +158,8 @@ class CboeProvider(Provider):
 # gamma is not SPY's) and SPXO (Wednesday special-settlement SPX); counting them as standard contracts was wrong,
 # and B1SPY even became the paste's ETF label (stress test B1, 2026-11-10).
 STANDARD_ROOTS = {"SPX": {"SPX", "SPXW"}, "NDX": {"NDX", "NDXP"}, "SPY": {"SPY"}, "QQQ": {"QQQ"}}
+# index / ETF price ratios outside these mean one of the two prices is wrong (SPY ~ SPX/10, QQQ ~ NDX/41)
+ETF_RATIO = {"SPX": (9.5, 10.5), "NDX": (38.0, 45.0)}
 
 
 def risk_free_rate() -> float:

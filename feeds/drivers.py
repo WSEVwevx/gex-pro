@@ -14,6 +14,7 @@ from __future__ import annotations
 import html
 import json
 import logging
+import math
 import re
 import threading
 import time
@@ -51,12 +52,16 @@ def parse_weights(page: str) -> list:
     return [[s, unescape(name).strip(), float(w)] for s, name, w in ROW.findall(page)]
 
 
+def _ok(*v) -> bool:
+    return all(isinstance(x, (int, float)) and math.isfinite(x) for x in v)
+
+
 def _bars(r: dict) -> list:
     """[[unix seconds, open, high, low, close], ...] from one chart result, empty bars skipped."""
     q = ((r.get("indicators") or {}).get("quote") or [{}])[0]
     o, h, lo, c = (q.get(k) or [] for k in ("open", "high", "low", "close"))
     return [[int(t), round(o[i], 2), round(h[i], 2), round(lo[i], 2), round(c[i], 2)]
-            for i, t in enumerate(r.get("timestamp") or []) if i < min(len(o), len(h), len(lo), len(c)) and None not in (o[i], h[i], lo[i], c[i])]
+            for i, t in enumerate(r.get("timestamp") or []) if i < min(len(o), len(h), len(lo), len(c)) and _ok(o[i], h[i], lo[i], c[i])]
 
 
 def parse_intraday(raw: bytes) -> Optional[dict]:
@@ -68,13 +73,13 @@ def parse_intraday(raw: bytes) -> Optional[dict]:
         price, prev = float(m["regularMarketPrice"]), float(m["chartPreviousClose"])
     except (KeyError, IndexError, TypeError, ValueError):
         return None
-    if price <= 0 or prev <= 0:
+    if not (math.isfinite(price) and math.isfinite(prev)) or price <= 0 or prev <= 0:
         return None
     reg = (m.get("currentTradingPeriod") or {}).get("regular") or {}
     out = {"price": price, "prev": prev, "pct": (price / prev - 1) * 100, "volume": m.get("regularMarketVolume"), "ext": None,
            "bars": _bars(r), "session": [reg.get("start"), reg.get("end")]}
     closes = ((r.get("indicators") or {}).get("quote") or [{}])[0].get("close") or []
-    last = next(((t, c) for t, c in zip(reversed(r.get("timestamp") or []), reversed(closes)) if c), None)
+    last = next(((t, c) for t, c in zip(reversed(r.get("timestamp") or []), reversed(closes)) if c and _ok(c)), None)
     if last and reg.get("start") and reg.get("end"):
         t, c = last
         session = "after" if t >= reg["end"] else "pre" if t < reg["start"] else None
@@ -92,8 +97,8 @@ def parse_daily(raw: bytes) -> Optional[dict]:
         q = r["indicators"]["quote"][0]
     except (KeyError, IndexError, TypeError, ValueError):
         return None
-    vols = [v for v in (q.get("volume") or [])[:-1] if v]
-    closes = [round(c, 2) for c in (q.get("close") or []) if c]
+    vols = [v for v in (q.get("volume") or [])[:-1] if v and _ok(v)]
+    closes = [round(c, 2) for c in (q.get("close") or []) if c and _ok(c)]
     return {"avg_volume": sum(vols) / len(vols) if vols else None, "spark": closes[-21:-1] if len(closes) > 1 else closes,
             "bars": _bars(r)}
 

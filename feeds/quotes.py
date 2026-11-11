@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import threading
 import time
 import urllib.parse
@@ -38,7 +39,7 @@ def parse(raw: bytes) -> Optional[dict]:
         price, prev = float(m["regularMarketPrice"]), float(m["chartPreviousClose"])
     except (KeyError, IndexError, TypeError, ValueError):
         return None
-    if price <= 0 or prev <= 0:
+    if not (math.isfinite(price) and math.isfinite(prev)) or price <= 0 or prev <= 0:
         return None
     return {"price": price, "prev": prev, "change": price - prev, "pct": (price / prev - 1) * 100,
             "time": datetime.fromtimestamp(int(m.get("regularMarketTime") or 0), timezone.utc).isoformat()}

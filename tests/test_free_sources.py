@@ -172,20 +172,24 @@ class TestCombined(unittest.TestCase):
         from gexsys import basis
         t0 = int(datetime(2026, 11, 9, 15, 0, tzinfo=NY).timestamp())
         idx = {t0 + 60 * i: 100.0 for i in range(30)}
-        fut = {t: 101.0 for t in idx}
+        fut = {t: 100.4 for t in idx}
         fut[t0 + 60 * 29] = 150.0                                          # one bad print: the median ignores it
         idx[t0 + 86400] = 100.0                                            # next day, one minute only: a new session
-        fut[t0 + 86400] = 100.5
+        fut[t0 + 86400] = 100.35
         r, when = basis.median_ratio(fut, idx, datetime(2026, 11, 9, 23, 0, tzinfo=NY))
-        self.assertEqual((r, when.timestamp()), (1.01, t0 + 60 * 29))
-        self.assertEqual(basis.median_ratio(fut, idx, datetime(2026, 11, 10, 16, 0, tzinfo=NY))[0], 1.005)
+        self.assertEqual((round(r, 12), when.timestamp()), (1.004, t0 + 60 * 29))
+        self.assertAlmostEqual(basis.median_ratio(fut, idx, datetime(2026, 11, 10, 16, 0, tzinfo=NY))[0], 1.0035, places=12)
         orig = basis._yahoo_1m
         try:
             basis._yahoo_1m = lambda sym, asof: fut if "=F" in sym else idx
             ob = basis.observed_basis("NDX", datetime(2026, 11, 9, 23, 0, tzinfo=NY))
-            self.assertEqual(ob[0], 1.01)
+            self.assertAlmostEqual(ob[0], 1.004, places=12)
             self.assertIn("NQ=F", ob[2])
             self.assertIsNone(basis.observed_basis("NDX", datetime(2026, 11, 20, 12, 0, tzinfo=NY)))   # stale
+            # stress test E1: bars shifted an hour gave a plausible but 93-point-wrong ratio; 0.6% from carry is refused
+            far = {t: v * 1.006 for t, v in fut.items()}
+            basis._yahoo_1m = lambda sym, asof: far if "=F" in sym else idx
+            self.assertIsNone(basis.observed_basis("NDX", datetime(2026, 11, 9, 23, 0, tzinfo=NY)))
             def down(sym, asof):
                 raise OSError("offline")
             basis._yahoo_1m = down

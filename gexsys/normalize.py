@@ -17,6 +17,7 @@ from .models import ChainSnapshot, OptionContract, OptionType, Quality
 
 log = logging.getLogger(__name__)
 
+CORRUPT_SHARE = 0.02      # more contracts than this with invalid values: the result is DEGRADED
 OCC_RE = re.compile(r"^(?:O:)?([A-Z0-9]{1,6})(\d{2})(\d{2})(\d{2})([CP])(\d{8})$")
 
 
@@ -97,4 +98,8 @@ def normalize(snap: ChainSnapshot, check_occ: bool = False, max_quote_age_s: Opt
         if v:
             warnings.append(f"normalize: {v} {k.replace('_', ' ')}")
             log.info("normalize %s=%d underlying=%s", k, v, snap.underlying)
+    bad = sum(counts[k] for k in ("invalid", "bad_oi", "bad_iv", "bad_gamma", "occ_mismatch"))
+    if snap.contracts and bad > CORRUPT_SHARE * len(snap.contracts):
+        # a few placeholders are normal (Cboe: ~0.3% IVs above 500%); many mean the feed is damaged
+        warnings.append(f"invalid values in {bad} of {len(snap.contracts)} contracts: the feed may be corrupt")
     return replace(snap, contracts=list(seen.values()), warnings=warnings)

@@ -33,6 +33,7 @@ log = logging.getLogger(__name__)
 OBSERVED = {"NDX": ("NQ=F", "^NDX"), "SPX": ("ES=F", "^GSPC")}     # Yahoo's continuous futures roll like NQ1!
 MAP_N = 15                       # minutes in the median, as in the indicator
 MAX_AGE = timedelta(days=4)      # older than this (a long weekend at most): use the carry model
+MAX_MODEL_GAP = 0.003            # further than this from the carry model: misaligned or wrong bars
 _cache: dict = {}
 DEFAULT_DIV_YIELD = {"SPX": 0.013, "NDX": 0.007, "SPY": 0.013, "QQQ": 0.006}
 CODE_MONTH = {v: k for k, v in marketcal.QUARTER_CODES.items()}
@@ -106,5 +107,12 @@ def observed_basis(source_key: str, asof: datetime) -> Optional[tuple[float, dat
         log.warning("measured basis unavailable (%s)", e)
         return None
     if not got or asof - got[1] > MAX_AGE or not 0.98 < got[0] < 1.05:
+        return None
+    # misaligned bars (a shifted clock) give a plausible-looking but wrong ratio: the market's basis never
+    # strayed more than 0.17% from the carry model in Oct-Nov 2026 (stress tests C1, E1)
+    model = math.exp((float(os.environ.get("GEX_RISK_FREE_RATE", "0.04")) - DEFAULT_DIV_YIELD.get(source_key, 0.0))
+                     * max(0.0, (futures_expiry("NQ" if source_key == "NDX" else "ES", asof)[1] - asof).total_seconds() / (365 * 86400)))
+    if abs(got[0] / model - 1) > MAX_MODEL_GAP:
+        log.warning("measured basis %.6f is %.2f%% from the carry model; not used", got[0], 100 * (got[0] / model - 1))
         return None
     return got[0], got[1], f"measured {fs} / {ix} basis (15-minute median to {got[1].astimezone(marketcal.NY):%m-%d %H:%M} ET)"
