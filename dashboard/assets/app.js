@@ -609,7 +609,10 @@ function renderBias(w){
 }
 
 function drawBias(b, col){
-  const svg = $("biasChart"), W = Math.max($("biasWrap").clientWidth, 280), H = 420, padL = 70, padR = 132, padT = 14, padB = 30;
+  const svg = $("biasChart"), W = Math.max($("biasWrap").clientWidth, 280), H = 420, padT = 14, padB = 30;
+  const narrow = W < 520, padL = narrow ? 50 : 70, padR = narrow ? 92 : 132;                // phones: short names, more plot
+  const SHORT = {"Call wall": "CW", "Put wall": "PW", "Zero gamma": "ZG", "Abs gamma": "AG", "Max pain 0DTE": "MP", "Base case": "Base"};
+  const nm = n => narrow ? SHORT[n] || n : n;
   const lv = Object.entries(b.levels || {}).filter(([, p]) => Math.abs(p - b.ref) <= 1.6 * b.expected_move);
   const ys = [...b.cone.flatMap(c => [c[1], c[2]]), ...b.path.map(p => p[1]), ...b.range, ...lv.map(([, p]) => p)];
   const lo = Math.min(...ys) - b.expected_move * 0.08, hi = Math.max(...ys) + b.expected_move * 0.08, T = b.session.minutes;
@@ -618,20 +621,28 @@ function drawBias(b, col){
   const clock = m => new Date(open.getTime() + m * 60000).toLocaleTimeString("en-US", {...ET, hour:"numeric", minute:"2-digit"});
   let g = "";
   for(let i = 0; i <= 6; i++){ const p = lo + (hi - lo) * i / 6; g += `<line x1="${padL}" x2="${W-padR}" y1="${y(p)}" y2="${y(p)}" stroke="var(--line)"/><text x="${padL-8}" y="${y(p)+4}" text-anchor="end">${num(p,0)}</text>`; }
-  for(let m = 30; m <= T; m += 60){ g += `<line x1="${x(m)}" x2="${x(m)}" y1="${padT}" y2="${H-padB}" stroke="var(--line)"/><text x="${x(m)}" y="${H-10}" text-anchor="middle">${clock(m)}</text>`; }
+  const every = [60, 120, 180].find(s => (W - padL - padR) * s / T >= (narrow ? 44 : 64)) || 180;     // ticks that never collide
+  for(let m = 30; m <= T; m += every){ g += `<line x1="${x(m)}" x2="${x(m)}" y1="${padT}" y2="${H-padB}" stroke="var(--line)"/><text x="${x(m)}" y="${H-10}" text-anchor="middle">${narrow ? clock(m).replace(":00", "") : clock(m)}</text>`; }
   // range band and cone
   g += `<rect x="${x(b.session.start_minute)}" y="${y(b.range[1])}" width="${x(T) - x(b.session.start_minute)}" height="${y(b.range[0]) - y(b.range[1])}" fill="${col}" opacity=".06"/>`;
   g += `<polygon points="${b.cone.map(c => `${x(c[0])},${y(c[2])}`).join(" ")} ${b.cone.slice().reverse().map(c => `${x(c[0])},${y(c[1])}`).join(" ")}" fill="rgba(139,149,165,.22)" stroke="rgba(139,149,165,.45)" stroke-width="1"/>`;
   // key levels with collision-free labels
   const LC = {"Call wall": "var(--pos)", "Put wall": "var(--neg)", "Zero gamma": "var(--zg)", "Abs gamma": "var(--ag)", "Max pain 0DTE": "var(--mp)"};
   lv.forEach(([n, p]) => { g += `<line x1="${padL}" x2="${W-padR}" y1="${y(p)}" y2="${y(p)}" stroke="${LC[n]}" stroke-width="1.3" stroke-dasharray="${n === "Zero gamma" ? "6 4" : "2 3"}"/>`; });
-  const labels = [...lv.map(([n, p]) => [p, `${n} ${num(p,0)}`, LC[n]]), [b.target, `Base case ${num(b.target,0)}`, col]];
+  // levels at the same (rounded) price share one label: "Put wall · Abs gamma 7,021"
+  const merged = list => Object.values(list.reduce((acc, [n, p]) => {
+    const k = num(p, 0);
+    (acc[k] = acc[k] || {p, names: [], color: LC[n]}).names.push(n);
+    return acc;
+  }, {}));
+  const labels = [...merged(lv).map(m => [m.p, `${m.names.map(nm).join(" · ")} ${num(m.p,0)}`, m.color]), [b.target, `${nm("Base case")} ${num(b.target,0)}`, col]];
   let last = -1e9;
   labels.sort((a, c) => y(a[0]) - y(c[0])).forEach(([p, t, c]) => { const ly = Math.max(y(p) + 4, last + 14); last = ly; g += `<text x="${W-padR+8}" y="${ly}" style="fill:${c}">${esc(t)}</text>`; });
-  // levels too far away to draw at this scale: named at the edge they lie beyond, with their distance
-  const off = Object.entries(b.levels || {}).filter(([n, p]) => p != null && !lv.some(([m]) => m === n)).sort((a, c) => c[1] - a[1]);
-  off.filter(([, p]) => p > b.ref).reverse().forEach(([n, p], i) => { g += `<text x="${W-padR-6}" y="${padT + 12 + i * 14}" text-anchor="end" style="fill:${LC[n]}">↑ ${esc(n)} ${num(p,0)} (+${num(p - b.ref,0)})</text>`; });
-  off.filter(([, p]) => p <= b.ref).forEach(([n, p], i) => { g += `<text x="${W-padR-6}" y="${H - padB - 8 - i * 14}" text-anchor="end" style="fill:${LC[n]}">↓ ${esc(n)} ${num(p,0)} (${num(p - b.ref,0)})</text>`; });
+  // levels too far away to draw at this scale: named at the edge they lie beyond (farthest outermost), with their distance
+  const off = merged(Object.entries(b.levels || {}).filter(([n, p]) => p != null && !lv.some(([m]) => m === n))).sort((a, c) => c.p - a.p);
+  const edge = (m, ly, arrow) => `<text x="${W-padR-6}" y="${ly}" text-anchor="end" style="fill:${m.color}">${arrow} ${esc(m.names.map(nm).join(" · "))} ${num(m.p,0)} (${m.p > b.ref ? "+" : ""}${num(m.p - b.ref,0)})</text>`;
+  off.filter(m => m.p > b.ref).forEach((m, i) => { g += edge(m, padT + 12 + (i + (narrow ? 1 : 0)) * 14, "↑"); });     // phones: under the "open" tag
+  off.filter(m => m.p <= b.ref).reverse().forEach((m, i) => { g += edge(m, H - padB - 8 - i * 14, "↓"); });
   // path, start and now markers
   g += `<polyline fill="none" stroke="${col}" stroke-width="2.5" stroke-linejoin="round" points="${b.path.map(p => `${x(p[0])},${y(p[1])}`).join(" ")}"/>`;
   const s0 = b.path[0];
@@ -643,7 +654,7 @@ function drawBias(b, col){
   svg.setAttribute("width", W); svg.setAttribute("height", H); svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
   svg.innerHTML = g;
   $("pathSw").style.background = col;
-  document.querySelectorAll("#biasLegend [data-lv]").forEach(el => { el.style.display = (lv.some(([n]) => n === el.dataset.lv) || off.some(([n]) => n === el.dataset.lv)) ? "" : "none"; });   // only what is shown
+  document.querySelectorAll("#biasLegend [data-lv]").forEach(el => { el.style.display = (lv.some(([n]) => n === el.dataset.lv) || off.some(m => m.names.includes(el.dataset.lv))) ? "" : "none"; });   // only what is shown
   const tip = $("biasTip");
   svg.onmousemove = e => {
     const r = svg.getBoundingClientRect(), mx = (e.clientX - r.left - padL) / (W - padL - padR) * T;
