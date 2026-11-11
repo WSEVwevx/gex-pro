@@ -76,8 +76,8 @@ class TestPineStatic(unittest.TestCase):
         # (or a typo, or a v5 leftover like transp / when) must be checked there too before it joins the list
         inp = {"display", "group", "inline", "tooltip"}
         known = {
-            "array.clear": set(), "array.from": set(), "array.get": set(), "array.includes": set(), "array.min": set(), "array.push": set(),
-            "array.set": set(), "array.size": set(), "box.delete": set(), "label.delete": set(), "line.delete": set(),
+            "array.clear": set(), "array.from": set(), "array.get": set(), "array.includes": set(), "array.median": set(), "array.min": set(),
+            "array.push": set(), "array.set": set(), "array.shift": set(), "array.size": set(), "box.delete": set(), "label.delete": set(), "line.delete": set(),
             "box.new": {"bgcolor", "border_color", "border_width", "extend", "xloc"},
             "color.new": set(), "label.set_text": set(), "line.set_color": set(),
             "input.bool": inp, "input.color": inp, "input.float": inp | {"maxval", "minval", "step"},
@@ -108,6 +108,16 @@ class TestPineStatic(unittest.TestCase):
                 top += ch if d == 0 else " "
             for arg in re.findall(r"(?:^|,)\s*(\w+)\s*=(?!=)", top):
                 self.assertIn(arg, known[name], f"{name}(): '{arg} =' is not an argument it takes")
+
+    def test_mapping_ratio_is_a_session_median(self):
+        # stress test C1 (2026-11-10): one minute's futures / index ratio moved an NQ level 10 points (95th pct) from
+        # minute to minute; the median of the last 15 matched minutes, restarted each session, is the fix
+        self.assertIn("MAP_N = 15", CODE)
+        for slot in "AB":
+            self.assertIn(f"array.median(bR{slot})", CODE)
+            self.assertIn(f"array.median(bD{slot})", CODE)
+        self.assertIn("> 3600000", CODE)
+        self.assertNotIn("matchPair", CODE)
 
     def test_continuation_lines_are_not_block_indented(self):
         # Pine reads a line indented by a multiple of 4 as a new statement in a block; a wrapped line must use
