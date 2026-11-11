@@ -628,6 +628,10 @@ function drawBias(b, col){
   const labels = [...lv.map(([n, p]) => [p, `${n} ${num(p,0)}`, LC[n]]), [b.target, `Base case ${num(b.target,0)}`, col]];
   let last = -1e9;
   labels.sort((a, c) => y(a[0]) - y(c[0])).forEach(([p, t, c]) => { const ly = Math.max(y(p) + 4, last + 14); last = ly; g += `<text x="${W-padR+8}" y="${ly}" style="fill:${c}">${esc(t)}</text>`; });
+  // levels too far away to draw at this scale: named at the edge they lie beyond, with their distance
+  const off = Object.entries(b.levels || {}).filter(([n, p]) => p != null && !lv.some(([m]) => m === n)).sort((a, c) => c[1] - a[1]);
+  off.filter(([, p]) => p > b.ref).reverse().forEach(([n, p], i) => { g += `<text x="${W-padR-6}" y="${padT + 12 + i * 14}" text-anchor="end" style="fill:${LC[n]}">↑ ${esc(n)} ${num(p,0)} (+${num(p - b.ref,0)})</text>`; });
+  off.filter(([, p]) => p <= b.ref).forEach(([n, p], i) => { g += `<text x="${W-padR-6}" y="${H - padB - 8 - i * 14}" text-anchor="end" style="fill:${LC[n]}">↓ ${esc(n)} ${num(p,0)} (${num(p - b.ref,0)})</text>`; });
   // path, start and now markers
   g += `<polyline fill="none" stroke="${col}" stroke-width="2.5" stroke-linejoin="round" points="${b.path.map(p => `${x(p[0])},${y(p[1])}`).join(" ")}"/>`;
   const s0 = b.path[0];
@@ -639,7 +643,7 @@ function drawBias(b, col){
   svg.setAttribute("width", W); svg.setAttribute("height", H); svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
   svg.innerHTML = g;
   $("pathSw").style.background = col;
-  document.querySelectorAll("#biasLegend [data-lv]").forEach(el => { el.style.display = lv.some(([n]) => n === el.dataset.lv) ? "" : "none"; });   // only what is drawn
+  document.querySelectorAll("#biasLegend [data-lv]").forEach(el => { el.style.display = (lv.some(([n]) => n === el.dataset.lv) || off.some(([n]) => n === el.dataset.lv)) ? "" : "none"; });   // only what is shown
   const tip = $("biasTip");
   svg.onmousemove = e => {
     const r = svg.getBoundingClientRect(), mx = (e.clientX - r.left - padL) / (W - padL - padR) * T;
