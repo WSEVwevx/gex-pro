@@ -84,7 +84,9 @@ class MarketWorker(threading.Thread):
         try:
             p = json.loads(self._pub_path.read_text(encoding="utf-8"))
             slot = datetime.strptime(p["slot_et"], "%Y-%m-%d %H:%M").replace(tzinfo=marketcal.NY)
-        except (OSError, ValueError, KeyError):
+            if not isinstance(p.get("payload"), str):
+                return
+        except (OSError, ValueError, KeyError, TypeError, AttributeError):    # damaged file: start without it
             return
         self.published, self.published_slot = p, slot
 
@@ -102,6 +104,8 @@ class MarketWorker(threading.Thread):
         try:
             r = json.loads(self._good_path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
+            return
+        if not isinstance(r, dict) or not isinstance(r.get("summary"), dict):    # damaged (stress test F1): start fresh
             return
         r["summary"].setdefault("warnings", []).append("restored from the previous run - waiting for a fresh refresh")
         self.result = r

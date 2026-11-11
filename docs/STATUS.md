@@ -6,6 +6,7 @@ system. **Awaiting credentials**: needs your provider account. **Simulated**: te
 
 | Area | Feature | Status |
 |---|---|---|
+| Stress | Quant stress test 2026-11-10 (tools/stress/: 18 scripts, each states its tolerance before running): Greeks, IV solver, independent GEX recompute, zero-gamma stability, ETF merge, chart mapping, roll/expiry, Pine parity, expected-move calibration, bias, reaction-study null, look-ahead, feed fuzzing, calendar 2026-2027, service stress, hosted/local parity | **21 defects fixed** with regression tests. Still failing as specified: chart mapping vs a 4% carry model (the model, not the chart, is off); bias not shown to beat a coin (no graded calls since the fix); band calibration unproven (28 sessions) |
 | Math | BSM / Black-76 gamma, delta, price; IV solver; CRR American check | Working (finite-difference and hand-checked) |
 | Math | GEX in 3 units with conversion; 4 positioning models | Working |
 | Math | Aggregation by strike, side, expiry, DTE bucket; density; totals | Working |

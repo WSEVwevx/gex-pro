@@ -79,5 +79,22 @@ class TestStoreLatest(unittest.TestCase):
             self.assertIsNone(st.latest("ES"))
 
 
+class TestDamagedCache(unittest.TestCase):
+    def test_service_starts_on_damaged_saved_files(self):
+        # stress test F1: a last-good or published file holding null or the wrong JSON shape crashed startup
+        import tempfile
+        from pathlib import Path
+        from gexsys import config as cfgmod, service
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = cfgmod.load("configs/free_nq_cboe.json")
+            cfg.storage["root"] = tmp
+            for junk in (b"null", b'{"unexpected": 1}', b'{"summary": 3}', b"\x00\xff garbage", b'{"slot_et": 5}'):
+                for name in ("last_good_NQ-CBOE.json", "published_NQ-CBOE.json"):
+                    (Path(tmp) / name).write_bytes(junk)
+                w = service.MarketWorker(cfg)
+                self.assertIsNone(w.result)
+                self.assertIsNone(w.published)
+
+
 if __name__ == "__main__":
     unittest.main()
