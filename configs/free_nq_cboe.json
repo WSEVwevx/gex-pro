@@ -63,7 +63,7 @@
     "max_skew_s": 60
   },
   "futures_ref": {
-    "mode": "carry"
+    "mode": "observed"
   },
   "description": "NQ levels from NDX + QQQ options (Cboe free feed, 15-min delayed), QQQ converted to NDX terms, mapped to NQ futures",
   "market": "NQ",

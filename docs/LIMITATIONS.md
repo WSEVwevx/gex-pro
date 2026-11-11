@@ -40,12 +40,13 @@ level as a *modeled concentration of option gamma*.
    to `EXTRA_CLOSURES`. CME's abbreviated holiday sessions are modeled as Globex trading until 13:00 ET on
    every NYSE holiday except New Year's Day, Good Friday and Christmas (closed all day, with no session the
    evening before); CME occasionally changes a holiday's hours, which is not picked up automatically.
-10. **Rollover.** `front_contract` uses the conventional roll (8 days before the third Friday).
+10. **Rollover.** The website's carry model prices the quarterly a continuous chart shows (NQ1!, ES1!: the
+    expiring contract until its 09:30 settlement). If you roll your chart to the next month 8 days early,
+    the indicator still maps correctly (it uses your chart); the website's futures prices are then a roll apart.
     Futures-options payloads must name the same contract month as the chart, or use `calendar_offset`.
 11. **SPY/QQQ in index terms.** ETF options are converted with the live index/ETF price ratio. Dollar
-    gamma is exact (exact converted strikes are used for all math), but the ETF's own IV and American
-    exercise are kept and its gamma uses the index's dividend yield (QQQ 0.6% vs NDX 0.7%: about 1 NDX
-    point of zero-gamma difference). Levels group each ETF strike with the nearest listed index strike.
+    gamma is exact (exact converted strikes are used for all math), and the ETF's own IV, dividend yield and
+    American exercise are kept. Levels group each ETF strike with the nearest listed index strike.
 
 ## Track record and backtest
 

@@ -44,6 +44,14 @@ def _futures_ref(cfg: MarketConfig, snap, override: Optional[tuple], provider=No
         return float(cfg.futures_ref["price"]), datetime.fromisoformat(t) if t else st, "manual", s, st
     if mode == "synthetic_basis" and s:
         return s * float(cfg.futures_ref.get("factor", 1.0105)), st, "synthetic", s, st
+    if mode == "observed" and s and st:
+        from .basis import observed_basis
+        ob = observed_basis(cfg.source, st)
+        if ob:
+            return s * ob[0], st, ob[2], s, st
+        c = _carry(cfg, s, st, " - measured basis unavailable")
+        if c:
+            return c
     if mode == "carry" and s and st:
         c = _carry(cfg, s, st)
         if c:

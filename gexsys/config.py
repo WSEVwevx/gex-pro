@@ -73,12 +73,12 @@ class MarketConfig:
         if self.provider.get("include_etf") and self.source not in ("SPX", "NDX"):
             raise ConfigError("provider.include_etf adds SPY to SPX or QQQ to NDX: source must be SPX or NDX")
         mode = self.futures_ref.get("mode", "none")
-        if mode not in ("none", "manual", "synthetic_basis", "carry"):
-            raise ConfigError("futures_ref.mode must be none | manual | synthetic_basis | carry")
+        if mode not in ("none", "manual", "synthetic_basis", "carry", "observed"):
+            raise ConfigError("futures_ref.mode must be none | manual | synthetic_basis | carry | observed")
         if mode == "synthetic_basis" and name != "synthetic":
             raise ConfigError("futures_ref.mode synthetic_basis is only allowed with the synthetic provider")
-        if mode == "carry" and src.kind.value != "INDEX":
-            raise ConfigError("futures_ref.mode carry needs a cash-index source (SPX or NDX)")
+        if mode in ("carry", "observed") and src.kind.value != "INDEX":
+            raise ConfigError(f"futures_ref.mode {mode} needs a cash-index source (SPX or NDX)")
         self.engine.validate()
         self.publish.validate()
         return self

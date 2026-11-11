@@ -130,10 +130,15 @@ class TestCarryBasis(unittest.TestCase):
         self.assertAlmostEqual(fv, 7700.0 * math.exp(0.027 * t))
         self.assertTrue(7733 < fv < 7734)                      # 58.7 days of 2.7% carry: 7700*(e^(0.027*0.1609)-1) = +33.5
 
-    def test_after_roll_uses_next_contract_and_micro_maps(self):
-        code, exp = futures_expiry("MNQ", datetime(2026, 12, 11, 12, 0, tzinfo=NY))
-        self.assertEqual(code, "NQH7")
-        self.assertEqual(exp.date().isoformat(), "2027-03-19")
+    def test_contract_is_the_one_a_continuous_chart_shows(self):
+        # stress test C2: NQ1! / NQ=F keep the expiring quarterly through roll week and switch at its 09:30
+        # settlement; pricing the next one from the roll date put the website ~0.8% (~230 NQ points) off the chart
+        for t, want in ((datetime(2026, 12, 10, 12, 0, tzinfo=NY), "NQZ6"),      # roll date
+                        (datetime(2026, 12, 18, 9, 29, tzinfo=NY), "NQZ6"),      # expiry day, before settlement
+                        (datetime(2026, 12, 18, 9, 30, tzinfo=NY), "NQH7"),
+                        (datetime(2027, 3, 21, 18, 5, tzinfo=NY), "NQM7")):      # Sunday open after March expiry
+            self.assertEqual(futures_expiry("MNQ", t)[0], want, t)
+        self.assertEqual(futures_expiry("NQ", datetime(2026, 12, 18, 10, 0, tzinfo=NY))[1].date().isoformat(), "2027-03-19")
 
     def test_etf_source_not_supported(self):
         self.assertIsNone(carry_fair_value("ES", "SPY", 770.0, datetime(2026, 10, 20, 16, 0, tzinfo=NY)))
@@ -161,10 +166,44 @@ class TestCombined(unittest.TestCase):
             self.assertIn("carry-model", r["mapped"]["mapping"]["futures_ref_mode"])
             self.assertEqual(len(list(SnapshotStore(tmp).iter_summaries("NQ-CBOE"))), 1)
 
+    def test_measured_basis_is_a_session_median_with_carry_fallback(self):
+        # stress test C1: the 4% carry model sat 22 NQ points below the market; the measured basis is the median
+        # futures / index ratio of the last 15 minutes both traded, restarted after an hour's gap, like the indicator
+        from gexsys import basis
+        t0 = int(datetime(2026, 11, 9, 15, 0, tzinfo=NY).timestamp())
+        idx = {t0 + 60 * i: 100.0 for i in range(30)}
+        fut = {t: 101.0 for t in idx}
+        fut[t0 + 60 * 29] = 150.0                                          # one bad print: the median ignores it
+        idx[t0 + 86400] = 100.0                                            # next day, one minute only: a new session
+        fut[t0 + 86400] = 100.5
+        r, when = basis.median_ratio(fut, idx, datetime(2026, 11, 9, 23, 0, tzinfo=NY))
+        self.assertEqual((r, when.timestamp()), (1.01, t0 + 60 * 29))
+        self.assertEqual(basis.median_ratio(fut, idx, datetime(2026, 11, 10, 16, 0, tzinfo=NY))[0], 1.005)
+        orig = basis._yahoo_1m
+        try:
+            basis._yahoo_1m = lambda sym, asof: fut if "=F" in sym else idx
+            ob = basis.observed_basis("NDX", datetime(2026, 11, 9, 23, 0, tzinfo=NY))
+            self.assertEqual(ob[0], 1.01)
+            self.assertIn("NQ=F", ob[2])
+            self.assertIsNone(basis.observed_basis("NDX", datetime(2026, 11, 20, 12, 0, tzinfo=NY)))   # stale
+            def down(sym, asof):
+                raise OSError("offline")
+            basis._yahoo_1m = down
+            self.assertIsNone(basis.observed_basis("SPX", datetime(2026, 11, 9, 23, 0, tzinfo=NY)))
+            with tempfile.TemporaryDirectory() as tmp:
+                c = cfgmod.from_dict({"market": "NQ", "source": "NDX", "provider": {"name": "cboe"},
+                                      "futures_ref": {"mode": "observed", "rate": 0.04, "div_yield": 0.007},
+                                      "engine": {"recompute_greeks": "always", "max_dte": 45, "max_spot_age_s": 1800},
+                                      "storage": {"root": tmp}})
+                r = run_once(c, CboeProvider(http=lambda *a, **k: cboe_json()))
+                self.assertIn("measured basis unavailable", r["mapped"]["mapping"]["futures_ref_mode"])
+        finally:
+            basis._yahoo_1m = orig
+
     def test_free_configs_validate(self):
         for f in ("free_nq_cboe", "free_es_cboe"):
             c = cfgmod.load(f"configs/{f}.json")
-            self.assertEqual(c.futures_ref["mode"], "carry")
+            self.assertEqual(c.futures_ref["mode"], "observed")
         with self.assertRaises(Exception):
             cfgmod.from_dict({"market": "ES", "source": "SPY", "provider": {"name": "cboe"},
                               "futures_ref": {"mode": "carry"}})

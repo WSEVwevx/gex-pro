@@ -185,6 +185,21 @@ def front_contract(root: str, on: date) -> str:
     raise RuntimeError("unreachable")
 
 
+def continuous_contract(root: str, on: datetime) -> str:
+    """The quarterly a continuous chart shows (TradingView NQ1!, Yahoo NQ=F): the expiring contract until its
+    09:30 ET settlement on expiry day, then the next. Not the trader's roll 8 days earlier: Yahoo's NQ=F and
+    ES=F switched on the Monday after expiry every quarter Dec 2025 - Sep 2026 (stress test C2)."""
+    t = on.astimezone(NY)
+    y, m = t.year, ((t.month - 1) // 3 + 1) * 3
+    for _ in range(3):
+        if t < datetime.combine(quarterly_expiry(y, m), time(9, 30), NY):
+            return f"{root}{QUARTER_CODES[m]}{y % 10}"
+        m += 3
+        if m > 12:
+            m, y = 3, y + 1
+    raise RuntimeError("unreachable")
+
+
 def option_expiry_time(d: date, root: str) -> datetime:
     """Expiry reference time used for time-to-expiry.
 

@@ -63,7 +63,7 @@
     "max_skew_s": 60
   },
   "futures_ref": {
-    "mode": "carry"
+    "mode": "observed"
   },
   "description": "ES levels from SPX + SPY options (Cboe free feed, 15-min delayed), SPY converted to SPX terms, mapped to ES futures",
   "market": "ES",

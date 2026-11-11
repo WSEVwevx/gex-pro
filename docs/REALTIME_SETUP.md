@@ -20,9 +20,10 @@ Double-click **START.bat**. It installs or updates the dependencies, starts the 
 * Cboe's Greeks are rounded to 4 decimals, so gamma is recomputed from Cboe's IV.
 * The feed is unofficial: no API contract, personal use only. If it breaks, the website shows the
   error and keeps the last good levels.
-* **Futures prices on the website** come from the cost-of-carry model,
-  F = index × e^((rate − dividend) × time to futures expiry). That's typically within a few points of
-  the traded price. TradingView maps levels with your live chart instead.
+* **Futures prices on the website** use the measured basis: the median futures / index ratio of the last
+  15 minutes both traded (Yahoo NQ=F / ES=F, free), the same rule the indicator uses on your chart. If those
+  bars are unavailable, the cost-of-carry model stands in, F = index × e^((rate − dividend) × time to
+  expiry); it drifted 4-44 NQ points from the market in Oct-Nov 2026, and the card says which one is in use.
 
 ## Updates (every hour)
 

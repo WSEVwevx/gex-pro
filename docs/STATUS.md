@@ -35,7 +35,7 @@ system. **Awaiting credentials**: needs your provider account. **Simulated**: te
 | Website | Heatmap: Lightweight Charts candles (Yahoo) with GEX history underneath (per-snapshot `heat` profile, gexsys/heatmap.py), level step lines, hover readout, 1m/5m/15m | Working: 3 tests; checked on NQ and ES in both themes 2026-10-24 |
 | Website | Live table (GEX ladder): net DEX / GEX / OI / volume by strike and expiration (gexsys/ladder.py), expiry strip, level chips, side panel | Working: 2 tests; checked live on NQ and ES 2026-10-23 (expiration totals equal net GEX) |
 | Website | Market stats strip, gamma by expiration, News tab with impact/currency filters and countdown | Working: checked in a browser against live data |
-| Data | Carry-model futures fair value for website prices (F = S·e^((r−q)T)) | Working (hand-checked test); a few points from the traded price by design |
+| Data | Website futures prices from the measured basis (15-minute median NQ=F/NDX, ES=F/SPX ratio), carry model as fallback | Working: 3 tests; the carry model alone was 4-44 NQ points off over 20 sessions (stress test C1) |
 | Data | Plausibility guard (exposure far from price, so the source is refused) | Working: caught a broken feed live |
 | Website | START.bat; regime/price/net cards; level ladder with a short explanation per level and group filters; GEX-by-price chart with hover and table view; max pain table; Copy for TradingView | Working: checked in a browser against live Cboe data (2026-10-21, overnight) |
 | Levels | 0DTE/next-expiration ZG and walls, volume walls, OI walls, max pain per expiration, daily/weekly expected-move bands, GEX profile bins | Working (unit tests with hand-checked values; live Cboe check 2026-10-21) |
