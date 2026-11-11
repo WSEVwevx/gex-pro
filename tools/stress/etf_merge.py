@@ -12,7 +12,6 @@ Tolerance (fixed before running): 1e-9 relative per contract and in total; 0 con
 from __future__ import annotations
 
 import dataclasses
-import math
 import sys
 from datetime import timedelta
 from pathlib import Path
