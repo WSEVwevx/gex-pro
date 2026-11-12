@@ -1,0 +1,27 @@
+{
+ "session": "2026-11-12",
+ "market": "ES",
+ "status": "pending",
+ "plan": {
+  "session": "2026-11-12",
+  "market": "ES",
+  "underlying": "SPX",
+  "asof": "2026-11-12T14:29:03.550520+00:00",
+  "frozen_at": "2026-11-12T15:03:36.005238+00:00",
+  "ref": 7619.38,
+  "em": 95.95,
+  "em_iv": 0.2419,
+  "regime": "INDETERMINATE",
+  "net": -10525757115.0,
+  "zg": 7629.48,
+  "cw": 8000.0,
+  "pw": 7600.0,
+  "ag": 8000.0,
+  "bias": "Bullish",
+  "confidence": "Low",
+  "day_type": "Pivot around zero gamma",
+  "side": "pivot",
+  "target": 7629.48
+ },
+ "outcome": null
+}
