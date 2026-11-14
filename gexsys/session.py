@@ -60,6 +60,7 @@ def session_start(now: datetime) -> datetime:
 # here use (asof, status and what key_levels reads). Re-parsing every one of the day's files on every refresh,
 # and 12 days of them for the hourly reaction stats, was 0.7 s and 3.2 s a refresh (perf_profile, 2026-11-13).
 _LIGHT: dict = {}
+LIGHT_MAX = 40_000      # 12 days of saved summaries for both markets is ~11,000
 
 
 def _light(s: dict) -> dict:
@@ -83,7 +84,7 @@ def _read_light(f: Path) -> Optional[dict]:
 def summaries_since(folder: Path, since: datetime) -> list:
     """Saved summaries (not raw chains) with asof >= since, oldest first; only the day folders that can hold them.
     Each is the reduced form above: what the session and reaction-stat readers use, nothing else."""
-    out, live = [], set()
+    out = []
     first = (since - timedelta(days=1)).strftime("%Y%m%d")
     for day in sorted(folder.glob("????????")):
         if not day.is_dir() or day.name < first:
@@ -93,14 +94,12 @@ def summaries_since(folder: Path, since: datetime) -> list:
                 continue
             try:
                 s = _read_light(f)
-                live.add(str(f))
                 if datetime.fromisoformat(s["asof"]) >= since and s.get("status") != "UNAVAILABLE":
                     out.append(s)
             except (OSError, ValueError, KeyError):
                 continue
-    if len(_LIGHT) > 4 * max(len(live), 1000):                  # pruned day folders: drop what is gone
-        for k in [k for k in _LIGHT if not Path(k[0]).exists()]:
-            del _LIGHT[k]
+    if len(_LIGHT) > LIGHT_MAX:                     # pruned folders leave entries behind: start over (rare, cheap)
+        _LIGHT.clear()
     out.sort(key=lambda s: s["asof"])
     return out
 
