@@ -389,14 +389,27 @@ def gamma_profile(rows: list[ContractExposure], snap: ChainSnapshot, cfg: Engine
     coverage = (sum(abs(r.exposure) for r in priceable) / gross) if gross else 0.0
     lo, hi = s * (1 - cfg.grid_pct), s * (1 + cfg.grid_pct)
     n = cfg.grid_steps
+    # Each contract's terms that do not depend on the grid price, computed once instead of at every grid point.
+    # The arithmetic is pricing.bsm_gamma's, term for term and in the same order (Black-76: q = r), so every
+    # value is bit-identical to calling it; that call was ~60% of a refresh (perf_profile, 2026-11-13).
+    rate, prep = snap.rate, []
+    for r in priceable:
+        c = r.contract
+        q = contract_q(c, snap)
+        t = max(r.t_years, pricing.MIN_T)
+        vol = max(r.iv, pricing.MIN_VOL)
+        sq = math.sqrt(t)
+        prep.append((c.strike, (rate - q + 0.5 * vol * vol) * t, vol * sq, math.exp(-q * t), vol, sq,
+                     r.sign * c.open_interest, c.multiplier))
+    log, exp, root2pi = math.log, math.exp, pricing.SQRT_2PI
     out = []
     for i in range(n):
         p = lo + (hi - lo) * i / (n - 1)
         sc = unit_scale(cfg.unit, p)
         tot = 0.0
-        for r in priceable:
-            g = _contract_gamma_at(r.contract, p, r.t_years, r.iv, snap)
-            tot += r.sign * r.contract.open_interest * g * r.contract.multiplier * sc
+        for k, drift, vs, dq, vol, sq, w, mult in prep:
+            d1 = (log(p / k) + drift) / vs
+            tot += w * (dq * (exp(-0.5 * d1 * d1) / root2pi) / (p * vol * sq)) * mult * sc
         out.append((p, tot))
     return out, coverage
 
