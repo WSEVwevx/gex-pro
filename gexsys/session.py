@@ -56,9 +56,34 @@ def session_start(now: datetime) -> datetime:
     return start if t >= start else start - timedelta(days=1)
 
 
+# A saved summary never changes once written, so each file is parsed once and kept in the small form the readers
+# here use (asof, status and what key_levels reads). Re-parsing every one of the day's files on every refresh,
+# and 12 days of them for the hourly reaction stats, was 0.7 s and 3.2 s a refresh (perf_profile, 2026-11-13).
+_LIGHT: dict = {}
+
+
+def _light(s: dict) -> dict:
+    n = (s.get("extras") or {}).get("nearest") or {}
+    trim = lambda rk: {side: (rk.get(side) or [])[:2] for side in ("call", "put", "abs")} if rk else rk
+    return {"asof": s["asof"], "status": s.get("status"), "regime": s.get("regime"), "zero_gamma": s.get("zero_gamma"),
+            "call_wall": s.get("call_wall"), "put_wall": s.get("put_wall"),
+            "extras": {"nearest": {"ranked": trim(n.get("ranked")), "ranked_etf": trim(n.get("ranked_etf")),
+                                   "etf_share": n.get("etf_share"), "zero_gamma": n.get("zero_gamma")}}}
+
+
+def _read_light(f: Path) -> Optional[dict]:
+    st = f.stat()
+    key = (str(f), st.st_mtime_ns, st.st_size)
+    hit = _LIGHT.get(key)
+    if hit is None:
+        hit = _LIGHT[key] = _light(json.loads(f.read_text(encoding="utf-8")))
+    return hit
+
+
 def summaries_since(folder: Path, since: datetime) -> list:
-    """Saved summaries (not raw chains) with asof >= since, oldest first; only the day folders that can hold them."""
-    out = []
+    """Saved summaries (not raw chains) with asof >= since, oldest first; only the day folders that can hold them.
+    Each is the reduced form above: what the session and reaction-stat readers use, nothing else."""
+    out, live = [], set()
     first = (since - timedelta(days=1)).strftime("%Y%m%d")
     for day in sorted(folder.glob("????????")):
         if not day.is_dir() or day.name < first:
@@ -67,11 +92,15 @@ def summaries_since(folder: Path, since: datetime) -> list:
             if f.name.endswith(".chain.json"):
                 continue
             try:
-                s = json.loads(f.read_text(encoding="utf-8"))
+                s = _read_light(f)
+                live.add(str(f))
                 if datetime.fromisoformat(s["asof"]) >= since and s.get("status") != "UNAVAILABLE":
                     out.append(s)
             except (OSError, ValueError, KeyError):
                 continue
+    if len(_LIGHT) > 4 * max(len(live), 1000):                  # pruned day folders: drop what is gone
+        for k in [k for k in _LIGHT if not Path(k[0]).exists()]:
+            del _LIGHT[k]
     out.sort(key=lambda s: s["asof"])
     return out
 
