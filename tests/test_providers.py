@@ -46,6 +46,20 @@ class TestHttp(unittest.TestCase):
         op = FakeOpener(script)
         return op, (lambda: http_get_json("http://x", {}, retries=retries, sleep=self.sleeps.append, opener=op))
 
+    def test_gzip_is_requested_and_unpacked(self):
+        # perf (2026-11-13): Cboe sends 1.8 MB gzipped instead of 13.7 MB of JSON when asked; same JSON
+        import gzip
+        seen = {}
+
+        def op(req, timeout=None):
+            seen.update(req.headers)
+            r = _Resp(gzip.compress(b'{"a": [1, 2.5, "x"]}'))
+            r.headers = {"Content-Encoding": "gzip"}
+            return r
+        self.assertEqual(http_get_json("http://x", {"Accept": "application/json"}, opener=op), {"a": [1, 2.5, "x"]})
+        self.assertEqual(seen.get("Accept-encoding"), "gzip")
+        self.assertEqual(http_get_json("http://x", {}, opener=lambda req, timeout=None: _Resp(b'{"b": 1}')), {"b": 1})
+
     def test_rate_limit_then_success_honours_retry_after(self):
         op, call = self.get([_http_error(429, 7), '{"ok": 1}'])
         self.assertEqual(call(), {"ok": 1})

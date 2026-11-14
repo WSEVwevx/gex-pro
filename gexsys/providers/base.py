@@ -2,6 +2,7 @@
 exponential backoff + jitter, Retry-After handling and error classification."""
 from __future__ import annotations
 
+import gzip
 import json
 import logging
 import random
@@ -66,10 +67,13 @@ def http_get_json(url: str, headers: dict, *, timeout: float = 15.0, retries: in
     for attempt in range(retries + 1):
         if limiter:
             limiter.wait()
-        req = urllib.request.Request(url, headers=headers, method="GET")
+        # compressed transfer: Cboe's SPX chain is 13.7 MB as JSON, 1.8 MB gzipped (same bytes once unpacked)
+        req = urllib.request.Request(url, headers={"Accept-Encoding": "gzip", **headers}, method="GET")
         try:
             with opener(req, timeout=timeout) as resp:
                 body = resp.read()
+                if body and (getattr(resp, "headers", None) or {}).get("Content-Encoding", "").lower() == "gzip":
+                    body = gzip.decompress(body)
             return json.loads(body.decode("utf-8")) if body else {}
         except urllib.error.HTTPError as e:
             if e.code in (401, 403):
