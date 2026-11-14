@@ -66,8 +66,12 @@ LIGHT_MAX = 40_000      # 12 days of saved summaries for both markets is ~11,000
 def _light(s: dict) -> dict:
     n = (s.get("extras") or {}).get("nearest") or {}
     trim = lambda rk: {side: (rk.get(side) or [])[:2] for side in ("call", "put", "abs")} if rk else rk
+    mps = (s.get("extras") or {}).get("max_pain") or []
     return {"asof": s["asof"], "status": s.get("status"), "regime": s.get("regime"), "zero_gamma": s.get("zero_gamma"),
-            "call_wall": s.get("call_wall"), "put_wall": s.get("put_wall"),
+            "call_wall": s.get("call_wall"), "put_wall": s.get("put_wall"), "abs_gamma": s.get("abs_gamma"),
+            # for the Bias chart replay (gexsys/timeline.py): the mapping saved with it, or what estimates it
+            "futures_map": s.get("futures_map"), "ref_price": s.get("ref_price"), "ref_time": s.get("ref_time"),
+            "mp0": mps[0].get("price") if n.get("label") == "0DTE" and mps else None,
             "extras": {"nearest": {"ranked": trim(n.get("ranked")), "ranked_etf": trim(n.get("ranked_etf")),
                                    "etf_share": n.get("etf_share"), "zero_gamma": n.get("zero_gamma")}}}
 

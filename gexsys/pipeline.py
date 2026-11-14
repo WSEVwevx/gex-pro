@@ -113,7 +113,8 @@ def run_once(cfg: MarketConfig, provider, store: Optional[SnapshotStore] = None,
                            greeks_quality=gq, delta=delta,
                            provider=summary["provider"]) if res.status != "UNAVAILABLE" else ""
     if store:
-        store.save(store_key, summary, raw=snap)
+        # the saved copy keeps the mapping it was shown with, so a replay maps each snapshot as it was (gexsys/timeline.py)
+        store.save(store_key, dict(summary, futures_map={"factor": factor, "offset": offset}) if mapped else summary, raw=snap)
     # compare like with like: the stored previous summary is in index points, so is `summary`
     # (comparing it with the futures-mapped levels reported the basis as a several-hundred-tick "shift")
     # an outage is reported by the stale check, not as level alerts
