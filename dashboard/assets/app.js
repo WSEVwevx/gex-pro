@@ -605,13 +605,15 @@ function renderBias(w){
   $("biasFactors").innerHTML = `<table><tr><th>Factor</th><th style="text-align:center">Lean</th><th style="text-align:left">Why</th></tr>${b.factors.map(f => {
     const c = f.score > 0 ? "var(--pos)" : f.score < 0 ? "var(--neg)" : "var(--ink3)";
     return `<tr><td style="white-space:nowrap">${esc(f.name)}</td><td class="m" style="text-align:center;color:${c};white-space:nowrap">${f.score > 0 ? "▲ +" + num(f.score) : f.score < 0 ? "▼ " + num(f.score) : "· day type"}</td><td style="text-align:left;white-space:normal;color:var(--ink2)">${esc(f.why)}</td></tr>`; }).join("")}</table>`;
-  drawBias(b, col);
+  rpSync(b, col);
 }
 
+const BIAS_SHORT = {"Call wall": "CW", "Put wall": "PW", "Zero gamma": "ZG", "Abs gamma": "AG", "Max pain 0DTE": "MP", "Base case": "Base"};
+const BIAS_LC = {"Call wall": "var(--pos)", "Put wall": "var(--neg)", "Zero gamma": "var(--zg)", "Abs gamma": "var(--ag)", "Max pain 0DTE": "var(--mp)"};
 function drawBias(b, col){
   const svg = $("biasChart"), W = Math.max($("biasWrap").clientWidth, 280), H = 420, padT = 14, padB = 30;
   const narrow = W < 520, padL = narrow ? 50 : 70, padR = narrow ? 92 : 132;                // phones: short names, more plot
-  const SHORT = {"Call wall": "CW", "Put wall": "PW", "Zero gamma": "ZG", "Abs gamma": "AG", "Max pain 0DTE": "MP", "Base case": "Base"};
+  const SHORT = BIAS_SHORT;
   const nm = n => narrow ? SHORT[n] || n : n;
   const lv = Object.entries(b.levels || {}).filter(([, p]) => Math.abs(p - b.ref) <= 1.6 * b.expected_move);
   const ys = [...b.cone.flatMap(c => [c[1], c[2]]), ...b.path.map(p => p[1]), ...b.range, ...lv.map(([, p]) => p)];
@@ -627,7 +629,7 @@ function drawBias(b, col){
   g += `<rect x="${x(b.session.start_minute)}" y="${y(b.range[1])}" width="${x(T) - x(b.session.start_minute)}" height="${y(b.range[0]) - y(b.range[1])}" fill="${col}" opacity=".06"/>`;
   g += `<polygon points="${b.cone.map(c => `${x(c[0])},${y(c[2])}`).join(" ")} ${b.cone.slice().reverse().map(c => `${x(c[0])},${y(c[1])}`).join(" ")}" fill="rgba(139,149,165,.22)" stroke="rgba(139,149,165,.45)" stroke-width="1"/>`;
   // key levels with collision-free labels
-  const LC = {"Call wall": "var(--pos)", "Put wall": "var(--neg)", "Zero gamma": "var(--zg)", "Abs gamma": "var(--ag)", "Max pain 0DTE": "var(--mp)"};
+  const LC = BIAS_LC;
   lv.forEach(([n, p]) => { g += `<line x1="${padL}" x2="${W-padR}" y1="${y(p)}" y2="${y(p)}" stroke="${LC[n]}" stroke-width="1.3" stroke-dasharray="${n === "Zero gamma" ? "6 4" : "2 3"}"/>`; });
   // levels at the same (rounded) price share one label: "Put wall · Abs gamma 7,021"
   const merged = list => Object.values(list.reduce((acc, [n, p]) => {
@@ -665,6 +667,215 @@ function drawBias(b, col){
   };
   svg.onmouseleave = () => { tip.style.opacity = 0; };
 }
+
+// ---------- Bias replay: the session's levels as the site had them, minute by minute (gexsys/timeline.py).
+// Nothing after the slider's minute is drawn or used: not price, not a level, not the axis range. At the right end
+// ("Live") the chart is drawBias's own, untouched.
+const rp = {tl: null, key: null, ver: null, stale: true, min: null, b: null, col: null, busy: null, empty: false, idx: -1};
+const RP_GAP_S = 600;                   // no saved snapshot for 10 minutes: the page says the levels are held
+const rpUrl = () => STATIC ? `data/bias-history-${market}.json` : `/api/bias-history?market=${encodeURIComponent(market)}`;
+const rpTime = (tl, sec) => new Date(Date.parse(tl.session.open) + sec * 1000).toLocaleTimeString("en-US", {...ET, hour: "numeric", minute: "2-digit"});
+const rpDay = tl => new Date(tl.session.open).toLocaleDateString("en-US", {...ET, weekday: "short", month: "short", day: "numeric"});
+
+function rpSync(b, col){
+  rp.b = b; rp.col = col;
+  if(rp.key !== market) Object.assign(rp, {tl: null, key: market, stale: true, min: null, empty: false, idx: -1});
+  if(data && rp.ver !== data.now){ rp.ver = data.now; rp.stale = true; }       // a new refresh: fetch again when needed
+  $("biasReplay").hidden = rp.empty;
+  if(rp.min == null) return rpLive(true);
+  rpLoad().then(() => { if(rp.min != null){ rpBounds(); drawReplay(); } });     // scrubbing: the slider stays put
+  rpMode(false);
+  drawReplay();
+}
+async function rpLoad(){
+  if(rp.tl && !rp.stale) return rp.tl;
+  if(!rp.busy) rp.busy = (async () => {
+    const want = market;
+    try {
+      const tl = await (await fetchFresh(rpUrl())).json();
+      if(want === market){ rp.tl = tl; rp.stale = false; rp.empty = !tl.rows.length; rpMarks(); }
+    } catch(e){ /* keep the copy we have */ }
+    finally { rp.busy = null; }
+  })();
+  await rp.busy;
+  return rp.tl;
+}
+function rpBounds(){
+  const s = $("rpSlider"), tl = rp.tl;
+  if(!tl) return;
+  s.max = Math.max(1, tl.session.now_minute);
+  if(rp.min != null && rp.min >= +s.max) rp.min = +s.max - 1;
+  rpFill();
+}
+function rpFill(){ const s = $("rpSlider"); s.style.setProperty("--p", (100 * s.value / (s.max || 1)) + "%"); }
+function rpMarks(){
+  const tl = rp.tl, max = Math.max(1, tl.session.now_minute), at = m => `${Math.min(100, 100 * m / max)}%`;
+  let h = tl.rows.slice(1).map(r => `<b style="left:${at(r[0])}"></b>`).join("");
+  const seen = tl.seen.filter(sv => sv >= 0).concat([tl.session.now_minute * 60]);
+  for(let k = 1; k < seen.length; k++) if(seen[k] - seen[k - 1] > RP_GAP_S)
+    h += `<s style="left:${at(seen[k - 1] / 60)};width:${Math.min(100, 100 * (seen[k] - seen[k - 1]) / 60 / max)}%"></s>`;
+  $("rpMarks").innerHTML = h;
+  $("biasReplay").hidden = rp.empty;
+}
+const RP_TEXT = {};                     // the chart card's own words, put back on Live
+function rpMode(live){
+  const h = $("biasWhen").parentElement.querySelector("h2"), foot = $("biasLegend").nextElementSibling;
+  if(!RP_TEXT.h) Object.assign(RP_TEXT, {h: h.textContent, foot: foot.textContent});
+  h.textContent = live ? RP_TEXT.h : "The session as it happened";
+  foot.textContent = live ? RP_TEXT.foot : "Each line is where the site had that level at the time (faint: earlier values). Levels come from 15-min delayed options data, placed at the minute they were fetched; nothing after the cursor is shown.";
+  if(!live && rp.tl){
+    $("biasWhen").textContent = `Replay · ${rpDay(rp.tl)} session`;
+    $("biasSummary").textContent = "Drag the slider, or use ← → (Shift for 15 minutes). Live or End returns to now.";
+  }
+  $("rpLive").setAttribute("aria-pressed", live);
+  $("biasReplay").classList.toggle("on", !live);
+  document.querySelectorAll("#biasLegend [data-live]").forEach(el => { el.hidden = !live; });
+  document.querySelectorAll("#biasLegend [data-rp]").forEach(el => { el.hidden = live; });
+  $("biasChart").setAttribute("aria-label", live ? "Illustrative path for the session with expected-move cone and key levels"
+    : "Replay: futures price and the key levels as they were at the chosen minute");
+}
+function rpLive(fromRender){
+  const s = $("rpSlider"), b = rp.b;
+  rp.min = null; rp.idx = -1;
+  s.max = rp.tl && !rp.stale ? Math.max(1, rp.tl.session.now_minute)
+    : b.session.live ? Math.max(1, Math.floor((Date.now() - Date.parse(b.session.open)) / 60000)) : 390;
+  s.value = s.max; s.setAttribute("aria-valuetext", "Live"); rpFill(); rpMode(true);
+  $("rpRead").textContent = `Drag to replay ${b.session.live ? "today's session" : "the last session"}`;
+  if(fromRender) drawBias(b, rp.col);
+  else renderBias(curW());
+}
+async function rpInput(){
+  const s = $("rpSlider");
+  rpFill();
+  if(+s.value >= +s.max) return rpLive();
+  rp.min = +s.value;
+  if(!rp.tl || rp.stale){
+    $("rpRead").textContent = "Loading the session…";
+    await rpLoad();
+    if(!rp.tl || rp.empty){ rp.min = null; $("biasReplay").hidden = true; return renderBias(curW()); }
+    rpBounds();
+    if(rp.min == null) return;
+  }
+  rpMode(false);
+  drawReplay();
+}
+
+function drawReplay(){
+  const tl = rp.tl, m = rp.min, col = rp.col;
+  if(!tl || m == null) return;
+  const svg = $("biasChart"), W = Math.max($("biasWrap").clientWidth, 280), H = 420, padT = 14, padB = 30;
+  const narrow = W < 520, padL = narrow ? 50 : 70, padR = narrow ? 92 : 132, T = tl.session.minutes;
+  const nm = n => narrow ? BIAS_SHORT[n] || n : n;
+  const rows = tl.rows, cols = tl.cols;
+  let i = -1;
+  while(i + 1 < rows.length && rows[i + 1][0] <= m) i++;
+  const cur = i >= 0 ? rows[i] : null;
+  const px = tl.price.filter(p => p[0] + 1 <= m);                       // bars closed by the slider's minute
+  const ref = px.length ? px.at(-1)[1] : cur ? cur.slice(1, -1).find(v => v != null) : null;
+  const seen = tl.seen.filter(sv => sv <= m * 60).at(-1);
+  const age = seen == null ? null : m * 60 - Math.max(0, seen);
+  // readout
+  $("rpSlider").setAttribute("aria-valuetext", `${rpTime(tl, m * 60)} Eastern`);
+  $("rpRead").innerHTML = `<b>${rpTime(tl, m * 60)} ET</b>${tl.session.live ? "" : ` · ${rpDay(tl)}`} · ` +
+    (seen == null ? `<span class="warn">no levels saved yet</span>`
+      : age > RP_GAP_S ? `<span class="warn">no update since ${rpTime(tl, seen)}</span>`
+      : `levels from ${rpTime(tl, seen)} <span class="est">(15-min delayed data${cur && cur.at(-1) ? ", mapping estimated" : ""})</span>`);
+  if(ref == null){
+    svg.innerHTML = `<text x="${W / 2}" y="${H / 2}" text-anchor="middle" style="fill:var(--ink3)">Nothing saved yet at this time</text>`;
+    return;
+  }
+  // the price axis: what was known by m, nothing later
+  const band = ref * 0.02, near = v => v != null && Math.abs(v - ref) <= band;
+  const ys = px.map(p => p[1]);
+  for(let k = 0; k <= i; k++) cols.forEach((n, c) => { if(near(rows[k][c + 1])) ys.push(rows[k][c + 1]); });
+  if(!ys.length) ys.push(ref);
+  let lo = Math.min(...ys), hi = Math.max(...ys);
+  const pad = Math.max((hi - lo) * 0.08, ref * 0.0012); lo -= pad; hi += pad;
+  const x = mm => padL + mm / T * (W - padL - padR), y = p => padT + (hi - p) / (hi - lo) * (H - padT - padB);
+  const clock = mm => rpTime(tl, mm * 60);
+  let g = `<defs><clipPath id="rpClip"><rect x="${padL}" y="${padT}" width="${W - padL - padR}" height="${H - padT - padB}"/></clipPath>` +
+    `<pattern id="rpHatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke="var(--line2)" stroke-width="1"/></pattern></defs>`;
+  for(let k = 0; k <= 6; k++){ const p = lo + (hi - lo) * k / 6; g += `<line x1="${padL}" x2="${W-padR}" y1="${y(p)}" y2="${y(p)}" stroke="var(--line)"/><text x="${padL-8}" y="${y(p)+4}" text-anchor="end">${num(p,0)}</text>`; }
+  const every = [60, 120, 180].find(sp => (W - padL - padR) * sp / T >= (narrow ? 44 : 64)) || 180;
+  for(let mm = 30; mm <= T; mm += every){ g += `<line x1="${x(mm)}" x2="${x(mm)}" y1="${padT}" y2="${H-padB}" stroke="var(--line)"/><text x="${x(mm)}" y="${H-10}" text-anchor="middle">${narrow ? clock(mm).replace(":00", "") : clock(mm)}</text>`; }
+  // after m: not known yet, so nothing is drawn there
+  if(m < T) g += `<rect x="${x(m)}" y="${padT}" width="${x(T) - x(m)}" height="${H - padT - padB}" fill="url(#rpHatch)" opacity=".7"/>`;
+  // each level's history up to m: faint steps, the value in force at m solid (it flashes when it has just changed)
+  let body = "";
+  cols.forEach((n, c) => {
+    let d = "", seg = "";
+    for(let k = 0; k <= i; k++){
+      const v = rows[k][c + 1], pv = k ? rows[k - 1][c + 1] : null, x0 = x(rows[k][0]), x1 = x(k < i ? rows[k + 1][0] : m);
+      if(v == null) continue;
+      if(pv != null && pv !== v) d += `M${x0},${y(pv)}V${y(v)}`;
+      if(k < i) d += `M${x0},${y(v)}H${x1}`; else seg = `M${x0},${y(v)}H${x1}`;
+    }
+    const moved = i > 0 && rows[i][c + 1] != null && rows[i][c + 1] !== rows[i - 1][c + 1] && rp.idx !== i;
+    const dash = n === "Zero gamma" ? "6 4" : "2 3";
+    if(d) body += `<path d="${d}" fill="none" stroke="${BIAS_LC[n]}" stroke-width="1.1" stroke-dasharray="${dash}" opacity=".45"/>`;
+    if(seg) body += `<path d="${seg}" fill="none" stroke="${BIAS_LC[n]}" stroke-width="1.6" stroke-dasharray="${dash}"${moved ? ' class="rp-flash"' : ""}/>`;
+  });
+  if(px.length > 1) body += `<polyline fill="none" stroke="var(--ink)" stroke-width="1.6" stroke-linejoin="round" points="${px.map(p => `${x(p[0] + 1)},${y(p[1])}`).join(" ")}"/>`;
+  g += `<g clip-path="url(#rpClip)">${body}</g>`;
+  // the cursor at m
+  g += `<line x1="${x(m)}" x2="${x(m)}" y1="${padT}" y2="${H-padB}" stroke="${col}" stroke-width="1.2"/>`;
+  if(px.length) g += `<circle cx="${x(px.at(-1)[0] + 1)}" cy="${y(ref)}" r="4" fill="var(--ink)" stroke="var(--panel)" stroke-width="2"/>`;
+  g += `<text x="${Math.min(x(m) + 6, W - padR - 44)}" y="${padT + 12}" style="fill:var(--ink2)">${esc(clock(m))}</text>`;
+  if(age != null && age > RP_GAP_S) g += `<text x="${padL + 8}" y="${padT + 12}" style="fill:var(--warn)">levels held: no update since ${esc(rpTime(tl, seen))}</text>`;
+  // labels: the values in force at m (same-price levels share one), with the last change if it is under 15 min old
+  const lastMove = c => {
+    for(let k = i; k > 0; k--) if(rows[k][c + 1] !== rows[k - 1][c + 1])
+      return m - rows[k][0] <= 15 && rows[k - 1][c + 1] != null && rows[k][c + 1] != null ? rows[k][c + 1] - rows[k - 1][c + 1] : null;
+    return null;
+  };
+  const live = cur ? cols.map((n, c) => [n, cur[c + 1], c]).filter(([, v]) => v != null) : [];
+  const groups = list => Object.values(list.reduce((acc, [n, p, c]) => {
+    const k = num(p, 0), d = lastMove(c);
+    (acc[k] = acc[k] || {p, names: [], color: BIAS_LC[n], mv: null}).names.push(n);
+    if(d) acc[k].mv = d;
+    return acc;
+  }, {}));
+  const onChart = v => near(v) && v >= lo && v <= hi;
+  const inn = groups(live.filter(([, v]) => onChart(v))), out = groups(live.filter(([, v]) => !onChart(v))).sort((a, c) => c.p - a.p);
+  let last = -1e9;
+  inn.sort((a, c) => y(a.p) - y(c.p)).forEach(gp => {
+    const ly = Math.max(y(gp.p) + 4, last + 14); last = ly;
+    const mv = gp.mv ? ` <tspan style="fill:var(--ink2)">${gp.mv > 0 ? "▲" : "▼"}</tspan>` : "";      // moved in the last 15 min
+    g += `<text x="${W-padR+8}" y="${ly}" style="fill:${gp.color}">${esc(gp.names.map(nm).join(" · "))} ${num(gp.p,0)}${mv}</text>`;
+  });
+  const edge = (gp, ly, arrow) => `<text x="${W-padR-6}" y="${ly}" text-anchor="end" style="fill:${gp.color}">${arrow} ${esc(gp.names.map(nm).join(" · "))} ${num(gp.p,0)} (${gp.p > ref ? "+" : ""}${num(gp.p - ref,0)})</text>`;
+  out.filter(gp => gp.p > ref).forEach((gp, k) => { g += edge(gp, padT + 12 + (k + 1) * 14, "↑"); });     // under the time label
+  out.filter(gp => gp.p <= ref).reverse().forEach((gp, k) => { g += edge(gp, H - padB - 8 - k * 14, "↓"); });
+  rp.idx = i;
+  svg.setAttribute("width", W); svg.setAttribute("height", H); svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.innerHTML = g;
+  document.querySelectorAll("#biasLegend [data-lv]").forEach(el => { el.style.display = live.some(([n]) => n === el.dataset.lv) ? "" : "none"; });
+  // hover: what was known at the hovered minute, never past m
+  const tip = $("biasTip");
+  svg.onmousemove = e => {
+    const r = svg.getBoundingClientRect(), mm = Math.max(0, Math.min(m, Math.round((e.clientX - r.left - padL) / (W - padL - padR) * T)));
+    const bar = px.filter(p => p[0] + 1 <= mm).at(-1);
+    let k = -1;
+    while(k + 1 <= i && rows[k + 1][0] <= mm) k++;
+    const lv = k >= 0 ? cols.map((n, c) => [n, rows[k][c + 1], k > 0 && rows[k - 1][c + 1] != null && rows[k][c + 1] !== rows[k - 1][c + 1] ? rows[k][c + 1] - rows[k - 1][c + 1] : 0]).filter(([, v]) => v != null) : [];
+    tip.innerHTML = `${clock(mm)} ET${bar ? `<br>Price <b>${num(bar[1])}</b>` : ""}${lv.map(([n, v, d]) => `<br><span style="color:${BIAS_LC[n]}">${esc(n)}</span> ${num(v)}${d ? ` <span style="color:var(--ink3)">${d > 0 ? "+" : ""}${num(d)}</span>` : ""}`).join("")}`;
+    tip.style.opacity = 1; tip.style.left = Math.min(x(mm) + 12, W - 190) + "px"; tip.style.top = (bar ? Math.max(0, y(bar[1]) - 30) : padT) + "px";
+  };
+  svg.onmouseleave = () => { tip.style.opacity = 0; };
+}
+(() => {
+  const s = $("rpSlider");
+  ["pointerdown", "focus"].forEach(ev => s.addEventListener(ev, () => { rpLoad(); }));
+  s.addEventListener("input", rpInput);
+  s.addEventListener("keydown", e => {
+    if(e.shiftKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")){
+      e.preventDefault();
+      s.value = Math.max(0, Math.min(+s.max, +s.value + (e.key === "ArrowRight" ? 15 : -15)));
+      rpInput();
+    }
+  });
+  $("rpLive").addEventListener("click", () => { if(rp.min != null) rpLive(); });
+})();
 
 function renderExpiry(s){
   const rows = Object.entries(s.by_expiry || {}).sort((a, b) => a[0].localeCompare(b[0])).slice(0, 8);
