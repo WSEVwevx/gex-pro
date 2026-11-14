@@ -724,7 +724,7 @@ function rpMode(live){
   h.textContent = live ? RP_TEXT.h : "The session as it happened";
   foot.textContent = live ? RP_TEXT.foot : "Each line is where the site had that level at the time (faint: earlier values). Levels come from 15-min delayed options data, placed at the minute they were fetched; nothing after the cursor is shown.";
   if(!live && rp.tl){
-    $("biasWhen").textContent = `Replay · ${rpDay(rp.tl)} session`;
+    $("biasWhen").textContent = `Replay · ${rpDay(rp.tl)} · 15-min delayed data${rp.tl.estimated ? " · futures mapping estimated" : ""}`;
     $("biasSummary").textContent = "Drag the slider, or use ← → (Shift for 15 minutes). Live or End returns to now.";
   }
   $("rpLive").setAttribute("aria-pressed", live);
@@ -744,20 +744,23 @@ function rpLive(fromRender){
   if(fromRender) drawBias(b, rp.col);
   else renderBias(curW());
 }
+// one redraw per screen frame, however many input events a drag sends
+let rpFrame = 0;
+const rpDraw = () => { if(!rpFrame) rpFrame = requestAnimationFrame(() => { rpFrame = 0; drawReplay(); }); };
 async function rpInput(){
   const s = $("rpSlider");
   rpFill();
   if(+s.value >= +s.max) return rpLive();
   rp.min = +s.value;
-  if(!rp.tl || rp.stale){
+  if(!rp.tl){
     $("rpRead").textContent = "Loading the session…";
     await rpLoad();
     if(!rp.tl || rp.empty){ rp.min = null; $("biasReplay").hidden = true; return renderBias(curW()); }
     rpBounds();
     if(rp.min == null) return;
-  }
-  rpMode(false);
-  drawReplay();
+  } else if(rp.stale) rpLoad().then(() => { if(rp.min != null){ rpBounds(); rpDraw(); } });   // keep dragging on the copy we have
+  if(!$("biasReplay").classList.contains("on")) rpMode(false);
+  rpDraw();
 }
 
 function drawReplay(){
@@ -776,26 +779,27 @@ function drawReplay(){
   const age = seen == null ? null : m * 60 - Math.max(0, seen);
   // readout
   $("rpSlider").setAttribute("aria-valuetext", `${rpTime(tl, m * 60)} Eastern`);
-  $("rpRead").innerHTML = `<b>${rpTime(tl, m * 60)} ET</b>${tl.session.live ? "" : ` · ${rpDay(tl)}`} · ` +
-    (seen == null ? `<span class="warn">no levels saved yet</span>`
-      : age > RP_GAP_S ? `<span class="warn">no update since ${rpTime(tl, seen)}</span>`
-      : `levels from ${rpTime(tl, seen)} <span class="est">(15-min delayed data${cur && cur.at(-2) ? ", mapping estimated" : ""})</span>`);
+  $("rpRead").innerHTML = `<b>${rpTime(tl, m * 60)}</b> · ` + (seen == null ? `<span class="warn">no levels yet</span>`
+      : age > RP_GAP_S ? `<span class="warn">no update since ${rpTime(tl, seen)}</span>` : `levels ${rpTime(tl, seen)}`);
   if(ref == null){
     svg.innerHTML = `<text x="${W / 2}" y="${H / 2}" text-anchor="middle" style="fill:var(--ink3)">Nothing saved yet at this time</text>`;
     return;
   }
-  // the price axis: what was known by m, nothing later
-  const band = ref * 0.02, near = v => v != null && Math.abs(v - ref) <= band;
-  const ys = px.map(p => p[1]);
-  for(let k = 0; k <= i; k++) cols.forEach((n, c) => { if(near(rows[k][c + 1])) ys.push(rows[k][c + 1]); });
-  if(!ys.length) ys.push(ref);
-  let lo = Math.min(...ys), hi = Math.max(...ys);
-  const pad = Math.max((hi - lo) * 0.08, ref * 0.0012); lo -= pad; hi += pad;
+  // the price axis: only what was known by m. It is held steady while dragging: levels count when they are near the
+  // price range so far (which only widens as the session goes on), and the ends snap to round grid steps, so the
+  // scale changes only when price or a level crosses a gridline, not every minute
+  const p0 = px.length ? px[0][1] : ref, pmin = px.length ? Math.min(...px.map(p => p[1])) : ref, pmax = px.length ? Math.max(...px.map(p => p[1])) : ref;
+  const reach = p0 * 0.012, near = v => v != null && v >= pmin - reach && v <= pmax + reach;
+  let lo = pmin, hi = pmax;
+  for(let k = 0; k <= i; k++) cols.forEach((n, c) => { const v = rows[k][c + 1]; if(near(v)){ lo = Math.min(lo, v); hi = Math.max(hi, v); } });
+  const raw = Math.max(hi - lo, p0 * 0.004) / 5, mag = 10 ** Math.floor(Math.log10(raw));
+  const step = [1, 2, 2.5, 5, 10].map(f => f * mag).find(st => st >= raw);
+  lo = Math.floor((lo - step * 0.25) / step) * step; hi = Math.ceil((hi + step * 0.25) / step) * step;
   const x = mm => padL + mm / T * (W - padL - padR), y = p => padT + (hi - p) / (hi - lo) * (H - padT - padB);
   const clock = mm => rpTime(tl, mm * 60);
   let g = `<defs><clipPath id="rpClip"><rect x="${padL}" y="${padT}" width="${W - padL - padR}" height="${H - padT - padB}"/></clipPath>` +
     `<pattern id="rpHatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke="var(--line2)" stroke-width="1"/></pattern></defs>`;
-  for(let k = 0; k <= 6; k++){ const p = lo + (hi - lo) * k / 6; g += `<line x1="${padL}" x2="${W-padR}" y1="${y(p)}" y2="${y(p)}" stroke="var(--line)"/><text x="${padL-8}" y="${y(p)+4}" text-anchor="end">${num(p,0)}</text>`; }
+  for(let p = lo; p <= hi + step / 2; p += step){ g += `<line x1="${padL}" x2="${W-padR}" y1="${y(p)}" y2="${y(p)}" stroke="var(--line)"/><text x="${padL-8}" y="${y(p)+4}" text-anchor="end">${num(p, step < 1 ? 2 : 0)}</text>`; }
   const every = [60, 120, 180].find(sp => (W - padL - padR) * sp / T >= (narrow ? 44 : 64)) || 180;
   for(let mm = 30; mm <= T; mm += every){ g += `<line x1="${x(mm)}" x2="${x(mm)}" y1="${padT}" y2="${H-padB}" stroke="var(--line)"/><text x="${x(mm)}" y="${H-10}" text-anchor="middle">${narrow ? clock(mm).replace(":00", "") : clock(mm)}</text>`; }
   // after m: not known yet, so nothing is drawn there

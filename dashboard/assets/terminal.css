@@ -191,7 +191,7 @@ svg text{fill:var(--ink3);font:10.5px var(--mono)}
 .rp-marks{position:absolute;left:7px;right:7px;top:50%;height:14px;transform:translateY(-50%);pointer-events:none}
 .rp-marks b{position:absolute;top:2px;width:1px;height:10px;background:var(--line3)}
 .rp-marks s{position:absolute;top:4px;height:6px;border-radius:2px;background:repeating-linear-gradient(135deg,rgba(230,195,92,.5) 0 2px,transparent 2px 5px)}
-.rp input[type=range]{-webkit-appearance:none;appearance:none;position:absolute;inset:0;width:100%;height:30px;margin:0;background:transparent;cursor:pointer;touch-action:pan-y;--p:100%}
+.rp input[type=range]{-webkit-appearance:none;appearance:none;position:absolute;inset:0;width:100%;height:30px;margin:0;background:transparent;cursor:pointer;touch-action:none;--p:100%}
 .rp input[type=range]:focus-visible{outline:none}
 .rp input[type=range]::-webkit-slider-runnable-track{height:3px;border-radius:3px;background:linear-gradient(to right,var(--pos) 0 var(--p),var(--line3) var(--p) 100%)}
 .rp input[type=range]::-moz-range-track{height:3px;border-radius:3px;background:var(--line3)}
@@ -200,14 +200,13 @@ svg text{fill:var(--ink3);font:10.5px var(--mono)}
 .rp input[type=range]::-moz-range-thumb{width:10px;height:10px;border-radius:50%;background:var(--panel);border:2px solid var(--pos);box-shadow:0 2px 6px var(--shadow2)}
 .rp input[type=range]:hover::-webkit-slider-thumb,.rp input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 5px rgba(57,135,229,.18),0 2px 6px var(--shadow2)}
 .rp input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
-.rp-read{font:500 11.5px var(--mono);color:var(--ink3);white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.rp-read{flex:none;width:32ch;font:500 11.5px var(--mono);color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}      /* fixed: a readout that changed width resized the track under the cursor */
 .rp-read b{color:var(--ink);font-weight:650}
 .rp-read .warn{color:var(--warn)}
-.rp-read .est{color:var(--ink4)}
 .rp.on{border-color:rgba(57,135,229,.35);box-shadow:inset 2px 0 0 var(--pos)}
 #biasChart .rp-flash{animation:rp-flash 1.4s ease-out}
 @keyframes rp-flash{0%{stroke-width:4;opacity:1}100%{stroke-width:1.6}}
-@media(max-width:640px){.rp{flex-wrap:wrap;gap:8px 12px}.rp-track{order:2;flex-basis:100%}.rp-read{order:1;flex:1;white-space:normal;line-height:1.35}.rp-read .est{display:none}}
+@media(max-width:640px){.rp{flex-wrap:wrap;gap:8px 12px}.rp-track{order:2;flex-basis:100%}.rp-read{order:1;flex:1;width:auto}}
 @media(prefers-reduced-motion:reduce){.rp-live[aria-pressed=true] i,#biasChart .rp-flash{animation:none}}
 .sw{width:14px;height:8px;border-radius:2px;display:inline-block}
 .metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:3px;overflow:hidden}
