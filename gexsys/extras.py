@@ -99,6 +99,9 @@ def volume_and_oi_walls(snap: ChainSnapshot, basket: list[str], window_pct: floa
             "oi_put": _argmax_by_strike(puts, OptionType.PUT, "open_interest")}
 
 
+_MAX_PAIN: dict = {}
+
+
 def max_pain(contracts: list[OptionContract]) -> Optional[float]:
     """Strike minimising total intrinsic payout to holders (ties -> lower strike)."""
     calls = [(c.strike, c.open_interest) for c in contracts if c.option_type == OptionType.CALL and c.open_interest]
@@ -107,11 +110,19 @@ def max_pain(contracts: list[OptionContract]) -> Optional[float]:
     strikes = sorted({c.level_strike for c in contracts if c.open_interest})
     if not strikes:
         return None
+    # It depends on strikes and open interest only, and OI is end-of-day: the same answer all session. Kept by its
+    # exact inputs (55 expirations x strikes x contracts was ~75% of the extras on every refresh; perf_profile).
+    key = (tuple(calls), tuple(puts), tuple(strikes))
+    if key in _MAX_PAIN:
+        return _MAX_PAIN[key]
     best, best_pay = None, math.inf
     for s in strikes:
         pay = sum(oi * max(0.0, s - k) for k, oi in calls) + sum(oi * max(0.0, k - s) for k, oi in puts)
         if pay < best_pay - 1e-9:
             best, best_pay = s, pay
+    if len(_MAX_PAIN) > 1000:                       # a new day's OI: the old entries are never asked for again
+        _MAX_PAIN.clear()
+    _MAX_PAIN[key] = best
     return best
 
 
