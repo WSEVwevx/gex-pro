@@ -8,7 +8,9 @@ is 15 minutes delayed, so placing it at its data time would show levels before t
 mapped to futures with its own factor, saved beside it since 2026-11-14 (`futures_map`). Older snapshots were saved
 without it: their factor is estimated from the futures bar at the index price's own time (flagged, and the page
 says so). A snapshot with neither is left out, and the levels before it are held: gaps stay visible.
-Rows are written only when a level changes; `seen` lists every snapshot's fetch time, for the "levels from" age.
+Rows are written only when a level changes: [minute, zero gamma, call wall, put wall, abs gamma, 0DTE max pain,
+estimated (1/0), moved (bit c set when column c's OPTIONS level changed, not just the futures basis under it)].
+`seen` lists every snapshot's fetch time, for the "levels from" age.
 Price: 1-minute futures bars (the heatmap's, no extra request); a bar is shown once it has closed.
 """
 from __future__ import annotations
@@ -64,6 +66,7 @@ def build(folder: Path, market: str, method: str, candles: list, now: Optional[d
     rows: list = []
     seen: list = []
     estimated = 0
+    prev_raw = None
     for s in summaries_since(folder, o - LOOKBACK):
         t = datetime.fromisoformat(s["asof"])
         if t > end:
@@ -76,20 +79,24 @@ def build(folder: Path, market: str, method: str, candles: list, now: Optional[d
             if not got:
                 continue
             (f, off), est = got, 1
-        vals = [_p(s.get("zero_gamma")), _p(s.get("call_wall")), _p(s.get("put_wall")), _p(s.get("abs_gamma")), s.get("mp0")]
-        vals = [None if v is None else round_to_tick(v * f + off, tick) for v in vals]
+        raw = [_p(s.get("zero_gamma")), _p(s.get("call_wall")), _p(s.get("put_wall")), _p(s.get("abs_gamma")), s.get("mp0")]
+        vals = [None if v is None else round_to_tick(v * f + off, tick) for v in raw]
+        moved = sum(1 << i for i, v in enumerate(raw) if prev_raw is not None and v != prev_raw[i])
+        prev_raw = raw
         sec = (t - o).total_seconds()
         m = max(0, math.ceil(sec / 60))                 # visible from the first whole minute at or after the fetch
         if sec < 0:                                     # before the open: only the last one counts (shown at 09:30)
             seen[:] = []
             rows[:] = []
             estimated = 0
+            moved = 0                                   # a change before the open is not a move during the session
         seen.append(round(sec))
         estimated += est
-        row = [m, *vals, est]
+        row = [m, *vals, est, moved]
         if rows and rows[-1][0] == m:
+            row[-1] |= rows[-1][-1]                     # both became visible at the same minute
             rows[-1] = row
-        elif not rows or rows[-1][1:] != row[1:]:
+        elif not rows or rows[-1][1:6] != row[1:6]:
             rows.append(row)
     price = []
     for b in candles or []:

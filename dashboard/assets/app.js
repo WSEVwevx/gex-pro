@@ -710,7 +710,7 @@ function rpBounds(){
 function rpFill(){ const s = $("rpSlider"); s.style.setProperty("--p", (100 * s.value / (s.max || 1)) + "%"); }
 function rpMarks(){
   const tl = rp.tl, max = Math.max(1, tl.session.now_minute), at = m => `${Math.min(100, 100 * m / max)}%`;
-  let h = tl.rows.slice(1).map(r => `<b style="left:${at(r[0])}"></b>`).join("");
+  let h = tl.rows.filter(r => r.at(-1)).map(r => `<b style="left:${at(r[0])}"></b>`).join("");      // options levels that moved
   const seen = tl.seen.filter(sv => sv >= 0).concat([tl.session.now_minute * 60]);
   for(let k = 1; k < seen.length; k++) if(seen[k] - seen[k - 1] > RP_GAP_S)
     h += `<s style="left:${at(seen[k - 1] / 60)};width:${Math.min(100, 100 * (seen[k] - seen[k - 1]) / 60 / max)}%"></s>`;
@@ -771,7 +771,7 @@ function drawReplay(){
   while(i + 1 < rows.length && rows[i + 1][0] <= m) i++;
   const cur = i >= 0 ? rows[i] : null;
   const px = tl.price.filter(p => p[0] + 1 <= m);                       // bars closed by the slider's minute
-  const ref = px.length ? px.at(-1)[1] : cur ? cur.slice(1, -1).find(v => v != null) : null;
+  const ref = px.length ? px.at(-1)[1] : cur ? cur.slice(1, -2).find(v => v != null) : null;
   const seen = tl.seen.filter(sv => sv <= m * 60).at(-1);
   const age = seen == null ? null : m * 60 - Math.max(0, seen);
   // readout
@@ -779,7 +779,7 @@ function drawReplay(){
   $("rpRead").innerHTML = `<b>${rpTime(tl, m * 60)} ET</b>${tl.session.live ? "" : ` · ${rpDay(tl)}`} · ` +
     (seen == null ? `<span class="warn">no levels saved yet</span>`
       : age > RP_GAP_S ? `<span class="warn">no update since ${rpTime(tl, seen)}</span>`
-      : `levels from ${rpTime(tl, seen)} <span class="est">(15-min delayed data${cur && cur.at(-1) ? ", mapping estimated" : ""})</span>`);
+      : `levels from ${rpTime(tl, seen)} <span class="est">(15-min delayed data${cur && cur.at(-2) ? ", mapping estimated" : ""})</span>`);
   if(ref == null){
     svg.innerHTML = `<text x="${W / 2}" y="${H / 2}" text-anchor="middle" style="fill:var(--ink3)">Nothing saved yet at this time</text>`;
     return;
@@ -810,7 +810,7 @@ function drawReplay(){
       if(pv != null && pv !== v) d += `M${x0},${y(pv)}V${y(v)}`;
       if(k < i) d += `M${x0},${y(v)}H${x1}`; else seg = `M${x0},${y(v)}H${x1}`;
     }
-    const moved = i > 0 && rows[i][c + 1] != null && rows[i][c + 1] !== rows[i - 1][c + 1] && rp.idx !== i;
+    const moved = i > 0 && rows[i][c + 1] != null && (rows[i].at(-1) & (1 << c)) && rp.idx !== i;
     const dash = n === "Zero gamma" ? "6 4" : "2 3";
     if(d) body += `<path d="${d}" fill="none" stroke="${BIAS_LC[n]}" stroke-width="1.1" stroke-dasharray="${dash}" opacity=".45"/>`;
     if(seg) body += `<path d="${seg}" fill="none" stroke="${BIAS_LC[n]}" stroke-width="1.6" stroke-dasharray="${dash}"${moved ? ' class="rp-flash"' : ""}/>`;
@@ -824,8 +824,8 @@ function drawReplay(){
   if(age != null && age > RP_GAP_S) g += `<text x="${padL + 8}" y="${padT + 12}" style="fill:var(--warn)">levels held: no update since ${esc(rpTime(tl, seen))}</text>`;
   // labels: the values in force at m (same-price levels share one), with the last change if it is under 15 min old
   const lastMove = c => {
-    for(let k = i; k > 0; k--) if(rows[k][c + 1] !== rows[k - 1][c + 1])
-      return m - rows[k][0] <= 15 && rows[k - 1][c + 1] != null && rows[k][c + 1] != null ? rows[k][c + 1] - rows[k - 1][c + 1] : null;
+    for(let k = i; k > 0; k--) if(rows[k].at(-1) & (1 << c))           // the options level moved, not just the basis
+      return m - rows[k][0] <= 15 && rows[k - 1][c + 1] != null && rows[k][c + 1] != null ? rows[k][c + 1] - rows[k - 1][c + 1] || null : null;
     return null;
   };
   const live = cur ? cols.map((n, c) => [n, cur[c + 1], c]).filter(([, v]) => v != null) : [];
@@ -857,7 +857,7 @@ function drawReplay(){
     const bar = px.filter(p => p[0] + 1 <= mm).at(-1);
     let k = -1;
     while(k + 1 <= i && rows[k + 1][0] <= mm) k++;
-    const lv = k >= 0 ? cols.map((n, c) => [n, rows[k][c + 1], k > 0 && rows[k - 1][c + 1] != null && rows[k][c + 1] !== rows[k - 1][c + 1] ? rows[k][c + 1] - rows[k - 1][c + 1] : 0]).filter(([, v]) => v != null) : [];
+    const lv = k >= 0 ? cols.map((n, c) => [n, rows[k][c + 1], k > 0 && rows[k - 1][c + 1] != null && (rows[k].at(-1) & (1 << c)) ? rows[k][c + 1] - rows[k - 1][c + 1] : 0]).filter(([, v]) => v != null) : [];
     tip.innerHTML = `${clock(mm)} ET${bar ? `<br>Price <b>${num(bar[1])}</b>` : ""}${lv.map(([n, v, d]) => `<br><span style="color:${BIAS_LC[n]}">${esc(n)}</span> ${num(v)}${d ? ` <span style="color:var(--ink3)">${d > 0 ? "+" : ""}${num(d)}</span>` : ""}`).join("")}`;
     tip.style.opacity = 1; tip.style.left = Math.min(x(mm) + 12, W - 190) + "px"; tip.style.top = (bar ? Math.max(0, y(bar[1]) - 30) : padT) + "px";
   };

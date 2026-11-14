@@ -91,7 +91,7 @@ class TestReplay(unittest.TestCase):
         bar = int((OPEN + timedelta(minutes=5)).timestamp())
         tl = self.build(OPEN + timedelta(minutes=40), [[bar, 0, 0, 0, 28084.0]])
         self.assertEqual(tl["rows"], [[20, round_to_tick(28000.0 * 28084.0 / 28000.0, 0.25),
-                                       *[round_to_tick(v * 28084.0 / 28000.0, 0.25) for v in (29000.0, 27000.0, 29000.0, 28100.0)], 1]])
+                                       *[round_to_tick(v * 28084.0 / 28000.0, 0.25) for v in (29000.0, 27000.0, 29000.0, 28100.0)], 1, 0]])
         self.assertEqual(tl["estimated"], 1)                                # the one without a bar is left out
 
     def test_price_bars_only_once_closed(self):
@@ -118,6 +118,15 @@ class TestReplay(unittest.TestCase):
         tl = self.build(OPEN + timedelta(minutes=391), bars)
         self.assertLess(len(gzip.compress(json.dumps(tl, separators=(",", ":")).encode())), 30_000)
 
+    def test_a_basis_change_is_not_a_level_move(self):
+        # the futures basis moves the mapped prices every refresh; only a change in the options level itself is a move
+        self.store.save(KEY, snap(OPEN - timedelta(minutes=5), zg=27000.0))
+        self.store.save(KEY, snap(OPEN + timedelta(minutes=1), zg=28000.0, factor=1.0032))
+        self.store.save(KEY, snap(OPEN + timedelta(minutes=2), zg=28000.0, factor=1.0034))
+        self.store.save(KEY, snap(OPEN + timedelta(minutes=3), zg=28100.0, factor=1.0034))
+        tl = self.build(OPEN + timedelta(minutes=10))
+        self.assertEqual([(r[0], r[-1]) for r in tl["rows"]], [(0, 0), (1, 1), (2, 0), (3, 1)])
+
     def test_empty_history(self):
         tl = self.build(OPEN + timedelta(minutes=30))
         self.assertEqual((tl["rows"], tl["seen"], tl["price"]), ([], [], []))
@@ -137,7 +146,7 @@ class TestSavedMapping(unittest.TestCase):
                                 datetime.fromisoformat(r["summary"]["asof"]) + timedelta(seconds=1))
             row = dict(zip(tl["cols"], tl["rows"][-1][1:]))
             self.assertEqual({k: v for k, v in row.items() if v is not None}, lv)
-            self.assertEqual(tl["rows"][-1][-1], 0)                          # its own saved mapping, not an estimate
+            self.assertEqual(tl["rows"][-1][-2], 0)                          # its own saved mapping, not an estimate
 
 
 if __name__ == "__main__":
