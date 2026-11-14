@@ -91,6 +91,7 @@ def site() -> tuple[bool, str]:
 
 
 def main() -> int:
+    sys.stdout.reconfigure(errors="replace")          # a failure message with an unusual character must still print
     quick = "--quick" in sys.argv
     steps = [("tests", lambda: run(["-m", "unittest", "discover", "-s", "tests", "-q"])),
              ("pyflakes", lambda: run(["-m", "pyflakes", *PACKAGES, "tests", "tools"])),

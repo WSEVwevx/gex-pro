@@ -1,5 +1,7 @@
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+// links from outside feeds: web addresses only (a "javascript:" address would run as code when clicked)
+const link = u => /^https?:[/][/]/i.test(String(u ?? "").trim()) ? esc(String(u).trim()) : "#";
 const num = (x, d=2) => x == null || !isFinite(x) ? "-" : Number(x).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
 const money = x => x == null || !isFinite(x) ? "-" : (x<0?"-":"+") + "$" + (Math.abs(x)>=1e9 ? num(Math.abs(x)/1e9,2)+"B" : num(Math.abs(x)/1e6,0)+"M");
 const signed = (x, d=2) => x == null || !isFinite(x) ? "" : (x>=0?"+":"-") + num(Math.abs(x), d);
@@ -155,10 +157,10 @@ function renderPosts(){
     const media = (p.media || [])[0];
     const counts = p.counts ? `<span>${num(p.counts.likes, 0)} likes · ${num(p.counts.retruths, 0)} ReTruths</span>` : "";
     return `<div class="post${hot ? " hot" : ""}">
-      <div class="meta"><b>${when(p.time)}</b>${kind}${counts}${p.url ? `<a href="${esc(p.url)}" target="_blank" rel="noopener">open</a>` : ""}</div>
-      ${p.text ? `<div class="txt" onclick="this.classList.toggle('open')" title="Click to expand">${esc(p.text)}</div>` : `<div class="txt" style="color:var(--ink3)">${media ? (media.type === "video" ? "Video post" : "Image post") : "Post without text"}</div>`}
+      <div class="meta"><b>${when(p.time)}</b>${kind}${counts}${p.url ? `<a href="${link(p.url)}" target="_blank" rel="noopener">open</a>` : ""}</div>
+      ${p.text ? `<div class="txt" role="button" tabindex="0" onclick="this.classList.toggle('open')" title="Click to expand">${esc(p.text)}</div>` : `<div class="txt" style="color:var(--ink3)">${media ? (media.type === "video" ? "Video post" : "Image post") : "Post without text"}</div>`}
       ${media && media.preview ? `<img loading="lazy" src="${esc(media.preview)}" alt="${media.type === "video" ? "video preview" : "image"} from the post" referrerpolicy="no-referrer">` : ""}
-      ${p.link && p.link.url ? `<a href="${esc(p.link.url)}" target="_blank" rel="noopener" style="font-size:12.5px">${esc(p.link.title || p.link.url)}</a>` : ""}
+      ${p.link && p.link.url ? `<a href="${link(p.link.url)}" target="_blank" rel="noopener" style="font-size:12.5px">${esc(p.link.title || p.link.url)}</a>` : ""}
       ${hot ? `<div class="tags">${p.tone ? `<span class="tone ${p.tone}" title="Keyword guess at what this post means for stocks, not a forecast">${p.tone}</span>` : ""}${p.market_words.map(w => `<span class="mw">${esc(w)}</span>`).join("")}</div>` : ""}
     </div>`; }).join("") || `<div class="expl">${postF === "market" ? "No recent posts mention market topics." : "No posts available."}</div>`;
   $("postsFoot").innerHTML = `Source: ${esc(posts.source || "-")}${posts.fetched_at ? `, updated ${ago(posts.fetched_at)}` : ""}; checked every 5 min. Yellow tags flag market topics (tariffs, the Fed, China, oil...); Bullish / Bearish is a keyword guess at the post's lean for stocks, shown only when it is clear. Posts can move futures quickly, and nothing here predicts how.${posts.error ? ` <span style="color:var(--warn)">${esc(posts.error)}</span>` : ""}`;
@@ -199,7 +201,7 @@ function renderBriefings(){
   if(b.sections) $("briefLead").innerHTML = b.sections.map(x => `<div class="bsec"><div class="eyebrow">${esc(x.title)}</div><p>${esc(x.text)}</p></div>`).join("");
   else $("briefLead").textContent = b.headline;
   $("briefNews").style.display = (b.headlines || []).length ? "" : "none";
-  $("briefNewsList").innerHTML = (b.headlines || []).map(x => `<div class="bpost"><div class="meta"><b style="color:var(--ink2)">${esc(new Date(x.day + "T12:00:00Z").toLocaleDateString("en-US", {weekday: "short", timeZone: "UTC"}))}</b>${x.source ? `<span>${esc(x.source)}</span>` : ""}${/^https:/.test(x.url || "") ? `<a href="${esc(x.url)}" target="_blank" rel="noopener">open</a>` : ""}</div>${esc(x.title)}</div>`).join("");
+  $("briefNewsList").innerHTML = (b.headlines || []).map(x => `<div class="bpost"><div class="meta"><b style="color:var(--ink2)">${esc(new Date(x.day + "T12:00:00Z").toLocaleDateString("en-US", {weekday: "short", timeZone: "UTC"}))}</b>${x.source ? `<span>${esc(x.source)}</span>` : ""}${/^https:/.test(x.url || "") ? `<a href="${link(x.url)}" target="_blank" rel="noopener">open</a>` : ""}</div>${esc(x.title)}</div>`).join("");
   const col = r => r === "POSITIVE" ? "var(--pos)" : r === "NEGATIVE" ? "var(--neg)" : "var(--zg)";
   $("briefMarkets").innerHTML = (b.markets || []).map(m => `<section class="card bm accent" style="--accent:${col(m.regime)}">
     <div class="head" style="margin-bottom:0"><h2>${esc(m.market)}</h2><span class="chip" style="color:${col(m.regime)}">${esc((m.regime || "").toLowerCase())} gamma</span></div>
@@ -215,7 +217,7 @@ function renderBriefings(){
     + ((c.items || []).map(e => `<div class="bev"><span class="tm">${esc(e.day)} ${esc(e.clock)}</span><span class="imp ${esc(e.impact)}">${esc(e.impact === "Medium" ? "Med" : e.impact)}</span><span>${esc(e.title)} <span style="color:var(--ink3);font:12px var(--mono)">${esc(e.country)}</span></span><span class="fp">${esc(e.detail || "")}</span></div>`).join("")
        || `<div class="expl" style="margin-top:0">No high- or medium-impact events.</div>`)).join("");
   $("briefPostsTitle").textContent = (b.posts || {}).title || "Market-moving posts";
-  $("briefPosts").innerHTML = ((b.posts || {}).items || []).map(x => `<div class="bpost"><div class="meta"><b style="color:var(--ink2)">${esc(x.clock)} ET</b>${x.tone ? `<span class="tone ${esc(x.tone)}">${esc(x.tone)}</span>` : ""}${(x.words || []).map(w => `<span class="mw">${esc(w)}</span>`).join("")}${x.url ? `<a href="${esc(x.url)}" target="_blank" rel="noopener">open</a>` : ""}</div>${esc(x.text)}</div>`).join("")
+  $("briefPosts").innerHTML = ((b.posts || {}).items || []).map(x => `<div class="bpost"><div class="meta"><b style="color:var(--ink2)">${esc(x.clock)} ET</b>${x.tone ? `<span class="tone ${esc(x.tone)}">${esc(x.tone)}</span>` : ""}${(x.words || []).map(w => `<span class="mw">${esc(w)}</span>`).join("")}${x.url ? `<a href="${link(x.url)}" target="_blank" rel="noopener">open</a>` : ""}</div>${esc(x.text)}</div>`).join("")
     || `<div class="expl" style="margin-top:0">No market-related posts in this window.</div>`;
 }
 
@@ -1148,6 +1150,10 @@ $("notesBtn").onclick = () => setNotes(!document.body.classList.contains("notes"
 setNotes(store.get("gex.notes", "0") === "1");
 $("keysClose").onclick = () => showKeys(false);
 $("keys").onclick = e => { if(e.target === $("keys")) showKeys(false); };
+// rows and posts that open on a click also open with Enter or Space
+document.addEventListener("keydown", e => {
+  if((e.key === "Enter" || e.key === " ") && e.target.matches && e.target.matches('[role="button"][tabindex]')){ e.preventDefault(); e.target.click(); }
+});
 document.addEventListener("keydown", e => {
   const typing = /INPUT|TEXTAREA|SELECT/.test((document.activeElement || {}).tagName || "");
   if((e.key === "k" && (e.ctrlKey || e.metaKey)) || (e.key === "/" && !typing)){ e.preventDefault(); $("cmd").focus(); return; }
@@ -1916,7 +1922,7 @@ function renderScreener(){
   const top15 = new Set(rows.slice().sort((a, b) => b["w_" + k] - a["w_" + k]).slice(0, 15).map(r => r.symbol));
   $("drvRows").innerHTML = rows.map(r => { const v = r["pts_" + k], cls = x => x > 0 ? "good" : x < 0 ? "bad" : "", ch = top15.has(r.symbol);
     const sym = ch ? `<span class="scr-sym">${esc(r.symbol)}</span>` : `<a class="scr-sym" href="https://www.tradingview.com/chart/?symbol=${encodeURIComponent(r.symbol.replace("-", "."))}" target="_blank" rel="noopener" title="Open ${esc(r.symbol)} on TradingView">${esc(r.symbol)}</a>`;
-    return `<tr class="${ch ? "clk" : ""}${r.stale ? " stale" : ""}"${ch ? ` data-sym="${esc(r.symbol)}" title="Click for ${esc(r.symbol)}'s chart"` : r.stale ? ' title="Could not refresh: last known price"' : ""}><td>${sym}<span class="scr-name">${esc(r.name)}</span>${ch ? '<svg class="scr-ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 13h12M4 10l3-3 2 2 4-5"/></svg>' : ""}</td>
+    return `<tr class="${ch ? "clk" : ""}${r.stale ? " stale" : ""}"${ch ? ` data-sym="${esc(r.symbol)}" role="button" tabindex="0" title="Click for ${esc(r.symbol)}'s chart"` : r.stale ? ' title="Could not refresh: last known price"' : ""}><td>${sym}<span class="scr-name">${esc(r.name)}</span>${ch ? '<svg class="scr-ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 13h12M4 10l3-3 2 2 4-5"/></svg>' : ""}</td>
       <td>${spark(r.spark)}</td>
       <td class="m">${num(r.price, 2)}</td>
       <td class="m ${cls(r.pct)}">${signed(r.pct, 2)}%</td>

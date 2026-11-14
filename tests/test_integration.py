@@ -181,6 +181,9 @@ class TestService(unittest.TestCase):
                 self.assertIn("profile", json.loads(get("/api/levels?market=NQ")))
                 self.assertTrue(get("/api/pine?market=NQ").startswith("GEX1;"))
                 self.assertIn("<title>", get("/"))
+                with urllib.request.urlopen(base + "/assets/app.js") as resp:      # served as what it is, never guessed
+                    self.assertEqual(resp.headers["X-Content-Type-Options"], "nosniff")
+                self.assertIn("Lightweight Charts", get("/assets/lightweight-charts-4.2.0.js")[:200])   # the chart library: no outside CDN
                 self.assertEqual(json.loads(get("/api/news"))["events"], [])              # the feeds component
                 self.assertEqual(json.loads(get("/api/posts"))["posts"], [])
             finally:
