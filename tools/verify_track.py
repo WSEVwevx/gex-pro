@@ -89,8 +89,20 @@ for f in sorted((TRACK / "sessions").glob("*.json")):
         check(same, f"{f.stem}: hand grade {mine} matches")
 
 # ---- backtest, S&P 500 with VIX, from raw files
-spx = json.loads(get("https://cdn.cboe.com/api/global/delayed_quotes/charts/historical/_SPX.json"))["data"]
-spx = {r["date"]: (float(r["open"]), float(r["high"]), float(r["low"]), float(r["close"])) for r in spx if float(r["open"]) > 0}
+# Cboe's daily history first; on 2026-11-14 it began answering with an empty file (SPX) or "access denied" (NDX),
+# so, like the app, fall back to Yahoo's full ^GSPC history (read here with my own parser)
+SRC = "Cboe"
+try:
+    spx = json.loads(get("https://cdn.cboe.com/api/global/delayed_quotes/charts/historical/_SPX.json"))["data"]
+    spx = {r["date"]: (float(r["open"]), float(r["high"]), float(r["low"]), float(r["close"])) for r in spx if float(r["open"]) > 0}
+except ValueError:
+    SRC = "Yahoo"
+    print("NOTE Cboe daily SPX history unavailable; using Yahoo ^GSPC")
+    _r = json.loads(get("https://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC?interval=1d&period1=631152000&period2="
+                        f"{int(datetime.now().timestamp()) + 86400}"))["chart"]["result"][0]
+    _q = _r["indicators"]["quote"][0]
+    spx = {datetime.fromtimestamp(t, NY).date().isoformat(): (_q["open"][i], _q["high"][i], _q["low"][i], _q["close"][i])
+           for i, t in enumerate(_r["timestamp"]) if _q["close"][i]}
 vix = {}
 for r in csv.DictReader(io.StringIO(get("https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv").decode())):
     m, dd, y = r["DATE"].split("/")
@@ -106,6 +118,11 @@ for a, b in zip(ds, ds[1:]):
     n += 1
     k += abs(spx[b][3] - spx[a][3]) <= band
 bt = json.loads((TRACK / "backtest.json").read_text())["markets"]["ES"]["overall"]
-check(n == bt["n"] and k == bt["close_in"]["k"], f"backtest SPX/VIX: mine {k}/{n} = {k / n:.4f}, engine {bt['close_in']['k']}/{bt['n']}")
+if SRC == "Cboe":
+    check(n == bt["n"] and k == bt["close_in"]["k"], f"backtest SPX/VIX: mine {k}/{n} = {k / n:.4f}, engine {bt['close_in']['k']}/{bt['n']}")
+else:   # a different price file: exact counts cannot match, the rate must (a day or two more, prices a cent apart)
+    check(abs(n - bt["n"]) <= 5 and abs(k / n - bt["close_in"]["k"] / bt["n"]) < 0.001,
+          f"backtest SPX/VIX on Yahoo: mine {k}/{n} = {k / n:.4f}, engine (Cboe file) {bt['close_in']['k']}/{bt['n']} "
+          f"= {bt['close_in']['k'] / bt['n']:.4f}: within 0.1%")
 print("ALL MATCH" if not bad else f"{bad} FAILED")
 sys.exit(1 if bad else 0)
