@@ -73,6 +73,7 @@ def main() -> int:
              ("positioning.json", "/api/positioning", {}), ("sources.json", "/api/sources", {}),
              ("pastes.json", "/api/pastes", {}), ("screener.json", "/api/screener", {})]
     pairs += [(f"heatmap-{m}-{tf}.json", "/api/heatmap", {"market": m, "tf": tf}) for m in ("NQ", "ES") for tf in RANGE]
+    pairs += [(f"bias-history-{m}.json", "/api/bias-history", {"market": m}) for m in ("NQ", "ES")]
     texts = [("pine-published.txt", "/api/pine/all", {"which": "published"}), ("pine-latest.txt", "/api/pine/all", {})]
     texts += [(f"pine-{w}-{m}.txt", "/api/pine/all", dict({"market": m}, **({"which": w} if w == "published" else {})))
               for w in ("published", "latest") for m in ("NQ", "ES")]

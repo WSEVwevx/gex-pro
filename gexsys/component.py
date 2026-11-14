@@ -5,7 +5,9 @@ Same shape as every GEX PRO component (see gexpro/components.py):
                               /api/indicator (the TradingView script, read from disk on every request),
   start() / stop()            one background refresh thread per market
                               /api/heatmap?market=NQ&tf=5m (candles + GEX history for the heatmap page)
-  build_static(data, state)   all.json, pine-*.txt, indicator.json and heatmap-{NQ,ES}-{1m,5m,15m}.json for the hosted site
+                              /api/bias-history?market=NQ (the session's levels minute by minute, for the Bias replay)
+  build_static(data, state)   all.json, pine-*.txt, indicator.json, heatmap-{NQ,ES}-{1m,5m,15m}.json and
+                              bias-history-{NQ,ES}.json for the hosted site
 
 Endpoints, by example:
   /api/levels?key=NQ-CBOE                    one worker's latest result (market=NQ picks the first NQ worker)
@@ -17,12 +19,13 @@ from __future__ import annotations
 import json
 import logging
 import shutil
+import time
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterable, Optional
 
-from . import marketcal
+from . import heatmap, marketcal, timeline
 from .config import MarketConfig
 from .export import combine
 from .heatmap import RANGE, HeatmapCache, build as build_heatmap
@@ -75,6 +78,7 @@ class GexComponent:
         self.gate = gate or NotifyGate()
         self.workers: dict[str, MarketWorker] = {}
         self.heat = HeatmapCache()
+        self._bars: dict = {}                  # market -> (fetched, 1-minute candles) for the Bias replay, 60 s
 
     @classmethod
     def from_workers(cls, workers: dict[str, MarketWorker]) -> "GexComponent":
@@ -101,7 +105,22 @@ class GexComponent:
     def routes(self) -> dict:
         return {"/health": self._health, "/api/markets": self._markets, "/api/all": lambda q: (200, _all(self.workers.values())),
                 "/api/pine/all": self._pine_all, "/api/levels": self._levels, "/api/pine": self._pine,
-                "/api/indicator": lambda q: (200, indicator_info()), "/api/heatmap": self._heatmap}
+                "/api/indicator": lambda q: (200, indicator_info()), "/api/heatmap": self._heatmap,
+                "/api/bias-history": self._bias_history}
+
+    def _bias_history(self, q):
+        w = self._worker(q)
+        if not w:
+            return 404, {"error": "unknown market"}
+        m = w.cfg.market
+        got = self._bars.get(m)
+        if not got or time.time() - got[0] > 60:
+            try:
+                got = self._bars[m] = (time.time(), heatmap.fetch_candles(m, "1m"))
+            except Exception as e:                     # no price line; snapshots saved with their mapping still replay
+                log.warning("bias replay candles %s: %s", m, e)
+                got = got or (0.0, [])
+        return 200, timeline.build(w.store.root / w.key, m, w.cfg.method, got[1])
 
     def _heatmap(self, q):
         w = self._worker(q)
@@ -195,15 +214,21 @@ class GexComponent:
         _write(data / "all.json", json.dumps(_all(workers, static=True)))
         _write(data / "indicator.json", json.dumps(indicator_info()))
         for w in workers:
+            bars: list = []
             for tf in RANGE:
                 try:
-                    hm = build_heatmap(w, tf)
+                    candles = heatmap.fetch_candles(w.cfg.market, tf)
+                    hm = build_heatmap(w, tf, candles=candles)
                     self.heat.note(w.cfg.market)
+                    if tf == "1m":
+                        bars = candles                        # the replay's price: the same bars, untrimmed
                 except Exception as e:                        # candles unavailable: the GEX history alone
                     log.warning("heatmap %s %s: %s", w.key, tf, e)
                     self.heat.note(w.cfg.market, f"{type(e).__name__}: {e}")
                     hm = build_heatmap(w, tf, candles=[])
                 _write(data / f"heatmap-{w.cfg.market}-{tf}.json", json.dumps(hm, separators=(",", ":")))
+            tl = timeline.build(w.store.root / w.key, w.cfg.market, w.cfg.method, bars)
+            _write(data / f"bias-history-{w.cfg.market}.json", json.dumps(tl, separators=(",", ":")))
         for which, pick in (("latest", lambda w: w.result and w.result.get("pine")),
                             ("published", lambda w: w.published and w.published.get("payload"))):
             _write(data / f"pine-{which}.txt", combine([p for p in map(pick, workers) if p]))
