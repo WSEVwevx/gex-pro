@@ -67,13 +67,14 @@ class SnapshotStore:
         base = self.root / market
         if not base.exists():
             return None
-        for p in sorted(base.glob("*/*.json"), reverse=True):
-            if p.name.endswith(".chain.json"):
-                continue
-            try:
-                s = json.loads(p.read_text(encoding="utf-8"))
-            except (OSError, json.JSONDecodeError):
-                continue
-            if not usable or s.get("status") != "UNAVAILABLE":
-                return s
+        for day in sorted((d for d in base.iterdir() if d.is_dir()), reverse=True):    # newest day first: the
+            for p in sorted(day.glob("*.json"), reverse=True):                         # rest of history is not listed
+                if p.name.endswith(".chain.json"):
+                    continue
+                try:
+                    s = json.loads(p.read_text(encoding="utf-8"))
+                except (OSError, json.JSONDecodeError):
+                    continue
+                if not usable or s.get("status") != "UNAVAILABLE":
+                    return s
         return None
