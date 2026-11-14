@@ -171,8 +171,21 @@ def run_engine(cfg_path, raw, asof=None):
     from gexsys.providers.cboe import CboeProvider
     cfg = cfgmod.load(cfg_path)
     prov = CboeProvider(http=lambda url, headers, limiter=None: raw[url.rsplit("/", 1)[1][:-5]], include_etf=True)
-    # the provider dates its window from the chain's own timestamp, which retime() moves: production settings
-    snap = normalize(prov.fetch_snapshot(cfg.source, cfg.engine.max_dte, cfg.engine.include_0dte), check_occ=True)
+    # the provider dates its window from the chain's own timestamp, which retime() moves: production settings.
+    # Its clock is the scenario's (a re-timed chain is not "from the future" there).
+    from datetime import datetime as _dt
+    from gexsys.providers import cboe as _cboe
+    stamp = max(_dt.strptime(r["timestamp"], "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc) for r in raw.values())
+
+    class _Clock(_dt):
+        @classmethod
+        def now(cls, tz=None):
+            return stamp.astimezone(tz) if tz else stamp.replace(tzinfo=None)
+    real, _cboe.datetime = _cboe.datetime, _Clock
+    try:
+        snap = normalize(prov.fetch_snapshot(cfg.source, cfg.engine.max_dte, cfg.engine.include_0dte), check_occ=True)
+    finally:
+        _cboe.datetime = real
     asof = asof or snap.fetched_at
     ecfg = cfg.engine if session_state(asof) == "RTH" else dataclasses.replace(cfg.engine, max_spot_age_s=400 * 86400)
     res = eng.compute(snap, ecfg, asof=asof)
