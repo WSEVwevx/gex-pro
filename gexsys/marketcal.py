@@ -15,8 +15,10 @@ Simplifications (documented in docs/LIMITATIONS.md):
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import lru_cache
+from types import MappingProxyType
 from datetime import date, datetime, time, timedelta
-from typing import Optional
+from typing import Mapping, Optional
 from zoneinfo import ZoneInfo
 
 NY = ZoneInfo("America/New_York")
@@ -64,7 +66,8 @@ def _observed(d: date) -> date:
     return d
 
 
-def nyse_holidays(year: int) -> dict[date, str]:
+@lru_cache(maxsize=None)
+def nyse_holidays(year: int) -> Mapping[date, str]:
     h: dict[date, str] = {}
     ny = date(year, 1, 1)
     if ny.weekday() != 5:        # NYSE does not observe a Saturday New Year on Friday Dec 31
@@ -82,10 +85,11 @@ def nyse_holidays(year: int) -> dict[date, str]:
     for d, name in EXTRA_CLOSURES.items():
         if d.year == year:
             h[d] = name
-    return h
+    return MappingProxyType(h)            # cached per year (rebuilt ~35,000 times a refresh before): read-only
 
 
-def early_closes(year: int) -> dict[date, time]:
+@lru_cache(maxsize=None)
+def early_closes(year: int) -> Mapping[date, time]:
     """13:00 ET equity/index-option early closes."""
     hol = nyse_holidays(year)
     out: dict[date, time] = {}
@@ -96,7 +100,7 @@ def early_closes(year: int) -> dict[date, time]:
     c24 = date(year, 12, 24)
     if c24.weekday() < 5 and c24 not in hol:
         out[c24] = time(13, 0)
-    return out
+    return MappingProxyType(out)
 
 
 FULL_CLOSURES = {"New Year's Day", "Good Friday", "Christmas Day"}    # CME equity futures closed all day
