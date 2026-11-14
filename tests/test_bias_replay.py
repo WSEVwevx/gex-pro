@@ -127,6 +127,14 @@ class TestReplay(unittest.TestCase):
         tl = self.build(OPEN + timedelta(minutes=10))
         self.assertEqual([(r[0], r[-1]) for r in tl["rows"]], [(0, 0), (1, 1), (2, 0), (3, 1)])
 
+    def test_zero_gamma_moves_once_it_has_moved_0_1_percent(self):
+        # zero gamma is interpolated and shifts a little every refresh; small steps add up until they count
+        self.store.save(KEY, snap(OPEN - timedelta(minutes=5), zg=28000.0))
+        for k, zg in enumerate((28010.0, 28020.0, 28030.0, 28035.0, 28100.0), start=1):
+            self.store.save(KEY, snap(OPEN + timedelta(minutes=k), zg=zg))
+        tl = self.build(OPEN + timedelta(minutes=10))
+        self.assertEqual([r[-1] for r in tl["rows"]], [0, 0, 0, 1, 0, 1])      # 28,030: 30 pts from 28,000 (0.107%)
+
     def test_empty_history(self):
         tl = self.build(OPEN + timedelta(minutes=30))
         self.assertEqual((tl["rows"], tl["seen"], tl["price"]), ([], [], []))

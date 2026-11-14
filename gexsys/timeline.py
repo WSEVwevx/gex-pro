@@ -9,7 +9,9 @@ mapped to futures with its own factor, saved beside it since 2026-11-14 (`future
 without it: their factor is estimated from the futures bar at the index price's own time (flagged, and the page
 says so). A snapshot with neither is left out, and the levels before it are held: gaps stay visible.
 Rows are written only when a level changes: [minute, zero gamma, call wall, put wall, abs gamma, 0DTE max pain,
-estimated (1/0), moved (bit c set when column c's OPTIONS level changed, not just the futures basis under it)].
+estimated (1/0), moved (bit c set when column c's OPTIONS level moved, not just the futures basis under it)].
+A strike level (walls, abs gamma, max pain) moves when it changes strike. Zero gamma is interpolated, so it shifts a
+little every refresh: it counts as moved once it is MOVE_ZG (0.1%) away from where it last moved, slow drift included.
 `seen` lists every snapshot's fetch time, for the "levels from" age.
 Price: 1-minute futures bars (the heatmap's, no extra request); a bar is shown once it has closed.
 """
@@ -26,7 +28,8 @@ from .mapping import FUTURES, round_to_tick
 from .session import summaries_since
 
 COLS = ("Zero gamma", "Call wall", "Put wall", "Abs gamma", "Max pain 0DTE")
-LOOKBACK = timedelta(hours=18)          # the last snapshot before the open: the levels shown at the open
+LOOKBACK = timedelta(hours=18)
+MOVE_ZG = 0.001          # the last snapshot before the open: the levels shown at the open
 
 
 def session_bounds(now: datetime) -> tuple[datetime, datetime]:
@@ -66,7 +69,8 @@ def build(folder: Path, market: str, method: str, candles: list, now: Optional[d
     rows: list = []
     seen: list = []
     estimated = 0
-    prev_raw = None
+    anchor: list = [None] * len(COLS)                  # each level where it last counted as moved
+    prev_seen = False
     for s in summaries_since(folder, o - LOOKBACK):
         t = datetime.fromisoformat(s["asof"])
         if t > end:
@@ -81,8 +85,15 @@ def build(folder: Path, market: str, method: str, candles: list, now: Optional[d
             (f, off), est = got, 1
         raw = [_p(s.get("zero_gamma")), _p(s.get("call_wall")), _p(s.get("put_wall")), _p(s.get("abs_gamma")), s.get("mp0")]
         vals = [None if v is None else round_to_tick(v * f + off, tick) for v in raw]
-        moved = sum(1 << i for i, v in enumerate(raw) if prev_raw is not None and v != prev_raw[i])
-        prev_raw = raw
+        moved = 0
+        for i, v in enumerate(raw):
+            a = anchor[i]
+            if v == a or (i == 0 and None not in (v, a) and abs(v - a) < MOVE_ZG * abs(a)):
+                continue
+            if prev_seen:                               # the first snapshot sets where each level starts
+                moved |= 1 << i
+            anchor[i] = v
+        prev_seen = True
         sec = (t - o).total_seconds()
         m = max(0, math.ceil(sec / 60))                 # visible from the first whole minute at or after the fetch
         if sec < 0:                                     # before the open: only the last one counts (shown at 09:30)
