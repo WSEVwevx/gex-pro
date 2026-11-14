@@ -76,7 +76,7 @@ def main() -> int:
     texts = [("pine-published.txt", "/api/pine/all", {"which": "published"}), ("pine-latest.txt", "/api/pine/all", {})]
     texts += [(f"pine-{w}-{m}.txt", "/api/pine/all", dict({"market": m}, **({"which": w} if w == "published" else {})))
               for w in ("published", "latest") for m in ("NQ", "ES")]
-    bad, n_vals = [], 0
+    bad = []
     for fname, path, q in pairs:
         f = data / fname
         if not f.exists() or path not in routes:
@@ -84,8 +84,6 @@ def main() -> int:
             continue
         code, body = local(path, **q)
         d = diff(json.loads(f.read_text(encoding="utf-8")), json.loads(json.dumps(body, default=str)))
-        n = len(json.dumps(body, default=str))
-        n_vals += n
         print(f"  {fname:28s} vs {path}{'?' + '&'.join(f'{k}={v}' for k, v in q.items()) if q else '':30s} "
               f"{'identical' if not d else f'{len(d)} differences'}")
         bad += [f"{fname}: {x}" for x in d[:5]]
