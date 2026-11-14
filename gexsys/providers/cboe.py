@@ -57,7 +57,7 @@ class CboeProvider(Provider):
 
     def __init__(self, requests_per_minute: float = 6.0, http=http_get_json, include_etf: bool = False):
         self._http = http
-        self.limiter = RateLimiter(requests_per_minute)
+        self.limiter = RateLimiter(requests_per_minute, burst=2)   # index + ETF chain together
         self.include_etf = include_etf
 
     def _chain(self, source_key: str, max_dte: float, include_0dte: bool) -> dict:

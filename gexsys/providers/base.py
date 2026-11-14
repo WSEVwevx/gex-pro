@@ -37,11 +37,13 @@ class ProviderUnavailable(ProviderError):
 
 
 class RateLimiter:
-    """Simple thread-safe minimum-interval limiter (requests per minute)."""
+    """Thread-safe limiter (requests per minute). `burst` requests may go back to back; the long-run rate never
+    exceeds per_minute (a token bucket of size burst)."""
 
     def __init__(self, per_minute: float, clock: Callable[[], float] = time.monotonic,
-                 sleep: Callable[[float], None] = time.sleep):
+                 sleep: Callable[[float], None] = time.sleep, burst: int = 1):
         self.interval = 60.0 / per_minute if per_minute > 0 else 0.0
+        self.burst = max(1, int(burst))
         self._next = 0.0
         self._lock = threading.Lock()
         self._clock, self._sleep = clock, sleep
@@ -49,8 +51,9 @@ class RateLimiter:
     def wait(self) -> None:
         with self._lock:
             now = self._clock()
-            delay = self._next - now
-            self._next = max(now, self._next) + self.interval
+            self._next = max(now, self._next)
+            delay = self._next - (self.burst - 1) * self.interval - now
+            self._next += self.interval
         if delay > 0:
             self._sleep(delay)
 

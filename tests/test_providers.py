@@ -102,6 +102,21 @@ class TestHttp(unittest.TestCase):
         rl.wait()
         self.assertEqual(slept, [0.5, 1.0])
 
+    def test_rate_limiter_burst_keeps_the_average_rate(self):
+        t = [0.0]
+        slept = []
+        rl = RateLimiter(6, clock=lambda: t[0], sleep=lambda d: (slept.append(d), t.__setitem__(0, t[0] + d)), burst=2)
+        for _ in range(8):
+            rl.wait()
+        self.assertEqual(slept[:1], [10.0])                     # the first two go together, the third waits
+        self.assertLessEqual(t[0], 60.0)
+        self.assertGreaterEqual(t[0], 60.0)                     # 8 requests still take 60 s: 6 per minute after the burst
+        t[0] += 600                                             # idle: the bucket refills to 2, never more
+        slept.clear()
+        for _ in range(3):
+            rl.wait()
+        self.assertEqual(slept, [10.0])
+
 
 class TestCsv(unittest.TestCase):
     def test_csv_fixture(self):
