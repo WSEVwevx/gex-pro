@@ -1,4 +1,5 @@
-"""Writes a briefing from a plain data snapshot. Rule-based text: the same data always gives the same words.
+"""Writes the Asia session briefing from a plain data snapshot, and hands the NY AM brief to morning.py.
+Rule-based text: the same data always gives the same words.
 
 Snapshot shape (built by the app shell, gexpro/context.py):
   {"now": iso,
@@ -55,13 +56,7 @@ def market_block(m: dict, kind: str, morning: Optional[dict] = None) -> dict:
     rng = None
     if em.get("anchor") is not None and em.get("daily"):
         lo, hi = em["anchor"] - em["daily"], em["anchor"] + em["daily"]
-        rng = {"low": lo, "high": hi, "text": f"Expected range {'today' if kind == 'nyam' else 'next session'}: "
-                                             f"{_f(lo)} to {_f(hi)} (±{em['daily']:,.0f} pts, 1σ)"}
-    near = m.get("nearest") or {}
-    odte = None
-    if near.get("zero_gamma") or near.get("call_wall") or near.get("put_wall"):
-        lab = near.get("label") or "0DTE"
-        odte = f"{lab}: zero gamma {_f(near.get('zero_gamma'))}, call wall {_f(near.get('call_wall'))}, put wall {_f(near.get('put_wall'))}"
+        rng = {"low": lo, "high": hi, "text": f"Expected range next session: {_f(lo)} to {_f(hi)} (±{em['daily']:,.0f} pts, 1σ)"}
     b = m.get("bias") or {}
     bias = None
     if b:
@@ -87,7 +82,7 @@ def market_block(m: dict, kind: str, morning: Optional[dict] = None) -> dict:
     if dl.get("regime_changed"):
         changes.append(f"Regime changed from {REGIME.get(dl.get('prev_regime'), dl.get('prev_regime'))} at the last update.")
     return {"market": m["market"], "price": p, "regime": regime, "headline": headline, "levels": levels,
-            "range": rng, "odte": odte if kind == "nyam" else None, "bias": bias, "plan": plan, "changes": changes,
+            "range": rng, "bias": bias, "plan": plan, "changes": changes,
             "zero_gamma": zg, "data": f"{m.get('options', '')} options, {'real time' if m.get('quality') == 'RT' else '15-min delayed'}"
                                          f" as of {_clock(_t(m['asof']))} ET; open interest from the last close"
                                          if m.get("asof") else ""}
@@ -121,22 +116,22 @@ def _posts(posts: list, since: datetime, limit: int = 5) -> list:
     return sorted(out, key=lambda x: x["time"], reverse=True)[:limit]
 
 
-def compose(kind: str, ctx: dict, slot: datetime, session: date, morning: Optional[dict] = None) -> dict:
-    """`morning`: this session's NY AM briefing markets by name ({"NQ": {...}}), for the Asia 'what changed'."""
+def compose(kind: str, ctx: dict, slot: datetime, session: date, morning: Optional[dict] = None,
+            record: Optional[list] = None, past: Optional[list] = None) -> dict:
+    """`morning`: this session's NY AM briefing markets by name ({"NQ": {...}}), for the Asia 'what changed'.
+    The NY AM brief is morning.py's (five blocks, graded afterwards); `record` and `past` are its history."""
+    if kind == "nyam":
+        from .morning import compose_morning
+        return compose_morning(ctx, slot, session, record, past, events_fn=_events)
     now = datetime.fromisoformat(ctx["now"]).astimezone(NY)
     markets = [market_block(m, kind, (morning or {}).get(m["market"])) for m in ctx.get("markets", []) if m.get("price")]
     sess = datetime.combine(session, datetime.min.time(), NY)
-    if kind == "nyam":
-        cal = [{"title": "US calendar today (ET)", "items": _events(ctx.get("events", []), sess, sess + timedelta(days=1), {"USD"})}]
-        posts = _posts(ctx.get("posts", []), slot - timedelta(hours=17))
-        posts_title = "Market-moving posts since yesterday's close"
-    else:
-        open_ = sess.replace(hour=9, minute=30)
-        cal = [{"title": "Overnight: Asia and Europe (ET)", "items": _events(ctx.get("events", []), slot - timedelta(hours=1), open_,
-                                                                                {"JPY", "CNY", "AUD", "NZD", "EUR", "GBP", "CHF", "All"})},
-               {"title": f"US calendar {session:%a %b %d} (ET)", "items": _events(ctx.get("events", []), sess, sess + timedelta(days=1), {"USD"})}]
-        posts = _posts(ctx.get("posts", []), slot - timedelta(hours=3))
-        posts_title = "Market-moving posts since the US close"
+    open_ = sess.replace(hour=9, minute=30)
+    cal = [{"title": "Overnight: Asia and Europe (ET)", "items": _events(ctx.get("events", []), slot - timedelta(hours=1), open_,
+                                                                            {"JPY", "CNY", "AUD", "NZD", "EUR", "GBP", "CHF", "All"})},
+           {"title": f"US calendar {session:%a %b %d} (ET)", "items": _events(ctx.get("events", []), sess, sess + timedelta(days=1), {"USD"})}]
+    posts = _posts(ctx.get("posts", []), slot - timedelta(hours=3))
+    posts_title = "Market-moving posts since the US close"
     high = [e for c in cal for e in c["items"] if e["impact"] == "High"]
     head = " ".join(mb["headline"] for mb in markets) or "No GEX levels available yet."
     if high:

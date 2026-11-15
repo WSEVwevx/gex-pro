@@ -11,11 +11,32 @@ from datetime import date, datetime, time, timedelta, timezone
 
 from feeds import weekinfo
 from gexsys import bias, export, marketcal, session
+from gexsys.mapping import FUTURES, round_to_tick
 from trackrecord import prices
 
 
 def _p(v):
     return v.get("price") if isinstance(v, dict) else v
+
+
+def prev_close(w, now: datetime, factor: float, offset: float) -> dict | None:
+    """The levels at the last cash close before `now`, in futures prices at TODAY's basis (so a change is a change in
+    the level, not in the basis): the brief's "what changed". None when that session was not saved."""
+    d = now.astimezone(marketcal.NY).date()
+    for _ in range(10):
+        if marketcal.is_trading_day(d):
+            close = datetime.combine(d, marketcal.rth_close(d), marketcal.NY)
+            if close <= now:
+                s = session._session_snapshot(w.store.root / w.key, datetime.combine(d, time(9, 30), marketcal.NY), close + timedelta(minutes=20))
+                if not s:
+                    return None
+                tick = FUTURES[w.cfg.market].tick_size
+                fut = lambda v: None if _p(v) is None else round_to_tick(_p(v) * factor + offset, tick)
+                em = ((s.get("extras") or {}).get("expected_move") or {}).get("daily_points")
+                return {"day": d.isoformat(), "zero_gamma": fut(s.get("zero_gamma")), "call_wall": fut(s.get("call_wall")),
+                        "put_wall": fut(s.get("put_wall")), "regime": s.get("regime"), "em": em * factor if em else None}
+        d -= timedelta(days=1)
+    return None
 
 
 def market_snapshot(w) -> dict | None:
@@ -26,7 +47,11 @@ def market_snapshot(w) -> dict | None:
     L = r.get("mapped") or s                          # futures prices when mapped, else index prices
     X = L.get("extras") or {}
     em, near, b = X.get("expected_move") or {}, X.get("nearest") or {}, r.get("bias")
+    mp = (r.get("mapped") or {}).get("mapping") or {}
+    factor, offset = mp.get("factor") or 1.0, mp.get("offset") or 0.0
     return {
+        "factor": factor, "offset": offset,
+        "prev": prev_close(w, datetime.fromisoformat(s["asof"]), factor, offset) if s.get("asof") else None,
         "market": w.cfg.market, "price": L.get("futures_equiv_of_ref") or s.get("ref_price"),
         "asof": s.get("asof"), "quality": s.get("ref_quality"),
         "options": (s.get("options_source") or w.cfg.source) + ("+" + s["etf"] if s.get("etf") else ""),
