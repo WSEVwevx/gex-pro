@@ -38,11 +38,13 @@ class Component(Protocol):
 
 
 def default_components(gex_configs) -> list:
-    """Order matters for the hosted build: briefings and the track record read what gex just built, and the
-    Data health check runs last so it sees every source as this build left it."""
+    """Order matters for the hosted build: the track record and the briefings read what gex just built, the
+    briefings read the track record (the brief's history and grades, from the folder that build points it at), and
+    the Data health check runs last so it sees every source as this build left it."""
     gex, feeds = GexComponent(gex_configs), FeedsComponent()
     briefings = BriefingsComponent(context=lambda: snapshot(gex, feeds), is_trading_day=marketcal.is_trading_day,
-                                   notify=publish.notify_desktop, week_data=lambda end: week_data(feeds, end))
+                                   notify=publish.notify_desktop, week_data=lambda end: week_data(feeds, end),
+                                   record=lambda: track.sessions())      # graded sessions: the brief's history and its grades
     track = TrackRecordComponent(pre_open=lambda d: pre_open(gex, d), is_trading_day=marketcal.is_trading_day,
                                  session_close=lambda d: datetime.combine(d, marketcal.rth_close(d), marketcal.NY))
-    return [gex, feeds, briefings, track, HealthComponent([gex, feeds, briefings, track])]
+    return [gex, feeds, track, briefings, HealthComponent([gex, feeds, briefings, track])]

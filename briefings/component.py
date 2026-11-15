@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from . import schedule
+from . import morning
 from .compose import compose
 from .weekly import VERSION as WEEKLY_VERSION, recap
 
@@ -41,8 +42,9 @@ class BriefingsComponent:
 
     def __init__(self, context: Callable[[], dict], is_trading_day: Callable, notify: Optional[Callable] = None,
                  store_dir: Optional[Path] = None, clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
-                 week_data: Optional[Callable] = None):
+                 week_data: Optional[Callable] = None, record: Optional[Callable[[], list]] = None):
         self.context, self.is_trading_day, self.notify, self.clock = context, is_trading_day, notify, clock
+        self.record = record                   # the Track record's sessions: the brief's history and its grades
         self.week_data = week_data
         self._week_try: Optional[datetime] = None
         self.dir = Path(store_dir) if store_dir else _default_dir()
@@ -142,7 +144,11 @@ class BriefingsComponent:
                     if kind == "asia":
                         am = self._load(f"{slot.astimezone(schedule.NY):%Y-%m-%d}-nyam")
                         morning = {m["market"]: m for m in (am or {}).get("markets", [])}
-                    b = compose(kind, ctx, slot, session, morning)
+                    try:
+                        b = compose(kind, ctx, slot, session, morning, record=self._record(), past=self.history())
+                    except ValueError as e:                # data stamped after the brief's own time: wait for a clean read
+                        log.warning("briefing %s not written: %s", sid, e)
+                        continue
                 self._save(sid, b)
                 written.append(sid)
                 log.info("briefing %s written", sid)
@@ -151,14 +157,59 @@ class BriefingsComponent:
                         self.notify(f"GEX PRO {b['title']}", b["headline"][:200])
                     except Exception:                     # a notification problem never blocks the briefing
                         log.exception("briefing notification failed")
+            try:
+                self.grade_due()
+            except Exception:
+                log.exception("briefing grading failed")
         return written
+
+    # ---------------------------------------------------------------- grading the NY AM brief
+    def _record(self) -> list:
+        try:
+            return self.record() if self.record else []
+        except Exception:
+            log.exception("track record unavailable to the briefings")
+            return []
+
+    def _grades(self) -> list:
+        """Every grade row written so far: {"id", "market", "type", "hit", "base"}."""
+        try:
+            return [json.loads(x) for x in (self.dir / "scores.jsonl").read_text(encoding="utf-8").splitlines() if x.strip()]
+        except (OSError, ValueError):
+            return []
+
+    def grade_due(self) -> list[str]:
+        """Grade each NY AM brief once its session has a Track record outcome. The brief itself is never edited:
+        grades are appended to scores.jsonl, which outlives the briefs' own history."""
+        done = {g["id"] for g in self._grades()}
+        todo = [b for b in self.history() if b.get("kind") == "nyam" and b.get("version", 1) >= morning.VERSION
+                and schedule.slot_id("nyam", datetime.fromisoformat(b["slot"])) not in done]
+        if not todo:
+            return []
+        outcome = {(r["session"], r["market"]): r["outcome"] for r in self._record() if r.get("outcome")}
+        graded, lines = [], []
+        for b in todo:
+            rows = [(mb["market"], g) for mb in b.get("markets", []) if (b["session"], mb["market"]) in outcome
+                    for g in morning.grade(mb, outcome[(b["session"], mb["market"])])]
+            if rows:
+                sid = schedule.slot_id("nyam", datetime.fromisoformat(b["slot"]))
+                lines += [json.dumps(dict(g, id=sid, market=mk)) for mk, g in rows]
+                graded.append(sid)
+        if lines:
+            self.dir.mkdir(parents=True, exist_ok=True)
+            with open(self.dir / "scores.jsonl", "a", encoding="utf-8") as f:
+                f.write("".join(x + "\n" for x in lines))
+        return graded
 
     def payload(self) -> dict:
         hist = self.history()
+        grades = self._grades()
         latest = {k: next((b for b in hist if b.get("kind") == k), None) for k in schedule.KINDS}
         now = self.clock()
         nxt = {k: (lambda s: s.isoformat() if s else None)(schedule.next_slot(k, now, self.is_trading_day)) for k in schedule.KINDS}
         return {"latest": latest, "next": nxt,
+                "score": {"rows": morning.score(grades), "briefs": len({g["id"] for g in grades}), "min": morning.MIN,
+                          "grades": {sid: [g for g in grades if g["id"] == sid] for sid in {g["id"] for g in grades[-200:]}}},
                 "history": [{"id": schedule.slot_id(b["kind"], datetime.fromisoformat(b["slot"])), "kind": b["kind"],
                              "title": b["title"], "session": b["session"], "slot": b["slot"]} for b in hist],
                 "by_id": {schedule.slot_id(b["kind"], datetime.fromisoformat(b["slot"])): b for i, b in enumerate(hist) if i < 20 or b["kind"] == "weekly"}}
