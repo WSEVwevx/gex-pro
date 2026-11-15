@@ -174,6 +174,50 @@ async function loadBriefings(){
   renderBriefings();
 }
 const BKIND = {nyam: "NY AM", asia: "Asia", weekly: "Weekly"};
+// ---------- the five-block NY AM brief (briefings/morning.py): figures only, each block linked to the page it lives on
+const B2_COL = n => /call/i.test(n) ? "var(--pos)" : /put/i.test(n) ? "var(--neg)" : /zero/i.test(n) ? "var(--zg)" : "var(--ag)";
+const B2_TAG = {band: "Range", regime_range: "Regime", key_level: "Level", wall_holds: "Wall"};
+function briefMarket2(m, grades){
+  const col = m.regime === "POSITIVE" ? "var(--pos)" : m.regime === "NEGATIVE" ? "var(--neg)" : "var(--zg)";
+  const go = (p, t) => `<button class="blink" data-go="${p}" data-m="${esc(m.market)}">${t} →</button>`;
+  const r = m.range;
+  let bar = "";
+  if(r){                                                    // price and the three levels inside the expected range
+    const lo = r.low - r.em * 0.3, hi = r.high + r.em * 0.3, at = p => Math.max(0, Math.min(100, 100 * (p - lo) / (hi - lo)));
+    bar = `<div class="b2-bar" role="img" aria-label="Price and the key levels inside today's expected range">
+      <i class="b2-band" style="left:${at(r.low)}%;width:${at(r.high) - at(r.low)}%"></i>
+      ${(m.levels || []).filter(l => l.price >= lo && l.price <= hi).map(l => `<i class="b2-tick" style="left:${at(l.price)}%;background:${B2_COL(l.name)}" title="${esc(l.name)} ${num(l.price)}"></i>`).join("")}
+      <i class="b2-dot" style="left:${at(m.price)}%" title="Price ${num(m.price)}"></i></div>
+      <div class="b2-ends"><span>${num(r.low)}</span><span>±${num(r.em, 0)} pts (1σ)</span><span>${num(r.high)}</span></div>`;
+  }
+  const g = (grades || []).filter(x => x.market === m.market);
+  return `<section class="card bm b2 accent" style="--accent:${col}">
+    <div class="head" style="margin-bottom:0"><h2>${esc(m.market)}</h2><span class="chip" style="color:${col}">${esc({POSITIVE: "positive gamma", NEGATIVE: "negative gamma"}[m.regime] || "balanced gamma")}</span><span class="spacer"></span>${go("levels", "Levels")}</div>
+    <div class="b2-px"><b>${num(m.price)}</b>${m.sigma == null ? "" : `<span><b style="color:${col}">${num(Math.abs(m.sigma), 1)}σ ${m.sigma >= 0 ? "above" : "below"}</b> zero gamma ${num(m.zero_gamma)}</span>`}</div>
+    <p class="b2-p">${esc(m.history)} ${go("track", "Track record")}</p>
+    <div class="eyebrow b2-eb">The three levels that matter</div>
+    <div class="b2-lv">${(m.levels || []).map(l => `<div><i style="background:${B2_COL(l.name)}"></i><span>${esc(l.name)}<small>${esc(l.why)}</small></span><b>${num(l.price)}<em>${signed(l.dist, 1)}${l.dist_em == null ? "" : ` · ${num(l.dist_em)}σ`}</em></b></div>`).join("")}</div>
+    ${bar}
+    <div class="eyebrow b2-eb">${m.changes.since ? `Since ${esc(m.changes.since)}'s close` : "Since the previous close"}</div>
+    <ul class="b2-ul">${m.changes.items.map(x => `<li>${esc(x)}</li>`).join("")}</ul>
+    <div class="eyebrow b2-eb">Yesterday, graded</div>
+    <p class="b2-p">${m.yesterday ? esc(m.yesterday.text) : "No earlier session in the track record yet."}</p>
+    ${g.length ? `<div class="eyebrow b2-eb">This brief, graded after the close</div><div class="b2-gr">${g.map(x => `<span class="trk-tag ${x.hit ? "good" : "bad"}">${x.hit ? "✓" : "✗"} ${B2_TAG[x.type] || esc(x.type)}</span>`).join("")}</div>` : ""}
+    ${m.stale ? `<div class="expl" style="color:var(--warn)">${esc(m.stale)}</div>` : ""}</section>`;
+}
+// one line for where every number comes from: "NDX+QQQ (9:01 AM) and SPX+SPY (9:01 AM) options, 15-min delayed; ..."
+function briefData(ms){
+  const p = ms.map(m => /^(.+) options, (.+), calculated (.+) ET; (.+)$/.exec(m.data || ""));
+  return p.length > 1 && p.every(x => x && x[2] === p[0][2] && x[4] === p[0][4])
+    ? `${p.map(x => `${x[1]} (${x[3]} ET)`).join(" and ")} options, ${p[0][2]}; ${p[0][4]}` : ms.map(m => m.data).filter(Boolean).join(" ");
+}
+function briefScore(sc){
+  const rows = (sc && sc.rows) || [], pct = v => v == null ? "-" : num(100 * v, 0) + "%";
+  const tag = r => !r.n ? `<span class="trk-tag">not graded yet</span>` : !r.enough ? `<span class="trk-tag">${r.n} of ${sc.min} needed</span>`
+    : r.flagged ? `<span class="trk-tag bad">below baseline: flagged</span>` : r.ci[0] > r.baseline ? `<span class="trk-tag good">beats baseline</span>` : `<span class="trk-tag">in line with baseline</span>`;
+  return `<div class="b2-sc">${rows.map(r => `<div><span>${esc(r.label)}<small>${r.baseline == null ? "baseline depends on each level's distance" : `guessing scores ${pct(r.baseline)}`}</small></span><b>${pct(r.rate)}<small>${r.n ? `${r.k} of ${r.n}` : "no grades"}</small></b>${tag(r)}</div>`).join("")}</div>
+    <div class="expl">${sc && sc.briefs ? `${sc.briefs} brief${sc.briefs > 1 ? "s" : ""} graded.` : "Grading starts after the first session closes."} A brief is frozen when written, then scored against the index's session after the close. The baseline is what guessing would score. A statement type is flagged for removal once, from ${sc ? sc.min : 20} grades on, even the top of its 95% range is below its baseline.</div>`;
+}
 function renderBriefings(){
   if(!brief) return;
   const latest = Object.values(brief.latest || {}).filter(Boolean).sort((a, b) => b.slot.localeCompare(a.slot));
@@ -193,17 +237,21 @@ function renderBriefings(){
   const weekly = b.kind === "weekly", when = o => new Date(b.session + "T12:00:00Z").toLocaleDateString("en-US", {...o, timeZone: "UTC"});
   $("briefHead").style.setProperty("--accent", b.kind === "asia" ? "var(--oi)" : "var(--pos)");
   $("briefKicker").textContent = weekly ? "The week in prices" : b.kind === "asia" ? "Night session · Asia open" : "Before the US open";
-  $("briefTitle").textContent = weekly ? `${b.title} · week ending ${when({month: "short", day: "numeric"})}` : `${b.title} · ${when({weekday: "long", month: "short", day: "numeric"})} session`;
+  $("briefTitle").textContent = weekly ? `${b.title} · week ending ${when({month: "short", day: "numeric"})}` : b.kind === "nyam" && b.version >= 2 ? `NY AM brief · ${when({weekday: "short", month: "short", day: "numeric"})}` : `${b.title} · ${when({weekday: "long", month: "short", day: "numeric"})} session`;
   $("briefSides").style.display = weekly ? "none" : "";      // no calendar or posts in a recap
+  $("briefHead").classList.toggle("b2h", b.kind === "nyam" && b.version >= 2);
   $("briefMeta").innerHTML = `<span class="chip">Written <b>${new Date(b.generated_at).toLocaleString("en-US", {...ET, weekday:"short", hour:"numeric", minute:"2-digit"})} ET</b></span>`
     + (b.late ? `<span class="chip" title="The app wasn't running at the scheduled time, so this was written when it started"><i class="dot warn"></i>Written late</span>` : "") + nxt
     + (b.indexes || []).map(x => `<span class="chip">${esc(x.name)} <b style="color:${x.pct > 0 ? "var(--good)" : x.pct < 0 ? "var(--bad)" : "inherit"}">${signed(x.pct, 1)}%</b></span>`).join("");
   if(b.sections) $("briefLead").innerHTML = b.sections.map(x => `<div class="bsec"><div class="eyebrow">${esc(x.title)}</div><p>${esc(x.text)}</p></div>`).join("");
+  else if(b.kind === "nyam" && b.version >= 2) $("briefLead").textContent = "";      // the cards and the calendar say it once
   else $("briefLead").textContent = b.headline;
   $("briefNews").style.display = (b.headlines || []).length ? "" : "none";
   $("briefNewsList").innerHTML = (b.headlines || []).map(x => `<div class="bpost"><div class="meta"><b style="color:var(--ink2)">${esc(new Date(x.day + "T12:00:00Z").toLocaleDateString("en-US", {weekday: "short", timeZone: "UTC"}))}</b>${x.source ? `<span>${esc(x.source)}</span>` : ""}${/^https:/.test(x.url || "") ? `<a href="${link(x.url)}" target="_blank" rel="noopener">open</a>` : ""}</div>${esc(x.title)}</div>`).join("");
   const col = r => r === "POSITIVE" ? "var(--pos)" : r === "NEGATIVE" ? "var(--neg)" : "var(--zg)";
-  $("briefMarkets").innerHTML = (b.markets || []).map(m => `<section class="card bm accent" style="--accent:${col(m.regime)}">
+  const v2 = b.kind === "nyam" && b.version >= 2, bid = (brief.history.find(h => h.slot === b.slot && h.kind === b.kind) || {}).id;
+  $("briefMarkets").innerHTML = v2 ? b.markets.map(m => briefMarket2(m, ((brief.score || {}).grades || {})[bid])).join("")
+    : (b.markets || []).map(m => `<section class="card bm accent" style="--accent:${col(m.regime)}">
     <div class="head" style="margin-bottom:0"><h2>${esc(m.market)}</h2><span class="chip" style="color:${col(m.regime)}">${esc((m.regime || "").toLowerCase())} gamma</span></div>
     <div class="hl">${esc(m.headline)}</div>
     <div class="blv">${(m.levels || []).map(l => `<div><span>${esc(l.name)}</span><b>${num(l.price)} <span style="color:var(--ink3);font-weight:500">${signed(l.price - m.price, 1)}</span></b></div>`).join("")}</div>
@@ -214,12 +262,19 @@ function renderBriefings(){
     ${(m.changes || []).length ? `<div class="bsec"><div class="eyebrow">What changed</div>${m.changes.map(c => `<p>${esc(c)}</p>`).join("")}</div>` : ""}
     ${m.data ? `<div class="expl">${esc(m.data)}</div>` : ""}</section>`).join("");
   $("briefCal").innerHTML = (b.calendar || []).map(c => `<div class="head" style="margin:${c === b.calendar[0] ? 0 : 18}px 0 6px"><h2>${esc(c.title)}</h2></div>`
-    + ((c.items || []).map(e => `<div class="bev"><span class="tm">${esc(e.day)} ${esc(e.clock)}</span><span class="imp ${esc(e.impact)}">${esc(e.impact === "Medium" ? "Med" : e.impact)}</span><span>${esc(e.title)} <span style="color:var(--ink3);font:12px var(--mono)">${esc(e.country)}</span></span><span class="fp">${esc(e.detail || "")}</span></div>`).join("")
-       || `<div class="expl" style="margin-top:0">No high- or medium-impact events.</div>`)).join("");
-  $("briefPostsTitle").textContent = (b.posts || {}).title || "Market-moving posts";
-  $("briefPosts").innerHTML = ((b.posts || {}).items || []).map(x => `<div class="bpost"><div class="meta"><b style="color:var(--ink2)">${esc(x.clock)} ET</b>${x.tone ? `<span class="tone ${esc(x.tone)}">${esc(x.tone)}</span>` : ""}${(x.words || []).map(w => `<span class="mw">${esc(w)}</span>`).join("")}${x.url ? `<a href="${link(x.url)}" target="_blank" rel="noopener">open</a>` : ""}</div>${esc(x.text)}</div>`).join("")
+    + ((c.items || []).map(e => `<div class="bev${v2 ? " today" : ""}"><span class="tm">${v2 ? "" : esc(e.day) + " "}${esc(e.clock)}</span><span class="imp ${esc(e.impact)}">${esc(e.impact === "Medium" ? "Med" : e.impact)}</span><span>${esc(e.title)} <span style="color:var(--ink3);font:12px var(--mono)">${esc(e.country)}</span></span><span class="fp">${esc(e.detail || "")}</span></div>`).join("")
+       || `<div class="expl" style="margin-top:0">No high- or medium-impact events.</div>`)
+    + (c.history ? `<div class="expl">${esc(c.history)}</div>` : "")).join("")
+    + (v2 ? `<div class="expl">${esc(briefData(b.markets))}</div>` : "");       // where the numbers come from, once
+  $("briefPostsTitle").textContent = v2 ? "How the brief has scored" : (b.posts || {}).title || "Market-moving posts";
+  $("briefPosts").innerHTML = v2 ? briefScore(brief.score) : ((b.posts || {}).items || []).map(x => `<div class="bpost"><div class="meta"><b style="color:var(--ink2)">${esc(x.clock)} ET</b>${x.tone ? `<span class="tone ${esc(x.tone)}">${esc(x.tone)}</span>` : ""}${(x.words || []).map(w => `<span class="mw">${esc(w)}</span>`).join("")}${x.url ? `<a href="${link(x.url)}" target="_blank" rel="noopener">open</a>` : ""}</div>${esc(x.text)}</div>`).join("")
     || `<div class="expl" style="margin-top:0">No market-related posts in this window.</div>`;
 }
+
+$("briefMarkets").addEventListener("click", e => {
+  const t = e.target.closest("[data-go]");
+  if(t){ if(t.dataset.m){ market = t.dataset.m; store.set("gex.market", market); } setPage(t.dataset.go); }
+});
 
 // ---------- Indicator page: the TradingView script, always the current file
 const PINE_KW = new Set("if else for to by in while switch var varip true false na and or not import export method type return continue break series simple const".split(" "));
