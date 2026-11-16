@@ -77,9 +77,9 @@ class TestPineStatic(unittest.TestCase):
         inp = {"display", "group", "inline", "tooltip"}
         known = {
             "array.clear": set(), "array.from": set(), "array.get": set(), "array.includes": set(), "array.median": set(), "array.min": set(),
-            "array.push": set(), "array.set": set(), "array.shift": set(), "array.size": set(), "box.delete": set(), "label.delete": set(), "line.delete": set(),
+            "array.push": set(), "array.set": set(), "array.shift": set(), "array.size": set(), "array.sort": set(), "array.sort_indices": set(), "box.delete": set(), "label.delete": set(), "line.delete": set(),
             "box.new": {"bgcolor", "border_color", "border_width", "extend", "xloc"},
-            "color.new": set(), "label.set_text": set(), "line.set_color": set(),
+            "color.new": set(), "color.r": set(), "color.g": set(), "color.b": set(), "label.set_text": set(),
             "input.bool": inp, "input.color": inp, "input.float": inp | {"maxval", "minval", "step"},
             "input.int": inp | {"maxval", "minval", "step"}, "input.string": inp | {"options"}, "input.text_area": {"display", "group", "tooltip"},
             "label.new": {"color", "size", "style", "text_font_family", "textalign", "textcolor", "tooltip", "xloc"},
@@ -186,6 +186,35 @@ class TestPineStatic(unittest.TestCase):
                 for k in re.findall(r'"(\w+)"', a)}
         names = set(re.findall(r'^\s+"(\w+)"\s+=>', PINE.split("rowName(")[1].split("valOf(")[0], re.M))
         self.assertFalse(keys - names, f"panel rows without a name: {keys - names}")
+
+    def test_colours_are_the_website_s(self):
+        # one visual system: each default colour, and its light-chart shade, is the website's token for that level
+        import re as _re
+        css = (Path(__file__).resolve().parent.parent / "dashboard" / "assets" / "terminal.css").read_text(encoding="utf-8")
+        dark = dict(_re.findall(r"--(\w+):(#[0-9a-fA-F]{6})", css.split(":root{")[1].split("}")[0]))
+        light = dict(_re.findall(r"--(\w+):(#[0-9a-fA-F]{6})", css.split(':root[data-theme="light"]{')[1].split("}")[0]))
+        for var, token in (("cZG", "zg"), ("cPos", "pos"), ("cNeg", "neg"), ("cAG", "ag"), ("cVol", "vol"), ("cOI", "oi"), ("cMP", "mp"), ("cEM", "em")):
+            m = _re.search(rf"^{var}\s*=\s*themed\(\w+, (#[0-9a-fA-F]{{6}}), (#[0-9a-fA-F]{{6}})\)", PINE, _re.M)
+            self.assertIsNotNone(m, f"{var} is not themed")
+            self.assertEqual((m.group(1).lower(), m.group(2).lower()), (dark[token].lower(), light[token].lower()), f"{var} differs from the website's --{token}")
+            self.assertRegex(PINE, rf"input\.color\({m.group(1)}, ", f"{var}'s input default is not its dark colour")
+
+    def test_view_presets_and_no_repeats(self):
+        self.assertIn('view     = input.string("Standard", "View", options = ["Minimal", "Standard", "Full"]', PINE)
+        for gone in ("compact", "emFill", "regimeBg", "nConc", "minOpac"):         # replaced by the view, or repeats of another element
+            self.assertNotRegex(CODE, rf"(?<![\w.]){gone}(?!\w)", f"'{gone}' is back")
+        self.assertIn("max_lines_count = 500, max_labels_count = 500, max_boxes_count = 500", PINE)
+        self.assertNotIn("line.set_color", CODE)                                    # strength is the tag's bar, not line opacity too
+
+    def test_line_styles_mean_one_thing(self):
+        # dotted = where a level stood earlier; dashed = an estimate (the flips and the IV bands); everything else solid
+        dashed = [l for l in CODE.splitlines() if "line.style_dashed" in l and "lnStyle(string" not in l and "s ==" not in l]
+        self.assertEqual(len(dashed), 1, dashed)
+        self.assertIn("zero gamma", dashed[0])                                      # the first expiry's flip
+        self.assertEqual(CODE.count("style = line.style_dotted"), 3)                # 9:30 open marks, past sessions, backtest days
+        for name in ("styMax", "styVol", "styOI", "styMP", "styRank", "sty0"):
+            self.assertRegex(PINE, rf'{name} = "────"', f"{name} should be solid")
+        self.assertRegex(PINE, r'styEM = "╌╌╌╌"')
 
     def test_payload_keys_match_the_service(self):
         read = set(re.findall(r'(?:strOf|numOf)\(m, "(\w+)"\)', PINE))
