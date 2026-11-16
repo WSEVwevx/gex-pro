@@ -7,6 +7,8 @@ Truth: each saved calculation's summary (index points, full precision), mapped t
 Under test: the paste made from that summary, read with the indicator's own rules (parseOne: GEX1;key=value;...;END,
 the ranking it picks, the levels it draws with default settings, rounding to whole points, merging lines closer than
 0.03% of price into one, dropping lines more than 8% from price).
+Since 2026-11-15 the indicator's Standard view lists a level further than 1.5 expected moves from price in an edge
+marker instead of drawing its line (the Full view draws them all); the prices and names checked here are the same.
 Sources: the 9:30 pastes on the track-record branch and the calculations saved on this computer.
 Tolerance (fixed before running): every drawn line at the same chart price as the truth's, with the same names;
 the only allowed difference is the paste's 2-decimal rounding (at most 0.005 index points), reported separately.

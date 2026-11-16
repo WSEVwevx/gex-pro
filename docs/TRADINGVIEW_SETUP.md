@@ -45,9 +45,9 @@ from price is never drawn; a paste with two sources draws extra levels and the p
 | Group | Contents |
 |---|---|
 | 1 - Data | Levels payload, price mapping |
-| 2 - Key levels | Compact chart; zero gamma, call wall, put wall, absolute gamma (on/off, colour, style, width each); ranked levels (on/off, ranked from, call and put levels, absolute-gamma levels); largest ±GEX strikes (on/off) |
+| 2 - Key levels | View (Minimal / Standard / Full); zero gamma, call wall, put wall, absolute gamma (on/off, colour, style, width each); ranked levels (on/off, ranked from, call and put levels, absolute-gamma levels); largest ±GEX strikes (on/off) |
 | 3 - More levels | 0DTE levels, volume walls, OI walls, max pain, IV range bands (on/off + colour each), max-pain expirations, IV bands (day / day + week / day + week + month), ±2σ |
-| 4 - Lines & labels | Where lines start (session open / full chart / right of price), labels (short / full / off), label size, label background, label offset, expected-move band shading, session tint by gamma side |
+| 4 - Lines & labels | Where lines start (session open / full chart / right of price), labels (short / full / off), label size, label background (the plate behind each label), label offset, gamma-zone column, levels at the open, past sessions |
 | 5 - GEX profile | On/off, width, gap, opacity |
 | 6 - Info panel | On/off, detail, position, text size |
 | 7 - Alerts | Approach (ticks), wall cross, zero-gamma cross, stale update, cooldown, touch of C1 / P1 / Ab1, gamma zone change, IV band touch |
@@ -63,10 +63,18 @@ from price is never drawn; a paste with two sources draws extra levels and the p
   of price only. Key levels and max pain are 2 px, others 1 px. The GEX profile is off by default.
 * **Colours, style and width**: every level type has its colour in settings; the four key levels also have line
   style and thickness, picked from drawn previews: `────` solid, `╌╌╌╌` dashed, `┈┈┈┈` dotted; `───` 1 px up to
-  `███` 4 px. Defaults: calls green, puts red, absolute gamma violet, zero gamma amber (dashed), expected move
-  grey, every line 1 px. Ranked levels fade with strength, from fully opaque to 85% for the weakest; tag and price
-  text always stay at full strength. Largest +/- GEX, volume walls and max pain are off by default (the ranked
-  levels cover them).
+  `███` 4 px. The defaults follow one visual system, the same colours as the website:
+
+  | | Meaning |
+  |---|---|
+  | **Colour** | blue = calls / positive gamma; orange = puts / negative gamma; grey = zero gamma; white = absolute gamma; gold = max pain; green = volume walls; violet = OI walls; slate = IV bands |
+  | **Weight** | heavy (2 px) = zero gamma, call wall, put wall; regular (1 px) = ranked levels, absolute gamma, first-expiry levels (ranks from the third down a little fainter); light (1 px, faded) = IV bands, volume / OI walls, max pain, largest +/- GEX |
+  | **Style** | solid = a strike level in force now; dashed = a computed estimate (zero gamma, IV bands); dotted = where a level stood earlier (the 9:30 open, past sessions, backtest days) |
+  | **Labels** | `NAME  price`, plus the distance from price where the label is not on its own line; every label sits on a plate, so its colour reads the same on any chart background |
+
+  On a light chart, a colour left at its default switches to the website's light-theme shade (a colour you picked
+  stays as picked); a mid-grey chart counts as dark. Largest +/- GEX, volume walls and max pain are off by default
+  (the ranked levels cover them).
 * **Tags + hover info** (the default label style): each level gets a short tag right of price with a
   strength bar, e.g. `━━━━ C1  Ab2`. Ranked levels: `C1`-`C7` (most positive net GEX), `P1`-`P7` (most
   negative net GEX), `Ab1`-`Ab3` (most total gamma). **Ranked from** picks their source. *First expiry*
@@ -89,9 +97,15 @@ from price is never drawn; a paste with two sources draws extra levels and the p
   opens with its **hold rate**, e.g. `HOLD RATE 70% (reliable): held 7 of 10 recent touches, median bounce 18 pts`
   (a hold = no close beyond the level within an hour; 70%+ reliable, 50-69% mixed, below 50% often breaks;
   fewer than 3 touches is too few to judge).
-* **Tag colours:** each name in a tag has its own colour (C and CW green, P and PW red, Ab violet, ZG amber,
-  IV bands grey), with the strength bar drawn as a slim line before them.
-* **Levels at the 9:30 open:** when C1, P1, Ab1 or the gamma flip has moved since the cash open, a faint dashed
+* **Tag colours:** each name in a tag has its level's colour (C and CW blue, P and PW orange, Ab white, ZG grey,
+  IV bands slate), on a dark plate, with the strength bar drawn as a slim line before them. Tags too close together
+  to print apart sit side by side instead of on top of each other; the later one carries its own price.
+* **View** (first setting under Key levels): **Standard** draws every level switched on, and lists any level
+  further than 1.5 daily expected moves from price in a small marker above or below (`↑ CW  29,104  +1,070`)
+  instead of drawing it; it comes back as a line when price approaches. **Full** draws everything at any distance,
+  plus the weekly / monthly and ±2σ IV bands and every past session set. **Minimal** shows the regime panel and
+  only the three gamma levels nearest price. Alerts are the same in every view.
+* **Levels at the 9:30 open:** when C1, P1, Ab1 or the gamma flip has moved since the cash open, a faint dotted
   line marks where it stood at 9:30 ("C1 open  29,800"), so you can see how the map has shifted.
 * **Backtesting an earlier day:** the website's **Backtesting** page (under Insight) lists the 9:30 paste of every
   past session. Paste one into **Levels payload** and scroll back to that day: the panel's Data row reads
@@ -99,7 +113,7 @@ from price is never drawn; a paste with two sources draws extra levels and the p
   day's zero gamma, walls, abs gamma and top three call / put levels are drawn across that day's 9:30-16:00 ET
   session only, and the Data row reads `Backtest week 11/02-11/06`. Click Copy for TradingView to return to live
   levels. During Bar Replay, a paste from a later day than the replayed bar reads `NEWER THAN CHART`.
-* **Past sessions' levels** (default 3 days, up to 5; 0 = off): zero gamma and the call and put walls at the close
+* **Past sessions' levels** (Standard shows the last session; Full as many as set, up to 5; 0 = off): zero gamma and the call and put walls at the close
   of each earlier session, as faint dotted lines across that day's 9:30-16:00 ET session ("CW 29,793"). They come
   in the paste (field `H`) and are converted with today's basis, so they line up with a back-adjusted continuous
   chart (NQ1! / ES1!).
@@ -108,8 +122,6 @@ from price is never drawn; a paste with two sources draws extra levels and the p
   it reads Neutral. It is an estimate from price and the flip, not measured flow.
 * **Merged levels:** levels within 0.03% of each other (about 9 NQ / 2 ES points) share one line and one tag,
   e.g. P1 from QQQ and the put wall from NDX converting 3 points apart.
-* **Compact chart** (first setting under Key levels): only C1-C3, P1-P3, Ab1 and the gamma flip the zones use;
-  walls, 0DTE walls, IV bands, max pain and volume / OI walls are hidden until you turn it off.
 * **Labels** ("Short" / "Full") sit right of the GEX profile on a dark pill: short code plus price with separators,
   e.g. `CW  29,883.25`. Codes: `ZG`, `CW`, `PW`, `+GEX`, `-GEX`, `+G 12%`, `0D ZG` / `0D CW` / `0D PW`,
   `VOL C` / `VOL P`, `OI C` / `OI P`, `MP 10-21`, IV bands `D+1σ` / `D-1σ` / `D+2σ` / `D-2σ` (`W` week, `M` month).
