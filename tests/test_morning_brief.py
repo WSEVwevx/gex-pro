@@ -194,6 +194,27 @@ class TestComponent(unittest.TestCase):
             self.assertEqual(p["latest"]["nyam"]["version"], 2)
             self.assertEqual([h["id"] for h in p["history"]], ["2026-11-16-nyam"])          # the score file is not a briefing
 
+    def test_an_old_format_brief_is_replaced_only_while_its_window_is_open(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            now = [datetime(2026, 11, 15, 19, 10, tzinfo=NY)]                               # Sunday evening: Monday's Asia brief
+            c = BriefingsComponent(context=lambda: dict(ctx(), now=now[0].astimezone(timezone.utc).isoformat(),
+                                                        markets=[market(asof=(now[0] - timedelta(minutes=2)).isoformat())]),
+                                   is_trading_day=is_trading_day, store_dir=tmp, clock=lambda: now[0])
+            old = {"kind": "asia", "title": "Asia session briefing", "slot": datetime(2026, 11, 15, 19, tzinfo=NY).isoformat(),
+                   "session": "2026-11-16", "headline": "old words", "markets": []}
+            closed = dict(old, kind="nyam", slot=datetime(2026, 11, 13, 9, tzinfo=NY).isoformat(), session="2026-11-13")
+            c.dir.mkdir(parents=True, exist_ok=True)
+            (c.dir / "2026-11-15-asia.json").write_text(json.dumps(old))
+            (c.dir / "2026-11-13-nyam.json").write_text(json.dumps(closed))
+            self.assertEqual(c.tick(weekly=False), ["2026-11-15-asia"])                     # old format, window open: replaced
+            self.assertEqual(c._load("2026-11-15-asia")["version"], 2)
+            self.assertEqual(c._load("2026-11-13-nyam"), closed)                            # its window closed: left as written
+            frozen = (c.dir / "2026-11-15-asia.json").read_bytes()
+            now[0] += timedelta(hours=1)
+            self.assertEqual(c.tick(weekly=False), [])                                      # current format: frozen
+            self.assertEqual((c.dir / "2026-11-15-asia.json").read_bytes(), frozen)
+            self.assertEqual(c.payload()["score"]["briefs"], 0)                             # the Asia brief is never graded
+
 
 if __name__ == "__main__":
     unittest.main()

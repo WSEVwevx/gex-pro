@@ -1,4 +1,6 @@
-"""The NY AM brief: one screen, every sentence a computed fact with its number, and a grade afterwards.
+"""The session brief: one screen, every sentence a computed fact with its number. Written twice for each session:
+the Asia brief the evening before (19:00 ET) and the NY AM brief before the open (09:00 ET). Same five blocks; only
+the NY AM brief is graded afterwards, so a session is never scored twice.
 
 Five blocks, in this order:
   1. regime      today's gamma regime and distance from zero gamma, and what that regime did in graded sessions
@@ -187,14 +189,14 @@ def event_history(graded: list, past: list) -> Optional[str]:
 
 
 # ---------------------------------------------------------------- the brief
-def market_brief(m: dict, record: list, session: str, now: datetime) -> dict:
+def market_brief(m: dict, record: list, session: str, now: datetime, kind: str = "nyam") -> dict:
     graded = _graded(record, session)
     reg = regime_block(m, graded)
     em = m.get("em") or {}
     rng = None
     if em.get("anchor") is not None and em.get("daily"):
         lo, hi = em["anchor"] - em["daily"], em["anchor"] + em["daily"]
-        rng = {"low": round(lo, 2), "high": round(hi, 2), "em": round(em["daily"], 2), "text": f"Expected range today {_f(lo)} to {_f(hi)} (±{em['daily']:,.0f} pts, 1σ)."}
+        rng = {"low": round(lo, 2), "high": round(hi, 2), "em": round(em["daily"], 2), "text": f"Expected range {'today' if kind == 'nyam' else 'next session'} {_f(lo)} to {_f(hi)} (±{em['daily']:,.0f} pts, 1σ)."}
     stale = None
     data = ""
     if m.get("asof"):
@@ -214,24 +216,31 @@ def market_brief(m: dict, record: list, session: str, now: datetime) -> dict:
                        "range_ref": reg["range_ref"]}}
 
 
-def compose_morning(ctx: dict, slot: datetime, session: date, record: Optional[list] = None, past: Optional[list] = None,
-                    events_fn=None) -> dict:
+OVERNIGHT = {"JPY", "CNY", "AUD", "NZD", "EUR", "GBP", "CHF", "All"}
+
+
+def compose_brief(kind: str, ctx: dict, slot: datetime, session: date, record: Optional[list] = None, past: Optional[list] = None,
+                  events_fn=None) -> dict:
+    """kind "nyam": written before `session`'s open. kind "asia": written the evening before it."""
     now = datetime.fromisoformat(ctx["now"]).astimezone(NY)
     sid = session.isoformat()
-    markets = [market_brief(m, record or [], sid, now) for m in ctx.get("markets", []) if m.get("price")]
+    markets = [market_brief(m, record or [], sid, now, kind) for m in ctx.get("markets", []) if m.get("price")]
     sess = datetime.combine(session, datetime.min.time(), NY)
-    items = events_fn(ctx.get("events", []), sess, sess + timedelta(days=1), {"USD"}) if events_fn else []
+    ev = lambda a, b, cur: events_fn(ctx.get("events", []), a, b, cur) if events_fn else []
+    items = ev(sess, sess + timedelta(days=1), {"USD"})
     high = [e for e in items if e["impact"] == "High"]
-    cal = {"title": "US releases today (ET)", "items": items,
+    cal = {"title": "US releases today (ET)" if kind == "nyam" else f"US releases {session:%a %b} {session.day} (ET)", "items": items,
            "history": event_history(_graded(record or [], sid), [b for b in past or [] if b.get("session", "9") < sid]) if high else None}
+    cals = [cal] if kind == "nyam" else [{"title": "Overnight: Asia and Europe (ET)", "history": None,
+                                          "items": ev(slot - timedelta(hours=1), sess.replace(hour=9, minute=30), OVERNIGHT)}, cal]
     head = " ".join(f"{mb['market']}: {REGIME.get(mb['regime'], 'no clear regime')}"
                     + (f", {abs(mb['sigma']):.1f}σ {'above' if mb['sigma'] >= 0 else 'below'} zero gamma." if mb["sigma"] is not None else ".")
                     for mb in markets) or "No GEX levels available yet."
     if high:
         head += f" {len(high)} high-impact release{'s' if len(high) > 1 else ''}: " + ", ".join(f"{e['title']} {e['clock']}" for e in high[:3]) + "."
-    return {"kind": "nyam", "version": VERSION, "title": TITLES["nyam"], "slot": slot.isoformat(), "session": sid,
+    return {"kind": kind, "version": VERSION, "title": TITLES[kind], "slot": slot.isoformat(), "session": sid,
             "generated_at": now.isoformat(), "late": (now - slot).total_seconds() > 30 * 60, "headline": head, "rule": RULE,
-            "markets": markets, "calendar": [cal],
+            "markets": markets, "calendar": cals,
             "note": "Computed from options positioning and graded sessions. Facts and their history, not predictions or advice."}
 
 

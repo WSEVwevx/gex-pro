@@ -211,13 +211,17 @@ class TestCompose(unittest.TestCase):
         self.assertIn("CPI m/m 8:30 AM", b["headline"])
         self.assertFalse(b["late"])
 
-    def test_asia_compares_with_the_morning(self):
+    def test_asia_is_the_same_brief_for_the_next_session(self):
         slot = et(2026, 10, 20, 19)
-        morning = {"NQ": {"zero_gamma": 29900.0, "regime": "POSITIVE"}}
-        b = compose("asia", ctx(slot, zg=30000.0), slot, date(2026, 10, 21), morning)
+        c = ctx(slot, zg=30000.0)
+        c["markets"][0]["prev"] = {"day": "2026-10-20", "zero_gamma": 29900.0, "call_wall": 29800.0, "put_wall": 28980.0,
+                                   "regime": "POSITIVE", "em": 400.0}
+        b = compose("asia", c, slot, date(2026, 10, 21))
         m = b["markets"][0]
-        self.assertIn("Zero gamma 29,900.00 this morning, 30,000.00 now (+100.0)", m["changes"][0])
-        self.assertIn("Regime flipped from positive gamma to negative gamma", m["changes"][1])
+        self.assertEqual((b["kind"], b["version"], b["session"]), ("asia", 2, "2026-10-21"))
+        self.assertEqual(m["changes"], {"since": "Tue Oct 20", "items": ["Regime: positive gamma → negative gamma.",
+                                                                         "Zero gamma 29,900.00 → 30,000.00 (+100.00)."]})
+        self.assertIn("Expected range next session 28,650.00 to 29,450.00", m["range"]["text"])
         overnight, us = b["calendar"]
         self.assertEqual([e["title"] for e in overnight["items"]], ["BOJ Policy Rate"])
         self.assertEqual([e["title"] for e in us["items"]], ["Retail Sales"])
@@ -241,7 +245,7 @@ class TestComponent(unittest.TestCase):
             self.assertEqual(c.tick(), ["2026-10-20-asia"])
             p = c.payload()
             self.assertEqual([h["kind"] for h in p["history"]], ["asia", "nyam"])   # newest first
-            self.assertIn("this morning", p["latest"]["asia"]["markets"][0]["changes"][0])
+            self.assertEqual((p["latest"]["asia"]["version"], p["latest"]["asia"]["session"]), (2, "2026-10-21"))
             self.assertEqual(p["next"]["nyam"], et(2026, 10, 21, 9).isoformat())
             status, body = c.routes()["/api/briefings"]({})
             self.assertEqual((status, body["latest"]["nyam"]["session"]), (200, "2026-10-20"))

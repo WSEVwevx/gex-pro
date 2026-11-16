@@ -121,7 +121,8 @@ class BriefingsComponent:
                 slot, session = d
                 sid = schedule.slot_id(kind, slot)
                 old = self._load(sid) if self._path(sid).exists() else None
-                if self._path(sid).exists() and (kind != "weekly" or (old or {}).get("version", 1) >= WEEKLY_VERSION):
+                # written once and then frozen; a brief in an older format is replaced while its window is still open
+                if self._path(sid).exists() and (old or {}).get("version", 1) >= (WEEKLY_VERSION if kind == "weekly" else morning.VERSION):
                     continue
                 if kind == "weekly":
                     if not weekly or not self.week_data or (self._week_try and (now - self._week_try).total_seconds() < WEEK_RETRY_S):
@@ -140,12 +141,8 @@ class BriefingsComponent:
                     if not any(m.get("price") and m.get("zero_gamma") is not None for m in ctx.get("markets", [])):
                         log.info("briefing %s waiting for GEX levels", sid)
                         continue
-                    morning = None
-                    if kind == "asia":
-                        am = self._load(f"{slot.astimezone(schedule.NY):%Y-%m-%d}-nyam")
-                        morning = {m["market"]: m for m in (am or {}).get("markets", [])}
                     try:
-                        b = compose(kind, ctx, slot, session, morning, record=self._record(), past=self.history())
+                        b = compose(kind, ctx, slot, session, record=self._record(), past=self.history())
                     except ValueError as e:                # data stamped after the brief's own time: wait for a clean read
                         log.warning("briefing %s not written: %s", sid, e)
                         continue
