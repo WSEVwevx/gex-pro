@@ -60,6 +60,20 @@ class TestLoadingAndStates(unittest.TestCase):
         for piece in ("function reserve()", "c.style.minHeight = h ? h + \"px\" : \"\"", "function settle()", "store.set(HKEY, JSON.stringify(cardH))"):
             self.assertIn(piece, JS)
 
+    def test_a_first_visit_reserves_the_usual_heights(self):
+        m = re.search(r"const DEFAULT_H = \{wide: (\{.*?\}),\s+narrow: (\{.*?\})\};", JS, re.S)
+        self.assertIsNotNone(m)
+        views = set(re.findall(r'<div id="(\w+View)"', HTML))
+        for block in m.groups():
+            got = dict(re.findall(r"(\w+View):\[([\d,]+)\]", block))
+            self.assertEqual(set(got), views, "a page has no default heights")
+            self.assertTrue(all(h.replace(',', '').isdigit() for h in got.values()))
+
+    def test_empty_states_say_what_is_missing_and_when(self):
+        self.assertGreaterEqual(JS.count('stateHtml("empty"'), 8)
+        for vague in ('>No data.<', '>No data yet.<', '>No sessions yet.<', '>Nothing graded yet.<', "Not available right now (needs"):
+            self.assertNotIn(vague, JS)
+
     def test_a_failure_says_what_is_shown_and_what_happens_next(self):
         self.assertNotRegex(JS, r"(?<![\w.])OFFLINE(?!\w)")
         self.assertIn("Showing the ${lastGood()} ET numbers.", JS)

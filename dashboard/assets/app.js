@@ -39,7 +39,17 @@ let cardH = {};
 try { cardH = JSON.parse(store.get(HKEY, "{}")) || {}; } catch(e) {}
 const PER_MARKET = ["levelsView", "ladderView", "heatmapView", "screenerView", "biasView"];
 const cardKey = c => { const v = c.closest("[id$=View]"); return v ? v.id + ":" + [...v.querySelectorAll(".card")].indexOf(c) + (PER_MARKET.includes(v.id) ? ":" + market : "") : null; };
-function reserve(){ document.querySelectorAll("[id$=View] .card").forEach(c => { const h = cardH[cardKey(c)]; c.style.minHeight = h ? h + "px" : ""; }); }
+// a first visit has no heights of its own yet: it reserves the usual ones (measured on the live site at 1366 and
+// 375 px wide, 2026-11-16), by page and card order. They are replaced by this device's real heights after one draw.
+const DEFAULT_H = {wide: {levelsView:[161,161,161,423,435,677,573,375,375,1467],ladderView:[183,1114,224,670,348],heatmapView:[743],screenerView:[290,372,99,681],biasView:[162,162,162,665,255,240],trackView:[261,615,637,299,274,1393,374,367,367,322],briefingsView:[136,0,619,619,181,453],newsView:[646,990],indicatorView:[261,261,261,709,372],libraryView:[152,760,1366],glossaryView:[5828],healthView:[1079],backtestView:[303,644]},
+  narrow: {levelsView:[129,161,119,633,463,1027,628,375,375,1548],ladderView:[183,1299,205,670,284],heatmapView:[838],screenerView:[311,420,217,800],biasView:[162,126,119,833,574,362],trackView:[456,1217,997,345,392,1425,650,395,418,589],briefingsView:[168,0,643,620,248,472],newsView:[829,1061],indicatorView:[259,261,237,709,991],libraryView:[320,1058,1715],glossaryView:[13954],healthView:[1903],backtestView:[322,711]}};
+function reserve(){
+  const usual = DEFAULT_H[innerWidth < 700 ? "narrow" : "wide"];
+  document.querySelectorAll("[id$=View] .card").forEach(c => {
+    const v = c.closest("[id$=View]"), h = cardH[cardKey(c)] || (usual[v.id] || [])[[...v.querySelectorAll(".card")].indexOf(c)];
+    c.style.minHeight = h ? h + "px" : "";
+  });
+}
 reserve();
 document.body.classList.add("first");                       // cards fade in once, on the first paint only
 setTimeout(() => document.body.classList.remove("first"), 600);
@@ -390,7 +400,7 @@ function renderIndicator(){
     indShown = ind.version;
   }
   $("indChanges").innerHTML = (ind.changes || []).map(c => `<div class="change"><code>${esc(c.commit)}</code><span>${esc(c.message)}</span><span class="when">${new Date(c.date).toLocaleDateString("en-US", {...ET, month:"short", day:"numeric"})} · ${ago(c.date)}</span></div>`).join("")
-    || `<div class="expl" style="margin-top:0">No change history available here.</div>`;
+    || `<div>${stateHtml("empty", "No change history here", "The list of recent script changes comes from the project's git history, which this copy was built without. The script itself is current.")}</div>`;
   const pub = data && data.workers.find(w => w.published);
   $("indPasteTime").textContent = pub ? `${pub.published.slot_et.slice(11)} ET paste` : "Waiting for the first paste";
 }
@@ -720,7 +730,7 @@ function renderCot(){
 function renderBias(w){
   loadCot(); renderCot();
   const b = w.result.bias;
-  if(!b){ $("biasCard").innerHTML = `<div class="eyebrow">Today's bias</div><div class="expl">Not available right now (needs levels and an expected move).</div>`; return; }
+  if(!b){ $("biasCard").innerHTML = `<div class="eyebrow">Today's bias</div><div>${stateHtml("empty", "No bias yet", "It needs today's levels and an expected move. It appears with the next refresh that has both.")}</div>`; return; }
   const col = BIAS_COLOR[b.bias], ref = b.ref;
   const tm = iso => new Date(iso).toLocaleTimeString("en-US", {...ET, hour:"numeric", minute:"2-digit"});
   $("biasCard").parentElement.classList.add("accent"); $("biasCard").parentElement.style.setProperty("--accent", col);
@@ -1023,14 +1033,14 @@ function renderExpiry(s){
   $("byExpiry").innerHTML = rows.length ? `<table><tr><th>Expiration</th><th>Net gamma</th><th style="width:38%">Share of total</th></tr>${rows.map(([e, v]) => {
     const dLbl = new Date(e + "T12:00:00Z").toLocaleDateString("en-US", {weekday:"short", month:"short", day:"numeric", timeZone:"UTC"});
     return `<tr><td>${esc(dLbl)}</td><td class="m" style="color:${v.net >= 0 ? "var(--pos)" : "var(--neg)"}">${money(v.net)}</td>
-      <td><span class="xbar" style="width:${Math.max(2, 100 * v.abs / mx * 0.7)}%;background:${v.net >= 0 ? "var(--pos)" : "var(--neg)"}"></span> <span class="m" style="color:var(--ink3)">${s.gross ? num(100 * v.abs / s.gross, 0) : "-"}%</span></td></tr>`; }).join("")}</table>` : `<div class="expl">No data.</div>`;
+      <td><span class="xbar" style="width:${Math.max(2, 100 * v.abs / mx * 0.7)}%;background:${v.net >= 0 ? "var(--pos)" : "var(--neg)"}"></span> <span class="m" style="color:var(--ink3)">${s.gross ? num(100 * v.abs / s.gross, 0) : "-"}%</span></td></tr>`; }).join("")}</table>` : `<div>${stateHtml("empty", "Nothing to list yet", "This table fills from the options chain. It appears with the next refresh, about a minute while the market is open.")}</div>`;
 }
 
 function renderMaxPain(X){
   const mp = (X.max_pain || []).slice(0, 8);
   $("maxpain").innerHTML = mp.length ? `<table><tr><th>Expiration</th><th>Max pain</th><th>Open interest</th></tr>${mp.map(m => {
     const d = new Date(m.expiration + "T12:00:00Z").toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric",timeZone:"UTC"});
-    return `<tr><td>${esc(d)}</td><td class="m" style="color:var(--mp)">${num(m.price)}</td><td class="m">${num(m.oi,0)}</td></tr>`; }).join("")}</table>` : `<div class="expl">No data.</div>`;
+    return `<tr><td>${esc(d)}</td><td class="m" style="color:var(--mp)">${num(m.price)}</td><td class="m">${num(m.oi,0)}</td></tr>`; }).join("")}</table>` : `<div>${stateHtml("empty", "Nothing to list yet", "This table fills from the options chain. It appears with the next refresh, about a minute while the market is open.")}</div>`;
 }
 
 // =====================================================================================================
@@ -1442,7 +1452,7 @@ function renderTrack(){
     return `<tr><td>${esc(day)}</td><td>${esc(s.market)}</td><td><span style="color:${regCol}">${esc(reg)}</span> · ${esc(p.bias || "-")}</td><td class="m">${num(p.ref, 2)}</td><td class="m">${num(p.em, 0)}</td>
       <td class="m">${o ? `${num(o.close, 2)} <span style="color:${o.move >= 0 ? "var(--good)" : "var(--bad)"}">${signed(o.move_em, 2)}σ</span>` : "-"}</td>
       <td>${o ? yes(o.em_close) : "-"}</td><td>${o ? wall(o.cw) : "-"}</td><td>${o ? wall(o.pw) : "-"}</td><td>${o ? yes(o.bias_hit, "right", "wrong") : "-"}</td><td>${tail}${rb}</td></tr>`;
-  }).join("")}</table>` : `<div class="expl">No sessions yet.</div>`;
+  }).join("")}</table>` : `<div>${stateHtml("empty", "No sessions yet", "A session is added when its plan is frozen before the 9:30 ET open, and graded after the close.")}</div>`;
   renderBacktest();
 }
 // each graded session's move from the plan price against the ±1σ band; ALL pairs NQ and ES day by day
@@ -1501,7 +1511,7 @@ function renderTrackSplit(ss){
   const regs = ["POSITIVE", "NEGATIVE"], confs = ["High", "Medium", "Low"];
   $("trkSplitSub").textContent = done.length ? `${done.length} graded · small groups swing a lot` : "";
   $("trkSplit").innerHTML = done.length ? `<table class="trk-table"><tr><th>Group</th><th>Sessions</th><th>Close in band</th><th>Bias right</th></tr>
-    ${group("Regime:", "regime", [...regs, ...others("regime", regs)])}${group("Confidence:", "confidence", [...confs, ...others("confidence", confs)])}</table>` : `<div class="expl">Nothing graded yet.</div>`;
+    ${group("Regime:", "regime", [...regs, ...others("regime", regs)])}${group("Confidence:", "confidence", [...confs, ...others("confidence", confs)])}</table>` : `<div>${stateHtml("empty", "Nothing graded yet", "The breakdown appears once a session's plan has been graded, after its close.")}</div>`;
 }
 function trackCsv(ss){
   const q = v => v == null ? "" : /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v);
@@ -1580,7 +1590,7 @@ const ldDate = d => d === "other" ? "LATER" : `${MON[Number(d.slice(5, 7)) - 1]}
 const compact = x => x == null || !isFinite(x) ? "-" : (x < 0 ? "-" : "+") + (Math.abs(x) >= 1e9 ? num(Math.abs(x) / 1e9, 2) + "B" : Math.abs(x) >= 1e6 ? num(Math.abs(x) / 1e6, 1) + "M" : num(Math.abs(x) / 1e3, 0) + "K");
 function renderLiveTable(){
   const w = curW();
-  if(!w || !w.result){ $("ldRows").innerHTML = `<div class="expl">No data yet.</div>`; return; }
+  if(!w || !w.result){ $("ldRows").innerHTML = `<div>${stateHtml("empty", "No table yet", "The live table is built from the options chain. It appears with the first calculation, within a minute.")}</div>`; return; }
   const r = w.result, s = r.summary, L = r.mapped || s, LD = r.ladder;
   if(!LD || !LD.rows || !LD.rows.length){ $("ldRows").innerHTML = `<div class="expl">The live table appears after the next refresh.</div>`; return; }
   const m = r.mapped && r.mapped.mapping, fac = m ? m.factor : 1, off = m ? m.offset || 0 : 0;
@@ -2160,7 +2170,7 @@ function renderLevelHistory(){
   const ss = trk.sessions.filter(s => s.market === market && s.plan).sort((a, b) => b.session.localeCompare(a.session));
   $("lhSub").textContent = ss.length ? `${market} · ${ss.length} session${ss.length === 1 ? "" : "s"} since ${new Date(ss[ss.length - 1].session + "T12:00:00Z").toLocaleDateString("en-US", {month: "short", day: "numeric", timeZone: "UTC"})}` : "";
   $("lhNote").textContent = `Levels from the last calculation before each 9:30 ET open (the same plan the Track record grades), converted to ${market} with today's basis so they match a back-adjusted continuous chart (${market}1!). The TradingView indicator draws the last few sessions' closing levels on the chart ("Past sessions' levels" in its settings).`;
-  if(!ss.length){ $("lhTable").innerHTML = `<div class="expl">No sessions saved for ${market} yet.</div>`; $("lhChart").innerHTML = ""; return; }
+  if(!ss.length){ $("lhTable").innerHTML = `<div>${stateHtml("empty", `No ${market} sessions saved yet`, "The 9:30 ET paste of each session is saved here once that session has opened.")}</div>`; $("lhChart").innerHTML = ""; return; }
   const day = s => new Date(s + "T12:00:00Z").toLocaleDateString("en-US", {weekday: "short", month: "short", day: "numeric", timeZone: "UTC"});
   const wl = x => !x ? `<span class="dim">-</span>` : x.held ? `<span class="trk-tag good">held</span>` : x.closed_beyond ? `<span class="trk-tag bad">broke</span>` : `<span class="dim">not reached</span>`;
   const px = v => v == null ? "-" : num(fut(v), 2);
