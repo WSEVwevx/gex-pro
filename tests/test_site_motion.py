@@ -53,7 +53,7 @@ class TestLoadingAndStates(unittest.TestCase):
         self.assertIn(".skeleton{font-size:0;color:transparent", CSS)
 
     def test_every_data_card_starts_as_a_skeleton(self):
-        for card in ("regimeCard", "priceCard", "netCard", "planCard", "biasCard", "targetCard", "rangeCard", "drvSum", "trkKpis"):
+        for card in ("regimeCard", "priceCard", "netCard", "planCard", "biasCard", "drvSum", "trkKpis"):
             self.assertRegex(HTML, rf'id="{card}">(?:<div class="eyebrow">[^<]*</div>)?<div class="skeleton"', card)
 
     def test_cards_keep_their_height_between_visits(self):
@@ -87,6 +87,35 @@ class TestLoadingAndStates(unittest.TestCase):
         self.assertIn("Math.abs(now - was) >= 0.001 * Math.abs(was)", JS)         # zero gamma: 0.1%, as gexsys/timeline.py MOVE_ZG
         from gexsys import timeline
         self.assertEqual(timeline.MOVE_ZG, 0.001)
+
+
+class TestBiasPage(unittest.TestCase):
+    def test_the_gauge_flips_where_the_model_flips(self):
+        src = (DASH.parent / "gexsys" / "bias.py").read_text(encoding="utf-8")
+        self.assertIn('"Bullish" if score >= 0.75 else "Bearish" if score <= -0.75', src)
+        self.assertIn("const BIAS_FLIP = 0.75, GAUGE_MAX = 2;", JS)
+        for piece in ("at(-BIAS_FLIP)", "at(BIAS_FLIP)", "at(b.score)"):
+            self.assertIn(piece, JS)
+
+    def test_one_verdict_card_and_nothing_said_twice(self):
+        view = HTML.split('<div id="biasView"', 1)[1].split("<!--", 1)[0]
+        self.assertEqual(view.count('class="card'), 4)                     # verdict, chart, factors, positioning
+        self.assertNotIn("b.summary", JS)                                  # the sentence that repeated the cards
+        self.assertIn('$("biasSummary").textContent = "";', JS)
+        self.assertIn("#biasSummary:empty{display:none}", CSS)
+
+    def test_levels_on_the_page_are_whole_points(self):
+        body = JS.split("function renderBias(w){", 1)[1].split("function drawReplay", 1)[0]
+        self.assertNotRegex(body, r"num\((b\.target|b\.range\[\d\]|ref|p\[1\])\)")
+        self.assertIn("const whole = t =>", JS)
+
+    def test_factors_are_bars_that_add_up_to_the_score(self):
+        for piece in ('class="fx-bar"', 'f.name === "Gamma side"', "The leans added up.", 'class="fx fx-sum"'):
+            self.assertIn(piece, JS)
+
+    def test_a_gap_in_the_replay_is_not_an_alarm(self):
+        self.assertNotRegex(CSS, r"\.rp-marks s\{[^}]*(gradient|warn)")
+        self.assertNotIn("no update since", JS)
 
 
 if __name__ == "__main__":

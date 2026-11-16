@@ -41,8 +41,8 @@ const PER_MARKET = ["levelsView", "ladderView", "heatmapView", "screenerView", "
 const cardKey = c => { const v = c.closest("[id$=View]"); return v ? v.id + ":" + [...v.querySelectorAll(".card")].indexOf(c) + (PER_MARKET.includes(v.id) ? ":" + market : "") : null; };
 // a first visit has no heights of its own yet: it reserves the usual ones (measured on the live site at 1366 and
 // 375 px wide, 2026-11-16), by page and card order. They are replaced by this device's real heights after one draw.
-const DEFAULT_H = {wide: {levelsView:[161,161,161,423,435,677,573,375,375,1467],ladderView:[183,1114,224,670,348],heatmapView:[743],screenerView:[290,372,99,681],biasView:[162,162,162,665,255,240],trackView:[261,615,637,299,274,1393,374,367,367,322],briefingsView:[136,0,619,619,181,453],newsView:[646,990],indicatorView:[261,261,261,709,372],libraryView:[152,760,1366],glossaryView:[5828],healthView:[1079],backtestView:[303,644]},
-  narrow: {levelsView:[129,161,119,633,463,1027,628,375,375,1548],ladderView:[183,1299,205,670,284],heatmapView:[838],screenerView:[311,420,217,800],biasView:[162,126,119,833,574,362],trackView:[456,1217,997,345,392,1425,650,395,418,589],briefingsView:[168,0,643,620,248,472],newsView:[829,1061],indicatorView:[259,261,237,709,991],libraryView:[320,1058,1715],glossaryView:[13954],healthView:[1903],backtestView:[322,711]}};
+const DEFAULT_H = {wide: {levelsView:[161,161,161,423,435,677,573,375,375,1467],ladderView:[183,1114,224,670,348],heatmapView:[743],screenerView:[290,372,99,681],biasView:[202,635,241,240],trackView:[261,615,637,299,274,1393,374,367,367,322],briefingsView:[136,0,619,619,181,453],newsView:[646,990],indicatorView:[261,261,261,709,372],libraryView:[152,760,1366],glossaryView:[5828],healthView:[1079],backtestView:[303,644]},
+  narrow: {levelsView:[129,161,119,633,463,1027,628,375,375,1548],ladderView:[183,1299,205,670,284],heatmapView:[838],screenerView:[311,420,217,800],biasView:[342,765,422,345],trackView:[456,1217,997,345,392,1425,650,395,418,589],briefingsView:[168,0,643,620,248,472],newsView:[829,1061],indicatorView:[259,261,237,709,991],libraryView:[320,1058,1715],glossaryView:[13954],healthView:[1903],backtestView:[322,711]}};
 function reserve(){
   const usual = DEFAULT_H[innerWidth < 700 ? "narrow" : "wide"];
   document.querySelectorAll("[id$=View] .card").forEach(c => {
@@ -709,6 +709,8 @@ function renderStats(w, s, L, X){
   ].join("");
 }
 
+const BIAS_FLIP = 0.75, GAUGE_MAX = 2;      // the score that makes a call (gexsys/bias.py), and where the gauge ends
+const whole = t => t.replace(/(\d,\d{3})\.\d\d(?!\d)/g, "$1");      // index levels in a sentence, to the point
 const BIAS_COLOR = {Bullish: "var(--pos)", Bearish: "var(--neg)", Neutral: "var(--zg)"};
 // CFTC positioning: fetched once per page load, it only changes weekly
 let cot = null, cotAsked = false;
@@ -725,7 +727,7 @@ function renderCot(){
   $("cotSub").textContent = `${s.contract} · as of ${when}`;
   const n = v => (v > 0 ? "+" : "") + Math.round(v).toLocaleString("en-US");
   $("cotBody").innerHTML = `<table class="trk-table"><tr><th>Group</th><th>Net</th><th>Week</th><th>Rank</th><th>Reading</th></tr>
-    ${s.groups.map(g => `<tr><td>${esc(g.name)}</td><td class="m">${n(g.net)}</td><td class="m">${n(g.change)}</td><td class="m"><b>${num(g.rank, 0)}%</b></td><td class="trk-mean">${esc(g.label)}</td></tr>`).join("")}</table>`;
+    ${s.groups.map(g => `<tr><td>${esc(g.name)}</td><td class="m">${n(g.net)}</td><td class="m">${n(g.change)}</td><td class="m"><span class="rk"><i style="width:${Math.max(0, Math.min(100, g.rank))}%"></i></span><b>${num(g.rank, 0)}%</b></td><td class="trk-mean">${esc(g.label)}</td></tr>`).join("")}</table>`;
 }
 function renderBias(w){
   loadCot(); renderCot();
@@ -733,24 +735,32 @@ function renderBias(w){
   if(!b){ $("biasCard").innerHTML = `<div class="eyebrow">Today's bias</div><div>${stateHtml("empty", "No bias yet", "It needs today's levels and an expected move. It appears with the next refresh that has both.")}</div>`; return; }
   const col = BIAS_COLOR[b.bias], ref = b.ref;
   const tm = iso => new Date(iso).toLocaleTimeString("en-US", {...ET, hour:"numeric", minute:"2-digit"});
-  $("biasCard").parentElement.classList.add("accent"); $("biasCard").parentElement.style.setProperty("--accent", col);
+  const card = $("biasCard").parentElement; card.classList.add("accent"); card.style.setProperty("--accent", col);
+  const sg = v => (v > 0 ? "+" : v < 0 ? "\u2212" : "") + num(Math.abs(v)), at = v => 50 + 50 * Math.max(-1, Math.min(1, v / GAUGE_MAX));
+  const drift = b.target - ref;
+  const lean = {Bullish: "Positioning leans up.", Bearish: "Positioning leans down.", Neutral: "No directional lean."}[b.bias];
+  const moves = {positive: "Moves are likely to be capped (positive gamma).", negative: "Moves are likely to extend (negative gamma)."}[b.side] || "Price is at the flip: the day type depends on which side of zero gamma it holds.";
   $("biasCard").innerHTML = `<div class="eyebrow">Today's bias (positioning model)</div>
-    <div class="regime"><span class="tag" style="color:${col};border-color:${col}">${b.bias === "Bullish" ? "▲" : b.bias === "Bearish" ? "▼" : "◆"}</span><span style="color:${col}">${b.bias}</span><span class="chip">${b.confidence} confidence</span></div>
-    <div class="kv"><span>Day type</span><b>${esc(b.day_type)}</b></div>
-    <div class="kv"><span>Score</span><b>${b.score >= 0 ? "+" : ""}${num(b.score)}</b></div>`;
-  $("targetCard").innerHTML = `<div class="eyebrow">Base case by the close</div>
-    <div class="big" style="color:${col}">${num(b.target)}</div>
-    <div class="kv"><span>From ${num(ref)}</span><b>${Math.abs(b.target - ref) < 0.5 ? "no change" : signed(b.target - ref) + " pts"}</b></div>
-    <div class="expl">Where the positioning factors point by 4 pm ET if nothing else intervenes.</div>`;
-  $("rangeCard").innerHTML = `<div class="eyebrow">Expected range</div>
-    <div class="big sm">${num(b.range[0])} – ${num(b.range[1])}</div>
-    <div class="kv"><span>1σ expected move</span><b>±${num(b.expected_move, 0)} pts</b></div>
-    <div class="expl">${b.side === "positive" ? "Tighter than the full expected move: positive gamma tends to cap the range, often at the walls." : b.side === "negative" ? "Wider on the side of the bias: negative gamma lets moves run." : "Full range: the day type depends on which side of zero gamma price holds."}</div>`;
-  $("biasSummary").textContent = b.summary;
+    <div class="bv-top">
+      <div class="bv-call"><div class="regime"><span class="tag" style="color:${col};border-color:${col}">${b.bias === "Bullish" ? "▲" : b.bias === "Bearish" ? "▼" : "◆"}</span><span style="color:${col}">${b.bias}</span><span class="chip">${b.confidence} confidence</span></div>
+        <div class="bv-day"><span>Day type</span><b>${esc(b.day_type)}</b></div></div>
+      <div class="bv-gauge" role="img" aria-label="Score ${sg(b.score)}. Bearish at ${sg(-BIAS_FLIP)} or less, bullish at ${sg(BIAS_FLIP)} or more.">
+        <div class="bv-ends"><span>Bearish</span><b>Score <em style="color:${col}">${sg(b.score)}</em></b><span>Bullish</span></div>
+        <div class="bv-track"><i class="neg" style="width:${at(-BIAS_FLIP)}%"></i><i class="pos" style="left:${at(BIAS_FLIP)}%"></i><u></u><b style="left:${at(b.score)}%;background:${col}"></b></div>
+        <div class="bv-scale"><span style="left:${at(-BIAS_FLIP)}%">${sg(-BIAS_FLIP)}</span><span style="left:50%">0</span><span style="left:${at(BIAS_FLIP)}%">${sg(BIAS_FLIP)}</span></div>
+      </div>
+    </div>
+    <div class="bv-line">${lean} ${moves}</div>
+    <div class="bv-facts"><div><span>Base case by the close</span><b>${num(b.target, 0)}</b><em>${Math.abs(drift) < 0.5 ? "no drift expected" : signed(drift, 0) + " pts from " + num(ref, 0)}</em></div>
+      <div><span>Expected range</span><b>${num(b.range[0], 0)} – ${num(b.range[1], 0)}</b><em>1σ move ±${num(b.expected_move, 0)} pts</em></div></div>`;
+  $("biasSummary").textContent = "";                                    // the strip above says it; replay puts its own hint here
   $("biasWhen").textContent = b.session.live ? `Session in progress · calculated ${ago(w.result.summary.asof)}` : `Plan for the ${new Date(b.session.open).toLocaleDateString("en-US", {...ET, weekday:"long", month:"short", day:"numeric"})} session`;
-  $("biasFactors").innerHTML = `<table><tr><th>Factor</th><th style="text-align:center">Lean</th><th style="text-align:left">Why</th></tr>${b.factors.map(f => {
-    const c = f.score > 0 ? "var(--pos)" : f.score < 0 ? "var(--neg)" : "var(--ink3)";
-    return `<tr><td style="white-space:nowrap">${esc(f.name)}</td><td class="m" style="text-align:center;color:${c};white-space:nowrap">${f.score > 0 ? "▲ +" + num(f.score) : f.score < 0 ? "▼ " + num(f.score) : "· day type"}</td><td style="text-align:left;white-space:normal;color:var(--ink2)">${esc(f.why)}</td></tr>`; }).join("")}</table>`;
+  const day = b.factors.filter(f => f.name === "Gamma side"), dir = b.factors.filter(f => f.name !== "Gamma side");
+  $("biasFactors").innerHTML = day.map(f => `<div class="fx-day"><span>${esc(b.day_type)}</span>${esc(whole(f.why))}. This sets the day type, not the direction.</div>`).join("")
+    + dir.map(f => { const c = f.score > 0 ? "var(--pos)" : f.score < 0 ? "var(--neg)" : "var(--ink3)", wd = 50 * Math.min(1, Math.abs(f.score));
+      return `<div class="fx"><span class="fx-n">${esc(f.name)}</span><span class="fx-bar"><i style="width:${wd}%;${f.score < 0 ? "right" : "left"}:50%;background:${c}"></i></span><b style="color:${c}">${sg(f.score)}</b><span class="fx-why">${esc(whole(f.why))}</span></div>`; }).join("")
+    + (dir.length ? `<div class="fx fx-sum"><span class="fx-n">Score</span><span class="fx-bar"></span><b style="color:${col}">${sg(b.score)}</b><span class="fx-why">The leans added up. ${sg(BIAS_FLIP)} or more is bullish, ${sg(-BIAS_FLIP)} or less is bearish, anything between is neutral.</span></div>`
+      : `<div>${stateHtml("empty", "No directional factor today", "Nothing in today's positioning leans either way, so the score is 0 and the bias is neutral.")}</div>`);
   rpSync(b, col);
 }
 
@@ -773,7 +783,7 @@ function drawBias(b, col){
   for(let m = 30; m <= T; m += every){ g += `<line x1="${x(m)}" x2="${x(m)}" y1="${padT}" y2="${H-padB}" stroke="var(--line)"/><text x="${x(m)}" y="${H-10}" text-anchor="middle">${narrow ? clock(m).replace(":00", "") : clock(m)}</text>`; }
   // range band and cone
   g += `<rect x="${x(b.session.start_minute)}" y="${y(b.range[1])}" width="${x(T) - x(b.session.start_minute)}" height="${y(b.range[0]) - y(b.range[1])}" fill="${col}" opacity=".06"/>`;
-  g += `<polygon points="${b.cone.map(c => `${x(c[0])},${y(c[2])}`).join(" ")} ${b.cone.slice().reverse().map(c => `${x(c[0])},${y(c[1])}`).join(" ")}" fill="rgba(139,149,165,.22)" stroke="rgba(139,149,165,.45)" stroke-width="1"/>`;
+  g += `<polygon points="${b.cone.map(c => `${x(c[0])},${y(c[2])}`).join(" ")} ${b.cone.slice().reverse().map(c => `${x(c[0])},${y(c[1])}`).join(" ")}" fill="${col}" fill-opacity=".1" stroke="${col}" stroke-opacity=".5" stroke-width="1"/>`;
   // key levels with collision-free labels
   const LC = BIAS_LC;
   lv.forEach(([n, p]) => { g += `<line x1="${padL}" x2="${W-padR}" y1="${y(p)}" y2="${y(p)}" stroke="${LC[n]}" stroke-width="1.3" stroke-dasharray="${n === "Zero gamma" ? "6 4" : "2 3"}"/>`; });
@@ -788,27 +798,29 @@ function drawBias(b, col){
   labels.sort((a, c) => y(a[0]) - y(c[0])).forEach(([p, t, c]) => { const ly = Math.max(y(p) + 4, last + 14); last = ly; g += `<text x="${W-padR+8}" y="${ly}" style="fill:${c}">${esc(t)}</text>`; });
   // levels too far away to draw at this scale: named at the edge they lie beyond (farthest outermost), with their distance
   const off = merged(Object.entries(b.levels || {}).filter(([n, p]) => p != null && !lv.some(([m]) => m === n))).sort((a, c) => c.p - a.p);
-  const edge = (m, ly, arrow) => `<text x="${W-padR-6}" y="${ly}" text-anchor="end" style="fill:${m.color}">${arrow} ${esc(m.names.map(nm).join(" · "))} ${num(m.p,0)} (${m.p > b.ref ? "+" : ""}${num(m.p - b.ref,0)})</text>`;
+  // text inside the plot sits on a plate, so no level line runs through it
+  const tag = (X, ly, t, fill, end) => { const w = t.length * 6.4 + 8; return `<rect x="${end ? X - w + 4 : X - 4}" y="${ly - 10}" width="${w}" height="13" rx="2" fill="var(--panel)"/><text x="${X}" y="${ly}"${end ? ' text-anchor="end"' : ""} style="fill:${fill}">${esc(t)}</text>`; };
+  const edge = (m, ly, arrow) => tag(W - padR - 6, ly, `${arrow} ${m.names.map(nm).join(" · ")} ${num(m.p,0)} (${m.p > b.ref ? "+" : ""}${num(m.p - b.ref,0)})`, m.color, true);
   off.filter(m => m.p > b.ref).forEach((m, i) => { g += edge(m, padT + 12 + (i + (narrow ? 1 : 0)) * 14, "↑"); });     // phones: under the "open" tag
   off.filter(m => m.p <= b.ref).reverse().forEach((m, i) => { g += edge(m, H - padB - 8 - i * 14, "↓"); });
   // path, start and now markers
   g += `<polyline fill="none" stroke="${col}" stroke-width="2.5" stroke-linejoin="round" points="${b.path.map(p => `${x(p[0])},${y(p[1])}`).join(" ")}"/>`;
   const s0 = b.path[0];
   g += `<circle cx="${x(s0[0])}" cy="${y(s0[1])}" r="5" fill="${col}" stroke="var(--panel)" stroke-width="2"/>`;
-  if(b.session.live) g += `<line x1="${x(s0[0])}" x2="${x(s0[0])}" y1="${padT}" y2="${H-padB}" stroke="var(--ink3)" stroke-dasharray="3 3"/><text x="${x(s0[0]) + 6}" y="${padT + 12}" style="fill:var(--ink2)">now</text>`;
-  else g += `<text x="${x(0) + 6}" y="${padT + 12}" style="fill:var(--ink2)">open</text>`;
+  if(b.session.live) g += `<line x1="${x(s0[0])}" x2="${x(s0[0])}" y1="${padT}" y2="${H-padB}" stroke="var(--ink3)" stroke-dasharray="3 3"/>` + tag(x(s0[0]) + 6, padT + 12, "now", "var(--ink2)");
+  else g += tag(x(0) + 6, padT + 12, "open", "var(--ink2)");
   const pe = b.path.at(-1);
   g += `<circle cx="${x(pe[0])}" cy="${y(pe[1])}" r="4" fill="var(--panel)" stroke="${col}" stroke-width="2"/>`;
   svg.setAttribute("width", W); svg.setAttribute("height", H); svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
   svg.innerHTML = g;
-  $("pathSw").style.background = col;
+  $("pathSw").style.background = col; $("coneSw").style.background = col;
   document.querySelectorAll("#biasLegend [data-lv]").forEach(el => { el.style.display = (lv.some(([n]) => n === el.dataset.lv) || off.some(m => m.names.includes(el.dataset.lv))) ? "" : "none"; });   // only what is shown
   const tip = $("biasTip");
   svg.onmousemove = e => {
     const r = svg.getBoundingClientRect(), mx = (e.clientX - r.left - padL) / (W - padL - padR) * T;
     let i = 0; b.path.forEach((p, k) => { if(Math.abs(p[0] - mx) < Math.abs(b.path[i][0] - mx)) i = k; });
     const p = b.path[i], c = b.cone[i];
-    tip.innerHTML = `${clock(p[0])} ET<br>Base case <b style="color:${col}">${num(p[1])}</b><br><span style="color:var(--ink3)">1σ ${num(c[1],0)} – ${num(c[2],0)}</span>`;
+    tip.innerHTML = `${clock(p[0])} ET<br>Base case <b style="color:${col}">${num(p[1], 0)}</b><br><span style="color:var(--ink3)">1σ ${num(c[1],0)} – ${num(c[2],0)}</span>`;
     tip.style.opacity = 1; tip.style.left = Math.min(x(p[0]) + 12, W - 170) + "px"; tip.style.top = (y(p[1]) - 30) + "px";
   };
   svg.onmouseleave = () => { tip.style.opacity = 0; };
@@ -925,8 +937,7 @@ function drawReplay(){
   const age = seen == null ? null : m * 60 - Math.max(0, seen);
   // readout
   $("rpSlider").setAttribute("aria-valuetext", `${rpTime(tl, m * 60)} Eastern`);
-  $("rpRead").innerHTML = `<b>${rpTime(tl, m * 60)}</b> · ` + (seen == null ? `<span class="warn">no levels yet</span>`
-      : age > RP_GAP_S ? `<span class="warn">no update since ${rpTime(tl, seen)}</span>` : `levels ${rpTime(tl, seen)}`);
+  $("rpRead").innerHTML = `<b>${rpTime(tl, m * 60)}</b> · ` + (seen == null ? "no levels yet" : age > RP_GAP_S ? `levels as of ${rpTime(tl, seen)}` : `levels ${rpTime(tl, seen)}`);
   if(ref == null){
     svg.innerHTML = `<text x="${W / 2}" y="${H / 2}" text-anchor="middle" style="fill:var(--ink3)">Nothing saved yet at this time</text>`;
     return;
@@ -971,7 +982,7 @@ function drawReplay(){
   g += `<line x1="${x(m)}" x2="${x(m)}" y1="${padT}" y2="${H-padB}" stroke="${col}" stroke-width="1.2"/>`;
   if(px.length) g += `<circle cx="${x(px.at(-1)[0] + 1)}" cy="${y(ref)}" r="4" fill="var(--ink)" stroke="var(--panel)" stroke-width="2"/>`;
   g += `<text x="${Math.min(x(m) + 6, W - padR - 44)}" y="${padT + 12}" style="fill:var(--ink2)">${esc(clock(m))}</text>`;
-  if(age != null && age > RP_GAP_S) g += `<text x="${padL + 8}" y="${padT + 12}" style="fill:var(--warn)">levels held: no update since ${esc(rpTime(tl, seen))}</text>`;
+  if(age != null && age > RP_GAP_S) g += `<text x="${padL + 8}" y="${padT + 12}" style="fill:var(--ink3)">levels held since ${esc(rpTime(tl, seen))}: no newer ones were saved</text>`;
   // labels: the values in force at m (same-price levels share one), with the last change if it is under 15 min old
   const lastMove = c => {
     for(let k = i; k > 0; k--) if(rows[k].at(-1) & (1 << c))           // the options level moved, not just the basis
