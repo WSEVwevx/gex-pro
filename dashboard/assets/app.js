@@ -17,8 +17,11 @@ const pineUrl = m => STATIC ? `data/pine-published${m ? "-" + m : ""}.txt`
 // every data request skips the browser cache; on the hosted copy a unique query also skips GitHub's
 // 10-minute CDN cache, so opening the page always gets the newest build
 const fetchFresh = url => fetch(STATIC ? url + (url.includes("?") ? "&" : "?") + "t=" + Date.now() : url, {cache: "no-store"});
-const OFFLINE = STATIC ? "Can't load the latest data file. Check your connection; retrying."
-                       : "Can't reach the GEX PRO service. Is START.bat still running? Retrying every 20 seconds.";
+// a failure says what failed, what is still on screen, and that the page is retrying
+const lastGood = () => data && data.now ? new Date(data.now).toLocaleTimeString("en-US", {timeZone: "America/New_York", hour: "numeric", minute: "2-digit"}) : null;
+const offline = () => (STATIC ? "Can't reach the data file. " : "Can't reach the GEX service on this PC (is START.bat still running?). ")
+  + (lastGood() ? `Showing the ${lastGood()} ET numbers. ` : "Nothing to show yet. ") + "Retrying by itself.";
+const stateHtml = (kind, title, text) => `<div class="state ${kind}"><i></i><div><b>${esc(title)}</b>${esc(text)}</div></div>`;
 
 if (location.protocol === "file:" && !STATIC) {
   document.body.innerHTML = `<div class="wrap"><div class="banner bad" style="margin-top:40px;font-size:15px;line-height:1.7">
@@ -28,6 +31,73 @@ if (location.protocol === "file:" && !STATIC) {
 }
 
 let data = null, market = store.get("gex.market", "NQ");
+
+// ---------- loading without jumps: each card keeps the height it had last time on this screen width, so the data
+// arriving moves nothing below it. Heights are remembered per card (and per market on the market pages).
+const HKEY = "gex.h." + Math.round(innerWidth / 40);
+let cardH = {};
+try { cardH = JSON.parse(store.get(HKEY, "{}")) || {}; } catch(e) {}
+const PER_MARKET = ["levelsView", "ladderView", "heatmapView", "screenerView", "biasView"];
+const cardKey = c => { const v = c.closest("[id$=View]"); return v ? v.id + ":" + [...v.querySelectorAll(".card")].indexOf(c) + (PER_MARKET.includes(v.id) ? ":" + market : "") : null; };
+function reserve(){ document.querySelectorAll("[id$=View] .card").forEach(c => { const h = cardH[cardKey(c)]; c.style.minHeight = h ? h + "px" : ""; }); }
+reserve();
+document.body.classList.add("first");                       // cards fade in once, on the first paint only
+setTimeout(() => document.body.classList.remove("first"), 600);
+let settleT = 0;
+function settle(){                                           // after a page has drawn: remember its cards' real heights
+  clearTimeout(settleT);
+  settleT = setTimeout(() => {
+    const v = document.querySelector("[id$=View]:not([hidden])");
+    if(!v) return;
+    v.querySelectorAll(".card").forEach(c => {
+      if([...c.querySelectorAll(".skeleton")].some(k => k.offsetParent)) return;     // still loading: keep the reservation
+      c.style.minHeight = "";
+      cardH[cardKey(c)] = Math.round(c.getBoundingClientRect().height);
+    });
+    store.set(HKEY, JSON.stringify(cardH));
+  }, 900);
+}
+
+// ---------- motion (durations and curves: the tokens at the top of terminal.css). A number that changed counts to its
+// new value; a level that really moved is marked for a few seconds. Nothing runs on the first paint, in a background
+// tab, or for people who ask for reduced motion.
+const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const seenNum = new Map();
+const numIn = t => { const m = /-?[\d,]+(?:\.\d+)?/.exec(t); return m ? {m, v: parseFloat(m[0].replace(/,/g, ""))} : null; };
+function countTo(node, from, to, text){
+  const hit = numIn(text), dec = (hit.m[0].split(".")[1] || "").length, t0 = performance.now(), ms = 280;
+  const step = now => {
+    const u = Math.min(1, (now - t0) / ms), e = 1 - (1 - u) * (1 - u);
+    const v = (from + (to - from) * e).toLocaleString("en-US", {minimumFractionDigits: dec, maximumFractionDigits: dec});
+    if(!node.isConnected) return;
+    node.nodeValue = u < 1 ? text.slice(0, hit.m.index) + v + text.slice(hit.m.index + hit.m[0].length) : text;
+    if(u < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+function showChanges(){
+  const v = document.querySelector("[id$=View]:not([hidden])");
+  if(!v) return;
+  const calm = REDUCED || document.hidden;
+  v.querySelectorAll(".big, #ladder .row .p").forEach((el, i) => {
+    const node = [...el.childNodes].find(n => n.nodeType === 3 && numIn(n.nodeValue));
+    if(!node) return;
+    const row = el.closest(".row"), name = row ? (row.querySelector(".name") || {}).firstChild : null;
+    const key = v.id + "|" + market + "|" + (row && name ? "lv:" + name.nodeValue.trim() : (el.closest("[id]") || {}).id + ":" + i);
+    const text = node.nodeValue, now = numIn(text).v, was = seenNum.get(key);
+    seenNum.set(key, now);
+    if(was == null || was === now || calm) return;
+    countTo(node, was, now, text);
+    // a level row: a strike level moved if its price changed at all; zero gamma once it has moved 0.1% (the replay's rule)
+    if(row && (!/zero gamma/i.test(name.nodeValue) || Math.abs(now - was) >= 0.001 * Math.abs(was))){
+      row.classList.add("moved");
+      const d = document.createElement("span");
+      d.className = "delta"; d.textContent = (now > was ? "▲ +" : "▼ ") + (now - was).toLocaleString("en-US", {maximumFractionDigits: 2});
+      el.parentNode.appendChild(d);
+      setTimeout(() => { d.remove(); row.classList.remove("moved"); }, 6000);
+    }
+  });
+}
 // One view at a time ("show only"). The old on/off toggles could hide the key levels by accident.
 try { localStorage.removeItem("gex.groups"); } catch(e) {}
 let view = store.get("gex.view", "all");
@@ -50,7 +120,7 @@ $("copyBox").onclick = e => { if(e.target === $("copyBox")) $("copyBox").hidden 
 let pastes = null, pasteWeeks = [];
 async function loadPastes(){
   try { const j = await (await fetchFresh(API.pastes)).json(); pastes = j.pastes || []; pasteWeeks = j.weeks || []; renderWeeks(); }
-  catch(e){ if(!pastes){ $("pastesList").innerHTML = `<div class="expl">${esc(OFFLINE)}</div>`; return; } }
+  catch(e){ if(!pastes){ $("pastesList").innerHTML = `<div class="expl">${esc(offline())}</div>`; return; } }
   const days = [...new Set(pastes.map(p => p.session))].sort().reverse();
   const get = (d, m) => (pastes.find(p => p.session === d && p.market === m) || {}).paste;
   $("pastesSub").textContent = days.length ? `${days.length} session${days.length === 1 ? "" : "s"}` : "";
@@ -87,7 +157,7 @@ function showPastes(){ setPage("backtest"); }
 $("indPastesJump").onclick = showPastes;
 async function copyFrom(url, what){
   let text;
-  try { text = (await (await fetchFresh(url)).text()).trim(); } catch(e){ toast(OFFLINE); return; }
+  try { text = (await (await fetchFresh(url)).text()).trim(); } catch(e){ toast(offline()); return; }
   if(!text){ toast("Nothing to copy yet - the first scheduled update hasn't happened."); return; }
   await copyText(text, `Copied ${what}. In TradingView: indicator settings > Levels payload > Ctrl+A, Ctrl+V > OK.`);
 }
@@ -104,9 +174,12 @@ const VIEW_IDS = ["levels", "ladder", "heatmap", "screener", "bias", "track", "b
 function setPage(p){
   if(!VIEW_IDS.includes(p)) p = "levels";
   if(p !== page){ const ar = document.querySelector(".area"); if(ar) ar.scrollTop = 0; window.scrollTo(0, 0); }   // a new page opens at its top
-  page = p;
   document.querySelectorAll("#pages button[data-p]").forEach(b => b.setAttribute("aria-selected", String(b.dataset.p === p)));
+  const arriving = p !== page || $(p + "View").hidden;
   VIEW_IDS.forEach(v => { $(v + "View").hidden = v !== p; });
+  if(arriving){ const vw = $(p + "View"); vw.classList.remove("view-enter"); void vw.offsetWidth; vw.classList.add("view-enter"); }
+  page = p;
+  settle();
   $("pageTitle").textContent = (PAGES.find(x => x[0] === p) || ["", "Levels"])[1];
   $("tabs").style.display = NO_MARKET_PAGES.includes(p) ? "none" : "";
   $("status").style.display = NO_MARKET_PAGES.includes(p) ? "none" : "";
@@ -127,7 +200,7 @@ function setPage(p){
 document.querySelectorAll("#pages button[data-p]").forEach(b => b.onclick = () => setPage(b.dataset.p));
 async function loadNews(){
   try { news = await (await fetchFresh(API.news)).json(); }
-  catch(e) { news = news || {events: [], error: OFFLINE}; }
+  catch(e) { news = news || {events: [], error: offline()}; }
   renderNews(); if(data) render();
 }
 const ET = {timeZone: "America/New_York"};
@@ -142,7 +215,7 @@ function newsFilter(e){
 let posts = null, postF = store.get("gex.postf", "all");      // all | market
 async function loadPosts(){
   try { posts = await (await fetchFresh(API.posts)).json(); }
-  catch(e) { posts = posts || {posts: [], error: OFFLINE}; }
+  catch(e) { posts = posts || {posts: [], error: offline()}; }
   renderPosts();
 }
 function renderPosts(){
@@ -170,7 +243,7 @@ function renderPosts(){
 let brief = null, briefPick = "";                          // "" = the newest briefing
 async function loadBriefings(){
   try { brief = await (await fetchFresh(API.briefings)).json(); }
-  catch(e){ $("briefTitle").textContent = "Briefings unavailable"; $("briefLead").textContent = OFFLINE; return; }
+  catch(e){ $("briefTitle").textContent = "Briefings unavailable"; $("briefLead").textContent = offline(); return; }
   renderBriefings();
 }
 const BKIND = {nyam: "NY AM", asia: "Asia", weekly: "Weekly"};
@@ -298,7 +371,7 @@ let ind = null, indShown = null;
 async function loadIndicator(){
   let d;
   try { d = await (await fetchFresh(API.indicator)).json(); }
-  catch(e){ $("indMeta").innerHTML = `<span class="chip"><i class="dot warn"></i>${OFFLINE}</span>`; return; }
+  catch(e){ $("indMeta").innerHTML = `<span class="chip"><i class="dot warn"></i>${offline()}</span>`; return; }
   const changed = ind && ind.version !== d.version;
   ind = d;
   if(changed) toast("The indicator code was just updated. Copy the new version into TradingView.");
@@ -377,7 +450,7 @@ async function load(){
     }
     render(); if(page === "indicator") renderIndicator();
   }
-  catch(e){ $("banner").innerHTML = `<div class="banner bad">${OFFLINE}</div>`; }
+  catch(e){ $("banner").innerHTML = `<div class="banner bad">${offline()}</div>`; }
 }
 
 // ---------- data health: every outside source, when it last worked, whether its last try failed
@@ -388,7 +461,7 @@ const HL = {ok: ["ok", "Working"], partial: ["warn", "Working, partly"], late: [
 const buildLag = iso => STATIC && (Date.now() - Date.parse(iso)) / 60000 > (sessionLabel(new Date())[0] === "Futures closed" ? 90 : 20);
 async function loadSources(){
   try { sources = await (await fetchFresh(API.sources)).json(); }
-  catch(e) { sources = sources || {sources: [], error: OFFLINE}; }
+  catch(e) { sources = sources || {sources: [], error: offline()}; }
   const bad = (sources.sources || []).some(r => r.status === "failing" || r.status === "down");     // red = failed; late stays amber
   document.querySelector('#pages button[data-p="health"]').classList.toggle("alert", !!bad);
   if(page === "health") renderSources();
@@ -439,9 +512,12 @@ function render(){
     ${STATIC ? `<span class="chip" title="The hosted site is rebuilt about every 3 minutes in cash hours, every 6 minutes overnight while futures trade, and hourly when they are closed">${lag ? '<i class="dot warn"></i>' : ""}Site rebuilt <b>${ago(data.now)}</b></span>` : ""}
     <span class="chip">Next paste <b>${h.next_publish_et ? esc(h.next_publish_et.slice(11)) + " ET" : "-"}</b></span>
     ${(() => { const e = nextHighUSD(); return e ? `<span class="chip" title="Next ${e.impact.toLowerCase()}-impact USD event (ForexFactory)"><i class="dot ${e.impact === "High" ? "bad" : "warn"}"></i>${esc(e.title)} <b>in ${dur(Date.parse(e.time) - Date.now())}</b></span>` : ""; })()}`;
-  $("banner").innerHTML = !w.result ? `<div class="banner">${h.last_error ? "Data error: " + esc(h.last_error) : "First calculation in progress..."}</div>`
-    : h.last_error ? `<div class="banner">${esc(h.last_error)}</div>`
+  $("banner").innerHTML = !w.result ? `<div class="banner">${h.last_error ? "The options data source failed on its last try. Nothing to show yet; retrying by itself. Details are on the Data health page." : "First calculation in progress: levels appear within a minute."}</div>`
+    : h.last_error ? `<div class="banner" title="${esc(h.last_error)}">The options data source failed on its last try. Showing the last good numbers; retrying by itself. Details are on the Data health page.</div>`
     : lag ? `<div class="banner">The hosted data was built ${ago(data.now)}. GitHub runs the refresh on a schedule that sometimes runs late; this page picks up the next build by itself.</div>` : "";
+  // old data says so on each market card, not only in the banner
+  document.body.classList.toggle("stale-data", !!lag);
+  document.body.style.setProperty("--stale-text", lag ? `"data from ${lastGood()} ET"` : '""');
   if(!w.result) return;
   const L = w.result.mapped || s, X = L.extras || {};
   const ref = L.futures_equiv_of_ref ?? s.ref_price;
@@ -813,7 +889,7 @@ async function rpInput(){
   if(+s.value >= +s.max) return rpLive();
   rp.min = +s.value;
   if(!rp.tl){
-    $("rpRead").textContent = "Loading the session…";
+    $("rpRead").innerHTML = `<span class="skeleton sk-line">Loading the session</span>`;
     await rpLoad();
     if(!rp.tl || rp.empty){ rp.min = null; $("biasReplay").hidden = true; return renderBias(curW()); }
     rpBounds();
@@ -1234,7 +1310,7 @@ const LIB = window.GEX_LIBRARY || {chapters: [], lessons: [], glossary: [], diag
 let libLesson = store.get("gex.lib", LIB.lessons[0] ? LIB.lessons[0].id : ""), libTab = "course";
 const libRead = (() => { try { return new Set(JSON.parse(store.get("gex.libread", "[]"))); } catch(e){ return new Set(); } })();
 const saveRead = () => store.set("gex.libread", JSON.stringify([...libRead]));
-function openLesson(id){ libLesson = id; store.set("gex.lib", id); libTab = "course"; if(page !== "library") setPage("library"); else renderLibrary(); document.querySelector(".area").scrollTo({top: 0, behavior: "smooth"}); }
+function openLesson(id){ libLesson = id; store.set("gex.lib", id); libTab = "course"; if(page !== "library") setPage("library"); else renderLibrary(); document.querySelector(".area").scrollTo({top: 0, behavior: "auto"}); }
 function renderLibrary(){
   const q = ($("libSearch").value || "").trim().toLowerCase();
   const hit = s => !q || s.toLowerCase().includes(q);
@@ -1287,7 +1363,7 @@ $("libSearch").addEventListener("input", renderLibrary);
 let trk = null, trkM = store.get("gex.trkm", "ALL"), btM = store.get("gex.btm", "ES");
 async function loadTrack(){
   try { trk = await (await fetchFresh(API.track)).json(); }
-  catch(e){ trk = trk || {error: OFFLINE}; }
+  catch(e){ trk = trk || {error: offline()}; }
   renderTrack();
 }
 const pct = r => r == null ? "-" : num(100 * r, 0) + "%";
@@ -1629,7 +1705,7 @@ async function loadHeatmap(){
   const want = market + hmTf;
   let got;
   try { got = await (await fetchFresh(hmUrl())).json(); }
-  catch(e){ $("hmMsg").textContent = OFFLINE; $("hmMsg").hidden = false; return; }
+  catch(e){ $("hmMsg").textContent = offline(); $("hmMsg").hidden = false; return; }
   if(want !== market + hmTf) return;                       // the market or timeframe changed while loading
   hm = got; hm._key = want;                                 // which market and timeframe this data is for
   renderHeatmap();
@@ -1926,7 +2002,7 @@ const SCR_COLS = [["symbol", "Stock"], ["spark", "20 days"], ["price", "Price"],
   ["weight", "Weight"], ["impact", "Index pts"], ["rel_volume", "Rel vol"], ["earnings", "Earnings"]];
 async function loadScreener(){
   try { scr = await (await fetchFresh(STATIC ? "data/screener.json" : "/api/screener")).json(); }
-  catch(e){ if(!scr) $("drvRows").innerHTML = `<tr><td colspan="9" class="expl">${esc(OFFLINE)}</td></tr>`; return; }
+  catch(e){ if(!scr) $("drvRows").innerHTML = `<tr><td colspan="9" class="expl">${esc(offline())}</td></tr>`; return; }
   renderScreener();
 }
 function spark(v){
@@ -2004,12 +2080,12 @@ function chartTimeET(t){
   return Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour % 24, +p.minute, +p.second) / 1000;
 }
 async function openStockChart(sym){
-  scSym = sym; $("scChart").hidden = false; $("scMsg").hidden = false; $("scMsg").textContent = "Loading the chart...";
+  scSym = sym; $("scChart").hidden = false; $("scMsg").hidden = false; $("scMsg").textContent = "…";
   let c = null;
   try {
     if(STATIC){ scCharts = scCharts || await (await fetchFresh("data/screener-charts.json")).json(); c = scCharts[sym]; }
     else c = await (await fetchFresh(`/api/screener/chart?symbol=${encodeURIComponent(sym)}`)).json();
-  } catch(e){ if(sym === scSym) $("scMsg").textContent = OFFLINE; return; }
+  } catch(e){ if(sym === scSym) $("scMsg").textContent = offline(); return; }
   if(sym !== scSym) return;                              // another stock was clicked while this one loaded
   if(!c || !c.symbol){ $("scMsg").textContent = "No chart data for this stock yet."; return; }
   renderStockChart(c);
@@ -2079,7 +2155,7 @@ function loadLevelHistory(){
 }
 function renderLevelHistory(){
   const w = curW(), mp = w && w.result && w.result.mapped && w.result.mapped.mapping;
-  if(!trk || !trk.sessions){ $("lhTable").innerHTML = `<div class="expl">Loading the saved sessions...</div>`; return; }
+  if(!trk || !trk.sessions){ $("lhTable").innerHTML = `<div class="expl"><span class="skeleton sk-line">Loading the saved sessions</span></div>`; return; }
   const f = (mp && mp.factor) || 1, o = (mp && mp.offset) || 0, fut = p => p == null ? null : Math.round((p * f + o) * 4) / 4;
   const ss = trk.sessions.filter(s => s.market === market && s.plan).sort((a, b) => b.session.localeCompare(a.session));
   $("lhSub").textContent = ss.length ? `${market} · ${ss.length} session${ss.length === 1 ? "" : "s"} since ${new Date(ss[ss.length - 1].session + "T12:00:00Z").toLocaleDateString("en-US", {month: "short", day: "numeric", timeZone: "UTC"})}` : "";
@@ -2182,7 +2258,7 @@ function renderGlossary(){
     + (letters.some(L => /[0-9]/.test(L)) ? `<button data-l="0">#</button>` : "");
   [...$("glAz").querySelectorAll("button")].forEach(b => b.onclick = () => {
     const el = document.querySelector(`#glList [data-letter="${b.dataset.l === "0" ? letters.find(L => /[0-9]/.test(L)) : b.dataset.l}"]`);
-    el && el.scrollIntoView({behavior: "smooth", block: "start"}); });
+    el && el.scrollIntoView({behavior: "auto", block: "start"}); });
   let last = "";
   $("glList").innerHTML = rows.map(([t, d, lesson, topic, where]) => {
     const L = glKey(t)[0], head = L !== last ? `<div class="gl-letter" data-letter="${L}">${/[0-9]/.test(L) ? "#" : L}</div>` : "";
@@ -2193,7 +2269,7 @@ function renderGlossary(){
   }).join("") || `<div class="expl">No term matches "${esc(q)}".</div>`;
   [...$("glList").querySelectorAll("[data-l]")].forEach(b => b.onclick = () => openLesson(b.dataset.l));
   $("glSub").textContent = `${rows.length} of ${G.length} terms`;
-  if(glFocus){ const el = $("gl-" + glKey(glFocus).replace(/[^A-Z0-9]+/g, "-")); glFocus = ""; el && setTimeout(() => el.scrollIntoView({behavior: "smooth", block: "center"}), 30); }
+  if(glFocus){ const el = $("gl-" + glKey(glFocus).replace(/[^A-Z0-9]+/g, "-")); glFocus = ""; el && setTimeout(() => el.scrollIntoView({behavior: "auto", block: "center"}), 30); }
 }
 // open the glossary on one term (from the Explain drawer)
 function openGlossary(term){ glTopic = "All"; $("glSearch").value = ""; glFocus = term; closeExplain(); if(page === "glossary") renderGlossary(); else setPage("glossary"); }
@@ -2226,6 +2302,7 @@ function refreshAll(){
 document.addEventListener("visibilitychange", () => { if(!document.hidden && Date.now() - lastPull > 30000) refreshAll(); });
 setInterval(loadQuotes, STATIC ? 5 * 60 * 1000 : 60 * 1000);   // the hosted copy refreshes with each site build
 setInterval(load, STATIC ? 60000 : 20000);
+{ const draw = render; render = function(){ draw(); showChanges(); settle(); }; }      // every render: what changed, then the heights
 setInterval(loadPosts, 2 * 60 * 1000);                     // the service itself re-fetches at most every 5 min
 setInterval(loadNews, 10 * 60 * 1000);                      // the service itself re-fetches at most every 30 min
 loadSources(); setInterval(loadSources, 5 * 60 * 1000);   // keeps the red dot on Data health current

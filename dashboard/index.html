@@ -78,13 +78,13 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
     <!-- LEVELS -->
     <div id="levelsView">
       <section class="hero">
-        <div class="card" data-help="regime"><div id="regimeCard"><div class="eyebrow">Gamma regime (model)</div><div class="skeleton">Loading...</div></div></div>
-        <div class="card" data-help="reference"><div id="priceCard"><div class="eyebrow">Reference price</div><div class="skeleton">Loading...</div></div></div>
-        <div class="card" data-help="net_gex"><div id="netCard"><div class="eyebrow">Net gamma exposure</div><div class="skeleton">Loading...</div></div></div>
+        <div class="card" data-help="regime"><div id="regimeCard"><div class="eyebrow">Gamma regime (model)</div><div class="skeleton">Loading</div></div></div>
+        <div class="card" data-help="reference"><div id="priceCard"><div class="eyebrow">Reference price</div><div class="skeleton">Loading</div></div></div>
+        <div class="card" data-help="net_gex"><div id="netCard"><div class="eyebrow">Net gamma exposure</div><div class="skeleton">Loading</div></div></div>
       </section>
       <section class="stats" id="stats" data-help="stats"></section>
       <section class="grid2 plan-row">
-        <div class="card" data-help="plan"><div id="planCard"><div class="skeleton">Loading...</div></div></div>
+        <div class="card" data-help="plan"><div id="planCard"><div class="skeleton">Loading</div></div></div>
         <div class="card" data-help="changes"><div class="head"><h2>What changed today</h2><span class="sub" id="chgSub"></span></div><div class="chg" id="chgFeed"></div></div>
       </section>
       <section class="main">
@@ -123,7 +123,7 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
           <div class="filters" id="hmTf" role="tablist" aria-label="Timeframe"></div>
           <label class="hm-ctl" title="Heatmap strength">Heat <input type="range" id="hmOpacity" min="10" max="100" step="5" value="60"></label>
           <label class="hm-ctl"><input type="checkbox" id="hmLevels" checked> Levels</label></div>
-        <div class="hm-chart" id="hmChart"><div class="hm-msg" id="hmMsg">Loading the chart...</div><div class="tip hm-tip" id="hmTip"></div></div>
+        <div class="hm-chart" id="hmChart"><div class="hm-msg" id="hmMsg"><span class="skeleton sk-line">Loading the chart</span></div><div class="tip hm-tip" id="hmTip"></div></div>
         <div class="legend"><span><i class="sw" style="background:var(--pos)"></i>positive gamma (hedging calms moves)</span><span><i class="sw" style="background:var(--neg)"></i>negative gamma (hedging adds to moves)</span>
           <span><i class="sw" style="background:var(--pos);height:2px"></i>call wall</span><span><i class="sw" style="background:var(--neg);height:2px"></i>put wall</span><span>ZG · CW · PW labels on the price axis = now</span><span>right edge: the latest GEX profile with today's C / P / Ab levels</span>
           <span class="hm-scale" id="hmScale"></span>
@@ -134,13 +134,13 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
     <!-- SCREENER: the stocks that move NQ / ES -->
     <div id="screenerView" hidden>
       <div class="grid2 drv-top">
-        <section class="card" data-help="screener"><div class="head"><h2>Index drivers</h2></div><div id="drvSum"><div class="skeleton">Loading...</div></div></section>
+        <section class="card" data-help="screener"><div class="head"><h2>Index drivers</h2></div><div id="drvSum"><div class="skeleton">Loading</div></div></section>
         <section class="card" data-help="screener"><div class="head"><h2>Points contribution today</h2><span class="sub">weight × move, in futures points</span></div><div class="drv-bars" id="drvBars"></div></section>
       </div>
       <section class="card drv-earn-card" data-help="screener"><div class="head"><h2>Earnings ahead</h2><span class="sub">BMO before the open · AMC after the close</span></div><div class="drv-earn" id="drvEarn"></div></section>
       <section class="card" data-help="screener">
         <div class="head"><h2>Drivers</h2><span class="sub" id="scrSub"></span></div>
-        <div class="scr-wrap"><table class="scr-table drv-table"><thead><tr id="drvHead"></tr></thead><tbody id="drvRows"><tr><td colspan="9"><div class="skeleton">Loading...</div></td></tr></tbody></table></div>
+        <div class="scr-wrap"><table class="scr-table drv-table"><thead><tr id="drvHead"></tr></thead><tbody id="drvRows"><tr><td colspan="9"><div class="skeleton">Loading</div></td></tr></tbody></table></div>
         <div class="expl">Index pts = the stock's index weight × its move today × the futures price: roughly how much of NQ / ES's move it explains. Weights from slickcharts.com, prices from Yahoo Finance (delayed), earnings from Nasdaq.com. Not trading advice.</div>
       </section>
     </div>
@@ -172,9 +172,9 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
     <!-- BIAS -->
     <div id="biasView" hidden>
       <section class="hero">
-        <div class="card" data-help="bias"><div id="biasCard"><div class="eyebrow">Today's bias (positioning model)</div><div class="skeleton">Loading...</div></div></div>
-        <div class="card" data-help="base_case"><div id="targetCard"><div class="eyebrow">Base case by the close</div><div class="skeleton">Loading...</div></div></div>
-        <div class="card" data-help="bias_range"><div id="rangeCard"><div class="eyebrow">Expected range</div><div class="skeleton">Loading...</div></div></div>
+        <div class="card" data-help="bias"><div id="biasCard"><div class="eyebrow">Today's bias (positioning model)</div><div class="skeleton">Loading</div></div></div>
+        <div class="card" data-help="base_case"><div id="targetCard"><div class="eyebrow">Base case by the close</div><div class="skeleton">Loading</div></div></div>
+        <div class="card" data-help="bias_range"><div id="rangeCard"><div class="eyebrow">Expected range</div><div class="skeleton">Loading</div></div></div>
       </section>
       <section class="card" data-help="bias_chart" style="margin-top:12px">
         <div class="head"><h2>How the session could unfold</h2><span class="spacer"></span><span class="sub" id="biasWhen"></span></div>
@@ -205,7 +205,7 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
       <section class="card trk-hero" data-help="track">
         <div class="head" style="margin-bottom:0"><div class="eyebrow">Live track record</div><span class="spacer"></span>
           <div class="filters" id="trkMarket" role="tablist" aria-label="Market"></div></div>
-        <div class="trk-kpis" id="trkKpis"><div class="skeleton">Loading...</div></div>
+        <div class="trk-kpis" id="trkKpis"><div class="skeleton">Loading</div></div>
         <div class="expl" id="trkNote"></div>
       </section>
       <section class="card" data-help="track_scorecard" style="margin-top:12px">
@@ -258,7 +258,7 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
         <div class="head" style="margin-bottom:0"><div class="eyebrow" id="briefKicker">Session briefing</div><span class="spacer"></span>
           <div class="filters" id="briefKind" role="tablist" aria-label="Briefing"></div>
           <select class="bsel" id="briefPick" aria-label="Earlier briefings"></select></div>
-        <div class="iname" id="briefTitle">Loading...</div>
+        <div class="iname" id="briefTitle"><span class="skeleton sk-line">Loading</span></div>
         <div class="meta-row" id="briefMeta"></div>
         <div class="lead" id="briefLead"></div>
       </section>
@@ -279,13 +279,13 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
           <div class="head"><h2>Economic calendar</h2><span class="sub" id="newsNext"></span><span class="spacer"></span>
             <div class="filters" id="impactF" role="tablist" aria-label="Impact"></div>
             <div class="filters" id="curF" role="tablist" aria-label="Currency"></div></div>
-          <div id="news"><div class="skeleton">Loading calendar...</div></div>
+          <div id="news"><div class="skeleton">Loading</div></div>
           <div class="expl" id="newsFoot"></div>
         </section>
         <section class="card" data-help="posts">
           <div class="head"><h2>Trump on Truth Social</h2><span class="spacer"></span>
             <div class="filters" id="postF" role="tablist" aria-label="Posts"></div></div>
-          <div id="posts" class="posts"><div class="skeleton">Loading posts...</div></div>
+          <div id="posts" class="posts"><div class="skeleton">Loading</div></div>
           <div class="expl" id="postsFoot"></div>
         </section>
       </div>
@@ -353,7 +353,7 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
         <div class="card accent" data-help="indicator" style="--accent:var(--pos)">
           <div class="eyebrow">TradingView indicator</div>
           <div class="iname" id="indName">GEX PRO</div>
-          <div class="meta-row" id="indMeta"><span class="chip">Loading...</span></div>
+          <div class="meta-row" id="indMeta"><span class="chip"><span class="skeleton sk-line">Loading</span></span></div>
           <div class="actions">
             <button class="btn" id="indCopy">Copy code</button>
             <button class="btn ghost" id="indDownload">Download .pine</button>
@@ -379,7 +379,7 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
       <section class="card" style="margin-top:12px">
         <div class="codehead"><h2>Source code</h2><span class="fname" id="indFile">GEX_PRO.pine</span><span class="spacer"></span>
           <button class="linkbtn" id="indCopy2">Copy</button></div>
-        <div class="code" id="indCode" role="region" aria-label="Indicator source code" tabindex="0"><div class="skeleton" style="padding:0 16px">Loading code...</div></div>
+        <div class="code" id="indCode" role="region" aria-label="Indicator source code" tabindex="0"><div class="skeleton" style="padding:0 16px">Loading</div></div>
       </section>
       <section class="card" style="margin-top:12px">
         <div class="head"><h2>Recent changes</h2></div>
