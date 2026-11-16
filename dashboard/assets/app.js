@@ -262,7 +262,9 @@ function renderBriefings(){
     <div class="bsec"><div class="eyebrow">Game plan</div><p>${esc(m.plan)}</p></div>
     ${(m.changes || []).length ? `<div class="bsec"><div class="eyebrow">What changed</div>${m.changes.map(c => `<p>${esc(c)}</p>`).join("")}</div>` : ""}
     ${m.data ? `<div class="expl">${esc(m.data)}</div>` : ""}</section>`).join("");
-  $("briefCal").innerHTML = (b.calendar || []).map(c => `<div class="head" style="margin:${c === b.calendar[0] ? 0 : 18}px 0 6px"><h2>${esc(c.title)}</h2></div>`
+  $("briefCal").innerHTML = (b.calendar || []).map(c => v2 && !(c.items || []).length          // an empty calendar is one line, not a section
+    ? `<div class="expl" style="margin-top:${c === b.calendar[0] ? 0 : 10}px"><b style="color:var(--ink2)">${esc(c.title.replace(" (ET)", ""))}:</b> no high- or medium-impact events.</div>`
+    : `<div class="head" style="margin:${c === b.calendar[0] ? 0 : 18}px 0 6px"><h2>${esc(c.title)}</h2></div>`
     + ((c.items || []).map(e => `<div class="bev${oneDay ? " today" : ""}"><span class="tm">${oneDay ? "" : esc(e.day) + " "}${esc(e.clock)}</span><span class="imp ${esc(e.impact)}">${esc(e.impact === "Medium" ? "Med" : e.impact)}</span><span>${esc(e.title)} <span style="color:var(--ink3);font:12px var(--mono)">${esc(e.country)}</span></span><span class="fp">${esc(e.detail || "")}</span></div>`).join("")
        || `<div class="expl" style="margin-top:0">No high- or medium-impact events.</div>`)
     + (c.history ? `<div class="expl">${esc(c.history)}</div>` : "")).join("")
