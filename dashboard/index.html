@@ -324,7 +324,11 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
 
     <!-- BACKTESTING: each past session's 9:30 paste -->
     <div id="backtestView" hidden>
-      <section class="card" data-help="pastes_week">
+      <section class="card" data-help="archive" id="archiveCard">
+        <div class="head"><h2>History archive</h2><span class="sub" id="arcSub"></span></div>
+        <div class="trk-kpis" id="arcKpis"></div>
+      </section>
+      <section class="card" data-help="pastes_week" style="margin-top:12px">
         <div class="head"><h2>Whole weeks</h2><span class="sub" id="weeksSub"></span></div>
         <div class="expl">A week's 9:30 levels in one paste: the indicator draws each day's levels across that day's session only (9:30 to 4 pm ET), so you can scroll through the whole week. Zero gamma, the walls, abs gamma and the top three call and put levels of each day.</div>
         <div id="weeksList"></div>

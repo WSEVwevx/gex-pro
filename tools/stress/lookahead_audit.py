@@ -15,11 +15,16 @@ Survivorship:
       (graded, missed or no_prices: never silently absent)
   S2  git history: once a session file says "graded", no later commit changes its plan or outcome
   S3  history.csv has exactly the sessions the files have, with the same status
+History archive (git branch archive, gexpro/archive.py):
+  A1  append-only: between consecutive commits, files are only added (never changed, renamed or deleted)
+  A2  every day folder's manifest lists exactly its files, with matching SHA-256 and size
+  A3  each day's open snapshot is timestamped before that day's 09:30 ET, its close snapshot at or before the close
 Tolerance: zero violations.
 """
 from __future__ import annotations
 
 import csv
+import hashlib
 import io
 import json
 import subprocess
@@ -29,6 +34,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from gexsys import marketcal  # noqa: E402
+from gexpro import archive  # noqa: E402
 
 NY = marketcal.NY
 BR = __import__("os").environ.get("GEXPRO_AUDIT_BRANCH", "origin/track-record")
@@ -113,11 +119,50 @@ def main() -> int:
     if rows != files_:
         diff = sorted(set(rows.items()) ^ set(files_.items()))
         bad.append(f"S3 history.csv and the session files differ: {diff[:6]}")
+    bad += audit_archive()
     print(f"sessions {len(sessions)}, pastes {len(pastes)}, minute records {len(minutes)}, days {days[0]} to {days[-1]}")
     print(f"violations: {len(bad)} (tolerance 0)")
     for b in bad:
         print("  " + b)
     return 1 if bad else 0
+
+
+def audit_archive(br: str = "origin/" + archive.BRANCH) -> list[str]:
+    """A1-A3 on the archive branch (absent: nothing to check yet, said so)."""
+    git("fetch", "-q", "origin", archive.BRANCH)
+    revs = git("rev-list", "--reverse", br).split()
+    if not revs:
+        print("archive: branch not started yet")
+        return []
+    bad = []
+    for a, b in zip(revs, revs[1:]):
+        bad += [f"A1 {b[:8]}: {v}" for v in archive.append_only_violations(git("diff", "--no-renames", "--name-status", a, b))]
+    files = git("ls-tree", "-r", "--name-only", br).split()
+    days = sorted({f.split("/")[1] for f in files if f.startswith("days/")})
+    for d in days:
+        here = {f.split("/", 2)[2] for f in files if f.startswith(f"days/{d}/")}
+        man = json.loads(show(f"days/{d}/manifest.json", br))
+        if set(man["files"]) != here - {"manifest.json"}:
+            bad.append(f"A2 {d}: manifest lists {sorted(set(man['files']) ^ (here - {'manifest.json'}))} differently from the folder")
+        names = sorted(man["files"])
+        out = subprocess.run(["git", "cat-file", "--batch"], capture_output=True,
+                             input="".join(f"{br}:days/{d}/{n}\n" for n in names).encode()).stdout
+        for n in names:                                  # one process per day; each answer: "<sha> blob <size>\n<bytes>\n"
+            head, out = out.split(b"\n", 1)
+            parts = head.split()
+            size = int(parts[2]) if len(parts) == 3 and parts[1] == b"blob" else -1
+            raw, out = (out[:size], out[size + 1:]) if size >= 0 else (b"", out)
+            meta = man["files"][n]
+            if hashlib.sha256(raw).hexdigest() != meta["sha256"] or len(raw) != meta["bytes"]:
+                bad.append(f"A2 {d}/{n}: content does not match its manifest")
+        day = date.fromisoformat(d)
+        for m, pick in (man.get("chosen") or {}).items():
+            if pick.get("open") and datetime.fromisoformat(pick["open"]["asof"]) >= marketcal.rth_open_dt(day):
+                bad.append(f"A3 {d} {m}: open snapshot {pick['open']['asof']} is not before 09:30 ET")
+            if pick.get("close") and datetime.fromisoformat(pick["close"]["asof"]) > marketcal.rth_close_dt(day):
+                bad.append(f"A3 {d} {m}: close snapshot {pick['close']['asof']} is after the close")
+    print(f"archive: {len(revs)} commits, {len(days)} days, {len(files)} files")
+    return bad
 
 
 if __name__ == "__main__":
