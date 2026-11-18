@@ -1,0 +1,23 @@
+# Weekly: does every outside source still answer GitHub's servers? The hosted site is built here, and a source that
+# answers your PC can still refuse GitHub (Truth Social: HTTP 403). Read-only: it only prints a table.
+name: Source probe
+
+on:
+  schedule:
+    - cron: "0 23 * * 0"            # Sundays 23:00 UTC (6-7 pm ET), as the futures week opens
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: python tools/probe_sources.py

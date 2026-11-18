@@ -28,6 +28,7 @@ permissions:
   pages: write
   id-token: write
   actions: write                    # only to start the next run (the "next" job)
+  checks: read                      # the deploy gate reads each commit's "tests" result
 
 concurrency:
   # one run at a time per lane. On 2026-11-09 GitHub left a run "waiting" forever (it could not be cancelled)
@@ -46,6 +47,16 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0              # full history: the Indicator page lists recent script changes
+      # The deploy gate: build the newest commit whose tests passed (tests.yml). A failed or still-testing commit is
+      # skipped, so it never goes live while the data keeps refreshing on the last good code; if none passed, the
+      # build stops here and the live site stays as it is. The reasons are in this step's log.
+      - name: Use the newest commit whose tests passed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sha=$(python3 .github/scripts/tested_commit.py "${{ github.repository }}")
+          if [ "$sha" != "$(git rev-parse HEAD)" ]; then git checkout -q --detach "$sha"; fi
+          echo "building $(git rev-parse --short HEAD)"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
