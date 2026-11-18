@@ -8,7 +8,7 @@ Written once a day by the hosted build (python -m gexpro archive, .github/workfl
   {M}-close.json     the last usable one at or before the close (within 60 minutes; early closes from marketcal)
   {M}-candidates.json  every snapshot seen for that day, so the choice can be re-derived by anyone
   {sym}-1m.json      1-minute bars [unix s, open, high, low, close, volume]: NQ=F and ES=F for the whole Globex day
-                     (18:00 ET the evening before to 17:00 ET), ^NDX and ^GSPC for the cash session; futures files
+                     (18:00 ET after the previous trading day to 17:00 ET), ^NDX and ^GSPC for the cash session; futures files
                      also name the contract each stretch of bars belongs to and flag roll weeks
   manifest.json      SHA-256 and size of every file, the rules version, what is missing and why
 
@@ -109,9 +109,8 @@ def parse_bars(raw: bytes) -> list[list]:
 
 
 def futures_window(d: date) -> tuple[datetime, datetime]:
-    """d's Globex day: 18:00 ET the evening before to 17:00 ET (the reopen after a weekend or holiday is still the
-    evening before d; earlier bars belong to the previous trading day's file)."""
-    return datetime.combine(d - timedelta(days=1), time(18, 0), NY), datetime.combine(d, time(17, 0), NY)
+    """d's Globex day (marketcal.globex_day): every futures bar since the previous trading day's file ended."""
+    return marketcal.globex_day(d)
 
 
 def contract_segments(root: str, bars: list[list]) -> list[dict]:
@@ -221,13 +220,15 @@ def append_only_violations(name_status: str) -> list[str]:
 
 
 # ---------------------------------------------------------------- the build's summary (Data health, Backtesting tab)
-def index_record(days: dict[str, dict], now: datetime, error: Optional[str] = None, last_ok: Optional[str] = None) -> dict:
+def index_record(days: dict[str, dict], now: datetime, error: Optional[str] = None, last_ok: Optional[str] = None,
+                 pending: Optional[dict] = None) -> dict:
     """What the site shows: depth per market (sessions with the 09:30 snapshot a study starts from), the newest day,
     days missing past 18:00 ET. days = {date: manifest}; last_ok = the previous successful check, kept on a failure."""
     have = set(days)
     depth = {m: sorted(d for d, man in days.items() if f"{m}-open.json" in man.get("files", {})) for m in MARKETS}
     checked = now.astimezone(timezone.utc).isoformat()
     return {"checked": checked, "last_ok": last_ok if error else checked, "first_day": FIRST_DAY.isoformat(), "error": error,
+            "pending": pending or {},
             "missing": missing_days(now, have),
             "gaps": {d: man.get("missing") for d, man in sorted(days.items()) if man.get("missing")},
             "markets": {m: {"sessions": len(v), "from": v[0] if v else None, "through": v[-1] if v else None}
@@ -240,10 +241,16 @@ def health_row(idx: Optional[dict]) -> dict:
     if not idx:
         return dict(row, note="not checked yet in this build's saved state")
     row["last_ok"] = idx.get("last_ok")
+    pend = idx.get("pending") or {}
+    why = lambda d: f" ({pend[d][0]})" if pend.get(d) else ""
     errs = ([idx["error"]] if idx.get("error") else []) + \
-           ([f"{len(idx['missing'])} trading day(s) missing after 18:00 ET: {', '.join(idx['missing'][-5:])}"] if idx.get("missing") else [])
+           ([f"{len(idx['missing'])} trading day(s) missing after 18:00 ET: {', '.join(d + why(d) for d in idx['missing'][-3:])}"]
+            if idx.get("missing") else [])
     row["error"] = "; ".join(errs) or None
-    if idx.get("gaps") and not row["error"]:
+    if pend and not row["error"]:
+        d = sorted(pend)[-1]
+        row["note"] = f"{d} waits for missing parts: {pend[d][0]}"
+    elif idx.get("gaps") and not row["error"]:
         last = sorted(idx["gaps"])[-1]
         row["note"] = f"{len(idx['gaps'])} day(s) saved with gaps, newest {last}: {idx['gaps'][last][0]}"
     return row
@@ -263,6 +270,10 @@ def _git(*a: str, inp: Optional[bytes] = None, env: Optional[dict] = None, check
     return p.stdout.decode()
 
 
+class _Nothing(Exception):
+    """Nothing is due: skip the network."""
+
+
 def _exists(obj: str) -> bool:
     import subprocess
     return subprocess.run(["git", "cat-file", "-e", obj], capture_output=True).returncode == 0
@@ -279,9 +290,11 @@ def run(state: Path, now: Optional[datetime] = None, push: bool = True, get: Cal
         manifests = json.loads(cache_f.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         manifests = {}
-    error, wrote = None, []
+    error, wrote, pending = None, [], {}
     try:
         tip = None
+        if not due_days(now, set(manifests)):
+            raise _Nothing                                       # every due day is already archived: no network
         if _git("ls-remote", "--heads", "origin", BRANCH).strip():
             _git("fetch", "-q", "--depth", "1", "--filter=blob:none", "origin", BRANCH)
             tip = _git("rev-parse", "FETCH_HEAD").strip()
@@ -291,12 +304,13 @@ def run(state: Path, now: Optional[datetime] = None, push: bool = True, get: Cal
             for d in sorted(have - set(manifests)):              # read once, then kept in the state cache
                 manifests[d] = json.loads(_git("cat-file", "-p", f"{tip}:days/{d}/manifest.json"))
         folders = {m: state / "snapshots" / k for m, k in SNAPSHOT_KEYS.items()}
-        commit = os.environ.get("GITHUB_SHA")
+        commit = os.environ.get("GEXPRO_BUILD_COMMIT") or os.environ.get("GITHUB_SHA")     # the commit the deploy gate built
         new: dict[str, bytes] = {}
         for d in due_days(now, have):
             files, gaps = build_day(d, folders, now, get=get, commit=commit)
             if files is None:
                 log.info("archive %s not written yet: %s", d, "; ".join(gaps))
+                pending[d.isoformat()] = gaps
                 continue
             new.update(files)
             wrote.append(d.isoformat())
@@ -315,16 +329,29 @@ def run(state: Path, now: Optional[datetime] = None, push: bool = True, get: Cal
                        "GIT_AUTHOR_EMAIL": "41898282+github-actions[bot]@users.noreply.github.com",
                        "GIT_COMMITTER_EMAIL": "41898282+github-actions[bot]@users.noreply.github.com"}
                 c = _git("commit-tree", tree, *(["-p", tip] if tip else []), "-m", f"Archive {', '.join(wrote)}", env=who).strip()
-                _git("push", "-q", "origin", f"{c}:refs/heads/{BRANCH}")      # fast-forward only: history is never rewritten
+                try:
+                    _git("push", "-q", "origin", f"{c}:refs/heads/{BRANCH}")  # fast-forward only: history is never rewritten
+                except RuntimeError:
+                    # another run (a second lane) may have written the same days first: then that is not a failure
+                    _git("fetch", "-q", "--depth", "1", "--filter=blob:none", "origin", BRANCH)
+                    now_have = {p.rsplit("/", 1)[-1] for p in _git("ls-tree", "--name-only", "FETCH_HEAD:days").split()}
+                    if not set(wrote) <= now_have:
+                        raise
+                    log.info("archive: %s already written by another run", ", ".join(wrote))
+                    for d in wrote:
+                        manifests[d] = json.loads(_git("cat-file", "-p", f"FETCH_HEAD:days/{d}/manifest.json"))
+                    new, wrote = {}, []
             for path, b in new.items():
                 if path.endswith("/manifest.json"):
                     manifests[path.split("/")[1]] = json.loads(b)
+    except _Nothing:
+        pass
     except Exception as e:                                       # named on Data health, never silent
         log.exception("archive step failed")
         error = f"{type(e).__name__}: {e}"[:300]
     state.mkdir(parents=True, exist_ok=True)
     cache_f.write_text(json.dumps(manifests), encoding="utf-8")
-    idx = index_record(manifests, now, error, (load_index(state) or {}).get("last_ok"))
+    idx = index_record(manifests, now, error, (load_index(state) or {}).get("last_ok"), pending)
     idx["wrote"] = wrote
     index_f.write_text(json.dumps(idx), encoding="utf-8")
     return idx

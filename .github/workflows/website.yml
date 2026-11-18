@@ -95,6 +95,8 @@ jobs:
       # 1-minute bars are added to the archive branch. Days are only ever added; a failure is named on Data health.
       - name: Add the due days to the history archive
         if: github.ref == 'refs/heads/main'
+        env:
+          GEXPRO_BUILD_COMMIT: ${{ steps.gate.outputs.sha }}
         run: python -m gexpro --log-level WARNING archive --state .state || echo "archive step failed (see Data health)"
       - run: python -m gexpro --log-level WARNING build-site --out _site --state .state
         env:

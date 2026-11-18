@@ -118,6 +118,7 @@ def is_trading_day(d: date) -> bool:
 
 
 RTH_OPEN = time(9, 30)
+GLOBEX_REOPEN, GLOBEX_HALT = time(18, 0), time(17, 0)     # CME equity index: daily halt 17:00-18:00 ET
 
 
 def rth_close(d: date) -> time:
@@ -132,6 +133,19 @@ def rth_open_dt(d: date) -> datetime:
 def rth_close_dt(d: date) -> datetime:
     """d's cash close, ET (13:00 on early closes)."""
     return datetime.combine(d, rth_close(d), NY)
+
+
+def previous_trading_day(d: date) -> date:
+    p = d - timedelta(days=1)
+    while not is_trading_day(p):
+        p -= timedelta(days=1)
+    return p
+
+
+def globex_day(d: date) -> tuple[datetime, datetime]:
+    """The futures bars that belong to trading day d: from the reopen after the previous trading day (18:00 ET) to
+    d's 17:00 ET halt. A weekend's Sunday open and a holiday's Globex morning fall inside it."""
+    return datetime.combine(previous_trading_day(d), GLOBEX_REOPEN, NY), datetime.combine(d, GLOBEX_HALT, NY)
 
 
 def last_close(t: datetime) -> datetime:

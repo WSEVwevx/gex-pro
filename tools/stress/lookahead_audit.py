@@ -144,8 +144,15 @@ def audit_archive(br: str = "origin/" + archive.BRANCH) -> list[str]:
         man = json.loads(show(f"days/{d}/manifest.json", br))
         if set(man["files"]) != here - {"manifest.json"}:
             bad.append(f"A2 {d}: manifest lists {sorted(set(man['files']) ^ (here - {'manifest.json'}))} differently from the folder")
-        for n, meta in man["files"].items():
-            raw = subprocess.run(["git", "show", f"{br}:days/{d}/{n}"], capture_output=True).stdout
+        names = sorted(man["files"])
+        out = subprocess.run(["git", "cat-file", "--batch"], capture_output=True,
+                             input="".join(f"{br}:days/{d}/{n}\n" for n in names).encode()).stdout
+        for n in names:                                  # one process per day; each answer: "<sha> blob <size>\n<bytes>\n"
+            head, out = out.split(b"\n", 1)
+            parts = head.split()
+            size = int(parts[2]) if len(parts) == 3 and parts[1] == b"blob" else -1
+            raw, out = (out[:size], out[size + 1:]) if size >= 0 else (b"", out)
+            meta = man["files"][n]
             if hashlib.sha256(raw).hexdigest() != meta["sha256"] or len(raw) != meta["bytes"]:
                 bad.append(f"A2 {d}/{n}: content does not match its manifest")
         day = date.fromisoformat(d)

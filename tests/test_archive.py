@@ -1,5 +1,6 @@
 """The history archive (gexpro/archive.py): which snapshots are kept, the bars, the manifest, append-only."""
 import hashlib
+import importlib.util
 import json
 import os
 import subprocess
@@ -94,8 +95,10 @@ class TestBars(unittest.TestCase):
         self.assertEqual([A.roll_week(date(2026, 12, d)) for d in (9, 10, 18, 21)], [False, True, True, False])
 
     def test_futures_window_is_the_globex_day(self):
-        lo, hi = A.futures_window(date(2026, 11, 23))                    # a Monday: from Sunday 18:00
-        self.assertEqual((lo, hi), (et(date(2026, 11, 22), 18, 0), et(date(2026, 11, 23), 17, 0)))
+        lo, hi = A.futures_window(date(2026, 11, 23))                    # a Monday: from Friday's reopen (Sunday open inside)
+        self.assertEqual((lo, hi), (et(date(2026, 11, 20), 18, 0), et(date(2026, 11, 23), 17, 0)))
+        lo, _ = A.futures_window(date(2027, 1, 19))                      # the Tuesday after MLK Day: Monday's Globex morning inside
+        self.assertEqual(lo, et(date(2027, 1, 15), 18, 0))
 
     def test_file_names(self):
         self.assertEqual([A.file_name(s) for s in ("NQ=F", "^GSPC")], ["NQF-1m.json", "GSPC-1m.json"])
@@ -165,6 +168,10 @@ class TestHealth(unittest.TestCase):
         ok = A.index_record({"2026-11-18": {"files": {"NQ-open.json": {}}, "missing": []}}, et(D, 18, 1))
         self.assertIsNone(A.health_row(ok)["error"])
         self.assertEqual((ok["markets"]["NQ"]["sessions"], ok["markets"]["ES"]["sessions"]), (1, 0))
+        waiting = A.index_record({}, et(D, 18, 1), pending={"2026-11-18": ["NQ=F 1-minute bars: HTTPError 429"]})
+        self.assertIn("2026-11-18 (NQ=F 1-minute bars: HTTPError 429)", A.health_row(waiting)["error"])
+        early = A.index_record({}, et(D, 17, 30), pending={"2026-11-18": ["x"]})
+        self.assertIn("waits for missing parts", A.health_row(early)["note"])
         failed = A.index_record({}, et(D, 17, 0), "RuntimeError: x", last_ok="2026-11-18T20:00:00+00:00")
         self.assertEqual(A.health_row(failed)["last_ok"], "2026-11-18T20:00:00+00:00")
 
@@ -181,6 +188,10 @@ class TestComponent(unittest.TestCase):
             c.build_static(data, state)
             self.assertEqual(json.loads((data / "archive.json").read_text())["missing"], ["2026-11-18"])
             self.assertEqual(c.sources()[0]["name"], "History archive")
+
+
+def boom(url):
+    raise AssertionError("no fetch expected")
 
 
 def git(cwd, *a):
@@ -209,7 +220,11 @@ class TestRunAgainstARealGitRemote(unittest.TestCase):
                 i1 = A.run(state, now=et(D, 17, 30), get=fake_get)
                 first = git(tmp / "origin.git", "rev-parse", "archive").strip()
                 i2 = A.run(state, now=et(D + timedelta(days=1), 17, 30), get=fake_get)
-                i3 = A.run(state, now=et(D + timedelta(days=1), 17, 40), get=fake_get)
+                i3 = A.run(state, now=et(D + timedelta(days=1), 17, 40), get=boom)      # nothing due: no network
+                spec = importlib.util.spec_from_file_location("la", Path(__file__).resolve().parent.parent / "tools" / "stress" / "lookahead_audit.py")
+                la = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(la)
+                audit = la.audit_archive()                                  # A1-A3 on the branch just written
             finally:
                 os.chdir(old)
             self.assertEqual((i1["error"], i1["wrote"]), (None, ["2026-11-18"]))
@@ -219,6 +234,7 @@ class TestRunAgainstARealGitRemote(unittest.TestCase):
             diff = git(tmp / "origin.git", "diff", "--no-renames", "--name-status", first, second)
             self.assertEqual(A.append_only_violations(diff), [])
             self.assertEqual(len(diff.splitlines()), 13)
+            self.assertEqual(audit, [])
 
 
 if __name__ == "__main__":
