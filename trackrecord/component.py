@@ -106,9 +106,15 @@ class TrackRecordComponent:
         return {"pastes": ps, "weeks": weeks.weeks(ps)}
 
     def _write(self, path: Path, obj: dict) -> None:
+        self._put(path, json.dumps(obj, indent=1))
+
+    @staticmethod
+    def _put(path: Path, text: str) -> None:
+        """Whole or not at all: these files are only written when missing, so a write cut off by a crash would
+        otherwise stay damaged for good."""
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(obj, indent=1), encoding="utf-8")
+        tmp.write_text(text, encoding="utf-8")
         tmp.replace(path)
 
     def _read(self, path: Path) -> Optional[dict]:
@@ -190,8 +196,7 @@ class TrackRecordComponent:
             for x in json.loads((fetch or get)(url.replace("trackrecord.json", "pastes.json"))).get("pastes") or []:
                 d, m, text = date.fromisoformat(x["session"]), str(x["market"]), str(x["paste"])
                 if m.isalnum() and text.startswith("GEX1;") and not self._paste_path(d, m).exists():
-                    self._paste_path(d, m).parent.mkdir(parents=True, exist_ok=True)
-                    self._paste_path(d, m).write_text(text, encoding="utf-8")
+                    self._put(self._paste_path(d, m), text)
                     copied.append(f"{d}_{m} paste")
         except Exception as e:
             log.warning("track record pastes mirror failed: %s", e)
@@ -237,8 +242,7 @@ class TrackRecordComponent:
                     continue
                 for m, inp in (self._pre_open(d) or {}).items():
                     if inp and inp.get("paste") and not self._paste_path(d, m).exists():
-                        self._paste_path(d, m).parent.mkdir(parents=True, exist_ok=True)
-                        self._paste_path(d, m).write_text(inp["paste"], encoding="utf-8")
+                        self._put(self._paste_path(d, m), inp["paste"])
                         changed.append(f"{d}_{m} paste")
                     p = self._path(d, m)
                     if p.exists():
@@ -292,8 +296,7 @@ class TrackRecordComponent:
                 log.warning("1-minute bars for %s failed: %s", key, e)
                 continue
             if rec and len(rec["bars"]) >= 0.75 * rec["close_min"]:   # a full session (early closes included), not a partial download
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_text(json.dumps(rec, separators=(",", ":")), encoding="utf-8")
+                self._put(path, json.dumps(rec, separators=(",", ":")))
                 done.append(f"{d}_{s['market']} minutes")
         return done
 

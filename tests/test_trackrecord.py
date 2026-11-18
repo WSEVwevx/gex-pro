@@ -199,6 +199,23 @@ class TestSchedule(unittest.TestCase):
             self.assertEqual(c.mirror(url="https://x/trackrecord.json", fetch=fetch), ["2026-10-21_ES paste"])
             self.assertEqual([x["session"] + x["market"] for x in c.pastes()], ["2026-10-22NQ", "2026-10-21ES"])
 
+    def test_a_paste_cut_off_by_a_crash_is_written_again(self):
+        # 2026-11-17 audit: the 9:30 paste was written in place and only ever written if missing, so a write cut
+        # off by a crash left a damaged paste in the public record for good
+        from unittest import mock
+        inp = {"market": "NQ", "underlying": "NDX", "ref": 100.0, "em": 10.0, "paste": "GEX1;mkt=NQ;bt=20261022;END"}
+        real = Path.write_text
+
+        def crash(self, text, *a, **k):
+            real(self, text[: len(text) // 2], *a, **k)
+            raise OSError("power cut")
+        with tempfile.TemporaryDirectory() as tmp:
+            c = self.make(tmp, datetime(2026, 10, 22, 10, 5, tzinfo=NY), lambda d: {"NQ": dict(inp)} if d == date(2026, 10, 22) else {"NQ": None})
+            with mock.patch.object(Path, "write_text", crash), self.assertRaises(OSError):
+                c.tick()
+            c.tick()
+            self.assertEqual([x["paste"] for x in c.pastes()], ["GEX1;mkt=NQ;bt=20261022;END"])
+
     def test_partial_daily_bar_is_never_used(self):
         inp = {"market": "ES", "underlying": "SPX", "ref": 100.0, "em": 10.0}
         with tempfile.TemporaryDirectory() as tmp:

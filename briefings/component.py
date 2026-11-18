@@ -169,11 +169,21 @@ class BriefingsComponent:
             return []
 
     def _grades(self) -> list:
-        """Every grade row written so far: {"id", "market", "type", "hit", "base"}."""
+        """Every grade row written so far: {"id", "market", "type", "hit", "base"}. A line cut off by a crash is
+        skipped on its own; it must not make the whole file read as empty (every brief would be graded again)."""
         try:
-            return [json.loads(x) for x in (self.dir / "scores.jsonl").read_text(encoding="utf-8").splitlines() if x.strip()]
-        except (OSError, ValueError):
+            text = (self.dir / "scores.jsonl").read_text(encoding="utf-8")
+        except OSError:
             return []
+        out = []
+        for x in text.splitlines():
+            try:
+                g = json.loads(x)
+            except ValueError:
+                continue
+            if isinstance(g, dict) and "id" in g:
+                out.append(g)
+        return out
 
     def grade_due(self) -> list[str]:
         """Grade each NY AM brief once its session has a Track record outcome. The brief itself is never edited:
@@ -197,8 +207,10 @@ class BriefingsComponent:
                 graded.append(sid)
         if lines:
             self.dir.mkdir(parents=True, exist_ok=True)
-            with open(self.dir / "scores.jsonl", "a", encoding="utf-8") as f:
-                f.write("".join(x + "\n" for x in lines))
+            path = self.dir / "scores.jsonl"
+            cut = path.exists() and path.stat().st_size and not path.read_bytes().endswith(b"\n")
+            with open(path, "a", encoding="utf-8") as f:
+                f.write(("\n" if cut else "") + "".join(x + "\n" for x in lines))     # never glued onto a cut-off line
         return graded
 
     def payload(self) -> dict:
