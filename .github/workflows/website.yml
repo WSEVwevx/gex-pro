@@ -43,19 +43,23 @@ jobs:
     timeout-minutes: 15
     outputs:
       artifact_id: ${{ steps.upload.outputs.artifact_id }}
+      sha: ${{ steps.gate.outputs.sha }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0              # full history: the Indicator page lists recent script changes
       # The deploy gate: build the newest commit whose tests passed (tests.yml). A failed or still-testing commit is
       # skipped, so it never goes live while the data keeps refreshing on the last good code; if none passed, the
-      # build stops here and the live site stays as it is. The reasons are in this step's log.
+      # build stops here and the live site stays as it is. On any other branch HEAD itself must have passed (and
+      # nothing is deployed or saved from there). The reasons are in this step's log and the run's summary.
       - name: Use the newest commit whose tests passed
+        id: gate
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          sha=$(python3 .github/scripts/tested_commit.py "${{ github.repository }}")
+          sha=$(python3 .github/scripts/tested_commit.py "${{ github.repository }}" ${{ github.ref != 'refs/heads/main' && '--head-only' || '' }})
           if [ "$sha" != "$(git rev-parse HEAD)" ]; then git checkout -q --detach "$sha"; fi
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
           echo "building $(git rev-parse --short HEAD)"
       - uses: actions/setup-python@v5
         with:
@@ -91,6 +95,7 @@ jobs:
         env:
           GEXPRO_TRACK_DIR: .track
       - name: Save the track record
+        if: github.ref == 'refs/heads/main'           # only the live site's own build writes the public record
         run: |
           cd .track
           git add -A
@@ -116,6 +121,7 @@ jobs:
 
   deploy:
     needs: build
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -130,11 +136,13 @@ jobs:
         uses: actions/github-script@v7
         env:
           ARTIFACT_ID: ${{ needs.build.outputs.artifact_id }}
+          BUILT_SHA: ${{ needs.build.outputs.sha }}
         with:
           script: |
             const repo = {owner: context.repo.owner, repo: context.repo.repo};
-            const {data: head} = await github.rest.git.getCommit({...repo, commit_sha: context.sha});
-            const {data: ver} = await github.rest.git.createCommit({...repo, tree: head.tree.sha, parents: [context.sha],
+            const built = process.env.BUILT_SHA;              // the commit the deploy gate built, not always HEAD
+            const {data: head} = await github.rest.git.getCommit({...repo, commit_sha: built});
+            const {data: ver} = await github.rest.git.createCommit({...repo, tree: head.tree.sha, parents: [built],
               message: `Pages deployment for run ${context.runId}`});
             const {data: d} = await github.request("POST /repos/{owner}/{repo}/pages/deployments", {...repo,
               artifact_id: Number(process.env.ARTIFACT_ID), oidc_token: await core.getIDToken(), pages_build_version: ver.sha});

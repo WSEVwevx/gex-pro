@@ -26,6 +26,10 @@ class TestChoose(unittest.TestCase):
         # a push starts a website run at once, before its tests finish: the previous good commit is built meanwhile
         self.assertEqual(tc.choose(["new", "old"], runs({"old": ["success"]}))[0], "old")
 
+    def test_head_only_never_falls_back_or_bootstraps(self):
+        self.assertIsNone(tc.choose(["c"], runs({"c": ["failure"]}), bootstrap=False)[0])
+        self.assertIsNone(tc.choose(["c"], runs({}), bootstrap=False)[0])
+
     def test_a_rerun_that_passed_counts(self):
         self.assertEqual(tc.choose(["c"], runs({"c": ["failure", "success"]}))[0], "c")
 

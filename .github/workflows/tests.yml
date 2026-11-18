@@ -4,7 +4,8 @@ name: Tests
 
 on:
   push:
-  pull_request:
+    branches: [main]                # the deploy gate reads main's results
+  pull_request:                     # every other branch is tested through its PR (required to merge)
   workflow_dispatch:
 
 permissions:
