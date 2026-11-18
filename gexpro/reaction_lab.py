@@ -1,0 +1,285 @@
+"""Level-reaction lab, study level_reaction v1 (studies/level_reaction/v1.json: every rule is defined there first).
+
+  python -m gexpro.reaction_lab [--out results.json]
+
+When price first reaches a 09:30 level during the cash session, is it rejected more often than at a random level the
+same distance from the open? Inputs come only from the public track record (git branch track-record): the frozen
+plan (sessions/), the 09:30 paste (pastes/) and the 1-minute futures record (minutes/), all checked for look-ahead by
+tools/stress/lookahead_audit.py. Levels are mapped to futures with that morning's 09:30 ratio, one per session.
+The result carries the definition file's SHA-256, the seed and the data-through date.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import random
+import subprocess
+import sys
+from datetime import date, datetime, time, timedelta
+from pathlib import Path
+from typing import Optional
+
+from gexsys import marketcal
+
+ROOT = Path(__file__).resolve().parent.parent
+DEFINITION = ROOT / "studies" / "level_reaction" / "v1.json"
+BRANCH = "origin/track-record"
+TYPES = ["ZG", "CW", "PW", "Ab1", "C1", "C2", "C3", "P1", "P2", "P3"]      # also the cluster order
+PLAN_KEY = {"ZG": "zg", "CW": "cw", "PW": "pw", "Ab1": "ag"}
+HORIZONS = (15, 30, 60)
+BUCKETS = (("09:30-10:30", time(10, 30)), ("10:30-15:00", time(15, 0)), ("15:00-close", time(23, 59)))
+
+
+def definition() -> tuple[dict, str]:
+    raw = DEFINITION.read_bytes()
+    return json.loads(raw), hashlib.sha256(raw).hexdigest()
+
+
+# ---------------------------------------------------------------- inputs
+def paste_levels(text: str) -> dict[str, float]:
+    """C1-C3 and P1-P3: the first three C and P entries of the paste's R token, in the order written."""
+    tok = dict(t.split("=", 1) for t in text.strip().split(";") if "=" in t)
+    out, n = {}, {"C": 0, "P": 0}
+    for e in (tok.get("R") or "").split(","):
+        kind, rest = e[:1], e[1:]
+        if kind in n and n[kind] < 3 and rest:
+            n[kind] += 1
+            out[f"{kind}{n[kind]}"] = float(rest.split(":")[0])
+    return out
+
+
+def session_input(sess: dict, minutes: dict, paste: Optional[str], prev_close: Optional[float]) -> dict:
+    """Everything one session's replay uses, in futures points (one 09:30 ratio)."""
+    plan, r = sess["plan"], minutes["ratio"]
+    levels = {t: plan[k] for t, k in PLAN_KEY.items() if plan.get(k) is not None}
+    if paste:
+        levels.update(paste_levels(paste))
+    d = date.fromisoformat(sess["session"])
+    return {"session": sess["session"], "market": sess["market"], "regime": plan.get("regime"), "ratio": r,
+            "open": minutes["index_open"] * r, "em": plan["em"] * r,
+            "prev_close": None if prev_close is None else prev_close * r,
+            "levels": {t: v * r for t, v in levels.items()}, "has_paste": bool(paste),
+            "bars": minutes["bars"], "close_min": minutes.get("close_min", 390),
+            "roll_week": _roll_week(d)}
+
+
+def _roll_week(d: date) -> bool:
+    m = ((d.month - 1) // 3 + 1) * 3
+    return marketcal.roll_date(d.year, m) <= d <= marketcal.quarterly_expiry(d.year, m)
+
+
+def load(branch: str = BRANCH) -> list[dict]:
+    """Every graded session with a 1-minute record, oldest first, from the public track record."""
+    git = lambda *a: subprocess.run(["git", *a], cwd=ROOT, capture_output=True, text=True, encoding="utf-8").stdout
+    git("fetch", "-q", "origin", "track-record")
+    files = set(git("ls-tree", "-r", "--name-only", branch).split())
+    graded = {}
+    for f in sorted(x for x in files if x.startswith("sessions/")):
+        s = json.loads(git("show", f"{branch}:{f}"))
+        if s.get("status") == "graded":
+            graded[(s["session"], s["market"])] = s
+    out = []
+    for (d, m), s in sorted(graded.items()):
+        name = f"{d}_{m}"
+        if f"minutes/{name}.json" not in files:
+            continue
+        prev = graded.get((marketcal.previous_trading_day(date.fromisoformat(d)).isoformat(), m))
+        paste = git("show", f"{branch}:pastes/{name}.txt") if f"pastes/{name}.txt" in files else None
+        out.append(session_input(s, json.loads(git("show", f"{branch}:minutes/{name}.json")), paste,
+                                 prev["outcome"]["close"] if prev else None))
+    return out
+
+
+# ---------------------------------------------------------------- one level
+def tol_of(s: dict, rules: dict) -> float:
+    return max(2 * rules["tick"][s["market"]], 0.05 * s["em"])
+
+
+def bucket(minute: int) -> str:
+    t = (datetime.combine(date(2000, 1, 1), marketcal.RTH_OPEN) + timedelta(minutes=minute)).time()
+    return next(name for name, end in BUCKETS if t < end)
+
+
+def classify(level: float, s: dict, rules: dict) -> dict:
+    """One level's category and, for a touch, its outcome (the definition's rules, applied literally)."""
+    tol, k, o, bars = tol_of(s, rules), rules["k"], s["open"], s["bars"]
+    if abs(level - o) <= tol:
+        return {"cat": "at_open"}
+    if s["prev_close"] is None:
+        return {"cat": "no_prior_close"}
+    if min(s["prev_close"], o) < level < max(s["prev_close"], o):
+        return {"cat": "gap_through"}
+    up = level > o
+    i = next((i for i, b in enumerate(bars) if (b[1] >= level - tol if up else b[2] <= level + tol)), None)
+    if i is None:
+        return {"cat": "untouched", "side": "above" if up else "below"}
+    m0, last = bars[i][0], bars[-1][0]
+    res, when = "stall", None
+    for j in range(i, len(bars)):
+        m, h, lo, c = bars[j]
+        if m - m0 > 60:
+            break
+        if (c > level + tol) if up else (c < level - tol):
+            res, when = "break", m - m0                     # same bar as a reject: a break (the worse case)
+            break
+        if j > i and ((lo <= level - k * tol) if up else (h >= level + k * tol)):
+            res, when = "reject", m - m0
+            break
+    exc = {}
+    for hz in HORIZONS:
+        if m0 + hz > last:
+            exc[hz] = None                                  # runs past the close: not reported
+            continue
+        w = [b for b in bars[i:] if b[0] <= m0 + hz]
+        away = (level - min(b[2] for b in w)) if up else (max(b[1] for b in w) - level)
+        thru = (max(b[1] for b in w) - level) if up else (level - min(b[2] for b in w))
+        exc[hz] = {"away": round(away, 2), "through": round(thru, 2),
+                   "away_em": round(away / s["em"], 4), "through_em": round(thru / s["em"], 4)}
+    return {"cat": "touch", "side": "above" if up else "below", "minute": m0, "bucket": bucket(m0),
+            "outcome": res, "minutes_to_resolution": when, "excursions": exc}
+
+
+def session_levels(s: dict, rules: dict, shift: float = 0.0) -> list[dict]:
+    """Every real level of one session, classified, with the cluster rule (later members within tol: dependent)."""
+    tol, out, seen = tol_of(s, rules), [], []
+    for t in TYPES:
+        if t not in s["levels"]:
+            continue
+        lv = s["levels"][t] + shift
+        r = dict(classify(lv, s, rules), type=t, level=round(lv, 2), session=s["session"], market=s["market"],
+                 regime=s["regime"], roll_week=s["roll_week"])
+        if any(abs(lv - x) <= tol for x in seen):
+            r["dependent"] = True
+        seen.append(lv)
+        out.append(r)
+    return out
+
+
+# ---------------------------------------------------------------- baseline
+def baseline(sessions: list[dict], real: list[dict], rules: dict, n: int, seed: int) -> list[dict]:
+    """n random levels per market x type: a session where that type exists, a real distance (in expected moves, side
+    included) of that type and market, the same rules; redrawn when within tol of a real level of that session."""
+    rng = random.Random(seed)
+    out = []
+    by_key = {(s["session"], s["market"]): s for s in sessions}
+    for m in sorted({s["market"] for s in sessions}):
+        for t in TYPES:
+            ss = [s for s in sessions if s["market"] == m and t in s["levels"]]
+            dist = [(s["levels"][t] - s["open"]) / s["em"] for s in ss]
+            if not ss:
+                continue
+            got = tries = 0
+            while got < n and tries < 100 * n:                  # every draw on a real level (e.g. one session): stop, fewer drawn
+                tries += 1
+                s, d = rng.choice(ss), rng.choice(dist)
+                lv = s["open"] + d * s["em"]
+                if any(abs(lv - x) <= tol_of(s, rules) for x in by_key[(s["session"], m)]["levels"].values()):
+                    continue
+                out.append(dict(classify(lv, s, rules), type=t, level=round(lv, 4), session=s["session"], market=m,
+                                regime=s["regime"], roll_week=s["roll_week"], random=True))
+                got += 1
+    return out
+
+
+# ---------------------------------------------------------------- statistics
+def counted(rows: list[dict]) -> list[dict]:
+    return [r for r in rows if r["cat"] == "touch" and not r.get("dependent")]
+
+
+def rate(rows: list[dict]) -> Optional[float]:
+    t = counted(rows)
+    return sum(r["outcome"] == "reject" for r in t) / len(t) if t else None
+
+
+def bootstrap(real: list[dict], rand: list[dict], reps: int, seed: int) -> Optional[tuple[float, float]]:
+    """95% percentile interval of real - baseline reject rate, resampling sessions with replacement."""
+    days = sorted({r["session"] for r in real})
+    by_r = {d: [r for r in counted(real) if r["session"] == d] for d in days}
+    by_b = {d: [r for r in counted(rand) if r["session"] == d] for d in days}
+    rng, diffs = random.Random(seed), []
+    for _ in range(reps):
+        pick = [rng.choice(days) for _ in days]
+        rr = [r for d in pick for r in by_r[d]]
+        bb = [r for d in pick for r in by_b[d]]
+        if rr and bb:
+            diffs.append(sum(r["outcome"] == "reject" for r in rr) / len(rr) - sum(r["outcome"] == "reject" for r in bb) / len(bb))
+    if len(diffs) < reps * 0.9:
+        return None
+    diffs.sort()
+    return round(diffs[int(0.025 * len(diffs))], 4), round(diffs[int(0.975 * len(diffs)) - 1], 4)
+
+
+def cell(real: list[dict], rand: list[dict], st: dict, seed: int, reps: int) -> dict:
+    t, sessions = counted(real), len({r["session"] for r in real})
+    out = {"sessions": sessions, "levels": len(real), "touches": len(t),
+           "categories": {c: sum(r["cat"] == c for r in real) for c in ("touch", "untouched", "gap_through", "at_open", "no_prior_close")},
+           "dependent": sum(bool(r.get("dependent")) for r in real),
+           "outcomes": {o: sum(r["outcome"] == o for r in t) for o in ("reject", "break", "stall")},
+           "baseline_touches": len(counted(rand))}
+    if len(t) < st["min_n"]:
+        return dict(out, small=True)
+    rr, br = rate(real), rate(rand)
+    out.update(reject=round(rr, 4), baseline=None if br is None else round(br, 4),
+               difference=None if br is None else round(rr - br, 4), interval=bootstrap(real, rand, reps, seed))
+    return out
+
+
+def run(sessions: list[dict], shift_pts: Optional[dict] = None, reps: Optional[int] = None) -> dict:
+    """The whole study (and, with shift_pts {market: points}, the shifted-levels robustness run)."""
+    d, sha = definition()
+    rules, st = d["rules"], d["statistics"]
+    seed, n = 20261118, 1000
+    reps = reps or 10000
+    shifted = [dict(s, levels={t: v + (shift_pts or {}).get(s["market"], 0.0) for t, v in s["levels"].items()}) for s in sessions]
+    real = [r for s in shifted for r in session_levels(s, rules)]
+    rand = baseline(shifted, real, rules, n, seed)
+    table = []
+    for m in sorted({s["market"] for s in sessions}):
+        for t in TYPES:
+            R = [r for r in real if r["market"] == m and r["type"] == t]
+            if not R:
+                continue
+            B = [r for r in rand if r["market"] == m and r["type"] == t]
+            row = {"market": m, "type": t, "all": cell(R, B, st, seed, reps),
+                   "no_roll_weeks": cell([r for r in R if not r["roll_week"]], [r for r in B if not r["roll_week"]], st, seed, reps),
+                   "by_regime": {g: cell([r for r in R if r["regime"] == g], [r for r in B if r["regime"] == g], st, seed, reps)
+                                 for g in sorted({r["regime"] for r in R})},
+                   "by_time": {b: cell([r for r in R if r.get("bucket") == b], [r for r in B if r.get("bucket") == b], st, seed, reps)
+                               for b, _ in BUCKETS}}
+            table.append(row)
+    return {"study": d["study"], "version": d["version"], "definition_sha256": sha, "seed": seed, "baseline_per_type": n,
+            "bootstrap_reps": reps, "shift_pts": shift_pts or {}, "sessions": len(sessions),
+            "data_from": min(s["session"] for s in sessions), "data_through": max(s["session"] for s in sessions),
+            "roll_week_sessions": sum(s["roll_week"] for s in sessions), "table": table, "levels": real}
+
+
+def main(argv=None) -> int:
+    import argparse
+    ap = argparse.ArgumentParser(prog="gexpro.reaction_lab")
+    ap.add_argument("--out")
+    a = ap.parse_args(argv)
+    sessions = load()
+    res = {"main": run(sessions), "shift_up": run(sessions, {"NQ": 5.0, "ES": 1.0}), "shift_down": run(sessions, {"NQ": -5.0, "ES": -1.0})}
+    m = res["main"]
+    print(f"level_reaction v{m['version']}  definition sha256 {m['definition_sha256']}  seed {m['seed']}")
+    print(f"{m['sessions']} sessions ({m['data_from']} to {m['data_through']}), roll-week sessions {m['roll_week_sessions']}")
+    print(f"{'mkt':4}{'type':5}{'sess':>5}{'lvls':>5}{'touch':>6}{'rej':>5}{'brk':>5}{'stl':>5}  {'real':>6} {'base':>6} {'diff':>7}  interval        +5/+1   -5/-1")
+    alt = {k: {(r['market'], r['type']): r['all'] for r in res[k]['table']} for k in ("shift_up", "shift_down")}
+    for r in m["table"]:
+        c = r["all"]
+        def show(x):
+            return "n<20" if x.get("small") else f"{x['difference']:+.3f}"
+        if c.get("small"):
+            mid = f"  {'n<20':>6} {'':>6} {'':>7}  {'':14}"
+        else:
+            mid = f"  {c['reject']:6.3f} {c['baseline']:6.3f} {c['difference']:+7.3f}  {str(c['interval']):14}"
+        print(f"{r['market']:4}{r['type']:5}{c['sessions']:5}{c['levels']:5}{c['touches']:6}{c['outcomes']['reject']:5}"
+              f"{c['outcomes']['break']:5}{c['outcomes']['stall']:5}{mid}  {show(alt['shift_up'][(r['market'], r['type'])]):>6}  "
+              f"{show(alt['shift_down'][(r['market'], r['type'])]):>6}")
+    if a.out:
+        Path(a.out).write_text(json.dumps(res, indent=1), encoding="utf-8")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
