@@ -17,7 +17,9 @@ Run 2026-11-10 (48 h, 15-minute steps, 192 x 2 refreshes): memory flat (+5.7 MB)
 on restart with a null / wrong-shape saved file (fixed, tests/test_feed_guards.py); steps slowed as history grew
 (latest() re-read every file: fixed). 59 ES steps served zero gamma one tick from the start-of-run answer: the real
 clock moved 45 minutes on the same chain and time decay moved zero gamma 0.11 points (checked directly), so the
-fixed reference, not the service, was wrong there. A truer harness would recompute the reference at each step.
+fixed reference, not the service, was wrong there. Since 2026-11-17 the reference is a fault-free twin of each worker,
+stepped at the same moment on the same chain (the 48 h, 5-minute run that day had 536 such one-tick "wrong" steps);
+a worker serving its last good result through a fault may match the twin's previous step.
 Tolerance (fixed before running): no wrong level served, no crash, the second launch refused, memory growth from
 the first 10% of the run to the last under 10 MB.
 """
@@ -141,6 +143,12 @@ def main() -> int:
         w.step(datetime.now(timezone.utc))
     clean = {w.key: served(w) for w in workers}
     print("clean levels:", clean)
+    # the reference: a fault-free twin of each worker, stepped at the same moment on the same chain. Each refresh
+    # stamps the chain with the real clock, so time decay moves the levels a little over a long run; a start-of-run
+    # answer called that "wrong" (536 one-tick zero-gamma steps on 2026-11-17)
+    twin_store = Path(tempfile.mkdtemp(prefix="gexpro-stress-twin-"))
+    twins = [make_worker(c, raw, faults, twin_store) for c in cfgs]
+    prev = dict(clean)
 
     steps = int(a.hours * 60 / a.step_min)
     sim = datetime.now(timezone.utc)
@@ -167,8 +175,8 @@ def main() -> int:
                     workers = [make_worker(c, raw, faults, store) for c in cfgs]   # restart on the damaged files
                     for w in workers:
                         got = served(w)
-                        if got is not None and got[:3] != clean[w.key][:3]:
-                            wrong.append(f"restart on corrupt file #{n}: {w.key} served {got}")
+                        if got is not None and got[:3] != prev[w.key][:3]:
+                            wrong.append(f"restart on corrupt file #{n}: {w.key} served {got}, clean {prev[w.key]}")
                 except Exception as e:
                     crashes.append(f"restart on corrupt file #{n} ({junk[:20]!r}): {type(e).__name__}: {e}")
                     workers = []
@@ -177,6 +185,12 @@ def main() -> int:
                     if name.startswith(("last_good_", "published_")):
                         os.remove(store / name)
                 workers = [make_worker(c, raw, faults, store) for c in cfgs]
+        flags = (faults.offline, faults.bad_feed, faults.disk_full)
+        faults.offline = faults.bad_feed = faults.disk_full = False       # the twins never see a fault
+        for t in twins:
+            t.step(sim)
+        faults.offline, faults.bad_feed, faults.disk_full = flags
+        now = {t.key: served(t) for t in twins}
         for w in workers:
             try:
                 w.step(sim)
@@ -184,9 +198,10 @@ def main() -> int:
                 crashes.append(f"step {i} {w.key}: {type(e).__name__}: {e}")
                 continue
             got = served(w)
-            if got is not None and got[:3] != clean[w.key][:3]:
+            if got is not None and got[:3] not in (now[w.key][:3], prev[w.key][:3]):
                 wrong.append(f"step {i} ({'outage' if faults.offline else 'bad feed' if faults.bad_feed else 'disk full' if faults.disk_full else 'normal'}): "
-                             f"{w.key} served {got}, clean {clean[w.key]}")
+                             f"{w.key} served {got}, clean {now[w.key]}")
+        prev = now
         if i % max(1, steps // 20) == 0 or i == steps - 1:
             log_rows.append((i, sim, rss_mb(), time.time() - t_wall, time.process_time() - t_cpu))
     builtins.open, os.replace = real_open, real_replace
