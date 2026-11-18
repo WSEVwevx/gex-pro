@@ -41,8 +41,8 @@ const PER_MARKET = ["levelsView", "ladderView", "heatmapView", "screenerView", "
 const cardKey = c => { const v = c.closest("[id$=View]"); return v ? v.id + ":" + [...v.querySelectorAll(".card")].indexOf(c) + (PER_MARKET.includes(v.id) ? ":" + market : "") : null; };
 // a first visit has no heights of its own yet: it reserves the usual ones (measured on the live site at 1366 and
 // 375 px wide, 2026-11-16), by page and card order. They are replaced by this device's real heights after one draw.
-const DEFAULT_H = {wide: {levelsView:[161,161,161,423,435,677,573,375,375,1467],ladderView:[183,1114,224,670,348],heatmapView:[743],screenerView:[290,372,99,681],biasView:[202,635,241,240],trackView:[261,615,637,299,274,1393,374,367,367,322],briefingsView:[136,0,619,619,181,453],newsView:[646,990],indicatorView:[261,261,261,709,372],libraryView:[152,760,1366],glossaryView:[5828],healthView:[1079],backtestView:[303,644]},
-  narrow: {levelsView:[129,161,119,633,463,1027,628,375,375,1548],ladderView:[183,1299,205,670,284],heatmapView:[838],screenerView:[311,420,217,800],biasView:[342,765,422,345],trackView:[456,1217,997,345,392,1425,650,395,418,589],briefingsView:[168,0,643,620,248,472],newsView:[829,1061],indicatorView:[259,261,237,709,991],libraryView:[320,1058,1715],glossaryView:[13954],healthView:[1903],backtestView:[322,711]}};
+const DEFAULT_H = {wide: {levelsView:[161,161,161,423,435,677,573,375,375,1467],ladderView:[183,1114,224,670,348],heatmapView:[743],screenerView:[290,372,99,681],biasView:[202,635,241,240],trackView:[261,615,637,299,274,1393,374,367,367,322],briefingsView:[136,0,619,619,181,453],newsView:[646,990],indicatorView:[261,261,261,52,372],libraryView:[152,760,1366],glossaryView:[5828],healthView:[1079],backtestView:[303,644]},
+  narrow: {levelsView:[129,161,119,633,463,1027,628,375,375,1548],ladderView:[183,1299,205,670,284],heatmapView:[838],screenerView:[311,420,217,800],biasView:[342,765,422,345],trackView:[456,1217,997,345,392,1425,650,395,418,589],briefingsView:[168,0,643,620,248,472],newsView:[829,1061],indicatorView:[259,261,237,52,991],libraryView:[320,1058,1715],glossaryView:[13954],healthView:[1903],backtestView:[322,711]}};
 function reserve(){
   const usual = DEFAULT_H[innerWidth < 700 ? "narrow" : "wide"];
   document.querySelectorAll("[id$=View] .card").forEach(c => {
@@ -410,6 +410,9 @@ async function copyCode(){
 }
 $("indCopy").onclick = copyCode;
 $("indCopy2").onclick = copyCode;
+$("indShow").onclick = () => { const c = $("indCode"), show = c.hidden; c.hidden = !show;
+  $("indShow").textContent = show ? "Hide source" : "Show source"; $("indShow").setAttribute("aria-expanded", String(show)); };
+document.querySelector(".bt-more").ontoggle = e => { if(e.target.open) renderBacktest(); };     // its charts measure their width
 $("indDownload").onclick = () => {
   if(!ind) return;
   const a = document.createElement("a");
@@ -519,7 +522,6 @@ function render(){
   $("status").innerHTML = `<span class="chip"><i class="dot ${svc}"></i>Data <b>${esc(used)}</b> · ${opts}</span>
     <span class="chip">Options <b>${rt ? "real time" : "15-min delayed"}</b></span>
     ${s ? `<span class="chip">Updated <b>${ago(s.asof)}</b></span>` : ""}
-    ${STATIC ? `<span class="chip" title="The hosted site is rebuilt about every 3 minutes in cash hours, every 6 minutes overnight while futures trade, and hourly when they are closed">${lag ? '<i class="dot warn"></i>' : ""}Site rebuilt <b>${ago(data.now)}</b></span>` : ""}
     <span class="chip">Next paste <b>${h.next_publish_et ? esc(h.next_publish_et.slice(11)) + " ET" : "-"}</b></span>
     ${(() => { const e = nextHighUSD(); return e ? `<span class="chip" title="Next ${e.impact.toLowerCase()}-impact USD event (ForexFactory)"><i class="dot ${e.impact === "High" ? "bad" : "warn"}"></i>${esc(e.title)} <b>in ${dur(Date.parse(e.time) - Date.now())}</b></span>` : ""; })()}`;
   $("banner").innerHTML = !w.result ? `<div class="banner">${h.last_error ? "The options data source failed on its last try. Nothing to show yet; retrying by itself. Details are on the Data health page." : "First calculation in progress: levels appear within a minute."}</div>`
@@ -564,12 +566,10 @@ function renderHero(w, s, L, X, ref){
   $("regimeCard").innerHTML = `<div class="eyebrow">Gamma regime (model)</div>
     <div class="regime"><span class="tag" style="color:${R[2]};border-color:${R[2]}">${R[1]}</span><span style="color:${R[2]}">${R[0]}</span>${changed ? '<span class="chip">changed since last update</span>' : ""}</div>
     <div class="expl">${R[3]}</div>${sigTxt}`;
-  const em = X.expected_move || {};
   const fop = /_FOP$/.test(w.source);                 // levels straight from CME options on the future
   $("priceCard").innerHTML = `<div class="eyebrow">Reference price</div>
     <div class="big">${num(ref)}</div>
     <div class="kv"><span>${fop ? esc(s.underlying || market) + " future, live" : esc(w.source) + " close / last"}</span><b>${num(s.ref_price)}</b></div>
-    <div class="kv"><span>Expected move today (1 sd)</span><b>±${num(em.daily_points_fut ?? em.daily_points, 0)} pts</b></div>
     <div class="expl">${fop ? "Levels come from CME options on the " + market + " future itself, so they are already in futures prices; no conversion needed."
       : w.result.mapped ? market + " equivalent of the index price, from " + (/^measured/.test(w.result.mapped.mapping.futures_ref_mode || "") ? "the measured futures / index basis" : "the carry model") + ". Your TradingView chart uses the live price." : "Options-underlying price (no futures conversion available)."}</div>`;
   $("netCard").innerHTML = `<div class="eyebrow">Net gamma exposure</div>
@@ -694,6 +694,13 @@ function renderStats(w, s, L, X){
   const fut = L.futures_equiv_of_ref ?? s.ref_price, contract = fut * (POINT_VALUE[market] || 1);    // $ notional of one contract
   const ct = usd => usd == null || !isFinite(usd) ? null : usd / contract;
   const tile = (k, v, sub, color) => `<div class="stat"><div class="eyebrow">${k}</div><div class="v"${color ? ` style="color:${color}"` : ""}>${v}</div><div class="s">${sub}</div></div>`;
+  // the levels a trader looks for first: each with its distance from price
+  const p = v => v && typeof v === "object" ? v.price : v, emd = em.daily_points_fut ?? em.daily_points;
+  const away = v => v == null ? "" : `${num(Math.abs(v - fut), 0)} pts ${v >= fut ? "above" : "below"}${emd ? ` · ${num(Math.abs(v - fut) / emd, 1)}σ` : ""}`;
+  const key = (k, v, color) => tile(k, v == null ? "-" : num(v), away(v), color);
+  $("keyStrip").innerHTML = key("Zero gamma (est.)", p(L.zero_gamma), "var(--zg)") + key("Call wall", p(L.call_wall), "var(--pos)")
+    + key("Put wall", p(L.put_wall), "var(--neg)")
+    + tile("Expected move today", emd == null ? "-" : "±" + num(emd, 0), emd == null ? "" : `${num(fut - emd, 0)} – ${num(fut + emd, 0)} (1σ)`, "var(--em)");
   const hedge = ct(s.net), charm = ct(g.charm_flow_usd_per_day), vanna = ct(g.vanna_usd_per_vol_pt == null ? null : -g.vanna_usd_per_vol_pt);
   const cts = x => num(Math.abs(x), 0) + " " + market;
   $("stats").innerHTML = [
@@ -2078,7 +2085,7 @@ function renderScreener(){
   const top15 = new Set(rows.slice().sort((a, b) => b["w_" + k] - a["w_" + k]).slice(0, 15).map(r => r.symbol));
   $("drvRows").innerHTML = rows.map(r => { const v = r["pts_" + k], cls = x => x > 0 ? "good" : x < 0 ? "bad" : "", ch = top15.has(r.symbol);
     const sym = ch ? `<span class="scr-sym">${esc(r.symbol)}</span>` : `<a class="scr-sym" href="https://www.tradingview.com/chart/?symbol=${encodeURIComponent(r.symbol.replace("-", "."))}" target="_blank" rel="noopener" title="Open ${esc(r.symbol)} on TradingView">${esc(r.symbol)}</a>`;
-    return `<tr class="${ch ? "clk" : ""}${r.stale ? " stale" : ""}"${ch ? ` data-sym="${esc(r.symbol)}" role="button" tabindex="0" title="Click for ${esc(r.symbol)}'s chart"` : r.stale ? ' title="Could not refresh: last known price"' : ""}><td>${sym}<span class="scr-name">${esc(r.name)}</span>${ch ? '<svg class="scr-ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 13h12M4 10l3-3 2 2 4-5"/></svg>' : ""}</td>
+    return `<tr class="${ch ? "clk" : ""}${r.stale ? " stale" : ""}"${ch ? ` data-sym="${esc(r.symbol)}" role="button" tabindex="0" title="Click for ${esc(r.symbol)}'s chart"` : r.stale ? ' title="Could not refresh: last known price"' : ""}><td title="${esc(r.name)}">${sym}${ch ? '<svg class="scr-ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 13h12M4 10l3-3 2 2 4-5"/></svg>' : ""}</td>
       <td>${spark(r.spark)}</td>
       <td class="m">${num(r.price, 2)}</td>
       <td class="m ${cls(r.pct)}">${signed(r.pct, 2)}%</td>
