@@ -91,22 +91,31 @@ def yahoo_daily(sym: str, days: int = 45) -> dict[str, dict]:
         return {}
 
 
-def parse_cboe_intraday(raw: bytes) -> Optional[dict]:
-    """Today's session from 1-minute bars: {"date", OHLC, "last": "HH:MM"} (ET), or None."""
+def parse_cboe_intraday(raw: bytes, quote: Optional[bytes]) -> Optional[dict]:
+    """Today's session: open, high and low from the 1-minute bars, the close from the quote's official close,
+    {"date", OHLC, "last": "HH:MM"} (ET), or None. The last bar (15:59) misses the closing print: on 2026-11-17
+    NDX closed at 27,001.79 and its 15:59 bar at 26,946.73. So without a quote stamped after the last bar's
+    minute on the same day there is no close yet, and the daily bar is used instead."""
     rows = json.loads(raw).get("data", [])
     rows = [r for r in rows if r.get("price") and r.get("datetime")]
-    if not rows:
+    if not rows or not quote:
+        return None
+    q = json.loads(quote).get("data") or {}
+    day, last = rows[0]["datetime"][:10], rows[-1]["datetime"][11:16]
+    stamp = str(q.get("last_trade_time") or "")
+    if stamp[:10] != day or stamp[11:16] <= last:
         return None
     p = [r["price"] for r in rows]
-    b = _bar(rows[0]["datetime"][:10], p[0]["open"], max(x["high"] for x in p), min(x["low"] for x in p), p[-1]["close"], "Cboe 1-minute")
+    b = _bar(day, p[0]["open"], max(x["high"] for x in p), min(x["low"] for x in p), q.get("close"), "Cboe 1-minute, official close")
     if b:
-        b["last"] = rows[-1]["datetime"][11:16]
+        b["last"] = last
     return b
 
 
 def intraday(underlying: str) -> Optional[dict]:
     try:
-        return parse_cboe_intraday(_get(f"{CBOE}/delayed_quotes/charts/intraday/_{underlying}.json"))
+        return parse_cboe_intraday(_get(f"{CBOE}/delayed_quotes/charts/intraday/_{underlying}.json"),
+                                   _get(f"{CBOE}/delayed_quotes/quotes/_{underlying}.json"))
     except Exception as e:
         log.warning("intraday %s failed: %s", underlying, e)
         return None
