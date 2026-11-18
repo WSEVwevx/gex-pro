@@ -194,6 +194,27 @@ class TestComponent(unittest.TestCase):
             self.assertEqual(p["latest"]["nyam"]["version"], 2)
             self.assertEqual([h["id"] for h in p["history"]], ["2026-11-16-nyam"])          # the score file is not a briefing
 
+    def test_each_market_is_graded_when_its_own_outcome_arrives(self):
+        # 2026-11-17 audit: the Track record grades NQ and ES separately (each needs its own index bar); a brief
+        # graded as soon as one market had an outcome never got the other market's grades
+        with tempfile.TemporaryDirectory() as tmp:
+            now = [SLOT + timedelta(minutes=1)]
+            rec = history(20) + history(20, market="ES")
+            two = lambda: ctx(market(), market(market="ES", price=7000.0, zero_gamma=7100.0, call_wall=7200.0, put_wall=6900.0,
+                                             abs_gamma=6950.0, em={"anchor": 7000.0, "daily": 80.0},
+                                             nearest={"label": "0DTE", "zero_gamma": 7090.0, "call_wall": 7050.0, "put_wall": 6980.0}))
+            c = BriefingsComponent(context=two, is_trading_day=is_trading_day, store_dir=tmp, clock=lambda: now[0], record=lambda: rec)
+            c.tick(weekly=False)
+            rec.append(graded("2026-11-16", high=28190.0, low=27880.0, close=27920.0))
+            now[0] = SLOT + timedelta(hours=8)
+            c.tick(weekly=False)
+            rec.append(graded("2026-11-16", market="ES", high=7060.0, low=6970.0, close=7010.0))
+            c.tick(weekly=False)
+            c.tick(weekly=False)
+            rows = [json.loads(x) for x in (c.dir / "scores.jsonl").read_text().splitlines()]
+            self.assertEqual({r["market"] for r in rows}, {"NQ", "ES"})
+            self.assertEqual(len([r for r in rows if r["market"] == "NQ"]), 8)                 # NQ graded once, not again
+
     def test_an_old_format_brief_is_replaced_only_while_its_window_is_open(self):
         with tempfile.TemporaryDirectory() as tmp:
             now = [datetime(2026, 11, 15, 19, 10, tzinfo=NY)]                               # Sunday evening: Monday's Asia brief

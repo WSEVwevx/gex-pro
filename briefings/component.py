@@ -177,19 +177,22 @@ class BriefingsComponent:
 
     def grade_due(self) -> list[str]:
         """Grade each NY AM brief once its session has a Track record outcome. The brief itself is never edited:
-        grades are appended to scores.jsonl, which outlives the briefs' own history."""
-        done = {g["id"] for g in self._grades()}
+        grades are appended to scores.jsonl, which outlives the briefs' own history. Each market is graded when its
+        own outcome arrives: the Track record grades NQ and ES separately."""
+        done = {(g["id"], g.get("market")) for g in self._grades()}
+        sid_of = lambda b: schedule.slot_id("nyam", datetime.fromisoformat(b["slot"]))
         todo = [b for b in self.history() if b.get("kind") == "nyam" and b.get("version", 1) >= morning.VERSION
-                and schedule.slot_id("nyam", datetime.fromisoformat(b["slot"])) not in done]
+                and any((sid_of(b), mb.get("market")) not in done for mb in b.get("markets", []))]
         if not todo:
             return []
         outcome = {(r["session"], r["market"]): r["outcome"] for r in self._record() if r.get("outcome")}
         graded, lines = [], []
         for b in todo:
-            rows = [(mb["market"], g) for mb in b.get("markets", []) if (b["session"], mb["market"]) in outcome
+            sid = sid_of(b)
+            rows = [(mb["market"], g) for mb in b.get("markets", [])
+                    if (b["session"], mb["market"]) in outcome and (sid, mb["market"]) not in done
                     for g in morning.grade(mb, outcome[(b["session"], mb["market"])])]
             if rows:
-                sid = schedule.slot_id("nyam", datetime.fromisoformat(b["slot"]))
                 lines += [json.dumps(dict(g, id=sid, market=mk)) for mk, g in rows]
                 graded.append(sid)
         if lines:
