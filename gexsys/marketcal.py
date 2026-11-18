@@ -117,8 +117,21 @@ def is_trading_day(d: date) -> bool:
     return d.weekday() < 5 and d not in nyse_holidays(d.year)
 
 
+RTH_OPEN = time(9, 30)
+
+
 def rth_close(d: date) -> time:
     return early_closes(d.year).get(d, time(16, 0))
+
+
+def rth_open_dt(d: date) -> datetime:
+    """d's cash open, ET."""
+    return datetime.combine(d, RTH_OPEN, NY)
+
+
+def rth_close_dt(d: date) -> datetime:
+    """d's cash close, ET (13:00 on early closes)."""
+    return datetime.combine(d, rth_close(d), NY)
 
 
 def last_close(t: datetime) -> datetime:

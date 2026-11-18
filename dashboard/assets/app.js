@@ -10,8 +10,8 @@ const store = { get(k, d){ try { return localStorage.getItem(k) ?? d; } catch(e)
 // Static mode: the hosted copy (python -m gexsys build-site) reads files that a scheduled job rewrites,
 // instead of the local service's /api endpoints.
 const STATIC = !!window.GEX_STATIC;
-const API = STATIC ? {all: "data/all.json", news: "data/news.json", posts: "data/posts.json", indicator: "data/indicator.json", briefings: "data/briefings.json", track: "data/trackrecord.json", quotes: "data/quotes.json", positioning: "data/positioning.json", sources: "data/sources.json", pastes: "data/pastes.json"}
-                   : {all: "/api/all", news: "/api/news", posts: "/api/posts", indicator: "/api/indicator", briefings: "/api/briefings", track: "/api/trackrecord", quotes: "/api/quotes", positioning: "/api/positioning", sources: "/api/sources", pastes: "/api/pastes"};
+const API = STATIC ? {all: "data/all.json", news: "data/news.json", posts: "data/posts.json", indicator: "data/indicator.json", briefings: "data/briefings.json", track: "data/trackrecord.json", quotes: "data/quotes.json", positioning: "data/positioning.json", sources: "data/sources.json", pastes: "data/pastes.json", archive: "data/archive.json"}
+                   : {all: "/api/all", news: "/api/news", posts: "/api/posts", indicator: "/api/indicator", briefings: "/api/briefings", track: "/api/trackrecord", quotes: "/api/quotes", positioning: "/api/positioning", sources: "/api/sources", pastes: "/api/pastes", archive: "/api/archive"};
 const pineUrl = m => STATIC ? `data/pine-published${m ? "-" + m : ""}.txt`
                             : `/api/pine/all?which=published${m ? "&market=" + encodeURIComponent(m) : ""}`;
 // every data request skips the browser cache; on the hosted copy a unique query also skips GitHub's
@@ -41,8 +41,8 @@ const PER_MARKET = ["levelsView", "ladderView", "heatmapView", "screenerView", "
 const cardKey = c => { const v = c.closest("[id$=View]"); return v ? v.id + ":" + [...v.querySelectorAll(".card")].indexOf(c) + (PER_MARKET.includes(v.id) ? ":" + market : "") : null; };
 // a first visit has no heights of its own yet: it reserves the usual ones (measured on the live site at 1366 and
 // 375 px wide, 2026-11-16), by page and card order. They are replaced by this device's real heights after one draw.
-const DEFAULT_H = {wide: {levelsView:[161,161,161,423,435,677,573,375,375,1467],ladderView:[183,1114,224,670,348],heatmapView:[743],screenerView:[290,372,99,681],biasView:[202,635,241,240],trackView:[261,615,637,299,274,1393,374,367,367,322],briefingsView:[136,0,619,619,181,453],newsView:[646,990],indicatorView:[261,261,261,52,372],libraryView:[152,760,1366],glossaryView:[5828],healthView:[1079],backtestView:[303,644]},
-  narrow: {levelsView:[129,161,119,633,463,1027,628,375,375,1548],ladderView:[183,1299,205,670,284],heatmapView:[838],screenerView:[311,420,217,800],biasView:[342,765,422,345],trackView:[456,1217,997,345,392,1425,650,395,418,589],briefingsView:[168,0,643,620,248,472],newsView:[829,1061],indicatorView:[259,261,237,52,991],libraryView:[320,1058,1715],glossaryView:[13954],healthView:[1903],backtestView:[322,711]}};
+const DEFAULT_H = {wide: {levelsView:[161,161,161,423,435,677,573,375,375,1467],ladderView:[183,1114,224,670,348],heatmapView:[743],screenerView:[290,372,99,681],biasView:[202,635,241,240],trackView:[261,615,637,299,274,1393,374,367,367,322],briefingsView:[136,0,619,619,181,453],newsView:[646,990],indicatorView:[261,261,261,52,372],libraryView:[152,760,1366],glossaryView:[5828],healthView:[1079],backtestView:[167,303,644]},
+  narrow: {levelsView:[129,161,119,633,463,1027,628,375,375,1548],ladderView:[183,1299,205,670,284],heatmapView:[838],screenerView:[311,420,217,800],biasView:[342,765,422,345],trackView:[456,1217,997,345,392,1425,650,395,418,589],briefingsView:[168,0,643,620,248,472],newsView:[829,1061],indicatorView:[259,261,237,52,991],libraryView:[320,1058,1715],glossaryView:[13954],healthView:[1903],backtestView:[200,322,711]}};
 function reserve(){
   const usual = DEFAULT_H[innerWidth < 700 ? "narrow" : "wide"];
   document.querySelectorAll("[id$=View] .card").forEach(c => {
@@ -197,7 +197,7 @@ function setPage(p){
   if(p === "briefings") loadBriefings();
   if(p === "news") renderNews();
   if(p === "indicator") loadIndicator();
-  if(p === "backtest") loadPastes();
+  if(p === "backtest"){ loadPastes(); loadArchive(); }
   if(p === "library") renderLibrary();
   if(p === "glossary") renderGlossary();
   if(p === "track") loadTrack();
@@ -1156,6 +1156,9 @@ const HELP = {
   pastes: {title: "9:30 pastes for backtesting", tldr: "The exact levels from each past session's open, ready to paste into the indicator.",
     body: `<p>Every session, the paste from the last calculation before 9:30 ET is saved, the same one the Track record grades. Copy a day, paste it into the indicator's <b>Levels payload</b>, then scroll your chart back to that day: every level, tag, zone and IV band is drawn as it was at that open, plus the closing levels of the sessions before it.</p><p>The indicator marks it "Backtest" with the date instead of "stale", and its alerts stay off. Click <b>Copy for TradingView</b> at the top of any page and paste that to go back to live levels.</p><p>The website keeps these permanently from now on; days before this feature go back as far as the saved snapshots did (about a week).</p>`,
     watch: ["Compare where price reacted with the C / P tags and the walls that day", "Use Copy both on a layout with NQ and ES charts"]},
+  archive: {title: "History archive", tldr: "GEX PRO's own options history, saved every trading day since Nov 18, 2026.",
+    body: `<p>Free options-chain history does not exist, so the site keeps its own. After 5:15 pm ET every trading day it saves, per market: the snapshot the 9:30 plan used, the one nearest noon and the last one before the close (levels, ranked levels, expected move, regime, the gamma profile and the 9:30 futures mapping), the list of every snapshot it chose from, and 1-minute bars for the future (the whole overnight-to-5 pm day) and the index (the cash session).</p><p>Files are only ever added, never changed: each day has a manifest with a SHA-256 fingerprint of every file, and a check fails if any saved file changes. Futures bars name their contract and flag roll weeks. Studies on this page say how many sessions they need and how many exist.</p>`,
+    watch: ["A study needs enough sessions before its result means anything", "Missing days are listed, never skipped quietly"]},
   pastes_week: {title: "Whole weeks", tldr: "A week of 9:30 levels in one paste, each day drawn on its own day.",
     body: `<p>One paste holds every day of the week. On the chart, each day's zero gamma, call wall, put wall, abs gamma and top three call and put levels are drawn only across that day's 9:30 to 4 pm ET session, so Monday's levels never run into Tuesday's.</p><p>The panel reads "Backtest week" with the dates and alerts stay off. Click <b>Copy for TradingView</b> at the top to go back to live levels.</p>`,
     watch: ["Scroll day by day and note which levels price respected", "Compare with the reaction stats on the Track record page"]},
@@ -1393,6 +1396,20 @@ async function loadTrack(){
   try { trk = await (await fetchFresh(API.track)).json(); }
   catch(e){ trk = trk || {error: offline()}; }
   renderTrack();
+}
+async function loadArchive(){
+  let A;
+  try { A = await (await fetchFresh(API.archive)).json(); } catch(e){ A = {unavailable: offline()}; }
+  renderArchive(A);
+}
+function renderArchive(A){
+  const day = d => d ? new Date(d + "T12:00:00Z").toLocaleDateString("en-US", {month: "short", day: "numeric", timeZone: "UTC"}) : "-";
+  if(A.unavailable){ $("arcSub").textContent = "unavailable"; $("arcKpis").innerHTML = `<div class="expl">${esc(A.unavailable)}</div>`; return; }
+  const thru = Object.values(A.markets).map(m => m.through).filter(Boolean).sort().at(-1);
+  $("arcSub").textContent = `data through ${day(thru)} · checked ${new Date(A.checked).toLocaleTimeString("en-US", {...ET, hour: "numeric", minute: "2-digit"})} ET`;
+  $("arcKpis").innerHTML = Object.entries(A.markets).map(([m, v]) => kpi(m, `${v.sessions} session${v.sessions === 1 ? "" : "s"}`, v.from ? `${day(v.from)} to ${day(v.through)}` : `starts ${day(A.first_day)}`)).join("")
+    + (A.missing.length ? kpi("Missing", `${A.missing.length} day${A.missing.length === 1 ? "" : "s"}`, esc(A.missing.slice(-3).map(day).join(", ")), "var(--neg)") : "")
+    + (A.error ? kpi("Last write", "failed", esc(A.error.slice(0, 80)), "var(--neg)") : "");
 }
 const pct = r => r == null ? "-" : num(100 * r, 0) + "%";
 const ciTxt = s => s && s.ci ? `${num(100 * s.ci[0], 0)}-${num(100 * s.ci[1], 0)}%` : "-";

@@ -24,6 +24,7 @@ from gexsys import marketcal, publish
 from gexsys.component import GexComponent
 from trackrecord.component import TrackRecordComponent
 
+from .archive import ArchiveComponent
 from .context import pre_open, snapshot, week_data
 from .health import HealthComponent
 
@@ -47,4 +48,5 @@ def default_components(gex_configs) -> list:
                                    record=lambda: track.sessions())      # graded sessions: the brief's history and its grades
     track = TrackRecordComponent(pre_open=lambda d: pre_open(gex, d), is_trading_day=marketcal.is_trading_day,
                                  session_close=lambda d: datetime.combine(d, marketcal.rth_close(d), marketcal.NY))
-    return [gex, feeds, track, briefings, HealthComponent([gex, feeds, briefings, track])]
+    arc = ArchiveComponent()
+    return [gex, feeds, track, briefings, arc, HealthComponent([gex, feeds, briefings, track, arc])]

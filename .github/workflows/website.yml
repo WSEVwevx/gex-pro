@@ -91,6 +91,11 @@ jobs:
           else
             git worktree add --orphan -b track-record .track
           fi
+      # The history archive (gexpro/archive.py): after 17:15 ET each trading day, that day's chosen snapshots and
+      # 1-minute bars are added to the archive branch. Days are only ever added; a failure is named on Data health.
+      - name: Add the due days to the history archive
+        if: github.ref == 'refs/heads/main'
+        run: python -m gexpro --log-level WARNING archive --state .state || echo "archive step failed (see Data health)"
       - run: python -m gexpro --log-level WARNING build-site --out _site --state .state
         env:
           GEXPRO_TRACK_DIR: .track
