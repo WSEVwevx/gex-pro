@@ -1,4 +1,5 @@
-"""Level-reaction lab, study level_reaction v1 (studies/level_reaction/v1.json: every rule is defined there first).
+"""Level-reaction lab, study level_reaction v2 (studies/level_reaction/v2.json: every rule is defined there first;
+v2 = v1's rules with Phase 4's statistics, gexpro/uncertainty.py).
 
   python -m gexpro.reaction_lab [--out results.json]
 
@@ -21,13 +22,15 @@ from typing import Optional
 
 from gexsys import marketcal
 
+from . import uncertainty
+
 ROOT = Path(__file__).resolve().parent.parent
-DEFINITION = ROOT / "studies" / "level_reaction" / "v1.json"
+DEFINITION = ROOT / "studies" / "level_reaction" / "v2.json"
 BRANCH = "origin/track-record"
 TYPES = ["ZG", "CW", "PW", "Ab1", "C1", "C2", "C3", "P1", "P2", "P3"]      # also the cluster order
 PLAN_KEY = {"ZG": "zg", "CW": "cw", "PW": "pw", "Ab1": "ag"}
 HORIZONS = (15, 30, 60)
-SEED, DRAWS, REPS = 20261118, 1000, 10000      # as written in the definition (test_reaction_lab checks the text)
+SEED, DRAWS, REPS = 20261118, 1000, uncertainty.REPS      # as written in the definition (test_reaction_lab checks)
 BUCKETS = (("09:30-10:30", time(10, 30)), ("10:30-15:00", time(15, 0)), ("15:00-close", time(23, 59)))
 
 
@@ -212,22 +215,14 @@ def rate(rows: list[dict]) -> Optional[float]:
     return sum(r["outcome"] == "reject" for r in t) / len(t) if t else None
 
 
-def bootstrap(real: list[dict], rand: list[dict], reps: int, seed: int) -> Optional[tuple[float, float]]:
-    """95% percentile interval of real - baseline reject rate, resampling sessions with replacement."""
-    days = sorted({r["session"] for r in real})
-    by_r = {d: [r for r in counted(real) if r["session"] == d] for d in days}
-    by_b = {d: [r for r in counted(rand) if r["session"] == d] for d in days}
-    rng, diffs = random.Random(seed), []
-    for _ in range(reps):
-        pick = [rng.choice(days) for _ in days]
-        rr = [r for d in pick for r in by_r[d]]
-        bb = [r for d in pick for r in by_b[d]]
-        if rr and bb:
-            diffs.append(sum(r["outcome"] == "reject" for r in rr) / len(rr) - sum(r["outcome"] == "reject" for r in bb) / len(bb))
-    if len(diffs) < reps * 0.9:
-        return None
-    diffs.sort()
-    return round(diffs[int(0.025 * len(diffs))], 4), round(diffs[int(0.975 * len(diffs)) - 1], 4)
+def per_session(real: list[dict], rand: list[dict]) -> list[tuple[int, int, int, int]]:
+    """(real rejects, real touches, baseline rejects, baseline touches) per session that has real levels in the cell."""
+    out = []
+    for d in sorted({r["session"] for r in real}):
+        rt = [r for r in counted(real) if r["session"] == d]
+        bt = [r for r in counted(rand) if r["session"] == d]
+        out.append((sum(r["outcome"] == "reject" for r in rt), len(rt), sum(r["outcome"] == "reject" for r in bt), len(bt)))
+    return out
 
 
 def cell(real: list[dict], rand: list[dict], st: dict, seed: int, reps: int) -> dict:
@@ -239,11 +234,10 @@ def cell(real: list[dict], rand: list[dict], st: dict, seed: int, reps: int) -> 
            "baseline_touches": len(counted(rand))}
     if len(t) < st["min_n"]:
         return dict(out, small=True)
-    rr, br = rate(real), rate(rand)
-    out.update(reject=round(rr, 4), baseline=None if br is None else round(br, 4),
-               difference=None if br is None else round(rr - br, 4), interval=bootstrap(real, rand, reps, seed))
-    if out["interval"] is None:
-        out["interval_note"] = "unavailable: over 10% of session resamples had no touch on one side"
+    ss = per_session(real, rand)              # baseline restricted to the sessions that have this level (paired)
+    bn = sum(s[3] for s in ss)
+    out.update(reject=round(rate(real), 4), baseline=round(sum(s[2] for s in ss) / bn, 4) if bn else None)
+    out.update(uncertainty.summarize(ss, reps, seed))     # difference = reject - baseline; interval, p-value, power
     return out
 
 
@@ -296,9 +290,11 @@ def main(argv=None) -> int:
     for r in m["table"]:
         c = r["all"]
         def show(x):
-            return "n<20" if x.get("small") else f"{x['difference']:+.3f}"
+            return "n<20" if x.get("small") else "n/a" if "unavailable" in x else f"{x['difference']:+.3f}"
         if c.get("small"):
             mid = f"  {'n<20':>6} {'':>6} {'':>7}  {'':14}"
+        elif "unavailable" in c:
+            mid = f"  {c['reject']:6.3f} {'':>6} {'':>7}  {'unavailable':14}"
         else:
             mid = f"  {c['reject']:6.3f} {c['baseline']:6.3f} {c['difference']:+7.3f}  {str(c['interval']):14}"
         print(f"{r['market']:4}{r['type']:5}{c['sessions']:5}{c['levels']:5}{c['touches']:6}{c['outcomes']['reject']:5}"

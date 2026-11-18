@@ -20,7 +20,7 @@ def flat(n, p=100.0):
 class TestDefinition(unittest.TestCase):
     def test_locked_values(self):
         d, sha = L.definition()
-        self.assertEqual((d["version"], RULES["k"], d["statistics"]["min_n"]), (1, 4, 20))
+        self.assertEqual((d["version"], RULES["k"], d["statistics"]["min_n"]), (2, 4, 20))
         self.assertEqual(len(sha), 64)
 
     def test_paste_levels_first_three_in_written_order(self):
@@ -64,7 +64,7 @@ class TestLoad(unittest.TestCase):
         d = L.definition()[0]
         self.assertIn(f"{L.DRAWS} random levels", d["baseline"]["draws"])
         self.assertIn(f"seed {L.SEED}", d["baseline"]["draws"])
-        self.assertIn(f"{L.REPS:,} reps", d["statistics"]["interval"])
+        self.assertIn(f"{L.REPS:,} session resamples, seed {L.SEED}", d["statistics"]["interval"])
 
 
 class TestClassify(unittest.TestCase):
@@ -138,14 +138,19 @@ class TestClustersAndBaseline(unittest.TestCase):
         self.assertTrue(c["small"])
         self.assertNotIn("reject", c)
 
-    def test_bootstrap_is_seeded(self):
-        real = [{"cat": "touch", "outcome": "reject" if i % 2 else "break", "session": f"d{i % 10}"} for i in range(40)]
-        rand = [{"cat": "touch", "outcome": "reject" if i % 3 == 0 else "break", "session": f"d{i % 10}"} for i in range(300)]
-        a = L.bootstrap(real, rand, 500, 3)
-        self.assertEqual(a, L.bootstrap(real, rand, 500, 3))
-        self.assertLess(a[0], 0.5 - 1 / 3 + 1e-9)
-        self.assertGreater(a[1], 0.5 - 1 / 3 - 1e-9)
+    def test_per_session_counts(self):
+        real = [{"cat": "touch", "outcome": "reject", "session": "a"}, {"cat": "touch", "outcome": "break", "session": "a"},
+                {"cat": "untouched", "session": "b"}]
+        rand = [{"cat": "touch", "outcome": "reject", "session": "b"}, {"cat": "touch", "outcome": "stall", "session": "z"}]
+        self.assertEqual(L.per_session(real, rand), [(1, 2, 0, 0), (0, 0, 1, 1)])
 
+    def test_cell_baseline_is_paired_and_subtracts(self):
+        real = [{"cat": "touch", "outcome": "reject" if i % 2 else "break", "session": f"d{i % 10}"} for i in range(20)]
+        rand = [{"cat": "touch", "outcome": "reject" if i % 4 == 0 else "stall", "session": f"d{i % 10}"} for i in range(40)]
+        rand += [{"cat": "touch", "outcome": "reject", "session": "other"}] * 50     # a day without the level: ignored
+        c = L.cell(real, rand, {"min_n": 20}, 1, 500)
+        self.assertEqual((c["reject"], c["baseline"]), (0.5, 0.25))
+        self.assertAlmostEqual(c["difference"], c["reject"] - c["baseline"])
 
 if __name__ == "__main__":
     unittest.main()
