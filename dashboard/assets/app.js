@@ -1460,9 +1460,10 @@ function renderTrack(){
     const reg = (p.regime || "").toLowerCase(), regCol = p.regime === "POSITIVE" ? "var(--pos)" : p.regime === "NEGATIVE" ? "var(--neg)" : "var(--zg)";
     const tail = s.status === "pending" ? `<span class="trk-tag">waiting for the close</span>` : s.status === "no_prices" ? `<span class="trk-tag bad">no price data</span>` : "";
     const rb = rebuilt(s) ? `<span class="trk-tag" title="Frozen later from saved snapshots; the data is timestamped ${esc(new Date(p.asof).toLocaleString("en-US", {...ET, month: "short", day: "numeric", hour: "numeric", minute: "2-digit"}))} ET, before the open">rebuilt</span>` : "";
+    const fix = s.correction ? `<span class="trk-tag" title="Graded first on the 15:59 minute bar (${esc(num(s.correction.recorded, 2))}), which misses the closing print. Shown here on the official close, ${esc(num(s.correction.official, 2))}. The original grade stays in the public record.">corrected</span>` : "";
     return `<tr><td>${esc(day)}</td><td>${esc(s.market)}</td><td><span style="color:${regCol}">${esc(reg)}</span> · ${esc(p.bias || "-")}</td><td class="m">${num(p.ref, 2)}</td><td class="m">${num(p.em, 0)}</td>
       <td class="m">${o ? `${num(o.close, 2)} <span style="color:${o.move >= 0 ? "var(--good)" : "var(--bad)"}">${signed(o.move_em, 2)}σ</span>` : "-"}</td>
-      <td>${o ? yes(o.em_close) : "-"}</td><td>${o ? wall(o.cw) : "-"}</td><td>${o ? wall(o.pw) : "-"}</td><td>${o ? yes(o.bias_hit, "right", "wrong") : "-"}</td><td>${tail}${rb}</td></tr>`;
+      <td>${o ? yes(o.em_close) : "-"}</td><td>${o ? wall(o.cw) : "-"}</td><td>${o ? wall(o.pw) : "-"}</td><td>${o ? yes(o.bias_hit, "right", "wrong") : "-"}</td><td>${tail}${rb}${fix}</td></tr>`;
   }).join("")}</table>` : `<div>${stateHtml("empty", "No sessions yet", "A session is added when its plan is frozen before the 9:30 ET open, and graded after the close.")}</div>`;
   renderBacktest();
 }

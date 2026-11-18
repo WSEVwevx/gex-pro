@@ -185,6 +185,25 @@ class BriefingsComponent:
                 out.append(g)
         return out
 
+    def _current_grades(self) -> list:
+        """The stored grade rows, except where the Track record later corrected a session's close: those markets'
+        rows are graded again on the corrected outcome (the file keeps what was written)."""
+        grades = self._grades()
+        fixed = {(r["session"], r["market"]): r["outcome"] for r in self._record() if r.get("correction") and r.get("outcome")}
+        done = {(g["id"], g.get("market")) for g in grades}
+        redo = {}
+        for b in self.history() if fixed else []:
+            if b.get("kind") != "nyam" or b.get("version", 1) < morning.VERSION:
+                continue
+            sid = schedule.slot_id("nyam", datetime.fromisoformat(b["slot"]))
+            for mb in b.get("markets", []):
+                o = fixed.get((b["session"], mb.get("market")))
+                if o and (sid, mb["market"]) in done:
+                    redo[(sid, mb["market"])] = [dict(g, id=sid, market=mb["market"], corrected=True) for g in morning.grade(mb, o)]
+        if not redo:
+            return grades
+        return [g for g in grades if (g["id"], g.get("market")) not in redo] + [g for rows in redo.values() for g in rows]
+
     def grade_due(self) -> list[str]:
         """Grade each NY AM brief once its session has a Track record outcome. The brief itself is never edited:
         grades are appended to scores.jsonl, which outlives the briefs' own history. Each market is graded when its
@@ -215,7 +234,7 @@ class BriefingsComponent:
 
     def payload(self) -> dict:
         hist = self.history()
-        grades = self._grades()
+        grades = self._current_grades()
         latest = {k: next((b for b in hist if b.get("kind") == k), None) for k in schedule.KINDS}
         now = self.clock()
         nxt = {k: (lambda s: s.isoformat() if s else None)(schedule.next_slot(k, now, self.is_trading_day)) for k in schedule.KINDS}

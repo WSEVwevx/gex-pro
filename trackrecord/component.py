@@ -53,6 +53,7 @@ LOOKBACK_DAYS = 10
 MINUTES_KEPT_BY_SOURCE = timedelta(days=28)    # Yahoo serves 1-minute bars for about 30 days
 BACKTEST_MAX_AGE = timedelta(hours=20)
 MIRROR_URL = "https://wsevwevx.github.io/gex-pro/data/trackrecord.json"      # the public record ($GEXPRO_TRACK_MIRROR)
+PRE_FIX_SOURCE = "Cboe 1-minute"     # graded on the 15:59 minute bar (until 2026-11-17): its close missed the closing print
 HISTORY_COLUMNS = ["session", "market", "status", "data_asof", "frozen_at", "ref", "em", "regime", "zero_gamma", "call_wall",
                    "put_wall", "abs_gamma", "bias", "target", "open", "high", "low", "close", "move_em", "close_in_band",
                    "range_in_band", "call_wall_result", "put_wall_result", "bias_right", "graded_at", "note"]
@@ -125,7 +126,39 @@ class TrackRecordComponent:
 
     def sessions(self) -> list[dict]:
         out = [s for s in map(self._read, sorted((self.dir / "sessions").glob("*.json"))) if s]
-        return sorted(out, key=lambda s: (s["session"], s["market"]), reverse=True)
+        return sorted(self._official_closes(out), key=lambda s: (s["session"], s["market"]), reverse=True)
+
+    def _official_closes(self, ss: list[dict]) -> list[dict]:
+        """Until 2026-11-17 a session graded the same evening took its close from the 15:59 minute bar, which misses
+        the closing print (NQ up to 55 points off). Graded files are never rewritten, so each such session is
+        regraded here on the official close, which the record itself holds: the next session's plan was frozen from
+        Cboe's index level before that session's open, and before the open the index level is the previous official
+        close (it matched Yahoo's daily close on all 34 sessions checked). The original outcome is kept in
+        s["correction"]; a session whose next plan is not frozen yet keeps its recorded close until it is."""
+        plans = {(s["session"], s["market"]): s["plan"] for s in ss if s.get("plan")}
+        out = []
+        for s in ss:
+            o = s.get("outcome") or {}
+            if s.get("status") == "graded" and o.get("source") == PRE_FIX_SOURCE:
+                d = nxt = date.fromisoformat(s["session"])
+                for _ in range(10):
+                    nxt += timedelta(days=1)
+                    if self.is_trading_day(nxt):
+                        break
+                p = plans.get((nxt.isoformat(), s["market"])) or {}
+                try:
+                    asof = datetime.fromisoformat(p["asof"])
+                    pre_open = self.session_close(d) < asof < datetime.combine(nxt, OPEN, NY) and p.get("underlying") == s["plan"].get("underlying")
+                except (KeyError, TypeError, ValueError):
+                    pre_open = False
+                if pre_open and abs(p["ref"] - o["close"]) >= 0.005:
+                    c = p["ref"]
+                    bar = {"open": o["open"], "high": max(o["high"], c), "low": min(o["low"], c), "close": c,
+                           "source": "Cboe 1-minute, official close from the next pre-open"}
+                    s = dict(s, outcome=grade(s["plan"], bar),
+                             correction={"recorded": o["close"], "official": c, "from": f"{nxt.isoformat()} plan reference", "original": o})
+            out.append(s)
+        return out
 
     # ---------------------------------------------------------------- the permanent table
     @staticmethod
@@ -141,7 +174,9 @@ class TrackRecordComponent:
                          p.get("em", ""), p.get("regime", ""), p.get("zg", ""), p.get("cw", ""), p.get("pw", ""), p.get("ag", ""),
                          p.get("bias", ""), p.get("target", ""), o.get("open", ""), o.get("high", ""), o.get("low", ""), o.get("close", ""),
                          o.get("move_em", ""), yn(o.get("em_close")), yn(o.get("em_range")), self._wall(o.get("cw")), self._wall(o.get("pw")),
-                         yn(o.get("bias_hit")), s.get("graded_at", ""), s.get("why", "")])
+                         yn(o.get("bias_hit")), s.get("graded_at", ""),
+                         s.get("why") or (f"close corrected from {s['correction']['recorded']} (15:59 minute bar) to the official {s['correction']['official']}"
+                                          if s.get("correction") else "")])
         return rows
 
     def write_history(self) -> Path:
@@ -178,6 +213,8 @@ class TrackRecordComponent:
         copied = []
         with self._lock:
             for s in remote:
+                if isinstance(s, dict) and isinstance(s.get("correction"), dict):
+                    s = {k: v for k, v in s.items() if k != "correction"} | {"outcome": s["correction"].get("original")}
                 try:
                     d, m = date.fromisoformat(s["session"]), s["market"]
                 except (KeyError, ValueError, TypeError):

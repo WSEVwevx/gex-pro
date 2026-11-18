@@ -232,6 +232,24 @@ class TestComponent(unittest.TestCase):
             self.assertEqual(c.payload()["score"]["briefs"], 1)
             self.assertEqual(sum(1 for x in f.read_text().splitlines() if x.startswith("{") and x.endswith("}")), 8)
 
+    def test_a_corrected_close_regrades_the_brief_without_rewriting_the_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            now = [SLOT + timedelta(minutes=1)]
+            rec = history(20)
+            c = BriefingsComponent(context=lambda: ctx(), is_trading_day=is_trading_day, store_dir=tmp, clock=lambda: now[0], record=lambda: rec)
+            c.tick(weekly=False)
+            rec.append(graded("2026-11-16", high=28700.0, low=27880.0, close=28650.0))            # outside the band
+            now[0] = SLOT + timedelta(hours=8)
+            c.tick(weekly=False)
+            stored = (c.dir / "scores.jsonl").read_bytes()
+            band = lambda: [r for r in c.payload()["score"]["rows"] if r["type"] == "band"][0]["k"]
+            self.assertEqual(band(), 0)
+            rec[-1] = dict(graded("2026-11-16", high=28700.0, low=27880.0, close=27920.0), correction={"recorded": 28650.0, "official": 27920.0})
+            self.assertEqual(band(), 1)                                                            # graded on the corrected close
+            c.tick(weekly=False)
+            self.assertEqual((c.dir / "scores.jsonl").read_bytes(), stored)                       # written rows never change
+            self.assertEqual(c.payload()["score"]["briefs"], 1)
+
     def test_an_old_format_brief_is_replaced_only_while_its_window_is_open(self):
         with tempfile.TemporaryDirectory() as tmp:
             now = [datetime(2026, 11, 15, 19, 10, tzinfo=NY)]                               # Sunday evening: Monday's Asia brief

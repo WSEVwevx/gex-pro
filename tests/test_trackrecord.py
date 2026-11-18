@@ -238,6 +238,36 @@ class TestSchedule(unittest.TestCase):
             c.tick()
             self.assertEqual([x["paste"] for x in c.pastes()], ["GEX1;mkt=NQ;bt=20261022;END"])
 
+    def test_a_pre_fix_close_is_shown_on_the_official_close_and_the_file_is_untouched(self):
+        # 2026-11-17 audit: closes graded on the 15:59 bar missed the closing print; graded files are never rewritten,
+        # so the session is regraded on the official close the record holds (the next plan's pre-open reference)
+        plan = lambda day, ref, asof: {"underlying": "NDX", "ref": ref, "em": 300.0, "cw": 27500.0, "pw": 27000.0, "regime": "NEGATIVE",
+                                      "bias": "Neutral", "asof": asof, "frozen_at": asof}
+        bar = {"open": 27229.95, "high": 27258.84, "low": 26580.86, "close": 26946.73, "source": "Cboe 1-minute"}
+        with tempfile.TemporaryDirectory() as tmp:
+            c = self.make(tmp, datetime(2026, 11, 18, 11, 0, tzinfo=NY), lambda d: {})
+            p17 = plan("2026-11-17", 27197.15, "2026-11-17T14:28:00+00:00")
+            c._write(c._path(date(2026, 11, 17), "NQ"), {"session": "2026-11-17", "market": "NQ", "status": "graded", "plan": p17,
+                                                         "outcome": grade(p17, bar), "graded_at": "2026-11-17T21:22:50+00:00"})
+            raw = c._path(date(2026, 11, 17), "NQ").read_bytes()
+            s = [x for x in c.sessions() if x["session"] == "2026-11-17"][0]
+            self.assertNotIn("correction", s)                                    # no next plan yet: as recorded
+            self.assertFalse(s["outcome"]["pw"]["held"])
+            c._write(c._path(date(2026, 11, 18), "NQ"), {"session": "2026-11-18", "market": "NQ", "status": "pending",
+                                                         "plan": plan("2026-11-18", 27001.79, "2026-11-18T14:28:00+00:00"), "outcome": None})
+            s = [x for x in c.sessions() if x["session"] == "2026-11-17"][0]
+            self.assertEqual((s["outcome"]["close"], s["correction"]["recorded"], s["correction"]["official"]), (27001.79, 26946.73, 27001.79))
+            self.assertTrue(s["outcome"]["pw"]["held"])                          # the grade the official close gives
+            self.assertEqual(s["correction"]["original"]["close"], 26946.73)
+            self.assertEqual(c._path(date(2026, 11, 17), "NQ").read_bytes(), raw)    # the graded file itself never changes
+            self.assertIn("corrected from 26946.73", (Path(tmp) / "history.csv").read_text(encoding="utf-8") if c.write_history() else "")
+            # a fresh copy of the public record takes the original outcome, never the corrected one
+            with tempfile.TemporaryDirectory() as tmp2:
+                c2 = self.make(tmp2, datetime(2026, 11, 18, 11, 0, tzinfo=NY), lambda d: {})
+                c2.mirror("x", fetch=lambda u: json.dumps({"sessions": c.sessions()} if u == "x" else {"pastes": []}).encode())
+                self.assertEqual(c2._read(c2._path(date(2026, 11, 17), "NQ"))["outcome"]["close"], 26946.73)
+                self.assertNotIn("correction", c2._read(c2._path(date(2026, 11, 17), "NQ")))
+
     def test_partial_daily_bar_is_never_used(self):
         inp = {"market": "ES", "underlying": "SPX", "ref": 100.0, "em": 10.0}
         with tempfile.TemporaryDirectory() as tmp:

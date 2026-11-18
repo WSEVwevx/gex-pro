@@ -42,6 +42,7 @@ def yahoo(sym):
 
 
 bars2 = {"SPX": yahoo("^GSPC"), "NDX": yahoo("^NDX")}
+PUBLIC = {(x["session"], x["market"]): x for x in json.loads(get("https://wsevwevx.github.io/gex-pro/data/trackrecord.json"))["sessions"]}
 for f in sorted((TRACK / "sessions").glob("*.json")):
     s = json.loads(f.read_text())
     p, o = s.get("plan"), s.get("outcome")
@@ -71,6 +72,21 @@ for f in sorted((TRACK / "sessions").glob("*.json")):
     if not o:
         print(f"     {f.stem}: {s['status']}")
         continue
+    if o.get("source") == "Cboe 1-minute":
+        # graded on the 15:59 minute bar (until 2026-11-17), which misses the closing print. The site shows these on
+        # the official close: the next session's plan reference, frozen from Cboe's index level before its open.
+        later = sorted(g for g in (TRACK / "sessions").glob(f"*_{s['market']}.json") if g.stem[:10] > s["session"])
+        n = json.loads(later[0].read_text()) if later else {}
+        np_ = n.get("plan") or {}
+        nd = date.fromisoformat(n["session"]) if n else None
+        if not np_ or datetime.fromisoformat(np_["asof"]) >= datetime(nd.year, nd.month, nd.day, 9, 30, tzinfo=NY):
+            print(f"WAIT {f.stem}: close from the 15:59 bar; corrected once the next session's plan is frozen")
+            continue
+        o = dict(o, close=np_["ref"])
+        pub = PUBLIC.get((s["session"], s["market"])) or {}
+        check((pub.get("correction") or {}).get("official") == np_["ref"],
+              f"{f.stem}: the site shows the official close {np_['ref']} (recorded {s['outcome']['close']}, the 15:59 bar)")
+        o = dict(pub.get("outcome") or o, close=np_["ref"])
     b2 = bars2[p["underlying"]].get(s["session"])
     if b2:
         diff = max(abs(a - b) for a, b in zip((o["open"], o["high"], o["low"], o["close"]), b2))
