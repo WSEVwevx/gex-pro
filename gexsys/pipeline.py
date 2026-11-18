@@ -16,7 +16,7 @@ from .bias import compute as compute_bias
 from .extras import compute_extras
 from .levels import summarize
 from .mapping import FUTURES, SOURCES, MappingContext, MappingError, map_summary
-from .marketcal import session_state
+from .marketcal import last_close, session_state
 from .models import Quality
 from .normalize import normalize
 from .storage import SnapshotStore
@@ -66,8 +66,10 @@ def run_once(cfg: MarketConfig, provider, store: Optional[SnapshotStore] = None,
     snap = normalize(snap, check_occ=getattr(provider, "name", "") == "cboe")
     ecfg = cfg.engine
     if src.kind.value != "FUT" and session_state(snap.fetched_at) != "RTH":
-        # cash index / ETF is not trading: its last close is the correct reference, not "stale"
-        ecfg = dataclasses.replace(cfg.engine, max_spot_age_s=4 * 86400)
+        # cash index / ETF is not trading: its last close is the correct reference, not "stale" - but anything
+        # older than that close is (a flat 4-day allowance let a Tuesday-evening chain stamped Sunday pass)
+        since_close = (snap.fetched_at - last_close(snap.fetched_at)).total_seconds()
+        ecfg = dataclasses.replace(cfg.engine, max_spot_age_s=since_close + cfg.engine.max_spot_age_s)
         snap.warnings.append("cash market closed - reference is the last close; levels from last session's data")
     res = eng.compute(snap, ecfg, asof=snap.fetched_at)
     summary = summarize(res, cfg.levels)

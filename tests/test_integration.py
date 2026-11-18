@@ -110,6 +110,39 @@ class TestPipeline(unittest.TestCase):
         self.assertGreater(sum(1 for r in res.rows if r.gamma_quality.value == "CALC"), 0)
 
 
+class TestClosedMarketStaleness(unittest.TestCase):
+    """Outside cash hours the last close is the right reference, but nothing older than that close is
+    (stress test E1, 2026-11-17: a Tuesday-evening chain stamped Sunday passed as fresh and ES zero gamma moved)."""
+    def run_at(self, fetched, spot_time):
+        from datetime import timedelta
+        from tests.util import chain, contract
+
+        class One:
+            name = "test"
+            def fetch_snapshot(self, *a):
+                cs = [contract(k, t, asof=fetched, days=3) for k in range(90, 111, 2) for t in "CP"]
+                s = chain(cs, spot_time=spot_time)
+                s.fetched_at = fetched
+                return s
+        with tempfile.TemporaryDirectory() as tmp:
+            return run_once(synth_cfg(tmp), One())["summary"]["warnings"]
+
+    def test_older_than_the_last_close_is_stale(self):
+        from datetime import datetime, timezone
+        tue_8pm = datetime(2026, 11, 18, 1, 0, tzinfo=timezone.utc)
+        sun_745pm = datetime(2026, 11, 16, 0, 45, tzinfo=timezone.utc)
+        self.assertTrue(any("stale" in w for w in self.run_at(tue_8pm, sun_745pm)))
+
+    def test_the_last_close_itself_is_not_stale(self):
+        from datetime import datetime, timezone
+        sun_8pm = datetime(2026, 11, 16, 1, 0, tzinfo=timezone.utc)           # Sunday evening, Friday's close
+        fri_close = datetime(2026, 11, 13, 21, 0, tzinfo=timezone.utc)
+        tue_8pm = datetime(2026, 11, 18, 1, 0, tzinfo=timezone.utc)
+        tue_close = datetime(2026, 11, 17, 21, 0, tzinfo=timezone.utc)
+        self.assertFalse(any("stale" in w for w in self.run_at(sun_8pm, fri_close)))
+        self.assertFalse(any("stale" in w for w in self.run_at(tue_8pm, tue_close)))
+
+
 class TestExport(unittest.TestCase):
     def test_round_trip(self):
         s = {"asof": "2026-10-20T15:00:00+00:00", "ref_price": 5800.0, "ref_quality": "DL", "positioning": "conventional",

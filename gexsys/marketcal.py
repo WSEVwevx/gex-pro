@@ -121,6 +121,18 @@ def rth_close(d: date) -> time:
     return early_closes(d.year).get(d, time(16, 0))
 
 
+def last_close(t: datetime) -> datetime:
+    """The most recent regular-session close at or before t."""
+    d = t.astimezone(NY).date()
+    for _ in range(12):
+        if is_trading_day(d):
+            c = datetime.combine(d, rth_close(d), NY)
+            if c <= t:
+                return c
+        d -= timedelta(days=1)
+    return t
+
+
 def session_state(dt: datetime) -> str:
     """RTH | ETH (Globex open, cash closed) | CLOSED | HOLIDAY."""
     if dt.tzinfo is None:

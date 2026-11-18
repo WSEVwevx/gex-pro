@@ -173,18 +173,6 @@ def _sessions(first: date, last: date) -> int:
     return sum(1 for i in range((last - first).days + 1) if marketcal.is_trading_day(first + timedelta(days=i)))
 
 
-def _last_close(t: datetime) -> datetime:
-    """The most recent regular-session close at or before t."""
-    d = t.astimezone(marketcal.NY).date()
-    for _ in range(12):
-        if marketcal.is_trading_day(d):
-            c = datetime.combine(d, marketcal.rth_close(d), marketcal.NY)
-            if c <= t:
-                return c
-        d -= timedelta(days=1)
-    return t
-
-
 def expected_moves(snap: ChainSnapshot, basket: list[str], asof: datetime, ivs_from: list[OptionContract]) -> Optional[dict]:
     if snap.spot is None or not basket:
         return None
@@ -198,7 +186,7 @@ def expected_moves(snap: ChainSnapshot, basket: list[str], asof: datetime, ivs_f
     # asof: otherwise the band would shrink all night on unchanged prices.
     t0 = asof
     if not rth and snap.spot_time and snap.spot_time < asof:
-        t0 = max(snap.spot_time, _last_close(asof))
+        t0 = max(snap.spot_time, marketcal.last_close(asof))
     b = set(basket)
     days = sorted({c.expiration.date().isoformat() for c in ivs_from if c.iv and c.expiration > asof
                    and c.expiration.date().isoformat() in b})
