@@ -32,7 +32,7 @@ from .models import SourceKind
 log = logging.getLogger(__name__)
 OBSERVED = {"NDX": ("NQ=F", "^NDX"), "SPX": ("ES=F", "^GSPC")}     # Yahoo's continuous futures roll like NQ1!
 MAP_N = 15                       # minutes in the median, as in the indicator
-MAX_AGE = timedelta(days=4)      # older than this (a long weekend at most): use the carry model
+MAX_LAG = timedelta(hours=1)     # bars ending more than this before the last session's close are stale: carry model
 MAX_MODEL_GAP = 0.003            # further than this from the carry model: misaligned or wrong bars
 _cache: dict = {}
 DEFAULT_DIV_YIELD = {"SPX": 0.013, "NDX": 0.007, "SPY": 0.013, "QQQ": 0.006}
@@ -96,17 +96,33 @@ def median_ratio(fut: dict, idx: dict, asof: datetime) -> Optional[tuple[float, 
     return statistics.median(fut[t] / idx[t] for t in run), datetime.fromtimestamp(ts[-1], timezone.utc)
 
 
+def _move_together(fut: dict, idx: dict, end: float, n: int = 120) -> bool:
+    """Do the futures and the index move the same way minute by minute, over the last n minutes both traded?
+    Bars shifted in time still give a plausible ratio, but their moves stop agreeing (2026-11-17, 5 days of
+    1-minute bars: aligned NQ and ES agreed in sign 89-100% over every 120-minute window; shifted 1 minute to 1
+    hour, 47-63%). Signs, not a correlation, so one bad print cannot decide it."""
+    ok = lambda d, t: t in d and t - 60 in d and math.isfinite(d[t]) and math.isfinite(d[t - 60])
+    ts = [t for t in sorted(idx) if t <= end and ok(idx, t) and ok(fut, t)][-n:]
+    moves = [(fut[t] - fut[t - 60], idx[t] - idx[t - 60]) for t in ts]
+    moves = [(a, b) for a, b in moves if a and b]
+    return len(moves) >= 20 and sum((a > 0) == (b > 0) for a, b in moves) / len(moves) >= 0.75
+
+
 def observed_basis(source_key: str, asof: datetime) -> Optional[tuple[float, datetime, str]]:
     """(ratio, time, label) from free 1-minute bars, or None when they are missing, stale or implausible."""
     if source_key not in OBSERVED:
         return None
     fs, ix = OBSERVED[source_key]
     try:
-        got = median_ratio(_yahoo_1m(fs, asof), _yahoo_1m(ix, asof), asof)
+        fut, idx = _yahoo_1m(fs, asof), _yahoo_1m(ix, asof)
+        got = median_ratio(fut, idx, asof)
     except Exception as e:                       # network, rate limit, format change: the carry model stands in
         log.warning("measured basis unavailable (%s)", e)
         return None
-    if not got or asof - got[1] > MAX_AGE or not 0.98 < got[0] < 1.05:
+    if not got or got[1] < marketcal.last_close(asof) - MAX_LAG or not 0.98 < got[0] < 1.05:
+        return None
+    if not _move_together(fut, idx, asof.timestamp()):
+        log.warning("futures and index bars do not move together (shifted clock?); measured basis not used")
         return None
     # misaligned bars (a shifted clock) give a plausible-looking but wrong ratio: the market's basis never
     # strayed more than 0.17% from the carry model in Oct-Nov 2026 (stress tests C1, E1)

@@ -171,8 +171,8 @@ class TestCombined(unittest.TestCase):
         # futures / index ratio of the last 15 minutes both traded, restarted after an hour's gap, like the indicator
         from gexsys import basis
         t0 = int(datetime(2026, 11, 9, 15, 0, tzinfo=NY).timestamp())
-        idx = {t0 + 60 * i: 100.0 for i in range(30)}
-        fut = {t: 100.4 for t in idx}
+        idx = {t0 + 60 * i: 100.0 + 0.1 * (i * 7 % 5) for i in range(30)}     # prices that move, as real ones do
+        fut = {t: v * 1.004 for t, v in idx.items()}
         fut[t0 + 60 * 29] = 150.0                                          # one bad print: the median ignores it
         idx[t0 + 86400] = 100.0                                            # next day, one minute only: a new session
         fut[t0 + 86400] = 100.35
@@ -186,9 +186,17 @@ class TestCombined(unittest.TestCase):
             self.assertAlmostEqual(ob[0], 1.004, places=12)
             self.assertIn("NQ=F", ob[2])
             self.assertIsNone(basis.observed_basis("NDX", datetime(2026, 11, 20, 12, 0, tzinfo=NY)))   # stale
+            # 2026-11-17 audit: bars ending Tuesday, read on Thursday evening, were inside a flat 4-day allowance;
+            # anything older than the last session's close is stale
+            self.assertIsNone(basis.observed_basis("NDX", datetime(2026, 11, 12, 20, 0, tzinfo=NY)))
             # stress test E1: bars shifted an hour gave a plausible but 93-point-wrong ratio; 0.6% from carry is refused
             far = {t: v * 1.006 for t, v in fut.items()}
             basis._yahoo_1m = lambda sym, asof: far if "=F" in sym else idx
+            self.assertIsNone(basis.observed_basis("NDX", datetime(2026, 11, 9, 23, 0, tzinfo=NY)))
+            # 2026-11-17 audit: shifted a little less, the ratio stays inside the 0.3% guard (29 NQ points off on
+            # live bars) - but the two series no longer move together minute by minute, which aligned bars always do
+            late = {t + 60: v for t, v in fut.items()}
+            basis._yahoo_1m = lambda sym, asof: late if "=F" in sym else idx
             self.assertIsNone(basis.observed_basis("NDX", datetime(2026, 11, 9, 23, 0, tzinfo=NY)))
             def down(sym, asof):
                 raise OSError("offline")
