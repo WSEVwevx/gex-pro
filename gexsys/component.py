@@ -148,6 +148,15 @@ class GexComponent:
                          "pages": ["Copy for TradingView", "Indicator"], "last_ok": pub.get("published_at"),
                          "error": None, "fresh_h": 1.5 if trading else None,
                          "detail": f"the paste on the site is the {pub['slot_et']} ET one" if pub.get("slot_et") else None})
+            # the website's index -> futures conversion: the measured NQ=F / ^NDX basis, or the carry model when
+            # Yahoo's minute bars fail (that model sat ~20 NQ / 6 ES points below the market, stress test C1)
+            mode = (((getattr(w, "result", None) or {}).get("mapped") or {}).get("mapping") or {}).get("futures_ref_mode") or ""
+            if mode:
+                measured = mode.startswith("measured")
+                rows.append({"name": f"{w.cfg.market} futures basis", "provider": "Yahoo Finance 1-minute bars",
+                             "pages": ["Levels", "Heatmap", "Bias"], "last_ok": ok, "error": None, "detail": mode,
+                             "note": None if measured else "fell back to the carry model: website levels may sit "
+                             "about 20 NQ / 6 ES points off (the TradingView chart maps live and is unaffected)"})
         for m in dict.fromkeys(w.cfg.market for w in self.workers.values()):
             s = self.heat.status.get(m) or {}
             rows.append({"name": f"{m} futures candles", "provider": "Yahoo Finance", "pages": ["Heatmap"],

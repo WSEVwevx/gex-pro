@@ -79,11 +79,10 @@ from price is never drawn; a paste with two sources draws extra levels and the p
   strength bar, e.g. `━━━━ C1  Ab2`. Ranked levels: `C1`-`C7` (most positive net GEX), `P1`-`P7` (most
   negative net GEX), `Ab1`-`Ab3` (most total gamma). **Ranked from** picks their source. *First expiry*
   means today's expiring options (the next expiry when none expire today): their gamma sits close to
-  price, so many nearby levels for intraday trading. *auto* (default) ranks whichever chain holds most of
-  that gamma: for NQ usually QQQ alone, at QQQ's own strikes (about 41 NQ points apart, the way the common
-  0DTE GEX tools draw NQ); for ES usually SPX with SPY, neighbouring strikes folded 10 points apart. *ETF
-  only* and *index + ETF* force one; *All expirations* ranks every expiry out to 45 days (fewer, bigger
-  levels further out). The hover header names the chain, e.g. `QQQ standalone · first expiry 0DTE`.
+  price, so many nearby levels for intraday trading. *index + ETF* (default) ranks both chains together on
+  the index grid: NDX with QQQ (neighbouring strikes folded 40 points apart), SPX with SPY (10 points).
+  *ETF only* draws QQQ / SPY strikes alone (QQQ's are about 41 NQ points apart); *All expirations* ranks
+  every expiry out to 45 days (fewer, bigger levels further out). The hover header names the chain, e.g. `NDX + QQQ · first expiry 0DTE`.
   The bar's length is the level's share of gamma, relative to the strongest. `••` dots mark confluence
   (that many levels at or within 0.10% of the price).
 * **Hover a tag** for its analysis, laid out like this: the expiry it comes from; the price and its

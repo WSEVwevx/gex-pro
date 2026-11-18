@@ -107,6 +107,24 @@ class TestGexRow(unittest.TestCase):
         self.assertEqual(status(row, datetime.now(timezone.utc)), "failing")
 
 
+class TestBasisRow(unittest.TestCase):
+    def test_carry_fallback_shows_as_partial(self):
+        # Yahoo's minute bars failing used to switch the website to the carry model (~20 NQ points off) silently
+        import time
+        from types import SimpleNamespace
+        from gexsys.component import GexComponent
+        g = GexComponent([])
+        for mode, want in (("measured NQ=F / ^NDX basis (15-minute median to 11-17 16:00 ET)", "ok"),
+                           ("carry-model fair value for NQZ6 (r 4.00%, dividend 0.70%) - measured basis unavailable", "partial")):
+            w = SimpleNamespace(cfg=SimpleNamespace(market="NQ", source="NDX"), label="CBOE", last_success=time.time(), failures=0,
+                                last_error=None, health=lambda: {"status": "ok", "calc_status": "OK"}, published=None,
+                                result={"mapped": {"mapping": {"futures_ref_mode": mode}}})
+            g.workers = {"NQ-CBOE": w}
+            row = next(r for r in g.sources() if r["name"] == "NQ futures basis")
+            self.assertEqual(status(row, datetime.now(timezone.utc)), want)
+            self.assertEqual(row["detail"], mode)
+
+
 class TestPasteRow(unittest.TestCase):
     def test_old_paste_is_late_while_the_futures_trade(self):
         import time

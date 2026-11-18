@@ -247,16 +247,15 @@ window.GEX_LIBRARY = (() => {
       example: `A tag reading "▬▬▬▬▬▬ C1  Ab2" at 29,800 means it is both the strongest positive-gamma strike and the second-largest total-gamma strike: a significant level.`,
       gex: ["indicator", "Copy the indicator and today's paste"],
       quiz: {q: "What does P1 mark?", choices: ["The strongest call strike", "The strike with the most negative net GEX", "The previous close"], answer: 1, why: "P levels rank negative net GEX; P1 is the largest of them."}}),
-    L({id: "first-expiry", chapter: "levels", title: "First expiry and standalone levels", minutes: 3,
-      oneLiner: "Intraday levels come from the nearest expiration, and for NQ usually from QQQ's own strikes.",
+    L({id: "first-expiry", chapter: "levels", title: "First expiry levels", minutes: 3,
+      oneLiner: "Intraday levels come from the nearest expiration, with the index and ETF options together.",
       body: `<p>By default the indicator ranks C, P and Ab levels from the <b>first expiry</b>: today's 0DTE options during the session, or the next expiry when none expire today. Their gamma sits close to price, so they produce many nearby, intraday-relevant levels. "All expirations" ranks every expiry out to 45 days instead, giving fewer, larger levels further away.</p>
-        <p>The default <b>auto</b> choice uses whichever chain holds most of that expiry's gamma:</p>
-        <ul><li><b>NQ</b>: usually <b>QQQ standalone</b>. QQQ's 0DTE options outweigh NDX's, and levels sit on QQQ's own $1 strikes, about 41 NQ points apart.</li><li><b>ES</b>: usually <b>SPX + SPY</b>, because SPX's 0DTE gamma is several times SPY's.</li></ul>
-        <p>The hover box always names the source, for example "QQQ standalone · first expiry 0DTE".</p>`,
-      points: ["First expiry = today's 0DTE (or the next expiry).", "NQ: usually QQQ standalone. ES: usually SPX + SPY.", "Before the open, levels use yesterday's closing data."],
-      example: `With an NQ/QQQ ratio of 41.28, QQQ strikes 720, 721 and 722 map to NQ at about 29,722, 29,763 and 29,804.`,
+        <p>By default both chains count: <b>NDX + QQQ</b> for NQ and <b>SPX + SPY</b> for ES, on the index's strike grid. QQQ often holds more of NQ's near-expiry gamma (64% on Nov 18, 2026), but NDX's share is real positioning too, so leaving it out would hide levels. "ETF only" in the settings draws QQQ or SPY strikes alone.</p>
+        <p>The hover box always names the source, for example "NDX + QQQ · first expiry 0DTE".</p>`,
+      points: ["First expiry = today's 0DTE (or the next expiry).", "NQ: NDX + QQQ. ES: SPX + SPY.", "Before the open, levels use yesterday's closing data."],
+      example: `With an NQ/QQQ ratio of 41.28, QQQ strikes 720, 721 and 722 map to NQ at about 29,722, 29,763 and 29,804; on the index grid, nearby NDX and QQQ strikes fold into one level.`,
       gex: ["indicator", "Change 'Ranked from' in the indicator settings"],
-      quiz: {q: "Why are NQ intraday levels about 41 points apart?", choices: ["It is a fixed setting", "They sit on QQQ's $1 strikes, about 41 NQ points each", "NQ futures only trade every 41 points"], answer: 1, why: "In standalone mode the levels are QQQ strikes converted to NQ, and one QQQ dollar is about 41 NQ points."}}),
+      quiz: {q: "In 'ETF only' mode, why are NQ levels about 41 points apart?", choices: ["It is a fixed setting", "They sit on QQQ's $1 strikes, about 41 NQ points each", "NQ futures only trade every 41 points"], answer: 1, why: "In ETF-only mode the levels are QQQ strikes converted to NQ, and one QQQ dollar is about 41 NQ points."}}),
     L({id: "gamma-zones", chapter: "levels", title: "Gamma zones and confluence", minutes: 4,
       oneLiner: "The ranked levels and the gamma flip divide the chart into zones with different hedging behaviour.",
       body: `{{d:zones}}<ul><li><b>Positive Gamma Zone</b>: from the gamma flip up to C1. Call-dominated gamma; hedging dampens moves.</li><li><b>Positive Gamma Extension Zone</b>: from C1 up to the next call level. Above C1 hedging pressure eases.</li><li><b>Negative Gamma Zone</b>: from P1 up to the gamma flip. Put-dominated gamma; hedging adds to moves.</li><li><b>Negative Gamma Extension Zone</b>: from P1 down to the next put level. Below P1 hedging adds to selling.</li></ul>

@@ -70,8 +70,8 @@ showRank = input.bool(true, "Ranked levels (C1-C7, P1-P7, Ab1-Ab3)", inline = "r
 styRank = "────"
 wRankPick = "───"
 wRank = pxOf(wRankPick)
-rankSrc = input.string("First expiry: auto", "Ranked from", options = ["First expiry: auto", "First expiry: ETF only", "First expiry: index + ETF", "All expirations (45 days)"], group = G2,
-     tooltip = "First expiry = today's expiring options (or the next expiry when none expire today): their gamma sits close to price, so many nearby levels for intraday trading.\nauto (recommended): whichever chain holds most of that gamma - for NQ usually QQQ alone (levels on QQQ's own strikes, about 41 NQ points apart), for ES usually SPX with SPY.\nETF only: QQQ / SPY strikes alone.\nindex + ETF: both chains on the index's strike grid.\nAll expirations: every expiry out to 45 days; fewer, bigger levels further out.", display = display.none)
+rankSrc = input.string("First expiry: index + ETF", "Ranked from", options = ["First expiry: index + ETF", "First expiry: ETF only", "All expirations (45 days)"], group = G2,
+     tooltip = "First expiry = today's expiring options (or the next expiry when none expire today): their gamma sits close to price, so many nearby levels for intraday trading.\nindex + ETF (recommended): NDX and QQQ (or SPX and SPY) together on the index's strike grid, so no chain's gamma is left out.\nETF only: QQQ / SPY strikes alone (QQQ's $1 strikes are about 41 NQ points apart).\nAll expirations: every expiry out to 45 days; fewer, bigger levels further out.", display = display.none)
 rankC = input.int(7, "Call and put levels", minval = 0, maxval = 7, group = G2, display = display.none)
 rankP = rankC
 rankA = input.int(3, "Absolute-gamma levels", minval = 0, maxval = 3, group = G2, tooltip = "How many call, put and absolute-gamma levels to draw (strongest first).", display = display.none)
@@ -705,7 +705,7 @@ rankedOf(Snap s) =>
     bool hasI = s.rk0 != ""
     bool hasE = s.rk0e != ""
     bool first = rankSrc != "All expirations (45 days)" and (hasI or hasE)
-    bool etf = first and (rankSrc == "First expiry: ETF only" ? hasE : rankSrc == "First expiry: index + ETF" ? not hasI : hasE and (nz(s.g0e) >= 50 or not hasI))
+    bool etf = first and (rankSrc == "First expiry: ETF only" ? hasE : not hasI)
     string what = not first ? "all expiries'" : etf ? s.etf + "'s own (this expiry)" : "this expiry's"
     [first ? (etf ? s.rk0e : s.rk0) : s.rk, what, first, etf]
 

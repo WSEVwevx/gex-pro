@@ -10,7 +10,7 @@ def snap(t, c1=100.0, p1=90.0, regime="POSITIVE", zg=95.0, etf_share=0.6):
     rk = {"call": [{"price": c1}, {"price": c1 + 5}], "put": [{"price": p1}], "abs": [{"price": c1}]}
     return {"asof": t.isoformat(), "regime": regime, "zero_gamma": {"price": zg}, "call_wall": {"price": 110.0},
             "put_wall": {"price": 80.0},
-            "extras": {"nearest": {"ranked": {"call": [{"price": 1.0}]}, "ranked_etf": rk, "etf_share": etf_share,
+            "extras": {"nearest": {"ranked": rk, "ranked_etf": {"call": [{"price": 1.0}]}, "etf_share": etf_share,
                                    "zero_gamma": {"price": 96.0}}}}
 
 
@@ -38,10 +38,13 @@ class TestSession(unittest.TestCase):
             self.assertEqual(session.history_token(pr), "20261027:97.0:110.0:80.0,20261026:95.0:110.0:80.0")
             self.assertEqual(session.prior_levels(folder, tue.replace(hour=20), n=1), pr[:1])
 
-    def test_key_levels_follow_the_auto_chain(self):
-        lv = session.key_levels(snap(T0))
+    def test_key_levels_use_index_and_etf_together(self):
+        # NDX stays in even when QQQ holds most of the expiry's gamma (it held 64% on 2026-11-18)
+        lv = session.key_levels(snap(T0, etf_share=0.64))
         self.assertEqual((lv["C1"], lv["C2"], lv["P1"], lv["Ab1"], lv["flip"], lv["ZG"], lv["CW"]), (100.0, 105.0, 90.0, 100.0, 96.0, 95.0, 110.0))
-        self.assertEqual(session.key_levels(snap(T0, etf_share=0.2))["C1"], 1.0)        # index + ETF ranking
+        s = snap(T0)
+        s["extras"]["nearest"]["ranked"] = None                                          # no index chain: the ETF alone
+        self.assertEqual(session.key_levels(s)["C1"], 1.0)
 
     def test_changes_need_two_snapshots(self):
         s = [snap(T0), snap(T0 + timedelta(minutes=5), c1=104), snap(T0 + timedelta(minutes=10)),   # one-off flicker

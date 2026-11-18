@@ -19,8 +19,8 @@ R = ranked levels near price for the chart's tags: C (most positive net GEX firs
 net GEX first), A (most total gamma first), each "price:share %" in rank order.
 R0 = the same for the first expiration only (x0d = its date): C1-C7, P1-P7, Ab1-Ab3 close to price,
 index + ETF options together, neighbouring strikes folded (40 points on NDX, 10 on SPX). R0e = the ETF's
-options alone at their own strikes (QQQ / SPY), g0e = the ETF's % of that expiry's gamma: the chart's
-"auto" choice uses R0e when the ETF holds most of it (NQ: QQQ), else R0 (ES: SPX).
+options alone at their own strikes (QQQ / SPY), g0e = the ETF's % of that expiry's gamma. The chart uses R0
+by default (index + ETF), R0e only in "ETF only" mode or when the index chain is missing.
 
 Level prices are in the OPTIONS-UNDERLYING space (e.g. NDX points).  The Pine
 script maps them to the chart with either a live TradingView reference symbol

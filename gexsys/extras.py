@@ -57,8 +57,8 @@ def nearest_expiry_levels(snap: ChainSnapshot, cfg: eng.EngineConfig, res: eng.G
     s = summarize(sub, LevelConfig(top_n=0))
     # the chart's tags: this expiry's strongest levels close to price (C1-C7, P1-P7, Ab1-Ab3), two ways:
     #   ranked      index + ETF options together, on the index strike grid (neighbours folded together)
-    #   ranked_etf  the ETF's options alone at its own strikes (QQQ $1 = ~41 NQ points), the way the common
-    #               0DTE GEX tools draw NQ; etf_share says which chain holds more of this expiry's gamma
+    #   ranked_etf  the ETF's options alone at its own strikes (QQQ $1 = ~41 NQ points), drawn only in the
+    #               chart's "ETF only" mode; etf_share says which chain holds more of this expiry's gamma
     etf: dict = {}
     for r in sub.rows:
         if r.contract.group_strike is not None:                     # converted ETF leg: exact strike x ratio

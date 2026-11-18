@@ -36,8 +36,7 @@ def key_levels(s: dict) -> dict:
     """The watched levels from one summary (index prices); missing ones are left out."""
     out: dict = {"regime": s.get("regime")}
     n = (s.get("extras") or {}).get("nearest") or {}
-    rk = n.get("ranked_etf") if (n.get("etf_share") or 0) >= 0.5 and n.get("ranked_etf") else n.get("ranked")
-    rk = rk or {}
+    rk = n.get("ranked") or n.get("ranked_etf") or {}            # index + ETF together; the ETF alone only without the index
     for side, code, k in (("call", "C", 2), ("put", "P", 2), ("abs", "Ab", 1)):
         for i, x in enumerate((rk.get(side) or [])[:k]):
             out[f"{code}{i + 1}"] = _p(x)

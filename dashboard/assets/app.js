@@ -1934,9 +1934,9 @@ function renderHeatmap(){
   const ses = hmSessions(hm._times);
   hm._opens = ses.opens; hm._starts = ses.starts;
   hm._profile = [...hm.columns].reverse().find(c => !c.rel) || null;
-  // today's key levels from the latest calculation: the first expiry's C / P / Ab (the indicator's 'auto' chain) and its flip
+  // today's key levels from the latest calculation: the first expiry's C / P / Ab (index + ETF, as the indicator ranks them) and its flip
   const wk = data && data.workers.find(x => x.market === market && x.result), nr = wk && ((wk.result.summary.extras || {}).nearest || {});
-  const rk = nr && (nr.etf_share >= .5 && nr.ranked_etf ? nr.ranked_etf : nr.ranked);
+  const rk = nr && (nr.ranked || nr.ranked_etf);
   const fut = p => Math.round((p * hm.factor + hm.offset) * 4) / 4;
   hm._marks = !rk ? [] : [
     ...(rk.call || []).slice(0, 2).map((x, i) => ({p: fut(x.price), label: "C" + (i + 1), col: cssVar("--pos")})),

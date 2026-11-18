@@ -111,7 +111,7 @@ def draw(d: dict, f: float) -> list[tuple[float, list[str]]]:
 
     has_i, has_e = bool(d["rk0"]), bool(d["rk0e"])
     first = has_i or has_e
-    etf = first and has_e and ((d["g0e"] or 0) >= 50 or not has_i)
+    etf = first and has_e and not has_i                  # the default "index + ETF": the ETF alone only without the index
     ranked = d["rk0e"] if etf else d["rk0"] if first else d["rk"]
     level(mp(d["zg"]), "ZG")
     level(mp(d["cw"]), "CW")
