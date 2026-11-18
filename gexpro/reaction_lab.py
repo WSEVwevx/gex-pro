@@ -27,6 +27,7 @@ BRANCH = "origin/track-record"
 TYPES = ["ZG", "CW", "PW", "Ab1", "C1", "C2", "C3", "P1", "P2", "P3"]      # also the cluster order
 PLAN_KEY = {"ZG": "zg", "CW": "cw", "PW": "pw", "Ab1": "ag"}
 HORIZONS = (15, 30, 60)
+SEED, DRAWS, REPS = 20261118, 1000, 10000      # as written in the definition (test_reaction_lab checks the text)
 BUCKETS = (("09:30-10:30", time(10, 30)), ("10:30-15:00", time(15, 0)), ("15:00-close", time(23, 59)))
 
 
@@ -68,24 +69,44 @@ def _roll_week(d: date) -> bool:
     return marketcal.roll_date(d.year, m) <= d <= marketcal.quarterly_expiry(d.year, m)
 
 
-def load(branch: str = BRANCH) -> list[dict]:
-    """Every graded session with a 1-minute record, oldest first, from the public track record."""
-    git = lambda *a: subprocess.run(["git", *a], cwd=ROOT, capture_output=True, text=True, encoding="utf-8").stdout
+def read_branch(branch: str = BRANCH) -> dict[str, bytes]:
+    """{path: bytes} of the track record's sessions, minutes and pastes, read with one git process."""
+    git = lambda *a, **k: subprocess.run(["git", *a], cwd=ROOT, capture_output=True, **k).stdout
     git("fetch", "-q", "origin", "track-record")
-    files = set(git("ls-tree", "-r", "--name-only", branch).split())
+    paths = [f for f in git("ls-tree", "-r", "--name-only", branch).decode().split()
+             if f.startswith(("sessions/", "minutes/", "pastes/"))]
+    out, buf = {}, git("cat-file", "--batch", input="".join(f"{branch}:{f}\n" for f in paths).encode())
+    for f in paths:                                     # each answer: "<sha> blob <size>\n<bytes>\n"
+        head, buf = buf.split(b"\n", 1)
+        size = int(head.split()[2])
+        out[f], buf = buf[:size], buf[size + 1:]
+    return out
+
+
+def load(branch: str = BRANCH, files: Optional[dict] = None, skipped: Optional[list] = None) -> list[dict]:
+    """Every graded session with a 1-minute record and an expected move, oldest first. Sessions left out, and sessions
+    whose previous trading day has no graded close (all their levels: no_prior_close), are named in `skipped`."""
+    files = read_branch(branch) if files is None else files
+    skipped = [] if skipped is None else skipped
     graded = {}
     for f in sorted(x for x in files if x.startswith("sessions/")):
-        s = json.loads(git("show", f"{branch}:{f}"))
+        s = json.loads(files[f])
         if s.get("status") == "graded":
             graded[(s["session"], s["market"])] = s
     out = []
     for (d, m), s in sorted(graded.items()):
         name = f"{d}_{m}"
         if f"minutes/{name}.json" not in files:
+            skipped.append(f"{name}: no 1-minute record")
+            continue
+        if not (s.get("plan") or {}).get("em"):
+            skipped.append(f"{name}: the plan has no expected move")
             continue
         prev = graded.get((marketcal.previous_trading_day(date.fromisoformat(d)).isoformat(), m))
-        paste = git("show", f"{branch}:pastes/{name}.txt") if f"pastes/{name}.txt" in files else None
-        out.append(session_input(s, json.loads(git("show", f"{branch}:minutes/{name}.json")), paste,
+        if prev is None:
+            skipped.append(f"{name}: the previous trading day has no graded close (levels counted as no_prior_close)")
+        paste = files[f"pastes/{name}.txt"].decode() if f"pastes/{name}.txt" in files else None
+        out.append(session_input(s, json.loads(files[f"minutes/{name}.json"]), paste,
                                  prev["outcome"]["close"] if prev else None))
     return out
 
@@ -221,15 +242,18 @@ def cell(real: list[dict], rand: list[dict], st: dict, seed: int, reps: int) -> 
     rr, br = rate(real), rate(rand)
     out.update(reject=round(rr, 4), baseline=None if br is None else round(br, 4),
                difference=None if br is None else round(rr - br, 4), interval=bootstrap(real, rand, reps, seed))
+    if out["interval"] is None:
+        out["interval_note"] = "unavailable: over 10% of session resamples had no touch on one side"
     return out
 
 
-def run(sessions: list[dict], shift_pts: Optional[dict] = None, reps: Optional[int] = None) -> dict:
+def run(sessions: list[dict], shift_pts: Optional[dict] = None, reps: Optional[int] = None,
+        skipped: Optional[list] = None) -> dict:
     """The whole study (and, with shift_pts {market: points}, the shifted-levels robustness run)."""
     d, sha = definition()
     rules, st = d["rules"], d["statistics"]
-    seed, n = 20261118, 1000
-    reps = reps or 10000
+    seed, n = SEED, DRAWS
+    reps = reps or REPS
     shifted = [dict(s, levels={t: v + (shift_pts or {}).get(s["market"], 0.0) for t, v in s["levels"].items()}) for s in sessions]
     real = [r for s in shifted for r in session_levels(s, rules)]
     rand = baseline(shifted, real, rules, n, seed)
@@ -250,7 +274,8 @@ def run(sessions: list[dict], shift_pts: Optional[dict] = None, reps: Optional[i
     return {"study": d["study"], "version": d["version"], "definition_sha256": sha, "seed": seed, "baseline_per_type": n,
             "bootstrap_reps": reps, "shift_pts": shift_pts or {}, "sessions": len(sessions),
             "data_from": min(s["session"] for s in sessions), "data_through": max(s["session"] for s in sessions),
-            "roll_week_sessions": sum(s["roll_week"] for s in sessions), "table": table, "levels": real}
+            "roll_week_sessions": sum(s["roll_week"] for s in sessions), "skipped": skipped or [], "table": table,
+            "levels": real}
 
 
 def main(argv=None) -> int:
@@ -258,11 +283,14 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="gexpro.reaction_lab")
     ap.add_argument("--out")
     a = ap.parse_args(argv)
-    sessions = load()
-    res = {"main": run(sessions), "shift_up": run(sessions, {"NQ": 5.0, "ES": 1.0}), "shift_down": run(sessions, {"NQ": -5.0, "ES": -1.0})}
+    skipped: list = []
+    sessions = load(skipped=skipped)
+    res = {"main": run(sessions, skipped=skipped), "shift_up": run(sessions, {"NQ": 5.0, "ES": 1.0}), "shift_down": run(sessions, {"NQ": -5.0, "ES": -1.0})}
     m = res["main"]
     print(f"level_reaction v{m['version']}  definition sha256 {m['definition_sha256']}  seed {m['seed']}")
     print(f"{m['sessions']} sessions ({m['data_from']} to {m['data_through']}), roll-week sessions {m['roll_week_sessions']}")
+    for x in m["skipped"]:
+        print("  note: " + x)
     print(f"{'mkt':4}{'type':5}{'sess':>5}{'lvls':>5}{'touch':>6}{'rej':>5}{'brk':>5}{'stl':>5}  {'real':>6} {'base':>6} {'diff':>7}  interval        +5/+1   -5/-1")
     alt = {k: {(r['market'], r['type']): r['all'] for r in res[k]['table']} for k in ("shift_up", "shift_down")}
     for r in m["table"]:

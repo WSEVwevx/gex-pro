@@ -1,4 +1,5 @@
 """Study level_reaction v1 (gexpro/reaction_lab.py): every rule of studies/level_reaction/v1.json on hand-made bars."""
+import json
 import unittest
 
 from gexpro import reaction_lab as L
@@ -34,6 +35,36 @@ class TestDefinition(unittest.TestCase):
         self.assertAlmostEqual(s["open"], 202.0)
         self.assertAlmostEqual(s["prev_close"], 191.9)
         self.assertAlmostEqual(s["em"], 10.1)
+
+
+class TestLoad(unittest.TestCase):
+    def files(self):
+        def one(d, m, em=40.0, status="graded", close=100.0):
+            return json.dumps({"session": d, "market": m, "status": status, "plan": {"zg": 110.0, "em": em, "regime": "X"},
+                               "outcome": {"close": close}}).encode()
+        mins = json.dumps({"ratio": 1.0, "index_open": 100.0, "bars": [[0, 101, 99, 100]], "close_min": 390}).encode()
+        return {"sessions/2026-11-06_NQ.json": one("2026-11-06", "NQ", close=95.0),           # Friday, no minutes
+                "sessions/2026-11-09_NQ.json": one("2026-11-09", "NQ"),                        # Monday
+                "minutes/2026-11-09_NQ.json": mins, "pastes/2026-11-09_NQ.txt": b"R=C120.00:1,P80.00:1",
+                "sessions/2026-11-10_NQ.json": one("2026-11-10", "NQ", em=None), "minutes/2026-11-10_NQ.json": mins,
+                "sessions/2026-11-11_NQ.json": one("2026-11-11", "NQ", status="missed"),
+                "sessions/2026-11-12_NQ.json": one("2026-11-12", "NQ"), "minutes/2026-11-12_NQ.json": mins}
+
+    def test_previous_trading_day_paste_and_skips(self):
+        skipped = []
+        ss = L.load(files=self.files(), skipped=skipped)
+        self.assertEqual([s["session"] for s in ss], ["2026-11-09", "2026-11-12"])
+        self.assertEqual(ss[0]["prev_close"], 95.0)                       # Monday's previous close is Friday's
+        self.assertEqual(set(ss[0]["levels"]), {"ZG", "C1", "P1"})
+        self.assertIsNone(ss[1]["prev_close"])                            # Wednesday was missed
+        self.assertEqual(skipped, ["2026-11-06_NQ: no 1-minute record", "2026-11-10_NQ: the plan has no expected move",
+                                   "2026-11-12_NQ: the previous trading day has no graded close (levels counted as no_prior_close)"])
+
+    def test_constants_match_the_definition_text(self):
+        d = L.definition()[0]
+        self.assertIn(f"{L.DRAWS} random levels", d["baseline"]["draws"])
+        self.assertIn(f"seed {L.SEED}", d["baseline"]["draws"])
+        self.assertIn(f"{L.REPS:,} reps", d["statistics"]["interval"])
 
 
 class TestClassify(unittest.TestCase):
