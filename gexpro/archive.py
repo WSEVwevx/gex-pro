@@ -35,7 +35,7 @@ from gexsys import marketcal
 
 log = logging.getLogger("gexpro.archive")
 NY = marketcal.NY
-RULES_VERSION = 1
+RULES_VERSION = 2                              # 2 (from 2026-11-19): Yahoo's live-quote row is no longer kept as a bar
 FIRST_DAY = date(2026, 11, 18)                 # the archive starts here; earlier days are not recoverable
 PRE_OPEN_WINDOW = timedelta(hours=30)          # = gexpro.context.PRE_OPEN_WINDOW (tested)
 MIDDAY = time(12, 0)
@@ -96,13 +96,15 @@ WHY = {"open": "no usable snapshot in the 30 hours before 09:30 ET", "midday": "
 
 # ---------------------------------------------------------------- 1-minute bars
 def parse_bars(raw: bytes) -> list[list]:
-    """[[unix s, open, high, low, close, volume], ...], bars without a price left out."""
+    """[[unix s, open, high, low, close, volume], ...]: whole minutes only. Bars without a price are left out, and so
+    is Yahoo's live-quote row, which it appends off the minute (e.g. 16:59:59 ET, flat, volume 0: archived in
+    2026-11-18's futures files under rules version 1)."""
     r = json.loads(raw)["chart"]["result"][0]
     q = r["indicators"]["quote"][0]
     out = []
     for i, t in enumerate(r.get("timestamp") or []):
         o, h, lo, c = q["open"][i], q["high"][i], q["low"][i], q["close"][i]
-        if None in (o, h, lo, c) or min(o, h, lo, c) <= 0:
+        if None in (o, h, lo, c) or min(o, h, lo, c) <= 0 or int(t) % 60:
             continue
         out.append([int(t), round(o, 2), round(h, 2), round(lo, 2), round(c, 2), int(q["volume"][i] or 0)])
     return out
