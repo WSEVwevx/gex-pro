@@ -114,7 +114,6 @@ class TestClosedMarketStaleness(unittest.TestCase):
     """Outside cash hours the last close is the right reference, but nothing older than that close is
     (stress test E1, 2026-11-17: a Tuesday-evening chain stamped Sunday passed as fresh and ES zero gamma moved)."""
     def run_at(self, fetched, spot_time):
-        from datetime import timedelta
         from tests.util import chain, contract
 
         class One:
