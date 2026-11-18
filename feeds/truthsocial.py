@@ -149,9 +149,26 @@ def from_api(statuses) -> list[dict]:
 
 
 # the archive writes each attachment as a link: <a href="...jpg">View image</a> (or "View video")
-RT_LINE = re.compile(r"^RT:?\s+(https?://\S+)\s*$", re.M)
+RT_URL = re.compile(r"RT:?\s+(https?://[^\s<\"]+)")      # in the raw HTML: the archive glues the next words onto it
 QUOTED_LINE = re.compile(r"^Quoted (.{1,80})$", re.M)
+QUOTED_BODY = re.compile(r"<blockquote\b.*?</blockquote>", re.I | re.S)   # the quoted post itself, not Trump's words
 ATTACHMENT = re.compile(r'<a\s[^>]*href="([^"]+)"[^>]*>\s*View (image|video)\s*</a>', re.I)
+ARC, TRUTH, MRSS = "{https://www.trumpstruth.org/rss-extensions}", "{https://truthsocial.com/ns}", "{http://search.yahoo.com/mrss/}"
+
+
+def _rss_media(it, files) -> list[dict]:
+    """The post's picture: an attached image, else a video's poster frame (nested in its media:content)."""
+    media = [{"type": "image", "preview": _picture(u)} for u, kind in files if kind.lower() == "image" and _picture(u)]
+    for el in it:
+        if el.tag in (MRSS + "content", "content") and el.attrib.get("medium") == "video":
+            th = next((c for c in el if c.tag.endswith("thumbnail") and _picture(c.attrib.get("url"))), None)
+            if th is not None:
+                media.append({"type": "video", "preview": th.attrib["url"]})
+        elif el.tag.endswith("content") or el.tag.endswith("thumbnail"):
+            u = _picture(el.attrib.get("url"))
+            if u:
+                media.append({"type": "image", "preview": u})
+    return media
 
 
 def from_rss(xml_bytes: bytes) -> list[dict]:
@@ -162,25 +179,26 @@ def from_rss(xml_bytes: bytes) -> list[dict]:
             t = parsedate_to_datetime(it.findtext("pubDate"))
         except (TypeError, ValueError):
             continue
-        raw = html.unescape(it.findtext("description") or "")
+        raw = QUOTED_BODY.sub("", html.unescape(it.findtext("description") or ""))
+        # a repost or quote arrives as "RT: <truthsocial url>" plus "Quoted <name>": shown as a link, not as text
+        rt = RT_URL.search(raw)
+        raw = RT_URL.sub("\n", raw)
         files = ATTACHMENT.findall(raw)                       # pictures, not text: shown as the post's image
         desc = html_to_text(ATTACHMENT.sub("", raw))
         title = (it.findtext("title") or "").strip()
-        text = desc or ("" if title.lower().startswith(("image post", "video post")) else title)
-        # a repost or quote arrives as "RT: <truthsocial url>" plus "Quoted <name>": shown as a link, not as text
-        ptype = (it.findtext("{https://www.trumpstruth.org/rss-extensions}postType") or "").lower()
-        rt, quoted = RT_LINE.search(text), QUOTED_LINE.search(text)
-        link = {"url": rt.group(1), "title": f"Quoted post{' by ' + quoted.group(1).strip() if quoted else ''}"} if rt else None
-        text = QUOTED_LINE.sub("", RT_LINE.sub("", text)).strip()
-        media = [{"type": "image", "preview": _picture(u)} for u, kind in files if kind.lower() == "image" and _picture(u)]
-        for el in it:
-            if el.tag.endswith("content") or el.tag.endswith("thumbnail"):
-                u = _picture(el.attrib.get("url"))               # a video attachment has no picture to show
-                if u:
-                    media.append({"type": "image", "preview": u})
-        out.append({"id": it.findtext("guid") or it.findtext("link") or t.isoformat(), "time": t.astimezone(timezone.utc).isoformat(),
+        text = desc or ("" if title.lower().startswith(("image post", "video post", "quote post")) else title)
+        ptype = (it.findtext(ARC + "postType") or "").lower()
+        quoted = QUOTED_LINE.search(text)
+        ref = it.find(ARC + "reference")
+        target = _https(ref.findtext(ARC + "originalUrl")) if ref is not None else None
+        link = {"url": target or rt.group(1), "title": f"Quoted post{' by ' + quoted.group(1).strip() if quoted else ''}"} \
+            if (rt or target) else None
+        text = QUOTED_LINE.sub("", text).strip()
+        out.append({"id": it.findtext(TRUTH + "originalId") or it.findtext("guid") or it.findtext("link") or t.isoformat(),
+                    "time": t.astimezone(timezone.utc).isoformat(),
                     "kind": "quote" if ptype == "quote" else "retruth" if ptype in ("retruth", "reblog") or text.startswith("RT ") else "post",
-                    "author": None, "text": text, "media": media[:1], "url": _https(it.findtext("link")), "link": link, "counts": None,
+                    "author": None, "text": text, "media": _rss_media(it, files)[:1],
+                    "url": _https(it.findtext(TRUTH + "originalUrl")) or _https(it.findtext("link")), "link": link, "counts": None,
                     "market_words": market_words(text), "tone": market_tone(text)})
     return out
 
@@ -229,6 +247,9 @@ class Posts:
             if posts:
                 posts.sort(key=lambda p: p["time"], reverse=True)
                 self._data = {"posts": posts[: self.limit], "fetched_at": datetime.now(timezone.utc).isoformat(), "source": name}
+                if errors:                                   # why the first choice failed, for the Data health page
+                    self._data["primary_error"] = errors[0][:200]
+                    log.warning("posts: %s; using %s", errors[0], name)
                 try:
                     self.cache_path.parent.mkdir(parents=True, exist_ok=True)
                     self.cache_path.write_text(json.dumps(self._data), encoding="utf-8")

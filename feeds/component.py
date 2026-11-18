@@ -87,7 +87,8 @@ class FeedsComponent:
                  **({"last_ok": cal.get("fetched_at"), "error": cal.get("error")} if cal else first("News page"))},
                 {"name": "Posts", "provider": (posts or {}).get("source") or "Truth Social", "pages": ["News", "Briefings"], "fresh_h": 2,
                  **({"last_ok": posts.get("fetched_at"), "error": posts.get("error"),
-                     "note": "Truth Social did not answer, so the backup archive is in use"
+                     "note": "Truth Social did not answer" + (f" ({posts['primary_error'].removeprefix('Truth Social: ')})"
+                                                             if posts.get("primary_error") else "") + ", so the backup archive is in use"
                      if posts.get("source") and posts["source"] != "Truth Social" else None} if posts else first("News page"))}]
         if quotes is None:
             rows.append({"name": "Ticker quotes", "provider": "Yahoo Finance", "pages": ["Top ticker"], **first("page")})

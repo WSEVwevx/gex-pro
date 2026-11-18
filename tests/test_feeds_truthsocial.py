@@ -80,6 +80,31 @@ class TestParsing(unittest.TestCase):
         self.assertEqual(p["link"], {"url": "https://truthsocial.com/users/realDonaldTrump/statuses/117583459253586462",
                                      "title": "Quoted post by Donald J. Trump"})
 
+    def test_archive_quote_and_video_match_truth_social(self):
+        # 2026-11-18, the live archive vs the API: a quote's "RT:" link was glued to the words (so kept as text) and the
+        # quoted person's post was appended as if it were Trump's; a video post's poster frame (nested in media:content) was missed
+        ns = ('xmlns:media="http://search.yahoo.com/mrss/" xmlns:archive="https://www.trumpstruth.org/rss-extensions" '
+              'xmlns:truth="https://truthsocial.com/ns"')
+        xml = (f'<rss {ns}><channel><item><title>Biggest drop</title><link>https://www.trumpstruth.org/statuses/43613</link>'
+               '<pubDate>Tue, 17 Nov 2026 22:09:46 +0000</pubDate><description><![CDATA[<p><span><br />RT: '
+               'https://truthsocial.com/users/Schoenlaw/statuses/117632129147481602</span>Biggest drop in gasoline in 18 years.</p>'
+               '<p>Quoted <a href="https://www.trumpstruth.org/statuses/43614">Schoenlaw</a></p><blockquote><p>Last week saw the '
+               'biggest drop in retail gas prices</p></blockquote>]]></description>'
+               '<truth:originalUrl>https://truthsocial.com/@realDonaldTrump/117634065135557984</truth:originalUrl>'
+               '<truth:originalId>117634065135557984</truth:originalId><archive:postType>quote</archive:postType>'
+               '<archive:reference type="quote"><archive:originalUrl>https://truthsocial.com/@Schoenlaw/117632129147481602'
+               '</archive:originalUrl></archive:reference></item>'
+               '<item><title>Video post from November 16, 2026</title><link>https://www.trumpstruth.org/statuses/43601</link>'
+               '<pubDate>Mon, 16 Nov 2026 11:05:43 +0000</pubDate><description><![CDATA[<p></p><p><a href="https://archive.example/v.mov">'
+               'View video</a></p>]]></description><archive:postType>original</archive:postType>'
+               '<media:content url="https://archive.example/v.mov" medium="video"><media:thumbnail url="https://archive.example/poster.jpg"/>'
+               '</media:content></item></channel></rss>').encode()
+        q, v = from_rss(xml)
+        self.assertEqual((q["kind"], q["text"]), ("quote", "Biggest drop in gasoline in 18 years."))
+        self.assertEqual(q["link"], {"url": "https://truthsocial.com/@Schoenlaw/117632129147481602", "title": "Quoted post by Schoenlaw"})
+        self.assertEqual((q["id"], q["url"]), ("117634065135557984", "https://truthsocial.com/@realDonaldTrump/117634065135557984"))
+        self.assertEqual((v["text"], v["media"]), ("", [{"type": "video", "preview": "https://archive.example/poster.jpg"}]))
+
     def test_video_files_are_not_pictures(self):
         # an <img> cannot show an .mp4: a video post keeps its text, with no broken picture
         xml = ('<rss xmlns:media="http://search.yahoo.com/mrss/"><channel><item><title>t</title><link>https://www.trumpstruth.org/statuses/3</link>'
@@ -123,6 +148,7 @@ class TestFeed(unittest.TestCase):
             feed = Posts(opener=opener, clock=lambda: t[0], cache_path=Path(tmp) / "p.json")
             d = feed.get()
             self.assertEqual((d["source"], len(d["posts"])), ("trumpstruth.org archive", 2))
+            self.assertIn("403 blocked", d["primary_error"])                          # why, for the Data health page
             feed.get()
             self.assertEqual(len(calls), 2)                                           # cached within 5 minutes
             t[0] += 301
