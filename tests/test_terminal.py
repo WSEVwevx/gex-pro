@@ -68,6 +68,18 @@ class TestAssets(unittest.TestCase):
 
 
 
+class TestOfflineCopy(unittest.TestCase):
+    def test_one_offline_copy_per_file_not_per_deploy(self):
+        """Every deploy changes each asset's ?v= hash. Stored under the full URL, each deploy added another copy of
+        every file and none was ever removed (2026-11-17 audit: three versions of terminal.css fetched through the
+        live service worker left three entries). Stored by path, a new version replaces the old one; the offline
+        lookup already ignores the query."""
+        sw = (Path(__file__).resolve().parent.parent / "dashboard" / "sw.js").read_text(encoding="utf-8")
+        self.assertIn("c.put(url.origin + url.pathname, copy)", sw)
+        self.assertIn("caches.match(req, {ignoreSearch: true})", sw)
+        self.assertIn('const CACHE = "gexpro-v2";', sw)                       # clears the copies v1 piled up
+
+
 class TestScriptNames(unittest.TestCase):
     def test_no_two_functions_share_a_name(self):
         """A second `function x()` silently replaces the first in the browser (it blanked the Levels list once);
