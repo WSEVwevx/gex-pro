@@ -1,0 +1,27 @@
+{
+ "session": "2026-11-18",
+ "market": "NQ",
+ "status": "pending",
+ "plan": {
+  "session": "2026-11-18",
+  "market": "NQ",
+  "underlying": "NDX",
+  "asof": "2026-11-18T14:29:07.599034+00:00",
+  "frozen_at": "2026-11-18T15:02:45.842793+00:00",
+  "ref": 27001.79,
+  "em": 650.89,
+  "em_iv": 0.4629,
+  "regime": "NEGATIVE",
+  "net": -4779328947.0,
+  "zg": 27621.01,
+  "cw": 28590.0,
+  "pw": 27000.0,
+  "ag": 27775.0,
+  "bias": "Neutral",
+  "confidence": "Low",
+  "day_type": "Trend / expansion",
+  "side": "negative",
+  "target": 27001.79
+ },
+ "outcome": null
+}
