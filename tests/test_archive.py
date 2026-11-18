@@ -84,7 +84,15 @@ class TestChoose(unittest.TestCase):
 
 class TestBars(unittest.TestCase):
     def test_parse_drops_empty_bars(self):
-        self.assertEqual(len(A.parse_bars(yahoo(1000, 4))), 3)
+        self.assertEqual(len(A.parse_bars(yahoo(960, 4))), 3)
+
+    def test_parse_drops_the_live_quote_row_off_the_minute(self):
+        raw = json.loads(yahoo(1795039080, 2))                         # 16:58, 16:59 ET (the 16:59 one is empty)
+        r = raw["chart"]["result"][0]
+        r["timestamp"].append(1795039199)                               # 16:59:59: Yahoo's quote row, seen 2026-11-18
+        for k, v in r["indicators"]["quote"][0].items():
+            v.append(7340.25 if k != "volume" else 0)
+        self.assertEqual([b[0] for b in A.parse_bars(json.dumps(raw).encode())], [1795039080])
 
     def test_contract_switch_at_quarterly_expiry(self):
         exp = date(2026, 12, 18)
