@@ -1,0 +1,30 @@
+# The test gate: every push and pull request runs the full test suite. Its check ("tests") is required to merge into
+# main (branch protection), and the website only deploys commits where it passed (.github/scripts/tested_commit.py).
+name: Tests
+
+on:
+  push:
+    branches: [main]                # the deploy gate reads main's results
+  pull_request:                     # every other branch is tested through its PR (required to merge)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0              # some tests read the git history (the Indicator page's recent changes)
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: python -m unittest discover -s tests
