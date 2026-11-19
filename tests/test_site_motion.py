@@ -172,6 +172,12 @@ class TestBiasPage(unittest.TestCase):
         self.assertIn("<span>Model range</span>", JS)
         self.assertNotIn("<span>Expected range</span><b>${num(b.range[0]", JS)
 
+    def test_phone_status_chips_keep_one_height(self):
+        """On a phone the status chips take 64 px with the next-event chip and 40.5 px without it: the space stays
+        reserved after drawing (not only while empty), packed at the top, so a day with no event doesn't jump 23 px."""
+        self.assertIn(".pagebar #status{flex-basis:100%;min-height:64px;align-content:flex-start}", CSS)
+        self.assertNotIn("#status:empty{min-height:64px}", CSS)
+
     def test_a_gap_in_the_replay_is_not_an_alarm(self):
         self.assertNotRegex(CSS, r"\.rp-marks s\{[^}]*(gradient|warn)")
         self.assertNotIn("no update since", JS)
