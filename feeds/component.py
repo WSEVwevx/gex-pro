@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import os
 import threading
+from datetime import date
 from pathlib import Path
 from typing import Optional
 
@@ -29,6 +30,12 @@ def _state_dir() -> Path:
 def _write(path: Path, obj) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(obj, default=str), encoding="utf-8")
+
+
+def _short_date(iso: str) -> str:
+    """"2026-11-10" -> "Nov 10": a report date as written, with no time zone to shift it."""
+    d = date.fromisoformat(iso[:10])
+    return f"{d:%b} {d.day}"
 
 
 class FeedsComponent:
@@ -117,11 +124,14 @@ class FeedsComponent:
         if pos is None:
             rows.append({"name": "Big trader positioning", "provider": "CFTC", "pages": ["Bias"], **first("Bias page")})
         else:
-            # the OLDEST market's report: one contract that stops updating must not hide behind the other
+            # worked = the last good fetch; late = the OLDEST market's report (one contract that stops updating must not
+            # hide behind the other), a bare date of Tuesday's positions, never shown as a time
             dates = [m.get("asof") or "" for m in (pos.get("markets") or {}).values()]
-            rows.append({"name": "Big trader positioning", "provider": "CFTC", "pages": ["Bias"], "last_ok": min(dates) if dates and all(dates) else None,
-                         "error": pos.get("error") or (None if len(dates) == 2 else "a market's report is missing"), "fresh_h": 11 * 24,
-                         "detail": "weekly report: Tuesday's positions, published Friday"})
+            oldest = min(dates) if dates and all(dates) else None
+            rows.append({"name": "Big trader positioning", "provider": "CFTC", "pages": ["Bias"], "last_ok": pos.get("fetched_at"),
+                         "data_asof": oldest, "error": pos.get("error") or (None if len(dates) == 2 else "a market's report is missing"),
+                         "fresh_h": 11 * 24, "detail": "weekly report: Tuesday's positions, published Friday"
+                         + (f"; latest positions {_short_date(oldest)}" if oldest else "")})
         return rows
 
     def _chart(self, q):
