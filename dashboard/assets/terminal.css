@@ -281,6 +281,12 @@ body.first .card{animation:fade-in var(--t-slow) var(--ease-out)}
 .stat .v{font:600 17px var(--mono);margin-top:5px;letter-spacing:-.01em}
 .stat .s{color:var(--ink3);font-size:11.5px;margin-top:3px;line-height:1.4}
 .stats.keys{margin:6px 0 12px}
+/* before the first draw: the ticker, the market tabs and the Levels strips hold their drawn height, so nothing below jumps
+   (the strips only while no banner says there is nothing to draw yet) */
+.ticker:empty{min-height:16px}#tabs:empty{min-height:30px}
+#banner:empty+#levelsView #keyStrip:not(:has(.stat)){min-height:91px}#banner:empty+#levelsView #stats:not(:has(.stat)){min-height:132px}
+@media(max-width:1180px){#banner:empty+#levelsView #keyStrip:not(:has(.stat)){min-height:181px}#banner:empty+#levelsView #stats:not(:has(.stat)){min-height:264px}}
+@media(max-width:700px){.pagebar #status{flex-basis:100%}#status:empty{min-height:64px}#banner:empty+#levelsView #stats:not(:has(.stat)){min-height:280px}}
 .stats.keys .v{font-size:22px}
 body:not(.notes) .stats.keys .stat .s{display:block}
 .bt-more{margin-top:12px}
