@@ -143,12 +143,17 @@ class MarketWorker(threading.Thread):
         snaps = session.summaries_since(folder, session.session_start(now))
         m = (r.get("mapped") or {}).get("mapping") or {}
         f, o = m.get("factor") or 1.0, m.get("offset") or 0.0
-        fut = lambda p: None if p is None else round((p * f + o) * 4) / 4
+        # past levels keep the mapping saved with their own snapshot (the open's: frozen at the open), not the latest
+        # ratio, so they don't drift as the basis moves; without a saved one (or no mapping now), the current one
+        own = lambda fm: (fm["factor"], fm.get("offset") or 0.0) if m.get("factor") and fm and fm.get("factor") else (f, o)
+        fut = lambda p, fo=(f, o): None if p is None else round((p * fo[0] + fo[1]) * 4) / 4
         opened = session.open_levels(snaps, now)
         stats = self._stats(folder, now, f, o)
-        r["session"] = {"changes": [dict(c, frm=fut(c["frm"]) if c["what"] != "regime" else c["frm"],
-                                         to=fut(c["to"]) if c["what"] != "regime" else c["to"]) for c in session.changes(snaps)],
-                        "open": {k: (fut(v) if isinstance(v, (int, float)) else v) for k, v in opened.items()} if opened else None,
+        chg = [{k: v for k, v in c.items() if k != "map"} | ({} if c["what"] == "regime" else
+               {"frm": fut(c["frm"], own(c["map"])), "to": fut(c["to"], own(c["map"]))}) for c in session.changes(snaps)]
+        op = own(opened["map"]) if opened else None
+        r["session"] = {"changes": chg,
+                        "open": {k: (fut(v, op) if isinstance(v, (int, float)) else v) for k, v in opened.items() if k != "map"} if opened else None,
                         "stats": stats,
                         "levels": {k: (fut(v) if isinstance(v, (int, float)) else v) for k, v in session.key_levels(r["summary"]).items()}}
         if r.get("pine"):

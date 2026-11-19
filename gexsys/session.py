@@ -6,7 +6,7 @@ price has reacted at each kind of level.
                           ZG CW PW (all expiries) and the regime
   changes(snaps)          the day's steady changes, e.g. C1 29800 -> 29885 at 10:42 ET; a change counts once
                           it holds for two snapshots, so one-snapshot flickers are ignored
-  open_levels(snaps)      the levels in the first snapshot at or after today's 09:30 ET cash open
+  open_levels(snaps)      the levels in the first snapshot at or after today's cash open
   prior_levels(folder)    zero gamma and the walls at the close of each of the last few sessions (paste field H)
   reaction_stats(...)     every past touch of each level kind, replayed on futures candles: did price hold
                           (no close beyond it within an hour) and how far it moved back away (the bounce)
@@ -108,13 +108,13 @@ def summaries_since(folder: Path, since: datetime) -> list:
 
 
 def changes(snaps: Iterable[dict], limit: int = 40) -> list:
-    """[{t, what, frm, to}] newest first: a watched level (or the regime) moved and the new value held for
-    two snapshots in a row."""
-    seq = [(s["asof"], key_levels(s)) for s in snaps]
+    """[{t, what, frm, to, map}] newest first: a watched level (or the regime) moved and the new value held for
+    two snapshots in a row. `map` is the futures mapping saved with the snapshot of the change (None if none)."""
+    seq = [(s["asof"], key_levels(s), s.get("futures_map")) for s in snaps]
     out = []
     for k in WATCH + ("regime",):
         cur = None
-        vals = [(t, lv.get(k)) for t, lv in seq]
+        vals = [(t, lv.get(k)) for t, lv, _ in seq]
         for i, (t, v) in enumerate(vals):
             if v is None:
                 continue
@@ -123,21 +123,22 @@ def changes(snaps: Iterable[dict], limit: int = 40) -> list:
                 continue
             nxt = vals[i + 1][1] if i + 1 < len(vals) else None
             if v != cur and nxt == v:
-                out.append({"t": t, "what": k, "frm": cur, "to": v})
+                out.append({"t": t, "what": k, "frm": cur, "to": v, "map": seq[i][2]})
                 cur = v
     out.sort(key=lambda c: c["t"], reverse=True)
     return out[:limit]
 
 
 def open_levels(snaps: Iterable[dict], now: datetime) -> Optional[dict]:
-    """Levels at today's cash open (the first snapshot within an hour after 09:30 ET), from 09:30 until the
-    18:00 ET session change; None outside that window or if no snapshot was taken near the open."""
+    """Levels at today's cash open (the first snapshot within an hour after the open), from the open until the
+    evening session change; None outside that window or if no snapshot was taken near the open. `map` is the
+    futures mapping saved with that snapshot: the one frozen at the open."""
     t = now.astimezone(marketcal.NY)
-    if not marketcal.is_trading_day(t.date()) or not time(9, 30) <= t.time() < time(18):
+    if not marketcal.is_trading_day(t.date()) or not marketcal.RTH_OPEN <= t.time() < marketcal.GLOBEX_REOPEN:
         return None
-    o = datetime.combine(t.date(), time(9, 30), marketcal.NY)
+    o = marketcal.rth_open_dt(t.date())
     first = next((s for s in snaps if o <= datetime.fromisoformat(s["asof"]) <= o + timedelta(hours=1)), None)
-    return dict(key_levels(first), asof=first["asof"]) if first else None
+    return dict(key_levels(first), asof=first["asof"], map=first.get("futures_map")) if first else None
 
 
 def reaction_stats(snaps: list, candles: list, factor: float, offset: float = 0.0,
