@@ -19,6 +19,8 @@ History archive (git branch archive, gexpro/archive.py):
   A1  append-only: between consecutive commits, files are only added (never changed, renamed or deleted)
   A2  every day folder's manifest lists exactly its files, with matching SHA-256 and size
   A3  each day's open snapshot is timestamped before that day's 09:30 ET, its close snapshot at or before the close
+Study replays (gexpro/reaction_lab.py):
+  L7  every session the level-reaction study replays reads only plan, paste and 1-minute files that pass L1, L5 and L6
 Tolerance: zero violations.
 """
 from __future__ import annotations
@@ -120,11 +122,24 @@ def main() -> int:
         diff = sorted(set(rows.items()) ^ set(files_.items()))
         bad.append(f"S3 history.csv and the session files differ: {diff[:6]}")
     bad += audit_archive()
+    bad += audit_replay(bad)
     print(f"sessions {len(sessions)}, pastes {len(pastes)}, minute records {len(minutes)}, days {days[0]} to {days[-1]}")
     print(f"violations: {len(bad)} (tolerance 0)")
     for b in bad:
         print("  " + b)
     return 1 if bad else 0
+
+
+def audit_replay(bad: list[str]) -> list[str]:
+    """L7: the study's inputs are exactly files this audit checked, and none of them has a violation."""
+    from gexpro import reaction_lab
+    out = []
+    for s in reaction_lab.load(BR):
+        name = f"{s['session']}_{s['market']}"
+        used = [f"sessions/{name}.json", f"minutes/{name}.json"] + ([f"pastes/{name}.txt"] if s["has_paste"] else [])
+        out += [f"L7 replay of {name} reads {f}, which failed: {b}" for f in used for b in bad if f in b]
+    print(f"replay: {len({b.split()[3] for b in out})} of the study's sessions read a file with a violation")
+    return out
 
 
 def audit_archive(br: str = "origin/" + archive.BRANCH) -> list[str]:
