@@ -15,7 +15,7 @@ import threading
 from pathlib import Path
 from typing import Optional
 
-from .forexfactory import Calendar
+from .forexfactory import Calendar, keep_copy
 from .quotes import Quotes
 from .drivers import Drivers
 from .positioning import Positioning
@@ -138,7 +138,9 @@ class FeedsComponent:
     def build_static(self, data: Path, state: Path) -> dict:
         cal = self._calendar = self._calendar or Calendar(cache_path=state / "ff_calendar.json")
         posts = self._posts = self._posts or Posts(cache_path=state / "truth_posts.json")
-        _write(data / "news.json", cal.get())
+        news = cal.get()
+        _write(data / "news.json", news)
+        keep_copy(news, state / "calendar")      # for the history archive: the copy current before each 09:30
         _write(data / "posts.json", posts.get())
         _write(data / "quotes.json", self.quotes.get())
         self._screener = self._screener or Drivers(cache_path=state / "drivers.json")

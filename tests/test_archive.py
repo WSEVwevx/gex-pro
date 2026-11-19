@@ -140,10 +140,16 @@ class TestBuildDay(unittest.TestCase):
         for f in self.folders.values():
             for t in (et(D, 9, 20), et(D, 12, 2), et(D, 15, 50)):
                 save_snap(f, t)
-        files, gaps = A.build_day(D, self.folders, et(D, 17, 20), get=fake_get, commit="abc")
+        cal = Path(self.tmp.name) / "calendar"
+        from feeds.forexfactory import keep_copy
+        for t in (et(D - timedelta(days=2), 9, 0), et(D, 8, 45), et(D, 9, 30)):     # too early, the one, at the open
+            keep_copy({"fetched_at": t.isoformat(), "events": [{"title": "CPI m/m"}]}, cal, now=et(D, 17, 20))
+        files, gaps = A.build_day(D, self.folders, et(D, 17, 20), get=fake_get, commit="abc", calendar=cal)
         self.assertEqual(gaps, [])
         man = json.loads(files["days/2026-11-18/manifest.json"])
-        self.assertEqual(len(man["files"]), 2 * (3 + 1 + 2))
+        self.assertEqual(len(man["files"]), 2 * (3 + 1 + 2) + 1)
+        self.assertEqual(man["calendar"]["fetched_at"], et(D, 8, 45).isoformat())
+        self.assertEqual(json.loads(files["days/2026-11-18/calendar.json"])["fetched_at"], et(D, 8, 45).isoformat())
         for n, meta in man["files"].items():
             b = files[f"days/2026-11-18/{n}"]
             self.assertEqual((hashlib.sha256(b).hexdigest(), len(b)), (meta["sha256"], meta["bytes"]))
@@ -160,6 +166,15 @@ class TestBuildDay(unittest.TestCase):
         self.assertIn("NQ midday snapshot: no usable snapshot within 30 minutes of 12:00 ET", man["missing"])
         self.assertIn("ES open snapshot: no usable snapshot in the 30 hours before 09:30 ET", man["missing"])
         self.assertNotIn("days/2026-11-18/ES-open.json", files)
+
+    def test_missing_calendar_is_named_never_waited_for(self):
+        for f in self.folders.values():
+            for t in (et(D, 9, 20), et(D, 12, 2), et(D, 15, 50)):
+                save_snap(f, t)
+        files, gaps = A.build_day(D, self.folders, et(D, 17, 20), get=fake_get, calendar=Path(self.tmp.name) / "none")
+        self.assertIsNotNone(files)
+        self.assertEqual(gaps, ["calendar: no ForexFactory copy fetched in the 30 hours before 09:30 ET"])
+        self.assertIsNone(json.loads(files["days/2026-11-18/manifest.json"])["calendar"])
 
     def test_failed_bars_are_named(self):
         def boom(url):

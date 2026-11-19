@@ -18,7 +18,8 @@ Survivorship:
 History archive (git branch archive, gexpro/archive.py):
   A1  append-only: between consecutive commits, files are only added (never changed, renamed or deleted)
   A2  every day folder's manifest lists exactly its files, with matching SHA-256 and size
-  A3  each day's open snapshot is timestamped before that day's 09:30 ET, its close snapshot at or before the close
+  A3  each day's open snapshot is timestamped before that day's 09:30 ET, its close snapshot at or before the close,
+      and its calendar copy was fetched before 09:30 ET
 Study replays (gexpro/reaction_lab.py):
   L7  every session the level-reaction study replays reads only plan, paste and 1-minute files that pass L1, L5 and L6
 Tolerance: zero violations.
@@ -176,6 +177,9 @@ def audit_archive(br: str = "origin/" + archive.BRANCH) -> list[str]:
                 bad.append(f"A3 {d} {m}: open snapshot {pick['open']['asof']} is not before 09:30 ET")
             if pick.get("close") and datetime.fromisoformat(pick["close"]["asof"]) > marketcal.rth_close_dt(day):
                 bad.append(f"A3 {d} {m}: close snapshot {pick['close']['asof']} is after the close")
+        cal = man.get("calendar")
+        if cal and datetime.fromisoformat(cal["fetched_at"]) >= marketcal.rth_open_dt(day):
+            bad.append(f"A3 {d}: calendar copy fetched {cal['fetched_at']}, not before 09:30 ET")
     print(f"archive: {len(revs)} commits, {len(days)} days, {len(files)} files")
     return bad
 
