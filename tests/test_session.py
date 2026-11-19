@@ -88,6 +88,19 @@ class TestSession(unittest.TestCase):
             MarketWorker._add_session(w, r2, at(11, 0))
             self.assertEqual(r2["session"]["open"]["C1"], 100.0)
 
+    def test_a_failed_retry_after_the_close_is_not_news(self):
+        """In the daily break the delayed quotes are frozen at the close: if the shown result has them, a failed
+        retry (Cboe refusing this PC on 2026-11-19 at 17:30) is not worth a banner. Before it has them, it is."""
+        from gexsys.service import holds_latest
+        at = lambda d, h, m: datetime(2026, 11, d, h, m, tzinfo=NY)
+        close = {"ref_time": at(19, 16, 14).isoformat()}                     # Thu: the 16:15 quotes, after the close
+        self.assertTrue(holds_latest(close, at(19, 17, 30)))                 # daily break
+        self.assertTrue(holds_latest(close, at(20, 3, 0)))                   # overnight Globex, before Friday's open
+        self.assertFalse(holds_latest(close, at(20, 10, 0)))                 # Friday's cash session: newer quotes exist
+        self.assertFalse(holds_latest({"ref_time": at(19, 15, 50).isoformat()}, at(19, 16, 5)))   # the close not yet in
+        self.assertTrue(holds_latest({"ref_time": at(20, 16, 14).isoformat()}, at(22, 12, 0)))    # Sunday: Friday's close
+        self.assertFalse(holds_latest({}, at(19, 17, 30)))                   # no time: never assume it is current
+
     def test_session_start(self):
         self.assertEqual(session.session_start(datetime(2026, 10, 27, 10, 0, tzinfo=NY)), datetime(2026, 10, 26, 18, 0, tzinfo=NY))
         self.assertEqual(session.session_start(datetime(2026, 10, 27, 19, 0, tzinfo=NY)), datetime(2026, 10, 27, 18, 0, tzinfo=NY))

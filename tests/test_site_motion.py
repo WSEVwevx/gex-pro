@@ -145,6 +145,10 @@ class TestBiasPage(unittest.TestCase):
         self.assertEqual(got, [w for _, w in cases])
         self.assertEqual(JS.count('here === "'), 4)                        # each plan row asks planHere, nothing else
 
+    def test_no_failure_banner_when_the_close_is_already_shown(self):
+        """The 'data source failed' banner stays away while the market is shut and the close's numbers are shown."""
+        self.assertIn("h.last_error && !h.holds_latest ?", JS)
+
     def test_the_plan_zones_never_overlap(self):
         """Each price lies in exactly one plan row, and it is the marked one, even when P1 sits above the flip
         (NQ on 2026-11-19: C1 27,460, P1 27,731, flip 27,035, price 27,647 was marked "above C1" while the
