@@ -1,0 +1,43 @@
+{
+  "study": "rules",
+  "rule": "fade_first_touch",
+  "version": 1,
+  "written": "2026-11-19, before any trade was computed",
+  "question": "Does fading the first touch of a 09:30 GEX PRO level make money out of sample, after slippage and fees? Every trade is hypothetical: no order is ever placed.",
+  "sessions": "every (date, market) with a graded track-record plan (levels, expected move and the 09:30 ratio, read exactly as studies/level_reaction/v2.json reads them) and an archive day holding that market's futures 1-minute bars ({M}F-1m.json, Yahoo Finance) with no A2 or A3 violation. RTH bars only: bar start in [the day's 09:30 ET, its close) from gexsys/marketcal.py. A day without archive bars is left out and named.",
+  "trigger": "the touch of studies/level_reaction/v2.json (same tol, side, at_open, gap_through, no_prior_close and cluster rules) found on the archive bars' highs and lows; level types ZG CW PW Ab1 C1-C3 P1-P3; dependent levels and every non-touch category never trigger",
+  "side": "fade: short when the level is above the open, long when it is below",
+  "one_position": "per market and grid point, one position at a time: a trigger whose bar starts before the open trade's exit bar is skipped; triggers in time order, ties in the level-type order above",
+  "entry": "the open of the bar after the trigger bar, 1 tick against us (long +1 tick, short -1 tick); no later RTH bar: no trade",
+  "stop": "short: level + s x tol; long: level - s x tol. An entry at or beyond the stop is no trade (counted)",
+  "R": "|entry - stop| in points",
+  "target": "short: entry - t x R; long: entry + t x R",
+  "exits": {
+    "order": "bar by bar from the entry bar: first the time exit, then the stop, then the target",
+    "time": "the first bar starting at or after entry minute + T: exit at its open, 1 tick against us",
+    "stop": "high >= stop (short) or low <= stop (long): exit at the worse of the stop and that bar's open, 1 tick against us",
+    "target": "low <= target (short) or high >= target (long): exit at the target, 1 tick against us, never better even on a gap",
+    "same_bar": "stop and target inside one bar: the stop",
+    "close": "flat by the close: no exit by the last RTH bar: exit at its close, 1 tick against us"
+  },
+  "grid": {"s": [2, 4], "t": [1, 2], "T": [30, 60], "points": 8, "order": "s, then t, then T"},
+  "units": {"tick": 0.25, "point_value_usd": {"NQ": 20, "ES": 50}, "fees_round_turn_usd": 4.0, "fees_note": "configurable (--fees); the amount is shown with every result"},
+  "per_trade": "points and R after slippage, before fees; dollars per 1 contract after slippage and fees",
+  "walk_forward": {
+    "window": "expanding, per market, sessions in date order",
+    "min_train_sessions": 20,
+    "why_20": "the 8 grid points are ranked on in-sample trades; the level touch rate is about 1 per session per market (studies/level_reaction v2, Oct 21 - Nov 18: 21 counted touches in 21 sessions each), so 20 sessions give about 20 trades to rank them on. Fewer makes the choice noise; the same minimum as the splits study's groups",
+    "choice": "for each k >= 20: the grid point with the highest mean net dollars per trade over sessions 1..k (ties and no trades at all: the first in grid order); it trades session k+1",
+    "reported": "only the stitched sessions k+1; no session used for tuning is ever scored"
+  },
+  "in_sample_vs_out": "for each out-of-sample session, the chosen grid point's in-sample mean R per trade; their mean is shown beside the out-of-sample mean R per trade (the gap is the overfitting warning)",
+  "min_oos_trades": 30,
+  "not_enough_data": "fewer than 30 out-of-sample trades: no statistic is shown, only 'not enough data' with the trade and session counts",
+  "uncertainty": "expectancy per trade and per session over out-of-sample sessions with gexpro/uncertainty.py (95% expanded percentile or BCa, 10,000 whole-session resamples, seed 20261118, p-value against 0, sessions needed labelled optimistic)",
+  "equity_band": "cumulative net dollars by out-of-sample session; 10,000 resamples of those sessions with replacement, seed 20261118; the 2.5% and 97.5% values at each session count",
+  "drawdown_and_streak": "maximum peak-to-trough fall of cumulative net dollars by trade; longest run of trades with net dollars < 0; win = net dollars > 0; average win and loss in dollars and R",
+  "tries": "studies/rules/tries.json lists every rule version and its grid points, appended, never edited; the p-value is also shown adjusted for every grid point tried to date: min(1, p x tries)",
+  "roll_weeks": "the archive's roll_week flag; results shown with and without roll-week sessions",
+  "shift": "the expectancy per trade is also shown with every level shifted +5 / -5 points (NQ) and +1 / -1 (ES)",
+  "look_ahead": "levels, ratio and expected move are frozen before 09:30 (L1, L5); the parameters for session k+1 come only from sessions 1..k; tools/stress/lookahead_audit.py L9 recomputes every choice from earlier sessions only"
+}
