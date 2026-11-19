@@ -55,7 +55,7 @@ class TestText(unittest.TestCase):
         b = compose("nyam", ctx(events=[CPI]), SLOT, SESSION, record=rec, past=[])
         m = b["markets"][0]
         self.assertEqual(m["regime_line"], "NQ 28,000.00 is in negative gamma, 1.2σ below zero gamma 28,500.00.")
-        self.assertEqual(m["history"], "20 negative gamma sessions graded: range averaged 1.25× the expected move "
+        self.assertEqual(m["history"], "20 negative gamma sessions graded across ES and NQ: range averaged 1.25× the expected move "
                                        "(all 24: 1.17×). Walls held on 20 of 20 touches.")
         self.assertEqual([(x["name"], x["price"], x["dist"], x["dist_em"], x["why"]) for x in m["levels"]], [
             ("0DTE put wall", 27950.0, -50.0, 0.12, "largest put gamma strike"),
@@ -88,6 +88,12 @@ class TestEmptyCases(unittest.TestCase):
         self.assertEqual(m["changes"]["items"], ["No change since Fri Nov 13's close."])
         self.assertIsNone(m["yesterday"])
         self.assertEqual((b["calendar"][0]["items"], b["calendar"][0]["history"]), ([], None))
+
+    def test_pooled_history_names_its_markets(self):
+        rec = history(17, cw={"touched": True, "held": True}) + history(16, market="ES", pw={"touched": True, "held": False})
+        h = compose("nyam", ctx(), SLOT, SESSION, record=rec, past=[])["markets"][0]["history"]
+        self.assertTrue(h.startswith("33 negative gamma sessions graded across ES and NQ: "), h)
+        self.assertIn("Walls held on 17 of 33 touches.", h)
 
     def test_too_few_sessions_or_touches_print_no_percentage(self):
         b = compose("nyam", ctx(), SLOT, SESSION, record=history(19), past=[])

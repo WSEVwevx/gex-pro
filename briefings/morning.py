@@ -83,11 +83,15 @@ def regime_block(m: dict, graded: list) -> dict:
     same = [r["outcome"] for r in graded if r["plan"].get("regime") == regime and r["outcome"].get("range_em") is not None]
     every = [r["outcome"]["range_em"] for r in graded if r["outcome"].get("range_em") is not None]
     name = REGIME.get(regime, "this regime")
+    # the history pools every market's graded sessions (the rule fixed before any brief was graded); say so, or an
+    # NQ brief's "33 sessions" reads as NQ's own (NQ had 21)
+    mk = sorted({r["market"] for r in graded if r.get("market")})
+    pool = f" across {' and '.join(mk)}" if len(mk) > 1 else ""
     if len(same) < MIN:
-        hist = f"{len(same)} {name} sessions graded so far: not enough yet ({MIN} needed)."
+        hist = f"{len(same)} {name} sessions graded{pool} so far: not enough yet ({MIN} needed)."
     else:
         avg = sum(o["range_em"] for o in same) / len(same)
-        hist = (f"{len(same)} {name} sessions graded: range averaged {avg:.2f}× the expected move "
+        hist = (f"{len(same)} {name} sessions graded{pool}: range averaged {avg:.2f}× the expected move "
                 f"(all {len(every)}: {sum(every) / len(every):.2f}×).")
         touched = [w for o in same for w in (o.get("cw"), o.get("pw")) if w and w.get("touched")]
         if len(touched) >= MIN:

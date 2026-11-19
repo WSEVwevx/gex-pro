@@ -698,11 +698,12 @@ function renderStats(w, s, L, X){
   const tile = (k, v, sub, color) => `<div class="stat"><div class="eyebrow">${k}</div><div class="v"${color ? ` style="color:${color}"` : ""}>${v}</div><div class="s">${sub}</div></div>`;
   // the levels a trader looks for first: each with its distance from price
   const p = v => v && typeof v === "object" ? v.price : v, emd = em.daily_points_fut ?? em.daily_points;
+  const emc = em.anchor_fut ?? fut;                     // the range's centre: the same anchor the plan, ladder and levels use
   const away = v => v == null ? "" : `${num(Math.abs(v - fut), 0)} pts ${v >= fut ? "above" : "below"}${emd ? ` · ${num(Math.abs(v - fut) / emd, 1)}σ` : ""}`;
   const key = (k, v, color) => tile(k, v == null ? "-" : num(v), away(v), color);
   $("keyStrip").innerHTML = key("Zero gamma (est.)", p(L.zero_gamma), "var(--zg)") + key("Call wall", p(L.call_wall), "var(--pos)")
     + key("Put wall", p(L.put_wall), "var(--neg)")
-    + tile("Expected move today", emd == null ? "-" : "±" + num(emd, 0), emd == null ? "" : `${num(fut - emd, 0)} – ${num(fut + emd, 0)} (1σ)`, "var(--em)");
+    + tile("Expected move today", emd == null ? "-" : "±" + num(emd, 0), emd == null ? "" : `${num(emc - emd, 0)} – ${num(emc + emd, 0)} (1σ)`, "var(--em)");
   const hedge = ct(s.net), charm = ct(g.charm_flow_usd_per_day), vanna = ct(g.vanna_usd_per_vol_pt == null ? null : -g.vanna_usd_per_vol_pt);
   const cts = x => num(Math.abs(x), 0) + " " + market;
   $("stats").innerHTML = [
@@ -761,7 +762,7 @@ function renderBias(w){
     </div>
     <div class="bv-line">${lean} ${moves}</div>
     <div class="bv-facts"><div><span>Base case by the close</span><b>${num(b.target, 0)}</b><em>${Math.abs(drift) < 0.5 ? "no drift expected" : signed(drift, 0) + " pts from " + num(ref, 0)}</em></div>
-      <div><span>Expected range</span><b>${num(b.range[0], 0)} – ${num(b.range[1], 0)}</b><em>1σ move ±${num(b.expected_move, 0)} pts</em></div></div>`;
+      <div><span>Model range</span><b>${num(b.range[0], 0)} – ${num(b.range[1], 0)}</b><em>the 1σ move ±${num(b.expected_move, 0)} pts, scaled for the gamma side</em></div></div>`;
   $("biasSummary").textContent = "";                                    // the strip above says it; replay puts its own hint here
   $("biasWhen").textContent = b.session.live ? `Session in progress · calculated ${ago(w.result.summary.asof)}` : `Plan for the ${new Date(b.session.open).toLocaleDateString("en-US", {...ET, weekday:"long", month:"short", day:"numeric"})} session`;
   const day = b.factors.filter(f => f.name === "Gamma side"), dir = b.factors.filter(f => f.name !== "Gamma side");
@@ -1139,8 +1140,8 @@ const HELP = {
     body: `<p>Adds up a few positioning factors (magnet strike, walls, vanna, 0DTE max pain, and charm flow as a small tie-breaker) into a score. With no real lean it says Neutral rather than guess. The gamma side decides the <b>day type</b> (range, trend or pivot), not the direction. It's a starting scenario, not a forecast.</p>`},
   base_case: {title: "Base case", tldr: "Where the factors point by the close if nothing else intervenes.",
     body: `<p>In positive gamma it's usually the magnet strike; in negative gamma it's a move in the direction of the bias; near the flip it's zero gamma itself. News and flows can override it.</p>`},
-  bias_range: {title: "Expected range", tldr: "The likely range for the session given the gamma side.",
-    body: `<p>Positive gamma tightens the range, often to the walls. Negative gamma widens it on the side of the bias.</p>`},
+  bias_range: {title: "Model range", tldr: "The likely range for the session given the gamma side.",
+    body: `<p>The 1σ expected move from the Levels page, scaled by the model: positive gamma tightens it (0.7×, often to the walls), negative gamma widens it (1.2× each way, 0.8× on the side against the bias), near the flip 0.9×. So it differs from the plain 1σ range on Levels on purpose.</p>`},
   bias_chart: {title: "Session path", tldr: "An illustration of how the day could unfold.",
     body: `<p>The line is the base-case path; the cone is the ±1σ expected move growing through the session. About one day in three, price leaves the cone.</p>`},
   factors: {title: "Factors", tldr: "Each ingredient of the bias, with its score and reason.", body: `<p>Positive scores lean bullish, negative bearish. "Day type" rows set the character of the session rather than the direction.</p>`},
