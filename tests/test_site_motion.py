@@ -157,6 +157,12 @@ class TestBiasPage(unittest.TestCase):
         self.assertIn('<div class="eyebrow">Reference price${refAt(s.ref_time)}</div>', JS)
         self.assertNotIn('" future, live"', JS)                              # a time, not a claim that it is live
 
+    def test_every_view_of_the_reference_price_has_its_time(self):
+        """The 16:00 reference price carries its time wherever it is the headline number: Levels card, plan, Live table."""
+        for piece in ('<div class="eyebrow">Reference price${refAt(s.ref_time)}</div>', "<span>Price${refAt(s.ref_time)}</span>",
+                      '(s.etf ? "+" + s.etf : ""))}${refAt(s.ref_time)}</div>'):
+            self.assertIn(piece, JS)
+
     def test_a_gap_in_the_replay_is_not_an_alarm(self):
         self.assertNotRegex(CSS, r"\.rp-marks s\{[^}]*(gradient|warn)")
         self.assertNotIn("no update since", JS)

@@ -1801,7 +1801,7 @@ function renderLiveTable(){
   // side panel
   const T = LD.rows.reduce((t, row) => { sum(row).forEach((x, j) => t[j] += x); return t; }, [0, 0, 0, 0, 0, 0]);
   const gT = E.reduce((a, e, i) => a + (on(i) ? e.net : 0), 0), dT = E.reduce((a, e, i) => a + (on(i) ? e.dex : 0), 0);
-  $("ldPrice").innerHTML = `<div class="eyebrow">${esc(w.market)} · ${esc((s.options_source || w.source) + (s.etf ? "+" + s.etf : ""))}</div>
+  $("ldPrice").innerHTML = `<div class="eyebrow">${esc(w.market)} · ${esc((s.options_source || w.source) + (s.etf ? "+" + s.etf : ""))}${refAt(s.ref_time)}</div>
     <div class="big">${num(ref, 2)}</div>
     <div class="ld-cards"><div><div class="eyebrow">Net GEX</div><b style="color:${gT >= 0 ? "var(--pos)" : "var(--neg)"}">${money(gT)}</b><span>per 1% move</span></div>
       <div><div class="eyebrow">Net DEX</div><b style="color:${dT >= 0 ? "var(--pos)" : "var(--neg)"}">${compact(dT)}</b><span>dealer delta, $</span></div></div>
@@ -2386,7 +2386,7 @@ function renderPlan(w){
   const earn = planEarnings(k);
   const R = {POSITIVE: ["positive", "var(--pos)"], NEGATIVE: ["negative", "var(--neg)"]}[lv.regime] || ["balanced", "var(--zg)"];
   $("planCard").innerHTML = `<div class="head"><h2>Today's plan</h2><span class="sub">${esc(day)} · ${esc(market)} · ${esc(phase)}</span></div>
-    <div class="plan-kv"><span>Regime</span><b style="color:${R[1]}">${R[0]} gamma</b><span>Price</span><b class="m">${num(ref, 2)}</b>
+    <div class="plan-kv"><span>Regime</span><b style="color:${R[1]}">${R[0]} gamma</b><span>Price${refAt(s.ref_time)}</span><b class="m">${num(ref, 2)}</b>
       <span>Day range ±1σ</span><b class="m">${d && a ? p(a - d) + " – " + p(a + d) : "-"}</b><span>Ab1 (magnet)</span><b class="m">${p(lv.Ab1)}</b></div>
     <div class="plan-sc">${rows.map(([when, what, here]) => `<div class="${here ? "here" : ""}"><b>${esc(when)}</b><span>${esc(what)}</span>${here ? '<em>price is here</em>' : ""}</div>`).join("")}</div>
     ${usd.length ? `<div class="plan-ev"><span class="eyebrow">Data today (ET)</span>${usd.map(e => `<span class="${e.impact === "High" ? "hi" : ""}">${esc(new Date(e.time).toLocaleTimeString("en-US", {...ET, hour: "numeric", minute: "2-digit"}))} ${esc(e.title)}</span>`).join("")}</div>` : ""}
