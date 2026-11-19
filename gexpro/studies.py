@@ -7,13 +7,18 @@ A failed run keeps the last good result and says so (with its own computed-at ti
 it is.
 
 What the page shows per market:
-  verdict       "no proven edge yet", unless a study has evidence: a level type whose interval excludes 0, a split
-                that survives Benjamini-Hochberg, or a rule whose interval excludes 0 with an adjusted p below 0.05.
+  verdict       "no proven edge yet", unless a study has evidence, each named with its direction: a level type whose
+                interval excludes 0 and whose p-value survives Benjamini-Hochberg (q = 0.10) across that market's tested
+                level types; a split that survives its own Benjamini-Hochberg; a rule whose interval excludes 0 with a
+                p-value below 0.05 after adjusting for every try.
   needs         per study: sessions it has, sessions it needs and the date that is reached at today's rate (trading
                 days from marketcal, after the last data day). The rates (best case, all labelled estimates):
-                  level reaction  per level type: 20 x the market's sessions / that type's touches; the smallest
+                  level reaction  per level type: 20 x the sessions that have that level / its touches; the smallest
+                                  (every session has every level type now: the 9:30 pastes, which give C1-C3 and
+                                  P1-P3, started after the track record did, so have and need count the sessions
+                                  with that level)
                   splits          per split: 20 x the market's sessions / its smallest group; the smallest
-                (every "have" and "need" counts all of the market's sessions, so the date advances one per trading day)
+                (the date is the (need - have)-th trading day after the last data day)
                   rules           20 training sessions + 30 / (counted touches per track-record session)
 """
 from __future__ import annotations
@@ -42,11 +47,12 @@ SHIFT_UP, SHIFT_DOWN = {"NQ": 5.0, "ES": 1.0}, {"NQ": -5.0, "ES": -1.0}
 
 # ---------------------------------------------------------------- cache key
 def key() -> str:
-    """Branch heads + definitions + study code: any change recomputes."""
+    """Branch heads, the build's own commit (any code the studies call), definitions and study code: any change
+    recomputes."""
     git = lambda *a: subprocess.run(["git", *a], cwd=L.ROOT, capture_output=True, text=True).stdout.strip()
     git("fetch", "-q", "origin", "track-record", "archive")
     h = hashlib.sha256()
-    for part in (git("rev-parse", "origin/track-record"), git("rev-parse", "origin/archive")):
+    for part in (git("rev-parse", "origin/track-record"), git("rev-parse", "origin/archive"), git("rev-parse", "HEAD")):
         h.update(part.encode())
     for p in [*DEFS.values(), R.TRIES, *(Path(__file__).parent / f for f in CODE)]:
         h.update(p.read_bytes())
@@ -72,23 +78,27 @@ def need_row(study: str, have: int, need: Optional[int], last: str, basis: str) 
 
 def needs(m: str, lab_rows: list[dict], split_tests: list[dict], sessions: int, touches_per_session: Optional[float],
           archive_sessions: int, last: str, d_rules: dict) -> list[dict]:
-    lvl = [(math.ceil(20 * sessions / r["all"]["touches"]), r) for r in lab_rows if r["all"]["touches"]]
-    n, r = min(lvl, key=lambda x: x[0]) if lvl else (None, None)
-    out = [need_row("level_reaction", sessions, n, last,
-                    f"nearest level type {r['type']}: 20 touches at {r['all']['touches']} in {sessions} sessions" if r
-                    else "no level touched yet")]
+    lvl = [(math.ceil(20 * r["all"]["sessions"] / r["all"]["touches"]) - r["all"]["sessions"], r) for r in lab_rows
+           if r["all"]["touches"]]
+    _, r = min(lvl, key=lambda x: x[0]) if lvl else (None, None)
+    out = [need_row("level_reaction", r["all"]["sessions"] if r else sessions,
+                    math.ceil(20 * r["all"]["sessions"] / r["all"]["touches"]) if r else None, last,
+                    f"nearest level type {r['type']}: 20 touches at {r['all']['touches']} in its {r['all']['sessions']} sessions"
+                    if r else "no level touched yet")]
     sp = []
     for t in split_tests:
         g = [v["sessions"] for v in t["groups"].values()]
         if min(g) > 0:
             sp.append((math.ceil(20 * sessions / min(g)), t))
     n, t = min(sp, key=lambda x: x[0]) if sp else (None, None)
-    out.append(need_row("splits", sessions, n, last, f"nearest split {t['split']}: 20 sessions in its smallest group" if t
+    out.append(need_row("splits", sessions, n, last, f"nearest split {t['split']}: 20 sessions in its smallest group; "
+                        f"the other {len(split_tests) - 1} need as long or longer" if t
                         else "every split has an empty group"))
     k0, oos = d_rules["walk_forward"]["min_train_sessions"], d_rules["min_oos_trades"]
     n = k0 + math.ceil(oos / touches_per_session) if touches_per_session else None
     out.append(need_row("rules", archive_sessions, n, last,
-                        f"{k0} training sessions + {oos} trades at {touches_per_session:.2f} touches per session (best case)"
+                        f"archive sessions with 1-minute bars: {k0} to train + {oos} trades at {touches_per_session:.2f} "
+                        f"touches per session (best case)"
                         if touches_per_session else "no level touched yet"))
     return out
 
@@ -119,15 +129,18 @@ def payload(lab: dict, splits: dict, rules: dict, sessions: list[dict], archive_
         last = max((s["session"] for s in ss), default=None)
         touches = sum(x["all"]["touches"] for x in rows)
         lab_rows = [_lab_row(x, alt["shift_up"].get((m, x["type"]), {}), alt["shift_down"].get((m, x["type"]), {})) for x in rows]
-        edge = [f"level {r['type']}" for r in lab_rows if r.get("interval") and not (r["interval"][0] <= 0 <= r["interval"][1])]
-        edge += [f"split {t['split']}" for t in tests if t.get("survives")]
+        tested = {r["type"]: r["p_value"] for r in lab_rows if r.get("interval") and r.get("p_value") is not None}
+        keep, excl = S.bh(tested), lambda iv: not (iv[0] <= 0 <= iv[1])
+        edge = [f"level {r['type']}: {'more' if r['difference'] > 0 else 'fewer'} rejections than random levels"
+                for r in lab_rows if r["type"] in keep and excl(r["interval"])]
+        edge += [f"split {t['split']}: the groups differ" for t in tests if t.get("survives")]
         e = (rm.get("per_trade") or {}).get("r") or {}
-        if e.get("interval") and not (e["interval"][0] <= 0 <= e["interval"][1]) and (rm.get("p_adjusted") or 1) < 0.05:
-            edge.append(f"rule {rules['rule']}")
+        if e.get("interval") and excl(e["interval"]) and (rm.get("p_adjusted") or 1) < 0.05:
+            edge.append(f"rule {rules['rule']}: {'gains' if e['mean'] > 0 else 'loses'} out of sample (hypothetical)")
         out["markets"][m] = {
             "sessions": len(ss), "data_from": min((s["session"] for s in ss), default=None), "data_through": last,
             "archive_sessions": archive_days.get(m, 0), "roll_week_sessions": sum(s["roll_week"] for s in ss),
-            "verdict": {"edge": edge, "text": ("evidence in " + ", ".join(edge)) if edge else f"no proven edge yet ({len(ss)} sessions)"},
+            "verdict": {"edge": edge, "text": ("evidence: " + "; ".join(edge)) if edge else f"no proven edge yet ({len(ss)} sessions)"},
             "counts": {"level_types": len(rows), "level_types_20": sum(not x["all"].get("small") for x in rows),
                        "splits_registered": len(tests), "splits_tested": sum(t["status"] == "tested" for t in tests),
                        "oos_trades": rm.get("oos_trades", 0), "oos_needed": d_rules["min_oos_trades"]},
@@ -158,6 +171,8 @@ def compute() -> dict:
     rand = L.baseline(sessions, real, rules_def, L.DRAWS, L.SEED)
     cals, shares = S.read_archive()
     closes = {m: prices.vol_index(u) for m, u in S.VOL.items()}
+    if not all(closes.values()):                     # never cache a split result built on a failed download
+        raise RuntimeError("the VIX / VXN history did not download (Cboe and Yahoo)")
     sp = S.run(sessions, S.counts(real, rand), closes, cals, {m: S.dte_labels(v) for m, v in shares.items()})
     bars = R.read_bars()
     ru = R.run(sessions, bars)

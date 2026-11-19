@@ -1454,14 +1454,14 @@ function renderStudies(){
   [...$("stMarket").children].forEach(b => b.onclick = () => { stM = b.dataset.m; store.set("gex.stm", stM); renderStudies(); });
   const M = X.markets[stM], C = M.counts, St = X.studies, edge = M.verdict.edge.length;
   const at = new Date(X.computed_at).toLocaleString("en-US", {...ET, month: "short", day: "numeric", hour: "numeric", minute: "2-digit"});
-  $("stSub").innerHTML = `<span class="trk-tag ${edge ? "good" : "warn"}" style="margin-left:0">${edge ? "evidence found" : "no proven edge yet"}</span> data through ${sday(M.data_through)} · computed ${at} ET`;
+  $("stSub").innerHTML = `<span class="trk-tag ${edge ? "" : "warn"}" style="margin-left:0">${edge ? "evidence found" : "no proven edge yet"}</span> data through ${sday(M.data_through)} · computed ${at} ET`;
   $("stKpis").innerHTML =
     kpi("Sessions", num(M.sessions, 0), `${sday(M.data_from)} to ${sday(M.data_through)} · ${M.archive_sessions} archived with bars`)
     + kpi("Level types with 20+ touches", `${C.level_types_20} of ${C.level_types}`, "below 20 touches no rate is shown")
     + kpi("Splits tested", `${C.splits_tested} of ${C.splits_registered}`, `${St.splits.survivors.filter(x => x.endsWith(":" + stM)).length} survive · ${St.splits.registered} registered for both markets`)
     + kpi("Rule trades out of sample", `${C.oos_trades} of ${C.oos_needed}`, "hypothetical · walk-forward");
   $("stNote").innerHTML = (X.error ? `<b>The last update failed</b> (${esc(X.error)}); these are the results computed ${at} ET. ` : "")
-    + (edge ? `Evidence in ${esc(M.verdict.edge.join(", "))}, after the corrections each study names below.`
+    + (edge ? `Evidence, after each study's correction for the number of tests: ${esc(M.verdict.edge.join("; "))}.`
             : `No proven edge yet: ${M.sessions} sessions. Each study below says how many more it needs.`)
     + " Every rate and trade here comes from past data; none is advice.";
   // sample needed
@@ -1470,7 +1470,7 @@ function renderStudies(){
     `<tr><td>${STUDY_NAME[n.study]}<div class="dim">${esc(n.basis)}</div></td><td class="m">${n.have}</td><td class="m">${n.need ?? "-"}</td><td class="m">${n.need == null ? "unknown" : n.reached ? "reached" : "~" + sdayY(n.est_date)}</td></tr>`).join("")}</table>`;
   // levels vs random
   const LV = St.level_reaction, sh = Object.keys((M.level_reaction[0] || {}).shifted || {});
-  $("stLvlSub").textContent = `${M.sessions} sessions · v${LV.version} ${sha8(LV.sha256)}`;
+  $("stLvlSub").textContent = `${M.sessions} sessions through ${sday(M.data_through)} · v${LV.version} ${sha8(LV.sha256)}`;
   $("stLvl").innerHTML = `<table class="trk-table rx-table"><tr><th>Level</th><th>Touches</th><th>Rejected</th><th>Random</th><th>Difference, 95%</th></tr>${M.level_reaction.map(r => {
       if(r.small) return `<tr class="dim"><td>${r.type}</td><td class="m">${r.touches}</td><td class="m" colspan="3">n&lt;20</td></tr>`;
       if(r.unavailable) return `<tr><td>${r.type}</td><td class="m">${r.touches}</td><td class="m">${pct(r.reject)}</td><td class="m" colspan="2">unavailable: ${esc(r.unavailable)}</td></tr>`;
@@ -1479,12 +1479,12 @@ function renderStudies(){
     }).join("")}</table><div class="expl">Rejected: price turns 4 tolerances back before a 1-minute close beyond the level. Random: the same rule at ${LV.baseline_per_type.toLocaleString("en-US")} random levels per type, the same distance from the open. Intervals from 10,000 whole-session resamples, seed ${X.seed}. Roll-week sessions: ${M.roll_week_sessions}.</div>`;
   // splits
   const SP = St.splits;
-  $("stSplitSub").textContent = `${C.splits_tested} of ${C.splits_registered} tested · v${SP.version} ${sha8(SP.sha256)}`;
+  $("stSplitSub").textContent = `${C.splits_tested} of ${C.splits_registered} tested through ${sday(M.data_through)} · v${SP.version} ${sha8(SP.sha256)}`;
   $("stSplit").innerHTML = `<table class="trk-table rx-table"><tr><th>Split</th><th>Sessions per group</th><th>Result</th></tr>${M.splits.map(t => {
       const gs = Object.entries(t.groups).map(([g, v]) => `${esc(g.toLowerCase().replace(/_/g, " "))} ${v.sessions}${v.difference != null && v.interval ? ` (${sgn(v.difference)}, ${ivTxt(v.interval)})` : ""}`).join(" · ");
       const un = Object.values(t.unavailable || {}).reduce((a, b) => a + b, 0);
       const why = un ? `<div class="dim">${un} unavailable: ${esc(Object.keys(t.unavailable)[0])}</div>` : "";
-      const res = t.status === "tested" ? `<span class="trk-tag ${t.survives ? "good" : ""}" style="margin-left:0">${esc(t.verdict)}</span><div class="dim">p ${num(t.p_value, 3)}</div>` : `<span class="dim">${esc(t.status)}</span>`;
+      const res = t.status === "tested" ? `<span class="trk-tag ${t.survives ? "good" : ""}" style="margin-left:0">${esc(t.verdict)}</span><div class="dim">p ${num(t.p_value, 3)}</div>` : `<span class="dim">${t.status === "unavailable" ? "unavailable: over 10% of shuffles left a group with no touch" : esc(t.status)}</span>`;
       return `<tr><td>${SPLIT_NAME[t.split] || esc(t.split)}</td><td>${gs}${why}</td><td>${res}</td></tr>`;
     }).join("")}</table><div class="expl">Tested only when every group has 20 sessions; ${SP.permutations.toLocaleString("en-US")} permutations of whole sessions; Benjamini-Hochberg at q = ${num(SP.q, 2)} across every test run.</div>`;
   // rule tester

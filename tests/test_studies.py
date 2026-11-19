@@ -29,14 +29,15 @@ class TestNeeds(unittest.TestCase):
         self.assertEqual(ST.trading_days_after("2026-11-20", 0), "2026-11-20")
 
     def test_needs_count_every_session_of_the_market(self):
-        rows = [lab_row("ZG", 4), lab_row("CW", 2), lab_row("C1", 0)]
+        rows = [lab_row("ZG", 4), lab_row("CW", 2), lab_row("C1", 0), dict(lab_row("P2", 3), all={"sessions": 13, "touches": 3})]
         tests = [split("regime", POSITIVE=1, NEGATIVE=17), split("zg_distance", near=5, far=16), split("vol_tercile", low=0, mid=5, high=16)]
         n = ST.needs("NQ", rows, tests, 21, 21 / 21, 1, "2026-11-18", D_RULES)
         self.assertEqual([(x["study"], x["have"], x["need"]) for x in n],
-                         [("level_reaction", 21, 105), ("splits", 21, 84), ("rules", 1, 50)])   # 20x21/4, 20x21/5, 20+30/1
-        self.assertIn("ZG", n[0]["basis"])
+                         [("level_reaction", 13, 87), ("splits", 21, 84), ("rules", 1, 50)])
+        # ZG: 20x21/4 = 105, 84 more; P2: 20x13/3 = 87, 74 more (nearest); splits 20x21/5; rules 20 + 30/1
+        self.assertIn("P2", n[0]["basis"])
         self.assertIn("zg_distance", n[1]["basis"])
-        self.assertEqual(n[0]["est_date"], ST.trading_days_after("2026-11-18", 84))
+        self.assertEqual(n[0]["est_date"], ST.trading_days_after("2026-11-18", 74))
         self.assertFalse(n[2]["reached"])
 
     def test_nothing_touched_and_reached(self):
@@ -79,8 +80,28 @@ class TestPayload(unittest.TestCase):
 
     def test_evidence_names_the_study(self):
         m = ST.payload(*fake_inputs(edge_level=True, survive=True), {"NQ": 1})["markets"]["NQ"]
-        self.assertEqual(m["verdict"]["edge"], ["level ZG", "split regime"])
+        self.assertEqual(m["verdict"]["edge"], ["level ZG: more rejections than random levels", "split regime: the groups differ"])
         self.assertEqual(m["level_reaction"][0]["shifted"], {"+5": 0.3, "-5": 0.3})
+
+
+    def test_level_evidence_needs_benjamini_hochberg_and_states_direction(self):
+        lab, sp, ru, ss = fake_inputs()
+        cells = {"ZG": (0.04, -0.2, [-0.35, -0.05]), "CW": (0.5, 0.05, [-0.1, 0.2]), "PW": (0.6, 0.0, [-0.2, 0.2])}
+        rows = [{"market": "NQ", "type": t, "all": {"sessions": 21, "touches": 25, "reject": 0.3, "baseline": 0.4, "difference": d,
+                 "interval": iv, "interval_method": "expanded percentile", "p_value": p}, "no_roll_weeks": {"touches": 25}}
+                for t, (p, d, iv) in cells.items()]
+        for k in ("main", "shift_up", "shift_down"):
+            lab[k]["table"] = rows
+        self.assertEqual(ST.payload(lab, sp, ru, ss, {})["markets"]["NQ"]["verdict"]["edge"], [])   # 0.04 > 1 x 0.10 / 3
+        cells["ZG"] = (0.01, -0.2, [-0.35, -0.05])
+        rows[0]["all"]["p_value"] = 0.01
+        self.assertEqual(ST.payload(lab, sp, ru, ss, {})["markets"]["NQ"]["verdict"]["edge"],
+                         ["level ZG: fewer rejections than random levels"])
+
+    def test_a_failed_vol_download_is_not_a_result(self):
+        with mock.patch("trackrecord.prices.vol_index", return_value={}),              mock.patch.object(ST.L, "load", return_value=[]), mock.patch.object(ST.L, "run", return_value={"levels": []}),              mock.patch.object(ST.L, "baseline", return_value=[]), mock.patch.object(ST.S, "read_archive", return_value=({}, {})):
+            with self.assertRaisesRegex(RuntimeError, "VIX / VXN"):
+                ST.compute()
 
 
 class TestCache(unittest.TestCase):
