@@ -178,6 +178,14 @@ class TestBiasPage(unittest.TestCase):
         self.assertIn(".pagebar #status{flex-basis:100%;min-height:64px;align-content:flex-start}", CSS)
         self.assertNotIn("#status:empty{min-height:64px}", CSS)
 
+    def test_plan_zones_name_their_scope(self):
+        """Today's plan: the Regime row counts every expiry, the zones use the first expiry's flip; on 2026-11-19 NQ read
+        "negative gamma" with price in a "positive gamma" zone. The zones now say 0DTE and the note says which is which."""
+        self.assertIn('g0 = lv.flip != null ? "0DTE " : ""', JS)
+        self.assertIn("`positive ${g0}gamma: expect", JS)
+        self.assertIn("`negative ${g0}gamma: moves can extend`", JS)
+        self.assertIn("the regime counts every expiry.", JS)
+
     def test_a_gap_in_the_replay_is_not_an_alarm(self):
         self.assertNotRegex(CSS, r"\.rp-marks s\{[^}]*(gradient|warn)")
         self.assertNotIn("no update since", JS)

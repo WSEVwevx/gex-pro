@@ -2375,10 +2375,12 @@ function renderPlan(w){
   // levels are numbered by strength, not price: only name a "next" level that lies beyond C1 / P1
   const C2 = lv.C2 != null && lv.C2 > C1 ? lv.C2 : null, P2 = lv.P2 != null && lv.P2 < P1 ? lv.P2 : null;
   const here = planHere(ref, C1, P1, F);
+  // the zones use the first expiry's flip; the Regime row counts every expiry, so the zones name their own scope
+  const fl = lv.flip != null ? "the flip" : "zero gamma", g0 = lv.flip != null ? "0DTE " : "";
   const rows = [
     C1 != null && [`Above C1 ${p(C1)}`, "positive-gamma extension: rallies tend to slow" + (C2 != null ? `; next call level ${p(C2)}` : ""), here === "above"],
-    C1 != null && F != null && C1 > F && [`Between the flip ${p(F)} and C1 ${p(C1)}`, "positive gamma: expect two-way trade and fades back toward the middle", here === "upper"],
-    P1 != null && F != null && P1 < F && [`Between P1 ${p(P1)} and the flip ${p(F)}`, "negative gamma: moves can extend" + (P2 != null ? `; a break of P1 opens ${p(P2)}` : ""), here === "lower"],
+    C1 != null && F != null && C1 > F && [`Between ${fl} ${p(F)} and C1 ${p(C1)}`, `positive ${g0}gamma: expect two-way trade and fades back toward the middle`, here === "upper"],
+    P1 != null && F != null && P1 < F && [`Between P1 ${p(P1)} and ${fl} ${p(F)}`, `negative ${g0}gamma: moves can extend` + (P2 != null ? `; a break of P1 opens ${p(P2)}` : ""), here === "lower"],
     P1 != null && [`Below P1 ${p(P1)}`, "hedging adds to selling" + (P2 != null ? `; next put level ${p(P2)}` : ""), here === "below"],
   ].filter(Boolean);
   const day = now.toLocaleDateString("en-US", {...ET, weekday: "short", month: "short", day: "numeric"});
@@ -2392,7 +2394,7 @@ function renderPlan(w){
     <div class="plan-sc">${rows.map(([when, what, here]) => `<div class="${here ? "here" : ""}"><b>${esc(when)}</b><span>${esc(what)}</span>${here ? '<em>price is here</em>' : ""}</div>`).join("")}</div>
     ${usd.length ? `<div class="plan-ev"><span class="eyebrow">Data today (ET)</span>${usd.map(e => `<span class="${e.impact === "High" ? "hi" : ""}">${esc(new Date(e.time).toLocaleTimeString("en-US", {...ET, hour: "numeric", minute: "2-digit"}))} ${esc(e.title)}</span>`).join("")}</div>` : ""}
     ${earn.length ? `<div class="plan-ev"><span class="eyebrow">Earnings ahead</span>${earn.map(r => `<span>${esc(r.symbol)} ${esc(earnTxt(r.earnings))}: ±${num(r.earn_move.pct, 1)}% ≈ ±${num(Math.abs(r["earn_pts_" + k]), 0)} ${esc(market)} pts</span>`).join("")}</div>` : ""}
-    <div class="expl">Levels from the first expiry, the same as the indicator's C / P / Ab. A plan, not a prediction: news can override any level.</div>`;
+    <div class="expl">Levels and zones from the first expiry, the same as the indicator's C / P / Ab; the regime counts every expiry. A plan, not a prediction: news can override any level.</div>`;
   // the change feed
   const nm = {C1: "C1", C2: "C2", P1: "P1", P2: "P2", Ab1: "Ab1", flip: "0DTE flip", ZG: "Zero gamma", CW: "Call wall", PW: "Put wall", regime: "Regime"};
   const ch = S.changes || [];
