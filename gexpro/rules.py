@@ -168,7 +168,7 @@ def walk_forward(sessions: list[dict], d: dict, rules: dict, fees: float, shift:
         oos.append({"session": sessions[k]["session"], "roll_week": sessions[k]["roll_week"], "grid": G[g],
                     "trained_on": k, "in_sample_r": sum(t["r"] for t in ins) / len(ins) if ins else None,
                     "trades": per[k][g]})
-    return {"sessions": len(sessions), "oos": oos, "skips": skips}
+    return {"sessions": len(sessions), "data_through": sessions[-1]["session"] if sessions else None, "oos": oos, "skips": skips}
 
 
 # ---------------------------------------------------------------- statistics
@@ -225,7 +225,7 @@ def summarize(wf: dict, d: dict, n_tries: int, reps: int = U.REPS, seed: int = U
     oos = wf["oos"]
     trades = [t for o in oos for t in o["trades"]]
     out = {"sessions": wf["sessions"], "oos_sessions": len(oos), "oos_trades": len(trades), "skipped_triggers": wf["skips"],
-           "data_through": oos[-1]["session"] if oos else None}
+           "data_through": wf.get("data_through")}
     need = d["min_oos_trades"]
     if len(trades) < need:
         out.update(status="not enough data", reason=f"{len(trades)} of {need} out-of-sample trades")

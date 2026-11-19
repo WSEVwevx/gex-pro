@@ -153,6 +153,27 @@ class TestWalkForward(unittest.TestCase):
         self.assertEqual([o["grid"] for o in wf["oos"]], [o["grid"] for o in again["oos"]])
 
 
+class TestRun(unittest.TestCase):
+    def test_roll_weeks_and_shifts_are_applied(self):
+        rng, track, raw = random.Random(4), [], {}
+        for m in R.MARKETS:
+            for i in range(55):
+                rows = [[100, 101, 99, 100], [100, 117, 100, 114]] + [
+                    [114 - k * 0.5, 115 - k * 0.5, 112 - k * rng.random(), 113 - k * 0.5] for k in range(70)]
+                x = sess({"CW": 120.0}, bars(*rows), day=f"2026-{1 + i // 28:02d}-{1 + i % 28:02d}", market=m)
+                o = marketcal.rth_open_dt(date.fromisoformat(x["session"])).timestamp()
+                raw[(x["session"], m)] = {"bars": [[o + 60 * b[0], *b[1:], 0] for b in x["ohlc"]], "roll_week": i % 5 == 0}
+                track.append({k: v for k, v in x.items() if k not in ("ohlc", "bars", "roll_week")})
+        res = R.run(track, raw, reps=200)
+        nq = res["markets"]["NQ"]
+        self.assertEqual((nq["status"], nq["oos_trades"], nq["roll_week_sessions"], nq["data_through"]),
+                         ("tested", 35, 11, "2026-02-27"))
+        self.assertEqual(nq["without_roll_weeks"]["oos_trades"], 35 - 7)          # i = 20, 25, ..., 50
+        self.assertEqual(set(res["markets"]["ES"]["shifted"]), {"+1", "-1"})
+        # CW + 5 = 125 needs a high of 120 to be touched and the highs stop at 117: no trades; CW - 5 = 115 trades
+        self.assertEqual((nq["shifted"]["+5"]["oos_trades"], nq["shifted"]["-5"]["oos_trades"]), (0, 35))
+
+
 class TestSummary(unittest.TestCase):
     def wf(self, per_session):
         return {"sessions": 20 + len(per_session), "skips": {},
