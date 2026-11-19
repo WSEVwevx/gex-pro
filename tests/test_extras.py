@@ -148,6 +148,19 @@ class TestExpectedMove(unittest.TestCase):
         self.assertAlmostEqual(ex.expected_moves(live, basket, TUE_CLOSE + timedelta(hours=9), live.contracts)["daily_points"],
                                100 * math.sqrt(0.2 ** 2 * 15 / 8760))
 
+    def test_the_band_names_its_centre(self):
+        """The page says what the 1 sigma range is centred on: on a gap day a band around the prior close reads
+        as one around today's price unless it says so (NQ 2026-11-19, +1.7% gap)."""
+        snap, basket = self.mk()
+        rth = ex.expected_moves(snap, basket, ASOF, snap.contracts)                               # Tue 11:00 ET
+        self.assertEqual((rth["anchor"], rth["anchor_label"]), (98.0, "prior close"))
+        night = ex.expected_moves(snap, basket, TUE_CLOSE + timedelta(hours=3), snap.contracts)    # Tue 19:00 ET
+        self.assertEqual((night["anchor"], night["anchor_label"]), (100.0, "last close"))
+        live = ex.expected_moves(replace(snap, prev_close=None), basket, ASOF, snap.contracts)     # RTH, no prior close
+        self.assertEqual((live["anchor"], live["anchor_label"]), (100.0, "price"))
+        no_iv = [replace(c, iv=None) for c in snap.contracts]                                       # nothing to measure
+        self.assertIsNone(ex.expected_moves(replace(snap, contracts=no_iv), basket, ASOF, no_iv))
+
     def test_index_options_preferred_over_converted_etf(self):
         # a converted ETF option sits closer to the money, but the band uses the index's own ATM IV
         snap, basket = self.mk(spot=100.4)

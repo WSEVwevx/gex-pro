@@ -704,7 +704,7 @@ function renderStats(w, s, L, X){
   const key = (k, v, color) => tile(k, v == null ? "-" : num(v), away(v), color);
   $("keyStrip").innerHTML = key("Zero gamma (est.)", p(L.zero_gamma), "var(--zg)") + key("Call wall", p(L.call_wall), "var(--pos)")
     + key("Put wall", p(L.put_wall), "var(--neg)")
-    + tile("Expected move today", emd == null ? "-" : "±" + num(emd, 0), emd == null ? "" : `${num(emc - emd, 0)} – ${num(emc + emd, 0)} (1σ)`, "var(--em)");
+    + tile("Expected move today", emd == null ? "-" : "±" + num(emd, 0), emd == null ? "" : `${num(emc - emd, 0)} – ${num(emc + emd, 0)} ${em.anchor_label ? "· " + esc(em.anchor_label) : "(1σ)"}`, "var(--em)");
   const hedge = ct(s.net), charm = ct(g.charm_flow_usd_per_day), vanna = ct(g.vanna_usd_per_vol_pt == null ? null : -g.vanna_usd_per_vol_pt);
   const cts = x => num(Math.abs(x), 0) + " " + market;
   $("stats").innerHTML = [
@@ -2394,7 +2394,7 @@ function renderPlan(w){
   const R = {POSITIVE: ["positive", "var(--pos)"], NEGATIVE: ["negative", "var(--neg)"]}[lv.regime] || ["balanced", "var(--zg)"];
   $("planCard").innerHTML = `<div class="head"><h2>Today's plan</h2><span class="sub">${esc(day)} · ${esc(market)} · ${esc(phase)}</span></div>
     <div class="plan-kv"><span>Regime</span><b style="color:${R[1]}">${R[0]} gamma</b><span>Price${refAt(s.ref_time)}</span><b class="m">${num(ref, 2)}</b>
-      <span>Day range ±1σ</span><b class="m">${d && a ? p(a - d) + " – " + p(a + d) : "-"}</b><span>Ab1 (magnet)</span><b class="m">${p(lv.Ab1)}</b></div>
+      <span>${em.anchor_label ? "Day ±1σ from " + esc(em.anchor_label) : "Day range ±1σ"}</span><b class="m">${d && a ? p(a - d) + " – " + p(a + d) : "-"}</b><span>Ab1 (magnet)</span><b class="m">${p(lv.Ab1)}</b></div>
     <div class="plan-sc">${rows.map(([when, what, here]) => `<div class="${here ? "here" : ""}"><b>${esc(when)}</b><span>${esc(what)}</span>${here ? '<em>price is here</em>' : ""}</div>`).join("")}</div>
     ${usd.length ? `<div class="plan-ev"><span class="eyebrow">Data today (ET)</span>${usd.map(e => `<span class="${e.impact === "High" ? "hi" : ""}">${esc(new Date(e.time).toLocaleTimeString("en-US", {...ET, hour: "numeric", minute: "2-digit"}))} ${esc(e.title)}</span>`).join("")}</div>` : ""}
     ${earn.length ? `<div class="plan-ev"><span class="eyebrow">Earnings ahead</span>${earn.map(r => `<span>${esc(r.symbol)} ${esc(earnTxt(r.earnings))}: ±${num(r.earn_move.pct, 1)}% ≈ ±${num(Math.abs(r["earn_pts_" + k]), 0)} ${esc(market)} pts</span>`).join("")}</div>` : ""}

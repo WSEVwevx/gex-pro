@@ -148,6 +148,11 @@ class TestBiasPage(unittest.TestCase):
     def test_no_failure_banner_when_the_close_is_already_shown(self):
         """The 'data source failed' banner stays away while the market is shut and the close's numbers are shown."""
         self.assertIn("h.last_error && !h.holds_latest ?", JS)
+    def test_the_band_says_what_it_is_centred_on(self):
+        """The +/-1 sigma range names its centre (the prior close in RTH), in the key strip and the plan; results
+        saved before the field existed keep the old text. Both labels were measured to fit on one line at 375 px."""
+        self.assertIn('${em.anchor_label ? "· " + esc(em.anchor_label) : "(1σ)"}', JS)
+        self.assertIn('${em.anchor_label ? "Day ±1σ from " + esc(em.anchor_label) : "Day range ±1σ"}', JS)
 
     def test_the_plan_zones_never_overlap(self):
         """Each price lies in exactly one plan row, and it is the marked one, even when P1 sits above the flip
@@ -192,7 +197,7 @@ class TestBiasPage(unittest.TestCase):
         """Levels' key strip and Today's plan centre the 1σ range on the same anchor (they differed by a point), and
         the Bias card's wider or narrower range is labelled as the model's, not as the 1σ range."""
         self.assertIn("const emc = em.anchor_fut ?? fut;", JS)
-        self.assertIn("`${num(emc - emd, 0)} – ${num(emc + emd, 0)} (1σ)`", JS)
+        self.assertIn("`${num(emc - emd, 0)} – ${num(emc + emd, 0)} ${em.anchor_label ? ", JS)      # the centre is now named
         self.assertIn("a = em.anchor_fut ?? em.anchor", JS)                    # the plan's centre
         self.assertIn("<span>Model range</span>", JS)
         self.assertNotIn("<span>Expected range</span><b>${num(b.range[0]", JS)
