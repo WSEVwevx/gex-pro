@@ -43,7 +43,8 @@ NQ/ES options gamma-exposure system: Python engine (`gexsys`, `feeds`, `trackrec
 
 ## Workflow
 - A branch per task. Before opening a PR: all tests pass (`python -m unittest discover -s tests`), `/code-review` on
-  the diff, PR body lists what was verified and what was not. The user merges; never merge or push to `main` yourself.
+  the diff, PR body lists what was verified and what was not. Claude merges its own PR once its `tests` check passes
+  (`gh pr merge <n> --merge -R WSEVwevx/gex-pro`); never push to `main` directly or merge a PR whose checks failed.
 - `main` is protected: the `tests` check must pass. The website deploys only commits whose tests passed
   (`.github/scripts/tested_commit.py`).
 - After a merge, deploy at once in a fresh lane; never wait for the queue:
