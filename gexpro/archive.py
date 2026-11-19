@@ -164,6 +164,17 @@ def fetch_bars(sym: str, lo: datetime, hi: datetime, get: Callable[[str], bytes]
     return [b for b in parse_bars(get(url)) if lo.timestamp() <= b[0] < hi.timestamp()]
 
 
+def bar_record(m: str, sym: str, d: date, lo: datetime, hi: datetime, bars: list[list]) -> dict:
+    """One {sym}-1m.json file: the bars of [lo, hi) and, for futures, their contracts and the roll-week flag."""
+    rec = {"symbol": sym, "session": d.isoformat(), "from": int(lo.timestamp()), "to": int(hi.timestamp()),
+           "source": "Yahoo Finance chart API, 1-minute", "fields": ["t", "open", "high", "low", "close", "volume"], "bars": bars}
+    if sym.endswith("=F"):
+        rec["contracts"] = contract_segments(m, bars)
+        rec["roll_week"] = roll_week(d)
+        rec["contract_switch"] = len(rec["contracts"]) > 1
+    return rec
+
+
 # ---------------------------------------------------------------- one day
 def _json(x) -> bytes:
     return (json.dumps(x, separators=(",", ":"), sort_keys=True) + "\n").encode()
@@ -198,13 +209,7 @@ def build_day(d: date, folders: dict[str, Path], now: datetime, get: Callable[[s
             if err:
                 gaps.append(f"{sym} 1-minute bars: {err}")
                 continue
-            rec = {"symbol": sym, "session": d.isoformat(), "from": int(lo.timestamp()), "to": int(hi.timestamp()),
-                   "source": "Yahoo Finance chart API, 1-minute", "fields": ["t", "open", "high", "low", "close", "volume"], "bars": bars}
-            if sym.endswith("=F"):
-                rec["contracts"] = contract_segments(m, bars)
-                rec["roll_week"] = roll_week(d)
-                rec["contract_switch"] = len(rec["contracts"]) > 1
-            files[file_name(sym)] = _json(rec)
+            files[file_name(sym)] = _json(bar_record(m, sym, d, lo, hi, bars))
     if gaps and now < datetime.combine(d + timedelta(days=GIVE_UP_DAYS), WRITE_AFTER, NY):
         return None, gaps
     cal = calendar_copy(calendar, d) if calendar else None

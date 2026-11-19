@@ -2,8 +2,10 @@
 choice from earlier sessions only, and the refusal under 30 out-of-sample trades."""
 import json
 import random
+import tempfile
 import unittest
 from datetime import date
+from pathlib import Path
 
 from gexpro import reaction_lab as L
 from gexpro import rules as R
@@ -63,8 +65,24 @@ class TestBars(unittest.TestCase):
         t = [{"session": "2026-11-18", "market": "NQ"}, {"session": "2026-11-17", "market": "NQ"}]
         o = marketcal.rth_open_dt(date(2026, 11, 18)).timestamp()
         got = R.join(t, {("2026-11-18", "NQ"): {"bars": [[o, 1, 2, 0, 1, 0]], "roll_week": True}}, skipped)
-        self.assertEqual((len(got), got[0]["bars"], got[0]["roll_week"]), (1, [[0, 2, 0, 1]], True))
-        self.assertEqual(skipped, ["2026-11-17_NQ: no archive bars"])
+        self.assertEqual((len(got), got[0]["bars"], got[0]["roll_week"], got[0]["backfilled"]), (1, [[0, 2, 0, 1]], True, False))
+        self.assertEqual(skipped, ["2026-11-17_NQ: no 1-minute bars (archive or backfill)"])
+
+    def test_backfill_fills_days_the_archive_lacks_and_the_archive_wins(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            bf = Path(tmp)
+            for day, m, tag in (("2026-11-17", "NQ", "bf17"), ("2026-11-18", "NQ", "bf18"), ("2026-11-17", "ES", "bfES")):
+                (bf / day).mkdir(exist_ok=True)
+                (bf / day / f"{m}F-1m.json").write_text(json.dumps({"tag": tag, "backfilled": {"downloaded_at": "x"}}))
+            (bf / "2026-11-17" / "NDX-1m.json").write_text("{}")                     # not a futures file: ignored
+            arch = {"days/2026-11-18/NQF-1m.json": json.dumps({"tag": "arch18"}).encode()}
+            got = R.read_bars(arch, bf)
+            self.assertEqual({k: v["tag"] for k, v in got.items()},
+                             {("2026-11-17", "NQ"): "bf17", ("2026-11-18", "NQ"): "arch18", ("2026-11-17", "ES"): "bfES"})
+            self.assertEqual(R.read_bars(arch, bf / "missing"), {("2026-11-18", "NQ"): {"tag": "arch18"}})
+        o = marketcal.rth_open_dt(date(2026, 11, 17)).timestamp()
+        got = R.join([{"session": "2026-11-17", "market": "NQ"}], {("2026-11-17", "NQ"): {"bars": [[o, 1, 2, 0, 1, 0]], "backfilled": {"x": 1}}})
+        self.assertTrue(got[0]["backfilled"])
 
 
 class TestFills(unittest.TestCase):

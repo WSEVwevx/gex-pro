@@ -58,6 +58,8 @@ def key() -> str:
         h.update(part.encode())
     for p in [*DEFS.values(), R.TRIES, *(Path(__file__).parent / f for f in CODE)]:
         h.update(p.read_bytes())
+    for p in sorted(R.BACKFILL.glob("*/*.json")):                 # backfilled bars (committed, so also in HEAD)
+        h.update(p.name.encode() + p.read_bytes())
     return h.hexdigest()
 
 
@@ -99,7 +101,7 @@ def needs(m: str, lab_rows: list[dict], split_tests: list[dict], sessions: int, 
     k0, oos = d_rules["walk_forward"]["min_train_sessions"], d_rules["min_oos_trades"]
     n = k0 + math.ceil(oos / touches_per_session) if touches_per_session else None
     out.append(need_row("rules", archive_sessions, n, last,
-                        f"archive sessions with 1-minute bars: {k0} to train + {oos} trades at {touches_per_session:.2f} "
+                        f"sessions with 1-minute futures bars: {k0} to train + {oos} trades at {touches_per_session:.2f} "
                         f"touches per session (best case)"
                         if touches_per_session else "no level touched yet"))
     return out
@@ -160,7 +162,8 @@ def payload(lab: dict, splits: dict, rules: dict, sessions: list[dict], archive_
         "rules": {"rule": rules["rule"], "version": rules["version"], "sha256": rules["definition_sha256"], "tries": rules["tries"],
                   "fees_round_turn_usd": rules["fees_round_turn_usd"], "grid_points": d_rules["grid"]["points"],
                   "min_train_sessions": d_rules["walk_forward"]["min_train_sessions"], "min_oos_trades": d_rules["min_oos_trades"],
-                  "data_from": rules["data_from"], "data_through": rules["data_through"]}}
+                  "data_from": rules["data_from"], "data_through": rules["data_through"],
+                  "backfilled_from": min(rules["backfilled"], default=None), "backfilled_through": max(rules["backfilled"], default=None)}}
     return out
 
 

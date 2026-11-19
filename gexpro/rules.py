@@ -5,8 +5,10 @@ computed; every rule version ever run is listed in studies/rules/tries.json, and
 that many tries. No order is ever placed: every trade here is hypothetical.
 
   sessions   graded track-record plans (levels, expected move, 09:30 ratio: read by gexpro/reaction_lab.py) joined
-             with the archive's futures 1-minute bars of the same day ({M}F-1m.json), RTH only (marketcal).
-  trigger    the level-reaction touch (studies/level_reaction/v2.json), found on the archive bars.
+             with the archive's futures 1-minute bars of the same day ({M}F-1m.json), RTH only (marketcal). Days before
+             the archive began use studies/backfill/bars/ (tools/backfill_bars.py: the same format, downloaded after
+             the day, marked "backfilled"); for a day in both, the archive's file is used.
+  trigger    the level-reaction touch (studies/level_reaction/v2.json), found on those 1-minute bars.
   fills      entry at the next bar's open, stop and target 1 tick against us, stop first inside one bar, flat by the
              close; points and R before fees, dollars per 1 contract after fees.
   walk-fwd   expanding window per market: the grid point with the best in-sample mean net dollars per trade over
@@ -30,6 +32,7 @@ from . import uncertainty as U
 DEFINITION = L.ROOT / "studies" / "rules" / "fade_first_touch_v1.json"
 TRIES = L.ROOT / "studies" / "rules" / "tries.json"
 ARCHIVE = "origin/archive"
+BACKFILL = L.ROOT / "studies" / "backfill" / "bars"
 MARKETS = ("NQ", "ES")
 SHIFT = {"NQ": 5.0, "ES": 1.0}                 # the measured overnight basis miss, in futures points
 
@@ -64,13 +67,14 @@ def join(track: list[dict], bars: dict[tuple[str, str], dict], skipped: Optional
     for s in track:
         raw = bars.get((s["session"], s["market"]))
         if raw is None:
-            skipped.append(f"{s['session']}_{s['market']}: no archive bars")
+            skipped.append(f"{s['session']}_{s['market']}: no 1-minute bars (archive or backfill)")
             continue
         ohlc = rth_bars(raw, date.fromisoformat(s["session"]))
         if not ohlc:
-            skipped.append(f"{s['session']}_{s['market']}: no RTH bars in the archive file")
+            skipped.append(f"{s['session']}_{s['market']}: no RTH bars in the 1-minute file")
             continue
-        out.append(dict(s, ohlc=ohlc, bars=[[b[0], b[2], b[3], b[4]] for b in ohlc], roll_week=bool(raw.get("roll_week"))))
+        out.append(dict(s, ohlc=ohlc, bars=[[b[0], b[2], b[3], b[4]] for b in ohlc], roll_week=bool(raw.get("roll_week")),
+                        backfilled=bool(raw.get("backfilled"))))
     return out
 
 
@@ -260,7 +264,8 @@ def run(track: list[dict], bars: dict, fees: Optional[float] = None, reps: int =
     res = {"study": "rules", "rule": d["rule"], "version": d["version"], "definition_sha256": sha, "seed": seed,
            "fees_round_turn_usd": fees, "tries": n_tries, "hypothetical": True, "skipped": skipped,
            "data_from": min((s["session"] for s in sessions), default=None),
-           "data_through": max((s["session"] for s in sessions), default=None), "markets": {}}
+           "data_through": max((s["session"] for s in sessions), default=None),
+           "backfilled": sorted({s["session"] for s in sessions if s["backfilled"]}), "markets": {}}
     for m in MARKETS:
         ss = sorted((s for s in sessions if s["market"] == m), key=lambda s: s["session"])
         wf = walk_forward(ss, d, rules, fees)
@@ -280,10 +285,13 @@ def run(track: list[dict], bars: dict, fees: Optional[float] = None, reps: int =
     return res
 
 
-def read_bars(files: Optional[dict] = None) -> dict[tuple[str, str], dict]:
-    """{(date, market): the archive's futures 1-minute file}."""
+def read_bars(files: Optional[dict] = None, backfill: Optional[Path] = BACKFILL) -> dict[tuple[str, str], dict]:
+    """{(date, market): the futures 1-minute file}: the archive's, else the backfill's (days before the archive)."""
     files = L.read_branch(ARCHIVE, lambda f: f.endswith(("/NQF-1m.json", "/ESF-1m.json"))) if files is None else files
-    return {(f.split("/")[1], f.split("/")[2].split("F-")[0]): json.loads(b) for f, b in files.items()}
+    out = {(p.parent.name, p.name.split("F-")[0]): json.loads(p.read_bytes())
+           for p in sorted(backfill.glob("*/[NE][QS]F-1m.json"))} if backfill and backfill.is_dir() else {}
+    out.update({(f.split("/")[1], f.split("/")[2].split("F-")[0]): json.loads(b) for f, b in files.items()})
+    return out
 
 
 def main(argv=None) -> int:
@@ -295,7 +303,8 @@ def main(argv=None) -> int:
     res = run(L.load(), read_bars(), a.fees)
     print(f"rule {res['rule']} v{res['version']}  definition sha256 {res['definition_sha256']}  seed {res['seed']}  "
           f"(hypothetical; fees ${res['fees_round_turn_usd']:.2f} round turn; tries to date {res['tries']})")
-    print(f"sessions with archive bars: {res['data_from']} to {res['data_through']}; left out {len(res['skipped'])}")
+    print(f"sessions with 1-minute bars: {res['data_from']} to {res['data_through']} ({len(res['backfilled'])} backfilled); "
+          f"left out {len(res['skipped'])}")
     for m, r in res["markets"].items():
         head = f"{m}: {r['sessions']} sessions, {r['oos_sessions']} out of sample, {r['oos_trades']} trades"
         if r["status"] != "tested":
