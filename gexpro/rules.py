@@ -76,8 +76,10 @@ def join(track: list[dict], bars: dict[tuple[str, str], dict], skipped: Optional
 
 # ---------------------------------------------------------------- one session
 def triggers(s: dict, rules: dict, shift: float = 0.0) -> list[dict]:
-    """The session's touches (non-dependent), in time order, ties in the level-type order."""
-    rows = [r for r in L.session_levels(s, rules, shift) if r["cat"] == "touch" and not r.get("dependent")]
+    """The session's touches (non-dependent), in time order, ties in the level-type order; "px" is the exact level
+    (the lab's "level" is rounded to 2 decimals for display)."""
+    rows = [dict(r, px=s["levels"][r["type"]] + shift) for r in L.session_levels(s, rules, shift)
+            if r["cat"] == "touch" and not r.get("dependent")]
     return sorted(rows, key=lambda r: (r["minute"], L.TYPES.index(r["type"])))
 
 
@@ -90,7 +92,7 @@ def trade(s: dict, trig: dict, p: dict, rules: dict, d: dict, fees: float) -> di
         return {"skip": "no RTH bar after the trigger"}
     short = trig["side"] == "above"
     sg = -1 if short else 1                                 # +1 long, -1 short
-    lv, e_bar = trig["level"], bars[i + 1]
+    lv, e_bar = trig["px"], bars[i + 1]
     entry = e_bar[1] + sg * tick
     stop = lv + p["s"] * tol if short else lv - p["s"] * tol
     risk = (stop - entry) * -sg

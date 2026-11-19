@@ -74,6 +74,11 @@ class TestFills(unittest.TestCase):
         self.assertEqual((t["why"], t["exit"], t["pts"], t["usd"]), ("target", 97.75, 16.0, 16.0 * 20 - 4.0))
         self.assertAlmostEqual(t["r"], 16.0 / 16.25)
 
+    def test_stop_uses_the_exact_level_not_the_rounded_one(self):
+        t = one(sess({"CW": 120.004}, bars(*TOUCH, [111, 112, 97, 98])))
+        self.assertAlmostEqual(t["stop"], 130.004, places=9)
+        self.assertEqual(t["level"], 120.004)
+
     def test_stop_first_inside_one_bar(self):
         t = one(sess({"CW": 120.0}, bars(*TOUCH, [111, 131, 97, 98])))
         self.assertEqual((t["why"], t["exit"], t["pts"]), ("stop", 130.25, -16.5))
