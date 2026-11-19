@@ -157,6 +157,12 @@ class TestBiasPage(unittest.TestCase):
         self.assertIn('<div class="eyebrow">Reference price${refAt(s.ref_time)}</div>', JS)
         self.assertNotIn('" future, live"', JS)                              # a time, not a claim that it is live
 
+    def test_every_view_of_the_reference_price_has_its_time(self):
+        """The 16:00 reference price carries its time wherever it is the headline number: Levels card, plan, Live table."""
+        for piece in ('<div class="eyebrow">Reference price${refAt(s.ref_time)}</div>', "<span>Price${refAt(s.ref_time)}</span>",
+                      '(s.etf ? "+" + s.etf : ""))}${refAt(s.ref_time)}</div>'):
+            self.assertIn(piece, JS)
+
     def test_one_centre_for_the_1_sigma_range(self):
         """Levels' key strip and Today's plan centre the 1σ range on the same anchor (they differed by a point), and
         the Bias card's wider or narrower range is labelled as the model's, not as the 1σ range."""
