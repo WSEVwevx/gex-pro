@@ -2362,6 +2362,8 @@ function planHere(ref, C1, P1, F){
   if(ref >= F) return C1 != null && C1 > F && ref < C1 ? "upper" : C1 != null ? "above" : null;
   return P1 != null && P1 < F && ref >= P1 ? "lower" : P1 != null ? "below" : null;
 }
+// the outer zones' edges: C1 and P1, or the flip when C1 sits below it (P1 above it), so no two zones overlap
+const planEdges = (C1, P1, F) => [F == null || C1 > F ? C1 : F, F == null || P1 < F ? P1 : F];
 function renderPlan(w){
   const S = w && w.result && w.result.session;
   if(!S || !S.levels){ $("planCard").innerHTML = `<div class="eyebrow">Today's plan</div><div class="expl">The plan appears with the next refresh.</div>`; $("chgFeed").innerHTML = ""; return; }
@@ -2377,11 +2379,12 @@ function renderPlan(w){
   const here = planHere(ref, C1, P1, F);
   // the zones use the first expiry's flip; the Regime row counts every expiry, so the zones name their own scope
   const fl = lv.flip != null ? "the flip" : "zero gamma", g0 = lv.flip != null ? "0DTE " : "";
+  const [hi, lo] = planEdges(C1, P1, F), top = hi === C1 ? `C1 ${p(C1)}` : `${fl} ${p(F)}`, bot = lo === P1 ? `P1 ${p(P1)}` : `${fl} ${p(F)}`;
   const rows = [
-    C1 != null && [`Above C1 ${p(C1)}`, "positive-gamma extension: rallies tend to slow" + (C2 != null ? `; next call level ${p(C2)}` : ""), here === "above"],
+    C1 != null && [`Above ${top}`, "positive-gamma extension: rallies tend to slow" + (C2 != null ? `; next call level ${p(C2)}` : ""), here === "above"],
     C1 != null && F != null && C1 > F && [`Between ${fl} ${p(F)} and C1 ${p(C1)}`, `positive ${g0}gamma: expect two-way trade and fades back toward the middle`, here === "upper"],
     P1 != null && F != null && P1 < F && [`Between P1 ${p(P1)} and ${fl} ${p(F)}`, `negative ${g0}gamma: moves can extend` + (P2 != null ? `; a break of P1 opens ${p(P2)}` : ""), here === "lower"],
-    P1 != null && [`Below P1 ${p(P1)}`, "hedging adds to selling" + (P2 != null ? `; next put level ${p(P2)}` : ""), here === "below"],
+    P1 != null && [`Below ${bot}`, "hedging adds to selling" + (P2 != null ? `; next put level ${p(P2)}` : ""), here === "below"],
   ].filter(Boolean);
   const day = now.toLocaleDateString("en-US", {...ET, weekday: "short", month: "short", day: "numeric"});
   const usd = ((news && news.events) || []).filter(e => e.country === "USD" && (e.impact === "High" || e.impact === "Medium")

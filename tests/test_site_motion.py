@@ -145,6 +145,27 @@ class TestBiasPage(unittest.TestCase):
         self.assertEqual(got, [w for _, w in cases])
         self.assertEqual(JS.count('here === "'), 4)                        # each plan row asks planHere, nothing else
 
+    def test_the_plan_zones_never_overlap(self):
+        """Each price lies in exactly one plan row, and it is the marked one, even when P1 sits above the flip
+        (NQ on 2026-11-19: C1 27,460, P1 27,731, flip 27,035, price 27,647 was marked "above C1" while the
+        plan also listed "below P1 27,731")."""
+        import shutil, subprocess
+        if not shutil.which("node"):
+            self.skipTest("node is not installed")
+        src = ("function planHere(" + JS.split("function planHere(", 1)[1].split("\n}", 1)[0] + "\n}\n"
+               + "const planEdges" + JS.split("const planEdges", 1)[1].split("\n", 1)[0])
+        self.assertIn("const [hi, lo] = planEdges(C1, P1, F)", JS)
+        levels = [(27460, 27731, 27035), (7329, 7319, 7545), (110, 90, 100), (95, 105, 100), (110, 101, 100), (99, 90, 100)]
+        refs = list(range(80, 125)) + [7000, 7325, 7340, 7600, 26900, 27100, 27500, 27647, 27800]
+        cases = [(r, c, q, f) for c, q, f in levels for r in refs]
+        js = src + "\nconsole.log(JSON.stringify(" + json.dumps(cases) + ".map(a => [planHere(...a), planEdges(a[1], a[2], a[3])])))"
+        got = json.loads(subprocess.run(["node", "-e", js], capture_output=True, encoding="utf-8", check=True).stdout)
+        for (ref, c1, p1, f), (here, (hi, lo)) in zip(cases, got):
+            zones = {"above": ref >= hi, "upper": c1 > f and f <= ref < c1,          # the same rows renderPlan draws
+                     "lower": p1 < f and p1 <= ref < f, "below": ref < lo}
+            self.assertEqual([k for k, v in zones.items() if v], [here], (ref, c1, p1, f))
+        self.assertEqual(got[cases.index((27647, 27460, 27731, 27035))], ["above", [27460, 27035]])
+
     def test_the_reference_price_says_when_it_is_from(self):
         """The reference price shows its own time (ref_time), so the 16:00 print never reads as a live quote."""
         import shutil, subprocess

@@ -61,6 +61,33 @@ class TestSession(unittest.TestCase):
         self.assertIsNone(session.open_levels(s, datetime(2026, 10, 27, 18, 30, tzinfo=NY)))   # next session
         self.assertIsNone(session.open_levels([snap(T0)], datetime(2026, 10, 27, 11, 0, tzinfo=NY)))  # none near 09:30
 
+    def test_open_and_changes_keep_their_own_futures_mapping(self):
+        """The open's levels use the mapping saved at the open and each change the one saved with it, not the
+        latest ratio: on 2026-11-19 the NQ open levels moved ~4 points between refreshes as the basis moved."""
+        import tempfile
+        from types import SimpleNamespace
+        from gexsys.service import MarketWorker
+        from gexsys.storage import SnapshotStore
+        at = lambda h, m: datetime(2026, 10, 27, h, m, tzinfo=NY)
+        with tempfile.TemporaryDirectory() as tmp:
+            st = SnapshotStore(tmp)
+            for t, c1, fm in ((at(9, 33), 100.0, {"factor": 1.01, "offset": 0.0}), (at(10, 0), 110.0, {"factor": 1.02, "offset": 2.0}),
+                              (at(10, 5), 110.0, {"factor": 1.03, "offset": 0.0}), (at(10, 30), 120.0, None), (at(10, 35), 120.0, None)):
+                st.save("NQ-CBOE", dict(snap(t, c1=c1), status="OK", **({"futures_map": fm} if fm else {})))
+            w = SimpleNamespace(store=st, key="NQ-CBOE", _stats=lambda *a: {})
+            r = {"summary": dict(snap(at(11, 0), c1=120.0), status="OK"), "mapped": {"mapping": {"factor": 1.05, "offset": 0.0}}}
+            MarketWorker._add_session(w, r, at(11, 0))
+            S = r["session"]
+            self.assertEqual(S["open"]["C1"], 101.0)                                   # 100 x 1.01, frozen at the open
+            self.assertNotIn("map", S["open"])
+            c1 = [c for c in S["changes"] if c["what"] == "C1"]
+            self.assertEqual([(c["frm"], c["to"]) for c in c1], [(115.5, 126.0), (104.0, 114.25)])  # no saved map: 1.05 now
+            self.assertTrue(all("map" not in c for c in S["changes"]))
+            self.assertEqual(S["levels"]["C1"], 126.0)                                 # the live levels: today's mapping
+            r2 = {"summary": dict(snap(at(11, 0), c1=120.0), status="OK"), "mapped": None}      # no mapping now: index prices
+            MarketWorker._add_session(w, r2, at(11, 0))
+            self.assertEqual(r2["session"]["open"]["C1"], 100.0)
+
     def test_session_start(self):
         self.assertEqual(session.session_start(datetime(2026, 10, 27, 10, 0, tzinfo=NY)), datetime(2026, 10, 26, 18, 0, tzinfo=NY))
         self.assertEqual(session.session_start(datetime(2026, 10, 27, 19, 0, tzinfo=NY)), datetime(2026, 10, 27, 18, 0, tzinfo=NY))
