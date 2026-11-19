@@ -129,6 +129,22 @@ class TestBiasPage(unittest.TestCase):
         self.assertEqual(run({"columns": [], "candles": []}), "0 GEX snapshots · candles 5m, delayed")
         self.assertIn('$("hmSub").textContent = `${market} futures · ${hmAsOf(hm, hmTf)}`;', JS)
 
+    def test_the_plan_marks_one_zone(self):
+        """Today's plan marks exactly the zone price is in, even when C1 sits below the flip (ES on 2026-11-18:
+        C1 7,329, P1 7,319, flip 7,545, price 7,342 was marked both "above C1" and "between P1 and the flip")."""
+        import shutil, subprocess
+        if not shutil.which("node"):
+            self.skipTest("node is not installed")
+        src = "function planHere(" + JS.split("function planHere(", 1)[1].split("\n}", 1)[0] + "\n}"
+        cases = [((7342, 7329, 7319, 7545), "lower"), ((7600, 7329, 7319, 7545), "above"), ((7300, 7329, 7319, 7545), "below"),
+                 ((105, 110, 90, 100), "upper"), ((115, 110, 90, 100), "above"), ((95, 110, 90, 100), "lower"),
+                 ((85, 110, 90, 100), "below"), ((100, 110, 90, 100), "upper"), ((99, 110, 98, 100), "lower"),
+                 ((99, 110, 101, 100), "below"), ((115, 110, 90, None), "above"), ((100, 110, 90, None), None)]
+        js = src + "\nconsole.log(JSON.stringify(" + json.dumps([c for c, _ in cases]) + ".map(a => planHere(...a))))"
+        got = json.loads(subprocess.run(["node", "-e", js], capture_output=True, encoding="utf-8", check=True).stdout)
+        self.assertEqual(got, [w for _, w in cases])
+        self.assertEqual(JS.count('here === "'), 4)                        # each plan row asks planHere, nothing else
+
     def test_a_gap_in_the_replay_is_not_an_alarm(self):
         self.assertNotRegex(CSS, r"\.rp-marks s\{[^}]*(gradient|warn)")
         self.assertNotIn("no update since", JS)
