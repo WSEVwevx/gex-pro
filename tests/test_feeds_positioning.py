@@ -59,6 +59,8 @@ class TestPositioning(unittest.TestCase):
             self.assertEqual(p.get()["markets"], first["markets"])     # source down: last good report
             again = pos.Positioning(cache_path=cache, clock=lambda: 0.0, fetch=fetch)
             self.assertEqual(again._out["markets"], first["markets"])  # and it survives a restart
+            self.assertEqual(first["fetched_at"], "1970-01-02T03:46:40+00:00")    # clock 100000 s, in UTC
+            self.assertEqual(p.get()["fetched_at"], first["fetched_at"])          # a failed fetch keeps the last good time
 
 
 if __name__ == "__main__":

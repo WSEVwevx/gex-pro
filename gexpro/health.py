@@ -2,7 +2,8 @@
 
 Each component may have sources() -> [row]; a row is
   {"name", "provider", "pages": [...], "last_ok": ISO time or date or None, "error": str or None,
-   "note": str or None (works, but on a backup or partly), "fresh_h": hours it may go without news, "detail"}.
+   "note": str or None (works, but on a backup or partly), "fresh_h": hours it may go without news, "detail",
+   "data_asof": optional date the data itself is from (a weekly report); "late" is then judged on it, not on last_ok}.
 This module only collects the rows and gives each a status; the website shows them.
 """
 from __future__ import annotations
@@ -28,13 +29,15 @@ def _when(s: Optional[str]) -> Optional[datetime]:
 
 def status(row: dict, now: datetime) -> str:
     """down: never worked and failing | failing: last try failed, older copy shown | late: no news for longer
-    than expected | partial: works, on a backup or partly | waiting: not checked yet | ok."""
+    than expected (counted from data_asof when the row has one) | partial: works, on a backup or partly |
+    waiting: not checked yet | ok."""
     ok = _when(row.get("last_ok"))
     if row.get("error"):
         return "failing" if ok else "down"
     if not ok:
         return "waiting"
-    if row.get("fresh_h") and (now - ok).total_seconds() > row["fresh_h"] * 3600:
+    news = _when(row.get("data_asof")) or ok
+    if row.get("fresh_h") and (now - news).total_seconds() > row["fresh_h"] * 3600:
         return "late"
     return "partial" if row.get("note") else "ok"
 

@@ -14,6 +14,7 @@ import threading
 import time
 import urllib.parse
 import urllib.request
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -85,7 +86,8 @@ class Positioning:
         return self._out
 
     def get(self) -> dict:
-        """{"markets": {"ES": summary, "NQ": summary}}; the last good copy when the source fails."""
+        """{"markets": {"ES": summary, "NQ": summary}, "fetched_at": UTC time of the last good fetch}; the last good copy
+        when the source fails."""
         with self._lock:
             if self._out is not None and self.clock() - self._at < TTL_S:
                 return self._out
@@ -100,8 +102,9 @@ class Positioning:
                     log.warning("CFTC positioning %s failed: %s", m, e)
                     errors.append(f"{m}: {e}")
             merged = dict((self._out or {}).get("markets") or {}, **fresh)     # a market that failed keeps its last report
+            fetched_at = datetime.fromtimestamp(self._at, timezone.utc).isoformat() if fresh else (self._out or {}).get("fetched_at")
             self._out = {"markets": merged, "source": "CFTC Traders in Financial Futures",
-                         "error": "; ".join(errors) or None}
+                         "error": "; ".join(errors) or None, "fetched_at": fetched_at}
             if fresh and self.cache_path:
                 self.cache_path.parent.mkdir(parents=True, exist_ok=True)
                 self.cache_path.write_text(json.dumps(self._out), encoding="utf-8")

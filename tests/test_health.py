@@ -28,6 +28,9 @@ class TestStatus(unittest.TestCase):
         self.assertEqual(status({"last_ok": ago(0.1), "error": "HTTP 429"}, NOW), "failing")   # older copy still shown
         self.assertEqual(status({"last_ok": None, "error": "HTTP 429"}, NOW), "down")
         self.assertEqual(status({"last_ok": None}, NOW), "waiting")
+        # a weekly report fetched just now is late when the report itself is old, and on time otherwise
+        self.assertEqual(status({"last_ok": ago(1), "data_asof": "2026-10-20", "fresh_h": 11 * 24}, NOW), "late")
+        self.assertEqual(status({"last_ok": ago(1), "data_asof": "2026-11-03", "fresh_h": 11 * 24}, NOW), "ok")
 
     def test_weekly_report_date(self):
         # the CFTC report is a bare date; 8 days old is normal for a weekly report
@@ -85,8 +88,16 @@ class TestFeedRows(unittest.TestCase):
         self.assertEqual(status(r["Ticker quotes"], NOW), "down")
 
     def test_oldest_positioning_report_counts(self):
-        r = self.rows(positioning={"markets": {"ES": {"asof": "2026-10-27"}, "NQ": {"asof": "2026-10-13"}}})
+        r = self.rows(positioning={"markets": {"ES": {"asof": "2026-10-27"}, "NQ": {"asof": "2026-10-13"}}, "fetched_at": ago(1)})
         self.assertEqual(status(r["Big trader positioning"], NOW), "late")
+
+    def test_positioning_worked_is_the_fetch_time_not_the_report_date(self):
+        r = self.rows(positioning={"markets": {"ES": {"asof": "2026-11-03"}, "NQ": {"asof": "2026-11-03"}}, "fetched_at": ago(2)})
+        row = r["Big trader positioning"]
+        self.assertEqual((row["last_ok"], row["data_asof"], status(row, NOW)), (ago(2), "2026-11-03", "ok"))
+        self.assertTrue(row["detail"].endswith("latest positions Nov 3"))
+        old = self.rows(positioning={"markets": {"ES": {"asof": "2026-11-03"}, "NQ": {"asof": "2026-11-03"}}})
+        self.assertEqual(status(old["Big trader positioning"], NOW), "waiting")       # a copy saved before fetch times
 
     def test_bundled_weights_are_a_backup_not_late(self):
         scr = {"fetched": ago(0), "stocks": [{"stale": False}], "weights_asof": "2026-10-25", "weights_source": "slickcharts.com (bundled fallback)"}
