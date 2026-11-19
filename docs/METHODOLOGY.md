@@ -278,4 +278,20 @@ Any strategy study has to be pre-registered before it runs:
 - **Costs:** 1 tick of slippage per side plus commissions.
 - **Look-ahead control:** use only snapshots whose `asof` precedes the signal bar.
 
-The system ships no such result and makes no predictive claim.
+### Backtesting studies (website Backtesting tab, `gexpro/studies.py`)
+
+Each study is fixed in a definition file before any result; its SHA-256 is shown with the result, so any number can
+be rerun exactly. Every input is known before the session's 09:30 ET (`tools/stress/lookahead_audit.py` L7-L9).
+
+| Study | Definition | Question | Reports only when |
+|---|---|---|---|
+| Levels vs random levels (`gexpro/reaction_lab.py`) | `studies/level_reaction/v2.json` | Is price rejected at a 09:30 level more often than at a random level the same distance from the open? | a level type has 20 counted touches |
+| When it works (`gexpro/splits.py`) | `studies/splits/v1.json` | Does that difference change with regime, distance from zero gamma, VIX / VXN third, event days, weekday, opex week or 0DTE share? | every group of a split has 20 sessions; Benjamini-Hochberg q = 0.10 over the tests run |
+| Rule tester (`gexpro/rules.py`) | `studies/rules/fade_first_touch_v1.json`, `studies/rules/tries.json` | Does fading the first touch make money out of sample after slippage and fees? Hypothetical. | 30 out-of-sample trades in an expanding walk-forward |
+
+Intervals (`gexpro/uncertainty.py`): 95%, 10,000 whole-session resamples, expanded percentile (BCa when the
+bootstrap's bias is large), seed 20261118; the method's coverage is checked by `tools/stress/uncertainty_coverage.py`.
+An interval that includes 0 reads "no proven edge yet". The tab also shows how many sessions each study still needs
+at the current rate.
+
+The system makes no predictive claim; a study that finds nothing says so.

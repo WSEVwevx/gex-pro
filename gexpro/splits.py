@@ -76,7 +76,7 @@ def _et_day(iso: str) -> date:
 def event_label(d: date, cal: Optional[dict]) -> tuple[Optional[str], str, list[str]]:
     """(event | no_event | None, why unavailable, named releases) from the calendar copy fetched before 09:30."""
     if not cal:
-        return None, "no calendar copy archived for the day (recording began 2026-11-19)", []
+        return None, "no calendar copy saved before that day's 09:30", []
     sunday = d - timedelta(days=(d.weekday() + 1) % 7)
     days = {_et_day(e["time"]) for e in cal.get("events", []) if e.get("time")}
     if not any(sunday <= x <= sunday + timedelta(days=6) for x in days):
@@ -116,7 +116,7 @@ def labels(s: dict, closes: dict[str, float], cal: Optional[dict], dte: dict[str
             "event_day": (ev[0], ev[1], ev[2]),
             "weekday": (SPLITS["weekday"][d.weekday()], "", None),
             "opex_week": (opex_label(d), "", None),
-            "zero_dte_tercile": (*dte.get(s["session"], (None, "no archived 09:30 snapshot (archive began 2026-11-18)")), None)}
+            "zero_dte_tercile": (*dte.get(s["session"], (None, "no archived 09:30 snapshot for that day")), None)}
 
 
 # ---------------------------------------------------------------- the test

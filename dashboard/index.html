@@ -324,7 +324,25 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
 
     <!-- BACKTESTING: each past session's 9:30 paste -->
     <div id="backtestView" hidden>
-      <section class="card" data-help="archive" id="archiveCard">
+      <section class="card" data-help="studies" id="stCard">
+        <div class="head"><h2>Verdict</h2><span class="sub" id="stSub"></span><span class="spacer"></span>
+          <div class="filters" id="stMarket" role="tablist" aria-label="Market"></div></div>
+        <div class="trk-kpis" id="stKpis"></div>
+        <div class="expl" id="stNote"></div>
+      </section>
+      <section class="card" data-help="studies_need" style="margin-top:12px">
+        <div class="head"><h2>Sample needed</h2><span class="sub" id="stNeedSub"></span></div>
+        <div id="stNeed"></div>
+      </section>
+      <div class="grid2" style="margin-top:12px">
+        <section class="card" data-help="study_levels"><div class="head"><h2>Levels vs random levels</h2><span class="sub" id="stLvlSub"></span></div><div id="stLvl"></div></section>
+        <section class="card" data-help="study_splits"><div class="head"><h2>When it works</h2><span class="sub" id="stSplitSub"></span></div><div id="stSplit"></div></section>
+      </div>
+      <section class="card" data-help="study_rules" style="margin-top:12px">
+        <div class="head"><h2>Rule tester</h2><span class="sub" id="stRuleSub"></span></div>
+        <div id="stRule"></div>
+      </section>
+      <section class="card" data-help="archive" id="archiveCard" style="margin-top:12px">
         <div class="head"><h2>History archive</h2><span class="sub" id="arcSub"></span></div>
         <div class="trk-kpis" id="arcKpis"></div>
       </section>
