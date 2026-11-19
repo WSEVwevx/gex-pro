@@ -10,8 +10,8 @@ const store = { get(k, d){ try { return localStorage.getItem(k) ?? d; } catch(e)
 // Static mode: the hosted copy (python -m gexsys build-site) reads files that a scheduled job rewrites,
 // instead of the local service's /api endpoints.
 const STATIC = !!window.GEX_STATIC;
-const API = STATIC ? {all: "data/all.json", news: "data/news.json", posts: "data/posts.json", indicator: "data/indicator.json", briefings: "data/briefings.json", track: "data/trackrecord.json", quotes: "data/quotes.json", positioning: "data/positioning.json", sources: "data/sources.json", pastes: "data/pastes.json", archive: "data/archive.json"}
-                   : {all: "/api/all", news: "/api/news", posts: "/api/posts", indicator: "/api/indicator", briefings: "/api/briefings", track: "/api/trackrecord", quotes: "/api/quotes", positioning: "/api/positioning", sources: "/api/sources", pastes: "/api/pastes", archive: "/api/archive"};
+const API = STATIC ? {all: "data/all.json", news: "data/news.json", posts: "data/posts.json", indicator: "data/indicator.json", briefings: "data/briefings.json", track: "data/trackrecord.json", quotes: "data/quotes.json", positioning: "data/positioning.json", sources: "data/sources.json", pastes: "data/pastes.json", archive: "data/archive.json", studies: "data/studies.json"}
+                   : {all: "/api/all", news: "/api/news", posts: "/api/posts", indicator: "/api/indicator", briefings: "/api/briefings", track: "/api/trackrecord", quotes: "/api/quotes", positioning: "/api/positioning", sources: "/api/sources", pastes: "/api/pastes", archive: "/api/archive", studies: "/api/studies"};
 const pineUrl = m => STATIC ? `data/pine-published${m ? "-" + m : ""}.txt`
                             : `/api/pine/all?which=published${m ? "&market=" + encodeURIComponent(m) : ""}`;
 // every data request skips the browser cache; on the hosted copy a unique query also skips GitHub's
@@ -41,8 +41,8 @@ const PER_MARKET = ["levelsView", "ladderView", "heatmapView", "screenerView", "
 const cardKey = c => { const v = c.closest("[id$=View]"); return v ? v.id + ":" + [...v.querySelectorAll(".card")].indexOf(c) + (PER_MARKET.includes(v.id) ? ":" + market : "") : null; };
 // a first visit has no heights of its own yet: it reserves the usual ones (measured on the live site at 1366 and
 // 375 px wide, 2026-11-16), by page and card order. They are replaced by this device's real heights after one draw.
-const DEFAULT_H = {wide: {levelsView:[161,161,161,423,435,677,573,375,375,1467],ladderView:[183,1114,224,670,348],heatmapView:[743],screenerView:[290,372,99,681],biasView:[202,635,241,240],trackView:[261,615,637,299,274,1393,374,367,367,322],briefingsView:[136,0,619,619,181,453],newsView:[646,990],indicatorView:[261,261,261,52,372],libraryView:[152,760,1366],glossaryView:[5828],healthView:[1079],backtestView:[167,303,644]},
-  narrow: {levelsView:[129,161,119,633,463,1027,628,375,375,1548],ladderView:[183,1299,205,670,284],heatmapView:[838],screenerView:[311,420,217,800],biasView:[342,765,422,345],trackView:[456,1217,997,345,392,1425,650,395,418,589],briefingsView:[168,0,643,620,248,472],newsView:[829,1061],indicatorView:[259,261,237,52,991],libraryView:[320,1058,1715],glossaryView:[13954],healthView:[1903],backtestView:[200,322,711]}};
+const DEFAULT_H = {wide: {levelsView:[161,161,161,423,435,677,573,375,375,1467],ladderView:[183,1114,224,670,348],heatmapView:[743],screenerView:[290,372,99,681],biasView:[202,635,241,240],trackView:[261,615,637,299,274,1393,374,367,367,322],briefingsView:[136,0,619,619,181,453],newsView:[646,990],indicatorView:[261,261,261,52,372],libraryView:[152,760,1366],glossaryView:[5828],healthView:[1141],backtestView:[221,261,527,552,273,167,303,644]},
+  narrow: {levelsView:[129,161,119,633,463,1027,628,375,375,1548],ladderView:[183,1299,205,670,284],heatmapView:[838],screenerView:[311,420,217,800],biasView:[342,765,422,345],trackView:[456,1217,997,345,392,1425,650,395,418,589],briefingsView:[168,0,643,620,248,472],newsView:[829,1061],indicatorView:[259,261,237,52,991],libraryView:[320,1058,1715],glossaryView:[13954],healthView:[2053],backtestView:[474,343,590,699,356,200,322,711]}};
 function reserve(){
   const usual = DEFAULT_H[innerWidth < 700 ? "narrow" : "wide"];
   document.querySelectorAll("[id$=View] .card").forEach(c => {
@@ -197,7 +197,7 @@ function setPage(p){
   if(p === "briefings") loadBriefings();
   if(p === "news") renderNews();
   if(p === "indicator") loadIndicator();
-  if(p === "backtest"){ loadPastes(); loadArchive(); }
+  if(p === "backtest"){ loadPastes(); loadArchive(); loadStudies(); }
   if(p === "library") renderLibrary();
   if(p === "glossary") renderGlossary();
   if(p === "track") loadTrack();
@@ -1156,6 +1156,21 @@ const HELP = {
   pastes: {title: "9:30 pastes for backtesting", tldr: "The exact levels from each past session's open, ready to paste into the indicator.",
     body: `<p>Every session, the paste from the last calculation before 9:30 ET is saved, the same one the Track record grades. Copy a day, paste it into the indicator's <b>Levels payload</b>, then scroll your chart back to that day: every level, tag, zone and IV band is drawn as it was at that open, plus the closing levels of the sessions before it.</p><p>The indicator marks it "Backtest" with the date instead of "stale", and its alerts stay off. Click <b>Copy for TradingView</b> at the top of any page and paste that to go back to live levels.</p><p>The website keeps these permanently from now on; days before this feature go back as far as the saved snapshots did (about a week).</p>`,
     watch: ["Compare where price reacted with the C / P tags and the walls that day", "Use Copy both on a layout with NQ and ES charts"]},
+  studies: {title: "Backtesting studies", tldr: "Do the 9:30 levels give an edge? Tested against random levels, split by conditions, and as a rule, with the sample each still needs.",
+    body: `<p>Four studies, each fixed in a written definition file before any result (its hash is on each card, so any result can be rerun exactly). They use only what was known before each session's 9:30 open, checked by a look-ahead audit on every build.</p><p><b>No proven edge yet</b> means no study has an interval that excludes zero, or a split or rule that survives its correction for the number of tests. That is a valid result: with few sessions, real edges and noise look alike.</p><p>Every trade on this page is hypothetical. Nothing here is advice.</p>`,
+    watch: ["The verdict stays \"no proven edge yet\" until a study has enough sessions", "A study with too few sessions shows its count only, never a rate"]},
+  studies_need: {title: "Sample needed", tldr: "How many sessions each study has, how many it needs, and when that is reached at today's rate.",
+    body: `<p><b>Levels vs random:</b> the level type touched most often needs 20 touches before its rate is shown. <b>When it works:</b> the split closest to testable needs 20 sessions in its smallest group. <b>Rule tester:</b> 20 training sessions, then 30 out-of-sample trades, at today's touches per session.</p><p>The dates count trading days from the last data day. They are best cases: a rate seen over a few weeks can change, and the rule tester trades at most one position at a time, so it usually needs more.</p>`,
+    watch: ["Dates move as the touch rate changes", "Reached means the study can report, not that it found anything"]},
+  study_levels: {title: "Levels vs random levels", tldr: "Does price turn at a 9:30 level more often than at a random level the same distance away?",
+    body: `<p>For each level type: how often price, on first reaching the level during the cash session, turned back 4 tolerances before a 1-minute close beyond it. <i>Random</i> is the same rule at random levels from the same sessions, on the same side and distance from the open.</p><p>The difference has a 95% interval from resampling whole sessions (touches on one day are not independent). <b>n&lt;20</b>: fewer than 20 touches, no rate shown. <i>Shifted</i>: the same with the levels moved by the typical futures mapping error, so a result that depends on a few points is visible.</p>`,
+    watch: ["An interval that includes 0 is no proven edge", "Compare the shifted results: a real level effect survives a few points"]},
+  study_splits: {title: "When it works", tldr: "Is the level effect different on some days: regime, volatility, events, opex, weekday?",
+    body: `<p>Seven splits, each known before 9:30, registered before any result: gamma regime, distance from zero gamma, the VIX / VXN third (cutoffs from the past year only), USD high-impact event days, weekday, opex week and the 0DTE share of gamma.</p><p>A split is tested only when every group has 20 sessions, by shuffling whole sessions between groups 10,000 times. With many tests some look good by chance, so Benjamini-Hochberg at q = 0.10 decides which survive; only survivors show their groups' differences.</p>`,
+    watch: ["\"Not enough data\" is shown with each group's count", "Event day and 0DTE share started recording on Nov 19, 2026"]},
+  study_rules: {title: "Rule tester", tldr: "A written trading rule replayed on 1-minute bars, scored only on sessions it was not tuned on. Hypothetical.",
+    body: `<p>The rule fades the first touch of a 9:30 level: short a level above the open, long one below. Fills are deliberately conservative: entry at the next bar's open plus a tick, stop and target a tick worse, the stop first if both are inside one bar, fees on every trade.</p><p>Eight settings (stop, target, time exit) are compared on past sessions only; the best one trades the next session, then the window grows by a day. Only those next sessions are scored. Under 30 such trades nothing is shown but the count. The p-value is also shown multiplied by every setting ever tried, so trying many rules cannot manufacture a result.</p><p>Hypothetical: no order is ever placed, and nothing here is advice.</p>`,
+    watch: ["In-sample far above out-of-sample means the settings were fitted to noise", "R is the distance from entry to the stop"]},
   archive: {title: "History archive", tldr: "GEX PRO's own options history, saved every trading day since Nov 18, 2026.",
     body: `<p>Free options-chain history does not exist, so the site keeps its own. After 5:15 pm ET every trading day it saves, per market: the snapshot the 9:30 plan used, the one nearest noon and the last one before the close (levels, ranked levels, expected move, regime, the gamma profile and the 9:30 futures mapping), the list of every snapshot it chose from, and 1-minute bars for the future (the whole overnight-to-5 pm day) and the index (the cash session).</p><p>Files are only ever added, never changed: each day has a manifest with a SHA-256 fingerprint of every file, and a check fails if any saved file changes. Futures bars name their contract and flag roll weeks. Studies on this page say how many sessions they need and how many exist.</p>`,
     watch: ["A study needs enough sessions before its result means anything", "Missing days are listed, never skipped quietly"]},
@@ -1217,7 +1232,7 @@ const HELP = {
   paste: {title: "The hourly paste", tldr: "One text block that carries all levels to TradingView.",
     body: `<p>Published every hour on the hour (ET). One paste holds NQ and ES; each chart draws only its own market. The indicator marks levels stale after 90 minutes.</p>`},
 };
-const PAGE_HELP = {levels: "regime", ladder: "livetable", heatmap: "heatmap", screener: "screener", bias: "bias", briefings: "briefings", news: "calendar", indicator: "indicator", library: "library", glossary: "glossary", track: "track", backtest: "pastes", health: "health"};
+const PAGE_HELP = {levels: "regime", ladder: "livetable", heatmap: "heatmap", screener: "screener", bias: "bias", briefings: "briefings", news: "calendar", indicator: "indicator", library: "library", glossary: "glossary", track: "track", backtest: "studies", health: "health"};
 let exKey = null;
 function openExplain(key){
   const h = HELP[key]; if(!h) return;
@@ -1410,6 +1425,90 @@ function renderArchive(A){
   $("arcKpis").innerHTML = Object.entries(A.markets).map(([m, v]) => kpi(m, `${v.sessions} session${v.sessions === 1 ? "" : "s"}`, v.from ? `${day(v.from)} to ${day(v.through)}` : `starts ${day(A.first_day)}`)).join("")
     + (A.missing.length ? kpi("Missing", `${A.missing.length} day${A.missing.length === 1 ? "" : "s"}`, esc(A.missing.slice(-3).map(day).join(", ")), "var(--neg)") : "")
     + (A.error ? kpi("Last write", "failed", esc(A.error.slice(0, 80)), "var(--neg)") : "");
+}
+// ---------- Backtesting studies (phases 3-6): data/studies.json, recomputed only when their inputs change
+let studies = null, stM = store.get("gex.stm") || "NQ";
+async function loadStudies(){
+  try { studies = await (await fetchFresh(API.studies)).json(); } catch(e){ studies = {unavailable: offline()}; }
+  renderStudies();
+}
+const SPLIT_NAME = {regime: "Gamma regime", zg_distance: "Distance from zero gamma", vol_tercile: "VIX / VXN third", event_day: "Event day",
+                    weekday: "Weekday", opex_week: "Opex week", zero_dte_tercile: "0DTE share third"};
+const STUDY_NAME = {level_reaction: "Levels vs random", splits: "When it works", rules: "Rule tester"};
+const sday = d => d ? new Date(d + "T12:00:00Z").toLocaleDateString("en-US", {month: "short", day: "numeric", timeZone: "UTC"}) : "-";
+const sdayY = d => d ? new Date(d + "T12:00:00Z").toLocaleDateString("en-US", {month: "short", day: "numeric", year: "numeric", timeZone: "UTC"}) : "-";
+const sgn = (x, d=3) => x == null ? "-" : (x > 0 ? "+" : "") + num(x, d);
+const ivTxt = (iv, d=3) => iv ? `${sgn(iv[0], d)} to ${sgn(iv[1], d)}` : "";
+const sha8 = h => h ? h.slice(0, 8) : "-";
+function renderStudies(){
+  const X = studies;
+  if(!X) return;
+  if(X.unavailable){
+    ["stSub", "stNeedSub", "stLvlSub", "stSplitSub", "stRuleSub"].forEach(id => $(id).textContent = "unavailable");
+    ["stKpis", "stNeed", "stLvl", "stSplit", "stRule"].forEach(id => $(id).innerHTML = "");
+    $("stNote").textContent = X.unavailable; return;
+  }
+  const ms = Object.keys(X.markets);
+  if(!ms.includes(stM)) stM = ms[0];
+  $("stMarket").innerHTML = ms.map(m => `<button role="tab" aria-selected="${stM === m}" data-m="${m}">${m}</button>`).join("");
+  [...$("stMarket").children].forEach(b => b.onclick = () => { stM = b.dataset.m; store.set("gex.stm", stM); renderStudies(); });
+  const M = X.markets[stM], C = M.counts, St = X.studies, edge = M.verdict.edge.length;
+  const at = new Date(X.computed_at).toLocaleString("en-US", {...ET, month: "short", day: "numeric", hour: "numeric", minute: "2-digit"});
+  $("stSub").innerHTML = `<span class="trk-tag ${edge ? "good" : "warn"}" style="margin-left:0">${edge ? "evidence found" : "no proven edge yet"}</span> data through ${sday(M.data_through)} · computed ${at} ET`;
+  $("stKpis").innerHTML =
+    kpi("Sessions", num(M.sessions, 0), `${sday(M.data_from)} to ${sday(M.data_through)} · ${M.archive_sessions} archived with bars`)
+    + kpi("Level types with 20+ touches", `${C.level_types_20} of ${C.level_types}`, "below 20 touches no rate is shown")
+    + kpi("Splits tested", `${C.splits_tested} of ${C.splits_registered}`, `${St.splits.survivors.filter(x => x.endsWith(":" + stM)).length} survive · ${St.splits.registered} registered for both markets`)
+    + kpi("Rule trades out of sample", `${C.oos_trades} of ${C.oos_needed}`, "hypothetical · walk-forward");
+  $("stNote").innerHTML = (X.error ? `<b>The last update failed</b> (${esc(X.error)}); these are the results computed ${at} ET. ` : "")
+    + (edge ? `Evidence in ${esc(M.verdict.edge.join(", "))}, after the corrections each study names below.`
+            : `No proven edge yet: ${M.sessions} sessions. Each study below says how many more it needs.`)
+    + " Every rate and trade here comes from past data; none is advice.";
+  // sample needed
+  $("stNeedSub").textContent = "at today's rate · best case";
+  $("stNeed").innerHTML = `<table class="trk-table rx-table"><tr><th>Study</th><th>Have</th><th>Need</th><th>Reached by</th></tr>${M.needs.map(n =>
+    `<tr><td>${STUDY_NAME[n.study]}<div class="dim">${esc(n.basis)}</div></td><td class="m">${n.have}</td><td class="m">${n.need ?? "-"}</td><td class="m">${n.need == null ? "unknown" : n.reached ? "reached" : "~" + sdayY(n.est_date)}</td></tr>`).join("")}</table>`;
+  // levels vs random
+  const LV = St.level_reaction, sh = Object.keys((M.level_reaction[0] || {}).shifted || {});
+  $("stLvlSub").textContent = `${M.sessions} sessions · v${LV.version} ${sha8(LV.sha256)}`;
+  $("stLvl").innerHTML = `<table class="trk-table rx-table"><tr><th>Level</th><th>Touches</th><th>Rejected</th><th>Random</th><th>Difference, 95%</th></tr>${M.level_reaction.map(r => {
+      if(r.small) return `<tr class="dim"><td>${r.type}</td><td class="m">${r.touches}</td><td class="m" colspan="3">n&lt;20</td></tr>`;
+      if(r.unavailable) return `<tr><td>${r.type}</td><td class="m">${r.touches}</td><td class="m">${pct(r.reject)}</td><td class="m" colspan="2">unavailable: ${esc(r.unavailable)}</td></tr>`;
+      const out = r.interval[0] > 0 || r.interval[1] < 0;
+      return `<tr><td>${r.type}</td><td class="m">${r.touches}</td><td class="m">${pct(r.reject)}</td><td class="m">${pct(r.baseline)}</td><td class="m"><b class="${out ? (r.difference > 0 ? "good" : "bad") : ""}">${sgn(r.difference)}</b><div class="dim">${ivTxt(r.interval)} · ${esc(r.interval_method)} · p ${num(r.p_value, 3)}<br>shifted ${sh.map(k => `${k}: ${sgn(r.shifted[k])}`).join(", ")}</div></td></tr>`;
+    }).join("")}</table><div class="expl">Rejected: price turns 4 tolerances back before a 1-minute close beyond the level. Random: the same rule at ${LV.baseline_per_type.toLocaleString("en-US")} random levels per type, the same distance from the open. Intervals from 10,000 whole-session resamples, seed ${X.seed}. Roll-week sessions: ${M.roll_week_sessions}.</div>`;
+  // splits
+  const SP = St.splits;
+  $("stSplitSub").textContent = `${C.splits_tested} of ${C.splits_registered} tested · v${SP.version} ${sha8(SP.sha256)}`;
+  $("stSplit").innerHTML = `<table class="trk-table rx-table"><tr><th>Split</th><th>Sessions per group</th><th>Result</th></tr>${M.splits.map(t => {
+      const gs = Object.entries(t.groups).map(([g, v]) => `${esc(g.toLowerCase().replace(/_/g, " "))} ${v.sessions}${v.difference != null && v.interval ? ` (${sgn(v.difference)}, ${ivTxt(v.interval)})` : ""}`).join(" · ");
+      const un = Object.values(t.unavailable || {}).reduce((a, b) => a + b, 0);
+      const why = un ? `<div class="dim">${un} unavailable: ${esc(Object.keys(t.unavailable)[0])}</div>` : "";
+      const res = t.status === "tested" ? `<span class="trk-tag ${t.survives ? "good" : ""}" style="margin-left:0">${esc(t.verdict)}</span><div class="dim">p ${num(t.p_value, 3)}</div>` : `<span class="dim">${esc(t.status)}</span>`;
+      return `<tr><td>${SPLIT_NAME[t.split] || esc(t.split)}</td><td>${gs}${why}</td><td>${res}</td></tr>`;
+    }).join("")}</table><div class="expl">Tested only when every group has 20 sessions; ${SP.permutations.toLocaleString("en-US")} permutations of whole sessions; Benjamini-Hochberg at q = ${num(SP.q, 2)} across every test run.</div>`;
+  // rule tester
+  const RU = St.rules, r = M.rules || {};
+  $("stRuleSub").textContent = `fade first touch · v${RU.version} ${sha8(RU.sha256)} · hypothetical`;
+  const foot = `<div class="expl">Fade the first touch of a 9:30 level: entry at the next 1-minute bar's open + 1 tick, stop and target 1 tick against us (the stop first inside one bar), time exit, flat by the close, fees $${num(RU.fees_round_turn_usd, 2)} per round turn. Settings are picked on earlier sessions only (${RU.min_train_sessions} first) and scored on the next one. Tries to date: ${RU.tries} grid points. Archive bars: ${RU.data_from ? `${sday(RU.data_from)} to ${sday(RU.data_through)}` : "none yet"}. No orders are ever placed.</div>`;
+  if(r.status !== "tested"){
+    $("stRule").innerHTML = `<div class="trk-kpis st-one"><div class="kpi"><div class="eyebrow">Out-of-sample trades</div><div class="big sm">${r.oos_trades ?? 0} of ${RU.min_oos_trades}</div><div class="s"><span class="trk-tag warn" style="margin-left:0">not enough data</span> ${r.sessions ?? 0} session${r.sessions === 1 ? "" : "s"} with archive bars; nothing is scored before ${RU.min_oos_trades} out-of-sample trades</div></div></div>` + foot;
+    return;
+  }
+  const e = r.per_trade, ps = r.per_session, nr = r.without_roll_weeks || {};
+  $("stRule").innerHTML = `<div class="trk-kpis">`
+    + kpi("Expectancy per trade", `${sgn(e.r.mean, 2)} R`, `${ivTxt(e.r.interval, 2)} · ${sgn(e.pts.mean, 1)} pts · $${num(e.usd.mean, 0)} · p ${num(e.r.p_value, 3)}, ${num(r.p_adjusted, 3)} adjusted for ${r.tries} tries`)
+    + kpi("Per session", `$${num(ps.usd.mean, 0)}`, `${ivTxt(ps.usd.interval, 0)} · ${r.oos_sessions} sessions`)
+    + kpi("Win rate", pct(r.win_rate), `avg win $${num((r.avg_win || {}).usd, 0)} · avg loss $${num((r.avg_loss || {}).usd, 0)}`)
+    + kpi("Max drawdown", `$${num(r.max_drawdown_usd, 0)}`, `longest losing streak ${r.longest_losing_streak} · in-sample ${sgn(r.in_sample_r, 2)} R vs ${sgn(r.out_of_sample_r, 2)} R out of sample`)
+    + `</div>${equitySvg(r.equity)}<div class="expl">${r.oos_trades} hypothetical trades in ${r.oos_sessions} out-of-sample sessions. Without roll weeks: ${nr.status === "tested" ? sgn(nr.per_trade.r.mean, 2) + " R" : "not enough data"}. Levels shifted ${Object.entries(r.shifted || {}).map(([k, v]) => `${k}: ${v.r_per_trade == null ? "not enough data" : sgn(v.r_per_trade, 2) + " R"}`).join(", ")}.</div>` + foot;
+}
+function equitySvg(q){
+  if(!q || !q.curve.length) return "";
+  const n = q.curve.length, all = [...q.lo, ...q.hi, ...q.curve, 0], lo = Math.min(...all), hi = Math.max(...all), H = 120, W = 600;
+  const x = i => n === 1 ? W / 2 : 4 + i * (W - 8) / (n - 1), y = v => 6 + (hi - v) * (H - 12) / ((hi - lo) || 1);
+  const band = q.hi.map((v, i) => `${x(i)},${y(v)}`).concat(q.lo.map((v, i) => `${x(i)},${y(v)}`).reverse()).join(" ");
+  return `<svg class="st-eq" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Cumulative hypothetical dollars by out-of-sample session, with a 95% bootstrap band"><polygon points="${band}" fill="var(--line2)"/><line x1="0" x2="${W}" y1="${y(0)}" y2="${y(0)}" stroke="var(--line3)" stroke-dasharray="3 3"/><polyline points="${q.curve.map((v, i) => `${x(i)},${y(v)}`).join(" ")}" fill="none" stroke="var(--ink)" stroke-width="1.5" vector-effect="non-scaling-stroke"/></svg>`;
 }
 const pct = r => r == null ? "-" : num(100 * r, 0) + "%";
 const ciTxt = s => s && s.ci ? `${num(100 * s.ci[0], 0)}-${num(100 * s.ci[1], 0)}%` : "-";

@@ -27,6 +27,7 @@ from trackrecord.component import TrackRecordComponent
 from .archive import ArchiveComponent
 from .context import pre_open, snapshot, week_data
 from .health import HealthComponent
+from .studies import StudiesComponent
 
 
 class Component(Protocol):
@@ -49,4 +50,5 @@ def default_components(gex_configs) -> list:
     track = TrackRecordComponent(pre_open=lambda d: pre_open(gex, d), is_trading_day=marketcal.is_trading_day,
                                  session_close=lambda d: datetime.combine(d, marketcal.rth_close(d), marketcal.NY))
     arc = ArchiveComponent()
-    return [gex, feeds, track, briefings, arc, HealthComponent([gex, feeds, briefings, track, arc])]
+    st = StudiesComponent()
+    return [gex, feeds, track, briefings, arc, st, HealthComponent([gex, feeds, briefings, track, arc, st])]
