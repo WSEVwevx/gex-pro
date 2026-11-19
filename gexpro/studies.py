@@ -43,6 +43,8 @@ log = logging.getLogger("gexpro.studies")
 CODE = ["reaction_lab.py", "splits.py", "rules.py", "uncertainty.py", "studies.py"]
 DEFS = {"level_reaction": L.DEFINITION, "splits": S.DEFINITION, "rules": R.DEFINITION}
 SHIFT_UP, SHIFT_DOWN = {"NQ": 5.0, "ES": 1.0}, {"NQ": -5.0, "ES": -1.0}
+SPLIT_LABEL = {"regime": "gamma regime", "zg_distance": "distance from zero gamma", "vol_tercile": "VIX / VXN third",
+               "event_day": "event day", "weekday": "weekday", "opex_week": "opex week", "zero_dte_tercile": "0DTE share third"}
 
 
 # ---------------------------------------------------------------- cache key
@@ -91,7 +93,7 @@ def needs(m: str, lab_rows: list[dict], split_tests: list[dict], sessions: int, 
         if min(g) > 0:
             sp.append((math.ceil(20 * sessions / min(g)), t))
     n, t = min(sp, key=lambda x: x[0]) if sp else (None, None)
-    out.append(need_row("splits", sessions, n, last, f"nearest split {t['split']}: 20 sessions in its smallest group; "
+    out.append(need_row("splits", sessions, n, last, f"nearest split {SPLIT_LABEL.get(t['split'], t['split'])}: 20 sessions in its smallest group; "
                         f"the other {len(split_tests) - 1} need as long or longer" if t
                         else "every split has an empty group"))
     k0, oos = d_rules["walk_forward"]["min_train_sessions"], d_rules["min_oos_trades"]

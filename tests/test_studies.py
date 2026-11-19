@@ -36,7 +36,7 @@ class TestNeeds(unittest.TestCase):
                          [("level_reaction", 13, 87), ("splits", 21, 84), ("rules", 1, 50)])
         # ZG: 20x21/4 = 105, 84 more; P2: 20x13/3 = 87, 74 more (nearest); splits 20x21/5; rules 20 + 30/1
         self.assertIn("P2", n[0]["basis"])
-        self.assertIn("zg_distance", n[1]["basis"])
+        self.assertIn("distance from zero gamma", n[1]["basis"])
         self.assertEqual(n[0]["est_date"], ST.trading_days_after("2026-11-18", 74))
         self.assertFalse(n[2]["reached"])
 
