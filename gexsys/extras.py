@@ -179,8 +179,10 @@ def expected_moves(snap: ChainSnapshot, basket: list[str], asof: datetime, ivs_f
     rth = marketcal.session_state(asof) == "RTH"
     anchor = snap.prev_close if (rth and snap.prev_close) else snap.spot
     anchor_kind = "previous close" if (rth and snap.prev_close) else "last close/price"
+    # the centre in a few words for the page: outside RTH the index's last value is its close
+    anchor_label = "prior close" if (rth and snap.prev_close) else "price" if rth else "last close"
     sd = session_date(asof)
-    out = {"anchor": anchor, "anchor_kind": anchor_kind, "session": sd.isoformat()}
+    out = {"anchor": anchor, "anchor_kind": anchor_kind, "anchor_label": anchor_label, "session": sd.isoformat()}
     # implied total variance to each expiration: ATM IV^2 x calendar years remaining. Outside RTH the
     # free quotes (and their IVs) stay frozen at the close, so the clock starts at the quote time, not at
     # asof: otherwise the band would shrink all night on unchanged prices.
@@ -196,7 +198,7 @@ def expected_moves(snap: ChainSnapshot, basket: list[str], asof: datetime, ivs_f
         if iv:
             w[e], iv_of[e] = iv * iv * (e - t0).total_seconds() / eng.YEAR_SECONDS, iv
     if not w or not days:
-        return out if len(out) > 3 else None
+        return None                     # no usable IV for the session's expirations: no band (not a centre alone)
     nxt = sd + timedelta(days=1)
     while not marketcal.is_trading_day(nxt):
         nxt += timedelta(days=1)
