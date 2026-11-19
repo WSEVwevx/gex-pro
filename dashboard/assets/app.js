@@ -40,9 +40,9 @@ try { cardH = JSON.parse(store.get(HKEY, "{}")) || {}; } catch(e) {}
 const PER_MARKET = ["levelsView", "ladderView", "heatmapView", "screenerView", "biasView"];
 const cardKey = c => { const v = c.closest("[id$=View]"); return v ? v.id + ":" + [...v.querySelectorAll(".card")].indexOf(c) + (PER_MARKET.includes(v.id) ? ":" + market : "") : null; };
 // a first visit has no heights of its own yet: it reserves the usual ones (measured on the live site at 1366 and
-// 375 px wide, 2026-11-16; Levels 2026-11-18), by page and card order. They are replaced by this device's real heights after one draw.
+// 375 px wide, 2026-11-16; Levels 2026-11-18; Heatmap phone 2026-11-19), by page and card order. They are replaced by this device's real heights after one draw.
 const DEFAULT_H = {wide: {levelsView:[128,128,128,368,209,640,573,373,373,1159],ladderView:[183,1114,224,670,348],heatmapView:[743],screenerView:[290,372,99,681],biasView:[202,635,241,240],trackView:[261,615,637,299,274,1393,374,367,367,322],briefingsView:[136,0,619,619,181,453],newsView:[646,990],indicatorView:[261,261,261,52,372],libraryView:[152,760,1366],glossaryView:[5828],healthView:[1141],backtestView:[221,261,527,552,273,167,303,644]},
-  narrow: {levelsView:[129,126,119,547,353,1008,628,375,375,1634],ladderView:[183,1299,205,670,284],heatmapView:[838],screenerView:[311,420,217,800],biasView:[342,765,422,345],trackView:[456,1217,997,345,392,1425,650,395,418,589],briefingsView:[168,0,643,620,248,472],newsView:[829,1061],indicatorView:[259,261,237,52,991],libraryView:[320,1058,1715],glossaryView:[13954],healthView:[2053],backtestView:[474,393,590,727,356,200,322,711]}};
+  narrow: {levelsView:[129,126,119,547,353,1008,628,375,375,1634],ladderView:[183,1299,205,670,284],heatmapView:[855],screenerView:[311,420,217,800],biasView:[342,765,422,345],trackView:[456,1217,997,345,392,1425,650,395,418,589],briefingsView:[168,0,643,620,248,472],newsView:[829,1061],indicatorView:[259,261,237,52,991],libraryView:[320,1058,1715],glossaryView:[13954],healthView:[2053],backtestView:[474,393,590,727,356,200,322,711]}};
 function reserve(){
   const usual = DEFAULT_H[innerWidth < 700 ? "narrow" : "wide"];
   document.querySelectorAll("[id$=View] .card").forEach(c => {
@@ -1870,6 +1870,12 @@ const hmFmt = {
   full: new Intl.DateTimeFormat("en-US", {...ET, weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit"}),
   wd: new Intl.DateTimeFormat("en-US", {...ET, weekday: "short", day: "numeric"}),
 };
+// the card's "as of": the newest GEX snapshot and the newest candle in the file, not the time it was loaded
+function hmAsOf(h, tf){
+  const s = h.columns[h.columns.length - 1], c = h.candles[h.candles.length - 1], n = h.columns.length;
+  return `${n} GEX snapshot${n === 1 ? "" : "s"}${s ? `, latest ${hmFmt.full.format(new Date(s.t * 1000))} ET` : ""}`
+    + ` · candles ${tf}, delayed${c ? `, last ${etTime(c[0] * 1000)} ET` : ""}`;
+}
 function hmTimeOpts(){
   return {localization: {timeFormatter: t => hmFmt.full.format(new Date(t * 1000)) + " ET"},
     timeScale: {tickMarkFormatter: (t, type) => type < 3 ? hmFmt.day.format(new Date(t * 1000)) : hmFmt.hm.format(new Date(t * 1000))}};
@@ -2119,7 +2125,7 @@ function renderHeatmap(){
   }
   if(hm._key === market + hmTf) hmMarket = hm._key;
   const rel = hm.columns.filter(c => c.rel).length;
-  $("hmSub").textContent = `${market} futures · ${hm.columns.length} GEX snapshot${hm.columns.length === 1 ? "" : "s"} · candles ${hmTf}, delayed`;
+  $("hmSub").textContent = `${market} futures · ${hmAsOf(hm, hmTf)}`;
   $("hmNote").textContent = rel ? `${rel} older snapshot${rel === 1 ? "" : "s"} shown at relative strength` : "";
   $("hmScale").innerHTML = `<i class="hm-ramp"></i>brightest ≈ ±${money(hm._scale * 1e6).replace(/^[+-]/, "")} of gamma per 1% move`;
   hmPrim.requestUpdate && hmPrim.requestUpdate();
