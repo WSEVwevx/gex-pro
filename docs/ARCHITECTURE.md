@@ -4,7 +4,7 @@ GEX PRO is independent feature packages, one app shell that joins them, and one 
 
 | Package | Owns | May import |
 |---|---|---|
-| `gexsys/` | GEX only: options data, the math, levels, the hourly TradingView paste, the indicator script | nothing else in the project |
+| `gexsys/` | GEX only: options data, the math, levels, the TradingView paste every 30 minutes, the indicator script | nothing else in the project |
 | `feeds/` | Market news: ForexFactory calendar, Truth Social posts | nothing else in the project |
 | `briefings/` | NY AM and Asia session briefings | nothing else in the project |
 | `trackrecord/` | The live track record (plans frozen before the open, graded after the close) and the VIX/VXN expected-move backtest | nothing else in the project |

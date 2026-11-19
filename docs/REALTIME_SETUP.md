@@ -25,9 +25,9 @@ Double-click **START.bat**. It installs or updates the dependencies, starts the 
   bars are unavailable, the cost-of-carry model stands in, F = index × e^((rate − dividend) × time to
   expiry); it drifted 4-44 NQ points from the market in Oct-Nov 2026, and the card says which one is in use.
 
-## Updates (every hour)
+## Updates (every 30 minutes)
 
-**Every hour on the hour while NQ / ES futures trade**: from the Sunday 6 pm ET open to the Friday 5 pm
+**Every 30 minutes (:00 and :30 ET), plus 09:45 ET, while NQ / ES futures trade**: from the Sunday 6 pm ET open to the Friday 5 pm
 close, Sunday evening, holiday-evening reopens and holiday mornings (Thanksgiving and the like: futures trade
 until 1 pm ET) included; none during the 5-6 pm daily break, on weekends, after an early close's 1:15 pm halt,
 or on New Year's Day, Good Friday and Christmas:
@@ -40,11 +40,11 @@ or on New Year's Day, Good Friday and Christmas:
 Use the same paste on your ES chart. Each chart draws only its own market's levels.
 
 Between pastes, the indicator keeps converting index prices to your **real-time** futures price,
-using the live `NASDAQ:NDX` / `SP:SPX` reference. Levels are marked `[STALE]` after 90 minutes (one missed hourly update).
+using the live `NASDAQ:NDX` / `SP:SPX` reference. Levels are marked `[STALE]` after 90 minutes (about three missed pastes).
 
 ## Change the schedule
 
 Edit `"publish": {"times_et": [...], "all_day": true}` in `configs/free_nq_cboe.json` and
 `configs/free_es_cboe.json`, then restart START.bat. `all_day: false` keeps only the times before the
-cash close (16:00 ET, or 13:00 on early-close days). To stop the hourly Windows notifications, set
+cash close (16:00 ET, or 13:00 on early-close days). To stop the Windows notifications, set
 `"desktop_notify": false`; the website's Copy button still has each new paste.

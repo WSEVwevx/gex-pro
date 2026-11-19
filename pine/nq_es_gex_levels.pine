@@ -6,7 +6,7 @@ indicator("GEX PRO - NQ / ES", shorttitle = "GEX PRO", overlay = true,
 // =====================================================================================================
 // GEX PRO draws options levels computed by GEX PRO (the website, or START.bat at http://127.0.0.1:8765)
 // and pasted into "Levels payload". Pine cannot download data, so the levels change when you paste a
-// new update (every hour on the hour while the futures trade). Levels come from index + ETF options
+// new update (every 30 minutes, plus 9:45 ET, while the futures trade). Levels come from index + ETF options
 // (SPX + SPY for ES, NDX + QQQ for NQ), are expressed in index prices and are mapped live to this futures
 // chart. Levels are model estimates for the current session; only the closing levels of the last few
 // sessions (and a pasted 9:30 backtest day) reach back in time.
@@ -961,7 +961,7 @@ renderTags() =>
         foot := (s.bt != "" ? "🗓 Backtest: the levels at the 9:30 open on " + btDay(s) + ". Alerts are off; paste a current update to trade live."
              : "⏳ Updated " + ageS + " ago " + (staleOf(s) ? "⚠ STALE: copy a fresh paste from the GEX PRO website." : "✓"))
              + "\nRegime: " + (s.reg == "POS" ? "positive" : s.reg == "NEG" ? "negative" : "mixed") + " gamma, net " + (s.net >= 0 ? "+$" : "-$") + str.tostring(math.abs(s.net), "0.00") + "B per 1% move."
-             + "\n" + s.prov + " " + s.src + (s.etf != "" ? "+" + s.etf : "") + " options, 15-min delayed. The website publishes a new paste every hour; paste it again for fresher levels."
+             + "\n" + s.prov + " " + s.src + (s.etf != "" ? "+" + s.etf : "") + " options, 15-min delayed. The website publishes a new paste every 30 minutes, plus 9:45 ET; paste it again for fresher levels."
     string rule = "\n━━━━━━━━━━━━━━━━━━━━\n"
     // lowest price first, so a tag knows the one just below it
     array<int> ord = array.sort_indices(tgP)

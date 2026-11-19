@@ -198,9 +198,9 @@ notifies you) if it stays stale. Setup: [docs/HOSTING.md](docs/HOSTING.md).
 Only one copy of the service can run at a time. If START.bat is already open, a second copy
 prints "GEX PRO is ALREADY RUNNING" and exits. To pick up updates, close the old window first.
 
-## Scheduled updates (every hour)
+## Scheduled updates (every 30 minutes)
 
-The service publishes a TradingView payload every hour on the hour while the futures trade, from the
+The service publishes a TradingView payload every 30 minutes (:00 and :30 ET), plus 09:45 ET, while the futures trade, from the
 Sunday 6 pm ET open to the Friday 5 pm close (including Sunday evening, the evening reopen after a
 holiday, and holiday mornings such as Thanksgiving, when the futures trade until 1 pm ET); none while they are
 halted or on full closures (New Year's Day, Good Friday, Christmas). It sends a
@@ -229,7 +229,7 @@ feature: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 gexpro/            app shell: website server, hosted-site build, `python -m gexpro serve` (START.bat),
                    context (what briefings and the track record read from gex + feeds)
 gexsys/            GEX only: providers/{base,cboe,csvfile,synthetic}, pricing, engine, levels, extras,
-                   mapping, marketcal, pipeline, storage, alerts, publish (hourly paste), export (Pine
+                   mapping, marketcal, pipeline, storage, alerts, publish (paste every 30 min), export (Pine
                    payload), bias, indicator (script info), service (market workers), component
                    (its website endpoints), audit, replay, config, __main__ (GEX tools CLI)
 feeds/             market news: forexfactory (calendar), truthsocial (posts), component

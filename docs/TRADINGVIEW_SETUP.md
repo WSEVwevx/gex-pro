@@ -132,7 +132,7 @@ from price is never drawn; a paste with two sources draws extra levels and the p
   "Full" spells them out.
 * **Shared prices:** levels at the same price share one line, e.g. `CW · +GEX  29,883.25`.
 * **Source names** appear in labels only when two sources are drawn. `STALE` is added once the update
-  is older than 90 minutes (one missed hourly paste plus slack).
+  is older than 90 minutes (about three missed pastes).
 * **Safety:** a level more than 8% from price is skipped, not drawn.
 * **GEX profile**: boxes right of the last bar, one per price bin. Positive exposure extends right of
   the centre line, negative extends left.

@@ -64,12 +64,12 @@ def site() -> tuple[bool, str]:
             good = age_h < 3
             ok &= good
             lines.append(f"{'OK  ' if good else 'FAIL'} levels {w['market']}: {age_h:.1f} h old")
-            # the paste people copy: a new one every hour while the futures trade
+            # the paste people copy: a new one every 30 minutes (plus 09:45) while the futures trade
             pub = w.get("published") or {}
             if marketcal.session_state(datetime.now(timezone.utc)) in ("RTH", "ETH"):
                 at = pub.get("published_at")
                 p_h = (datetime.now(timezone.utc) - datetime.fromisoformat(at)).total_seconds() / 3600 if at else 99
-                good = p_h < 1.5
+                good = p_h < 1
                 ok &= good
                 lines.append(f"{'OK  ' if good else 'FAIL'} paste {w['market']}: slot {pub.get('slot_et')} ET, published {p_h:.1f} h ago")
         checks = {"quotes.json": lambda d: len(d["quotes"]), "screener.json": lambda d: len(d["stocks"]),

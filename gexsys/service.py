@@ -1,4 +1,4 @@
-"""GEX market workers: background refresh, keep-last-good, and the hourly TradingView paste.
+"""GEX market workers: background refresh, keep-last-good, and the TradingView paste every 30 minutes.
 
 One worker per config, keyed "<MARKET>-<PROVIDER>" (e.g. NQ-CBOE, ES-CBOE). The website endpoints that
 read them are in gexsys/component.py; the web server itself is the app shell's (gexpro/server.py).
@@ -187,7 +187,7 @@ class MarketWorker(threading.Thread):
     def _maybe_publish(self, now: datetime) -> None:
         slot = publish.due(self.published_slot, now, self.cfg.publish)
         if slot is None and self.published and self.result and self.result.get("pine")                 and _fv(self.result["pine"]) != _fv(self.published["payload"]):
-            slot = self.published_slot        # a new paste format (an update): republish now, not next hour
+            slot = self.published_slot        # a new paste format (an update): republish now, not at the next slot
         if slot is None or not self.result or not self.result.get("pine"):
             return
         s = self.result["mapped"] or self.result["summary"]

@@ -267,7 +267,7 @@ window.GEX_LIBRARY = (() => {
     // ---------------------------------------------------------------- 6. using GEX PRO
     L({id: "indicator-setup", chapter: "use", title: "Setting up the TradingView indicator", minutes: 3,
       oneLiner: "Install the script once, then paste fresh levels from the website when you want an update.",
-      body: `<ol><li>On the <b>Indicator</b> page, click <b>Copy code</b>. In TradingView open the Pine Editor, paste, and click Save, then add it to an NQ or ES chart.</li><li>On the website click <b>Copy for TradingView</b>. In the indicator's settings, open <b>Levels payload</b>, select all, paste, and click OK. One paste serves both NQ and ES charts.</li><li>A new paste is published every hour. TradingView scripts cannot download data, so the levels change only when you paste again.</li></ol>
+      body: `<ol><li>On the <b>Indicator</b> page, click <b>Copy code</b>. In TradingView open the Pine Editor, paste, and click Save, then add it to an NQ or ES chart.</li><li>On the website click <b>Copy for TradingView</b>. In the indicator's settings, open <b>Levels payload</b>, select all, paste, and click OK. One paste serves both NQ and ES charts.</li><li>A new paste is published every 30 minutes, plus 9:45 ET. TradingView scripts cannot download data, so the levels change only when you paste again.</li></ol>
         <p>If the levels are older than the stale limit (90 minutes by default), the tags and panel show <b>STALE</b>. When the script itself changes, copy the code again; the Indicator page lists recent changes.</p>`,
       points: ["Install the code once; paste levels as often as you like.", "One paste covers NQ and ES.", "STALE means it is time for a fresh paste."],
       example: `Before the open: copy the 9:00 paste, replace the old one in the settings, and the chart redraws with the morning's levels.`,
@@ -385,7 +385,7 @@ window.GEX_LIBRARY = (() => {
     ["Delayed data", "Free Cboe option quotes are 15 minutes behind; open interest updates once a day. Futures prices come from Yahoo, also delayed.", "limits", "Futures & data", "Status chips"],
     // ---- site and paste
     ["Paste (levels payload)", "The text you copy from the website into the indicator's settings. Pine can't download data, so the levels change when you paste a new one.", "indicator-setup", "Site & indicator", "Copy for TradingView, Indicator page"],
-    ["Scheduled paste", "A fresh paste is published every hour on the hour, and at once when its format changes.", "indicator-setup", "Site & indicator", "'Next paste' chip"],
+    ["Scheduled paste", "A fresh paste is published every 30 minutes (:00 and :30 ET), plus 09:45 ET, and at once when its format changes.", "indicator-setup", "Site & indicator", "'Next paste' chip"],
     ["Stale", "A paste older than the stale limit (90 minutes by default). Paste a fresh one for current levels.", "indicator-setup", "Site & indicator", "Indicator tags and panel"],
     ["Heatmap", "Futures candles with dealer gamma painted behind them, snapshot by snapshot: blue positive, orange negative.", "heatmap", "Site & indicator", "Heatmap page"],
     ["Live table", "A strike ladder with net DEX, net GEX, net OI and net volume at every band near price, for the expirations you pick.", "walls", "Site & indicator", "Live table page"],
