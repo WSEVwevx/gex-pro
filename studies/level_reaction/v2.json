@@ -1,0 +1,72 @@
+{
+  "study": "level_reaction",
+  "version": 2,
+  "written": "2026-11-18",
+  "question": "When price first reaches a 09:30 GEX PRO level during the cash session, is it rejected more often than at a random level the same distance from the open?",
+  "inputs": {
+    "sessions": "every graded session on the track-record branch (sessions/<date>_<market>.json) that has its 1-minute record, NQ and ES (every archive day so far is also there; archive-only days need their own loader and a new version)",
+    "levels": {
+      "ZG": "plan.zg",
+      "CW": "plan.cw",
+      "PW": "plan.pw",
+      "Ab1": "plan.ag",
+      "C1-C3": "the 09:30 paste's R token: the first three C entries in the order written (the paste ranks them)",
+      "P1-P3": "the 09:30 paste's R token: the first three P entries in the order written"
+    },
+    "levels_unit": "index points, as computed and frozen before 09:30 (plan.asof < 09:30 ET: lookahead_audit L1; paste ts < 09:30: L5)",
+    "bars": "the session's 1-minute futures record (minutes/<date>_<market>.json): [minute after 09:30, high, low, close], 09:30 to the close (13:00 on early closes, from marketcal)",
+    "mapping": "level_fut = level_index x ratio, ratio = futures 09:30 open / index 09:30 open, as stored in the minutes record (known at 09:30; the indicator maps the same way). One factor per session, never a later one.",
+    "open": "index_open x ratio (the futures price at 09:30)",
+    "expected_move": "em_fut = plan.em x ratio",
+    "previous_close": "the previous trading day's graded index close x today's ratio (marketcal.previous_trading_day); none on the first recorded day"
+  },
+  "rules": {
+    "tick": {
+      "NQ": 0.25,
+      "ES": 0.25
+    },
+    "tol": "max(2 ticks, 0.05 x em_fut)",
+    "side": "above if level_fut > open + tol, below if level_fut < open - tol; within tol of the open = 'at_open' (no side: own category, never a touch)",
+    "gap_through": "level_fut strictly between previous_close and open (price passed it overnight): own category, never a touch; unknown on the first recorded day (category 'no_prior_close')",
+    "touch": "the first bar whose high >= level_fut - tol (level above) or low <= level_fut + tol (level below)",
+    "untouched": "no touch by the close",
+    "k": 4,
+    "reject": "after the touch bar, price trades k x tol back from the level (low <= level_fut - k x tol above; high >= level_fut + k x tol below) before any bar closes beyond the level by tol",
+    "break": "a bar from the touch bar on closes beyond the level by tol (close > level_fut + tol above; close < level_fut - tol below) before a reject",
+    "same_bar": "a bar that both closes beyond (break) and trades k x tol back (reject) counts as a break",
+    "stall": "neither within 60 minutes after the touch bar, or by the close if sooner",
+    "resolution_minutes": "minutes from the touch bar to the deciding bar (stall: none)",
+    "excursions": "from the touch bar's minute, for h = 15, 30, 60: max move away = max distance traded back from the level in the reject direction; max move through = max distance traded beyond the level; points and em_fut units; a horizon past the close is not reported for that touch",
+    "cluster": "levels of one session and market within tol of each other form a cluster; its first member in the order ZG, CW, PW, Ab1, C1, C2, C3, P1, P2, P3 is counted, the others are reported only as 'dependent' and excluded from the headline rates"
+  },
+  "baseline": {
+    "draws": "for each market and level type: 1000 random levels (at least 200 required), seed 20261118",
+    "how": "pick a session uniformly from the sessions where that level type exists; pick a signed distance (in em_fut, side included) uniformly from that market's real distances of that type; random level = open + distance x em_fut, in that session",
+    "rules": "the same tol, side, gap_through, touch, outcome and cluster rules (a random level within tol of a real level of that session is dropped and redrawn)"
+  },
+  "statistics": {
+    "reject_rate": "rejects / touches (touches exclude at_open, gap_through, untouched, dependent)",
+    "difference": "real reject rate - baseline reject rate, per level type x market",
+    "unit": "the session: per session (real rejects, real touches, baseline rejects, baseline touches); resampling sessions, never touches",
+    "interval": "95%: 10,000 session resamples, seed 20261118; expanded percentile interval (Hesterberg: tails at z = sqrt(S/(S-1)) x t_0.975(S-1) for S sessions), or BCa (jackknife over sessions, same z) when |z0| > 0.25; the method is named (gexpro/uncertainty.py)",
+    "p_value": "two-sided against no difference, from the same resamples: 2 x the smaller share at or beyond 0, +1 smoothing; labelled a p-value",
+    "power": "sessions needed for 80% power at alpha 0.05: S x (z_0.975 + z_0.8)^2 x bootstrap variance / difference^2; labelled optimistic",
+    "headline": "an interval that includes 0 reads: no proven edge yet (n sessions)",
+    "method_check": "tools/stress/uncertainty_coverage.py: 1,000 synthetic datasets with a known effect and day-level clustering; coverage must be 93-97%",
+    "min_n": 20,
+    "small_cells": "fewer than 20 touches: shown as n<20, greyed, never ranked, no interval"
+  },
+  "robustness": [
+    "levels shifted +5 / -5 NQ points and +1 / -1 ES point (the measured overnight basis miss): the table is rerun and shown beside",
+    "roll weeks (marketcal.roll_date to the quarterly expiry) flagged; results with and without them"
+  ],
+  "reporting": [
+    "rows: level type x market",
+    "then x regime (plan.regime)",
+    "then x time of touch: 09:30-10:30, 10:30-15:00, 15:00-close",
+    "every table shows n (sessions and touches), the data-through date and this file's SHA-256"
+  ],
+  "verification": "the verifier re-derives every touch and outcome of 3 sessions (one quiet, one trend, one with a gap-through) from the raw bars; 100% agreement required",
+  "verdict_rule": "an edge is claimed only for a level type x market with n >= 20 touches whose interval excludes 0; otherwise 'no proven edge yet (n sessions)' or 'not enough data'",
+  "changes": "v2 (Phase 4): the statistics only; inputs, rules and baseline are v1's, so v1 and v2 classify every level identically"
+}
