@@ -1,5 +1,6 @@
 """The site's motion and loading system (dashboard/assets/terminal.css, app.js, index.html): one set of durations and
 curves, no endless animation, a shape wherever something is loading, and failures that say what happens next."""
+import json
 import re
 import unittest
 from pathlib import Path
@@ -112,6 +113,21 @@ class TestBiasPage(unittest.TestCase):
     def test_factors_are_bars_that_add_up_to_the_score(self):
         for piece in ('class="fx-bar"', 'f.name === "Gamma side"', "The leans added up.", 'class="fx fx-sum"'):
             self.assertIn(piece, JS)
+
+    def test_the_heatmap_says_when_its_data_is_from(self):
+        """The subtitle's times come from the file (newest snapshot and candle), shown in ET; run in node."""
+        import shutil, subprocess
+        if not shutil.which("node"):
+            self.skipTest("node is not installed")
+        grab = lambda start, end: start + JS.split(start, 1)[1].split(end, 1)[0]
+        src = "\n".join([grab("const ET =", "\n"), grab("const etTime =", "\n"), grab("const hmFmt = {", "\n};") + "\n};",
+                         grab("function hmAsOf(h, tf){", "\n}") + "\n}"])
+        h = {"columns": [{"t": 1795060000}, {"t": 1795066948}], "candles": [[1795066200], [1795066500]]}   # 2026-11-19 05:42 / 05:35 UTC
+        run = lambda x: subprocess.run(["node", "-e", src + f"\nconsole.log(hmAsOf({json.dumps(x)}, '5m'))"],
+                                       capture_output=True, encoding="utf-8", check=True).stdout.strip()
+        self.assertEqual(run(h), "2 GEX snapshots, latest Thu, Nov 19, 12:42 AM ET · candles 5m, delayed, last 12:35 AM ET")
+        self.assertEqual(run({"columns": [], "candles": []}), "0 GEX snapshots · candles 5m, delayed")
+        self.assertIn('$("hmSub").textContent = `${market} futures · ${hmAsOf(hm, hmTf)}`;', JS)
 
     def test_a_gap_in_the_replay_is_not_an_alarm(self):
         self.assertNotRegex(CSS, r"\.rp-marks s\{[^}]*(gradient|warn)")
