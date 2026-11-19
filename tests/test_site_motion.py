@@ -145,6 +145,18 @@ class TestBiasPage(unittest.TestCase):
         self.assertEqual(got, [w for _, w in cases])
         self.assertEqual(JS.count('here === "'), 4)                        # each plan row asks planHere, nothing else
 
+    def test_the_reference_price_says_when_it_is_from(self):
+        """The reference price shows its own time (ref_time), so the 16:00 print never reads as a live quote."""
+        import shutil, subprocess
+        if not shutil.which("node"):
+            self.skipTest("node is not installed")
+        src = "const ET =" + JS.split("const ET =", 1)[1].split("\n", 1)[0] + "\nconst refAt =" + JS.split("const refAt =", 1)[1].split("\n", 1)[0]
+        js = src + "\nconsole.log(JSON.stringify([refAt('2026-11-18T16:14:59-05:00'), refAt(null)]))"
+        got = json.loads(subprocess.run(["node", "-e", js], capture_output=True, encoding="utf-8", check=True).stdout)
+        self.assertEqual(got, [" · Nov 18, 4:14 PM ET", ""])
+        self.assertIn('<div class="eyebrow">Reference price${refAt(s.ref_time)}</div>', JS)
+        self.assertNotIn('" future, live"', JS)                              # a time, not a claim that it is live
+
     def test_a_gap_in_the_replay_is_not_an_alarm(self):
         self.assertNotRegex(CSS, r"\.rp-marks s\{[^}]*(gradient|warn)")
         self.assertNotIn("no update since", JS)

@@ -551,6 +551,8 @@ function render(){
     These are proxy levels from index and ETF options, not NQ/ES futures options, and not trading advice.`;
 }
 
+// the time of the price every level is measured from (after the close it is the 16:00 print, not a live quote)
+const refAt = t => t ? ` · ${new Date(t).toLocaleString("en-US", {...ET, month: "short", day: "numeric", hour: "numeric", minute: "2-digit"})} ET` : "";
 function renderHero(w, s, L, X, ref){
   const R = {POSITIVE:["Positive gamma","+","var(--pos)","Modeled dealers are long gamma, so their hedging leans against moves. That tends to mean tighter ranges and more mean reversion."],
              NEGATIVE:["Negative gamma","-","var(--neg)","Modeled dealers are short gamma, so their hedging follows the move. That tends to mean wider ranges and more trend days."],
@@ -567,9 +569,9 @@ function renderHero(w, s, L, X, ref){
     <div class="regime"><span class="tag" style="color:${R[2]};border-color:${R[2]}">${R[1]}</span><span style="color:${R[2]}">${R[0]}</span>${changed ? '<span class="chip">changed since last update</span>' : ""}</div>
     <div class="expl">${R[3]}</div>${sigTxt}`;
   const fop = /_FOP$/.test(w.source);                 // levels straight from CME options on the future
-  $("priceCard").innerHTML = `<div class="eyebrow">Reference price</div>
+  $("priceCard").innerHTML = `<div class="eyebrow">Reference price${refAt(s.ref_time)}</div>
     <div class="big">${num(ref)}</div>
-    <div class="kv"><span>${fop ? esc(s.underlying || market) + " future, live" : esc(w.source) + " close / last"}</span><b>${num(s.ref_price)}</b></div>
+    <div class="kv"><span>${fop ? esc(s.underlying || market) + " future" : esc(w.source) + " close / last"}</span><b>${num(s.ref_price)}</b></div>
     <div class="expl">${fop ? "Levels come from CME options on the " + market + " future itself, so they are already in futures prices; no conversion needed."
       : w.result.mapped ? market + " equivalent of the index price, from " + (/^measured/.test(w.result.mapped.mapping.futures_ref_mode || "") ? "the measured futures / index basis" : "the carry model") + ". Your TradingView chart uses the live price." : "Options-underlying price (no futures conversion available)."}</div>`;
   $("netCard").innerHTML = `<div class="eyebrow">Net gamma exposure</div>
