@@ -1,5 +1,6 @@
 """CFTC positioning: net positions ranked against their own history, and a failing source keeps the last report."""
 import json
+import os
 import tempfile
 import unittest
 from datetime import date, timedelta
@@ -61,6 +62,10 @@ class TestPositioning(unittest.TestCase):
             self.assertEqual(again._out["markets"], first["markets"])  # and it survives a restart
             self.assertEqual(first["fetched_at"], "1970-01-02T03:46:40+00:00")    # clock 100000 s, in UTC
             self.assertEqual(p.get()["fetched_at"], first["fetched_at"])          # a failed fetch keeps the last good time
+            cache.write_text(json.dumps({"markets": first["markets"], "error": None}), encoding="utf-8")
+            os.utime(cache, (1_800_000_000, 1_800_000_000))
+            older = pos.Positioning(cache_path=cache, clock=lambda: 0.0, fetch=fetch)
+            self.assertEqual(older.peek()["fetched_at"], "2027-01-15T08:00:00+00:00")  # a copy without one: when it was written
 
 
 if __name__ == "__main__":

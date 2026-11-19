@@ -71,6 +71,8 @@ class Positioning:
                 self._out = json.loads(cache_path.read_text(encoding="utf-8"))
             except (OSError, ValueError):
                 self._out = None
+        if self._out is not None and not self._out.get("fetched_at"):      # a copy saved before fetch times were kept:
+            self._out["fetched_at"] = datetime.fromtimestamp(cache_path.stat().st_mtime, timezone.utc).isoformat()  # written on a good fetch
 
     @staticmethod
     def _get(url: str) -> bytes:
