@@ -1,0 +1,6 @@
+{
+  "note": "every rule version ever run, appended, never edited; the total grid points is the number of tries the p-values are adjusted for",
+  "tries": [
+    {"rule": "fade_first_touch", "version": 1, "file": "studies/rules/fade_first_touch_v1.json", "grid_points": 8, "registered": "2026-11-19"}
+  ]
+}
