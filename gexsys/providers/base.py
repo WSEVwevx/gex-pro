@@ -80,7 +80,7 @@ def http_get_json(url: str, headers: dict, *, timeout: float = 15.0, retries: in
             return json.loads(body.decode("utf-8")) if body else {}
         except urllib.error.HTTPError as e:
             if e.code in (401, 403):
-                raise AuthError(f"HTTP {e.code} from provider - check credentials/entitlements") from e
+                raise AuthError(f"HTTP {e.code}: the provider refused the request (a key without access, or a free source blocking automated requests)") from e
             if e.code == 429:
                 ra = _retry_after(e)
                 last_exc = RateLimitError("HTTP 429 rate limited", ra)
