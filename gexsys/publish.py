@@ -1,13 +1,13 @@
 """Scheduled publishing of TradingView payloads.
 
-Pine cannot pull data, so "levels that update every hour" is implemented as:
+Pine cannot pull data, so "levels that update every 30 minutes" is implemented as:
 the service recalculates continuously, and at fixed ET publish times it freezes
 a payload, notifies the user (Windows toast and/or webhook), and exposes it at
 /api/pine?market=X&which=published and on the dashboard's Copy button.
 The user pastes it into the indicator (about 10 seconds).
 
-Publish slots are ET wall-clock times. Default (all_day=True): every hour on the hour while the futures
-trade, from the Sunday 18:00 open to the Friday 17:00 close, including the evening reopen after a
+Publish slots are ET wall-clock times. Default (all_day=True): every 30 minutes (:00 and :30) plus 09:45 while
+the futures trade, from the Sunday 18:00 open to the Friday 17:00 close, including the evening reopen after a
 holiday; none while they are halted (the daily 17:00 break, weekends, early-close afternoons). Slots
 used to need a trading DATE, which left the Sunday-evening session (Monday's trading day) with no paste
 until Monday; that is why they follow the futures session now. With all_day=False: only slots before
@@ -31,9 +31,14 @@ from .engine import ConfigError
 log = logging.getLogger("gexsys.publish")
 
 
+# every 30 minutes on :00 and :30 ET, plus 09:45: Cboe is 15 min delayed, so the 09:30 paste still carries ~09:15
+# (pre-open) quotes and the 09:45 one is the first with the opening prints
+DEFAULT_TIMES_ET = tuple(sorted([f"{h:02d}:{m:02d}" for h in range(24) for m in (0, 30)] + ["09:45"]))
+
+
 @dataclass
 class PublishConfig:
-    times_et: list[str] = field(default_factory=lambda: [f"{h:02d}:00" for h in range(24)])
+    times_et: list[str] = field(default_factory=lambda: list(DEFAULT_TIMES_ET))
     all_day: bool = True             # False: only slots before the cash close (16:00 / early close)
     desktop_notify: bool = True
     webhook_format: str = "json"     # json | discord | none

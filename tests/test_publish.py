@@ -2,6 +2,7 @@ import os
 import tempfile
 import unittest
 from datetime import datetime, timezone
+from pathlib import Path
 from unittest import mock
 
 from gexsys import config as cfgmod
@@ -19,31 +20,35 @@ C = pub.PublishConfig()
 
 
 class TestSchedule(unittest.TestCase):
-    def test_hourly_on_the_hour_around_the_clock(self):
-        self.assertEqual(len(C.slots()), 24)
-        self.assertEqual(pub.latest_slot(et(2026, 10, 20, 12, 30), C), et(2026, 10, 20, 12, 0))
+    def test_every_30_minutes_around_the_clock(self):
+        self.assertEqual(len(C.slots()), 49)                                                       # 48 + 09:45
+        self.assertEqual(pub.latest_slot(et(2026, 10, 20, 12, 30), C), et(2026, 10, 20, 12, 30))    # on the half hour
+        self.assertEqual(pub.latest_slot(et(2026, 10, 20, 12, 20), C), et(2026, 10, 20, 12, 0))
         self.assertEqual(pub.latest_slot(et(2026, 10, 20, 12, 0), C), et(2026, 10, 20, 12, 0))     # on the hour
-        self.assertEqual(pub.next_slot(et(2026, 10, 20, 12, 0), C), et(2026, 10, 20, 13, 0))
+        self.assertEqual(pub.next_slot(et(2026, 10, 20, 12, 0), C), et(2026, 10, 20, 12, 30))
         self.assertEqual(pub.latest_slot(et(2026, 10, 20, 3, 10), C), et(2026, 10, 20, 3, 0))      # overnight
         self.assertEqual(pub.next_slot(et(2026, 10, 20, 23, 30), C), et(2026, 10, 21, 0, 0))       # midnight
         self.assertEqual(pub.latest_slot(et(2026, 10, 20, 18, 5), C), et(2026, 10, 20, 18, 0))     # after the cash close
-        self.assertEqual(pub.latest_slot(et(2026, 10, 20, 17, 30), C), et(2026, 10, 20, 16, 0))    # no slot in the 17:00 halt
+        self.assertEqual(pub.latest_slot(et(2026, 10, 20, 17, 30), C), et(2026, 10, 20, 16, 30))   # no slot in the 17:00 halt
+        self.assertEqual(pub.next_slot(et(2026, 10, 20, 16, 30), C), et(2026, 10, 20, 18, 0))      # 17:00 and 17:30 skipped
 
     def test_weekend(self):
         sat = et(2026, 10, 24, 12, 0)
-        self.assertEqual(pub.latest_slot(sat, C), et(2026, 10, 23, 16, 0))         # the futures stop Friday 17:00
+        self.assertEqual(pub.latest_slot(sat, C), et(2026, 10, 23, 16, 30))        # the futures stop Friday 17:00
         self.assertEqual(pub.next_slot(sat, C), et(2026, 10, 25, 18, 0))           # and reopen Sunday 18:00
+        self.assertEqual(pub.next_slot(et(2026, 10, 25, 18, 0), C), et(2026, 10, 25, 18, 30))
 
     def test_sunday_evening_publishes(self):
         # 2026-11-08: the Sunday session had no paste at all (slots needed a trading date); Friday's was served
         sun = et(2026, 11, 8, 23, 45)
-        self.assertEqual(pub.latest_slot(sun, C), et(2026, 11, 8, 23, 0))
-        self.assertEqual(pub.due(et(2026, 11, 6, 23, 0), sun, C), et(2026, 11, 8, 23, 0))
+        self.assertEqual(pub.latest_slot(sun, C), et(2026, 11, 8, 23, 30))
+        self.assertEqual(pub.due(et(2026, 11, 6, 23, 30), sun, C), et(2026, 11, 8, 23, 30))
 
     def test_holiday_and_early_close(self):
-        # Thanksgiving Thu 2026-11-26: the futures trade until a 13:00 halt (hourly pastes to 12:00), reopen at 18:00
+        # Thanksgiving Thu 2026-11-26: the futures trade until a 13:00 halt (pastes to 12:30), reopen at 18:00
         self.assertEqual(pub.next_slot(et(2026, 11, 25, 23, 30), C), et(2026, 11, 26, 0, 0))
         self.assertEqual(pub.next_slot(et(2026, 11, 26, 12, 30), C), et(2026, 11, 26, 18, 0))
+        self.assertEqual(pub.latest_slot(et(2026, 11, 26, 17, 0), C), et(2026, 11, 26, 12, 30))
         # Christmas Fri 2026-12-25: nothing from the Christmas Eve halt to the Sunday reopen
         self.assertEqual(pub.next_slot(et(2026, 12, 24, 13, 30), C), et(2026, 12, 27, 18, 0))
         # Fri 11-27: the futures halt at 13:15
@@ -64,14 +69,30 @@ class TestSchedule(unittest.TestCase):
         now = et(2026, 10, 20, 12, 0)
         slot = pub.due(None, now, C)
         self.assertEqual(slot, et(2026, 10, 20, 12, 0))
-        self.assertIsNone(pub.due(slot, et(2026, 10, 20, 12, 59), C))
-        self.assertEqual(pub.due(slot, et(2026, 10, 20, 13, 46), C), et(2026, 10, 20, 13, 0))
+        self.assertIsNone(pub.due(slot, et(2026, 10, 20, 12, 29), C))
+        self.assertEqual(pub.due(slot, et(2026, 10, 20, 12, 31), C), et(2026, 10, 20, 12, 30))
+        self.assertEqual(pub.due(slot, et(2026, 10, 20, 13, 46), C), et(2026, 10, 20, 13, 30))    # a missed slot: the latest
 
-    def test_configs_are_hourly(self):
-        for path in ("configs/free_nq_cboe.json", "configs/free_es_cboe.json"):
-            pc = cfgmod.load(path).publish
-            self.assertTrue(pc.all_day)
-            self.assertEqual([s.strftime("%H:%M") for s in pc.slots()], [f"{h:02d}:00" for h in range(24)])
+    def test_the_extra_slot_after_the_open(self):
+        # Cboe is 15 min delayed: the 09:30 paste carries ~09:15 quotes, the 09:45 one the first opening prints
+        day = [s.strftime("%H:%M") for s in pub._day_slots(et(2026, 11, 19, 0, 0).date(), C)]
+        self.assertEqual(day[day.index("09:00"):day.index("10:00") + 1], ["09:00", "09:30", "09:45", "10:00"])
+        self.assertEqual(pub.latest_slot(et(2026, 11, 19, 9, 44), C), et(2026, 11, 19, 9, 30))
+        self.assertEqual(pub.latest_slot(et(2026, 11, 19, 9, 50), C), et(2026, 11, 19, 9, 45))
+        self.assertEqual(pub.next_slot(et(2026, 11, 19, 9, 44), C), et(2026, 11, 19, 9, 45))
+        self.assertEqual(pub.next_slot(et(2026, 11, 19, 9, 45), C), et(2026, 11, 19, 10, 0))
+        self.assertEqual(pub.due(et(2026, 11, 19, 9, 30), et(2026, 11, 19, 9, 47), C), et(2026, 11, 19, 9, 45))
+        # only when the futures trade: none on a Saturday or on Christmas (closed all day); Thanksgiving trades until 13:00
+        for d, want in ((et(2026, 11, 21, 0, 0), False), (et(2026, 12, 25, 0, 0), False), (et(2026, 11, 26, 0, 0), True)):
+            self.assertEqual(any(s.strftime("%H:%M") == "09:45" for s in pub._day_slots(d.date(), C)), want, d.date())
+
+    def test_configs_are_every_30_minutes_plus_0945(self):
+        want = sorted([f"{h:02d}:{m:02d}" for h in range(24) for m in (0, 30)] + ["09:45"])
+        self.assertEqual(list(pub.DEFAULT_TIMES_ET), want)
+        for path in sorted(Path("configs").glob("*.json")):
+            pc = cfgmod.load(str(path)).publish
+            self.assertTrue(pc.all_day, path)
+            self.assertEqual([s.strftime("%H:%M") for s in pc.slots()], want, path)
 
     def test_validation(self):
         with self.assertRaises(ConfigError):
@@ -102,14 +123,14 @@ class TestWorkerPublish(unittest.TestCase):
             w.send_webhook = lambda url, body: hooks.append((url, body))
             with mock.patch.dict(os.environ, {"GEX_PUBLISH_WEBHOOK_URL": "https://example.invalid/hook"}):
                 w.step(et(2026, 10, 20, 12, 5))
-                w.step(et(2026, 10, 20, 12, 30))
+                w.step(et(2026, 10, 20, 12, 20))
                 self.assertEqual(len(toasts), 1)
                 self.assertEqual(w.published["slot_et"], "2026-10-20 12:00")
                 self.assertTrue(w.published["payload"].startswith("GEX1;"))
                 self.assertIn("```GEX1;", hooks[0][1]["content"])
                 w.step(et(2026, 10, 20, 13, 50))
                 self.assertEqual(len(toasts), 2)
-                self.assertEqual(w.published["slot_et"], "2026-10-20 13:00")
+                self.assertEqual(w.published["slot_et"], "2026-10-20 13:30")
 
 
 if __name__ == "__main__":

@@ -10,7 +10,7 @@ Truth, written from the exchanges' own schedules (not from gexsys/marketcal.py):
       next trading day, except New Year's Day, Good Friday and Christmas (closed all day, no session the evening
       before)
 Paths checked, every day: UTC <-> ET for the open, the close, the 17:00 halt and the 18:00 reopen; session state at
-both edges of every boundary (one minute either side); the 15-minute data delay; the hourly publish slots; the plan
+both edges of every boundary (one minute either side); the 15-minute data delay; the publish slots (every 30 min plus 09:45); the plan
 freeze (09:30 + 30 min); the grading close; the 1-minute bar window (09:30 to the close, end excluded); the reaction
 study's per-minute scaling on a short session.
 Tolerance (fixed before running): exact. Any off-by-one minute or day is a fail.
@@ -131,12 +131,13 @@ def main() -> int:
     # the 15-minute delay
     if cboe.DELAY != timedelta(minutes=15):
         bad.append(f"Cboe delay {cboe.DELAY}, should be 15 minutes")
-    # publish slots: every hour on the hour while the futures trade
+    # publish slots: every 30 minutes on :00 and :30, plus 09:45, while the futures trade (written out here, not read from publish.py)
+    clocks = sorted([(h, m) for h in range(24) for m in (0, 30)] + [(9, 45)])
     cfg = publish.PublishConfig()
     n_slots = 0
     for d in days:
         got = publish._day_slots(d, cfg)
-        want = [et(d, h) for h in range(24) if state(d, time(h, 0)) in ("RTH", "ETH")
+        want = [et(d, h, m) for h, m in clocks if state(d, time(h, m)) in ("RTH", "ETH")
                 and not (d.month in (3, 11) and h == 2 and utc_offset_h(d, time(2, 0)) != utc_offset_h(d, time(12, 0)))]
         got = [g for g in got if not (d.month in (3, 11) and g.hour == 2 and utc_offset_h(d, time(2, 0)) != utc_offset_h(d, time(12, 0)))]
         n_slots += len(want)

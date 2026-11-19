@@ -4,7 +4,7 @@
   python -m gexpro build-site --out _site --state .state   the hosted copy (GitHub workflow)
 
 The shell owns no market logic. Each feature package provides a component (see components.py):
-  gexsys  -> GexComponent    options GEX levels, the hourly TradingView paste, the indicator script
+  gexsys  -> GexComponent    options GEX levels, the TradingView paste every 30 min, the indicator script
   feeds   -> FeedsComponent  ForexFactory calendar, Truth Social posts
   briefings -> BriefingsComponent  NY AM and Asia session briefings (reads a snapshot from gexpro/context.py)
 """

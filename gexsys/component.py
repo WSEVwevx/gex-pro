@@ -141,12 +141,12 @@ class GexComponent:
                          "error": w.last_error if w.failures else None, "fresh_h": 2,
                          "note": "first refresh in progress" if not ok and not w.failures
                          else f"the last calculation was {calc}" if calc and calc != "OK" else None})
-            # the hourly paste: late when it is more than 90 minutes old while the futures trade
+            # the paste (every 30 min, plus 09:45): late when it is more than an hour old (two missed slots) while the futures trade
             pub = w.published or {}
             trading = marketcal.session_state(datetime.now(timezone.utc)) in ("RTH", "ETH")
-            rows.append({"name": f"{w.cfg.market} TradingView paste", "provider": "GEX PRO (hourly, from the options chain)",
+            rows.append({"name": f"{w.cfg.market} TradingView paste", "provider": "GEX PRO (every 30 min and 09:45 ET, from the options chain)",
                          "pages": ["Copy for TradingView", "Indicator"], "last_ok": pub.get("published_at"),
-                         "error": None, "fresh_h": 1.5 if trading else None,
+                         "error": None, "fresh_h": 1 if trading else None,
                          "detail": f"the paste on the site is the {pub['slot_et']} ET one" if pub.get("slot_et") else None})
             # the website's index -> futures conversion: the measured NQ=F / ^NDX basis, or the carry model when
             # Yahoo's minute bars fail (that model sat ~20 NQ / 6 ES points below the market, stress test C1)
