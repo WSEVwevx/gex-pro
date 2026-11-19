@@ -6,7 +6,9 @@ import unittest
 import urllib.error
 from pathlib import Path
 
-from feeds.forexfactory import Calendar, normalize_events
+from datetime import datetime, timedelta, timezone
+
+from feeds.forexfactory import Calendar, keep_copy, normalize_events
 
 SAMPLE = [
     {"title": "CPI m/m", "country": "USD", "date": "2026-10-22T08:30:00-04:00", "impact": "High", "forecast": "0.3%", "previous": "0.4%"},
@@ -54,6 +56,22 @@ class TestNews(unittest.TestCase):
             self.assertIn("ForexFactory", d["source"])
             again = Calendar(opener=opener, clock=lambda: t[0], cache_path=Path(tmp) / "c.json")   # restart: disk copy
             self.assertEqual(len(again._data["events"]), 3)
+
+
+class TestKeepCopy(unittest.TestCase):
+    def test_saved_once_under_its_fetch_time_and_old_days_dropped(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder, now = Path(d), datetime(2026, 11, 19, 14, 0, tzinfo=timezone.utc)
+            data = {"fetched_at": "2026-11-19T13:05:01.5+00:00", "events": [{"title": "CPI m/m"}], "source": "x"}
+            f = keep_copy(data, folder, now)
+            self.assertEqual(f.relative_to(folder).as_posix(), "20261119/130501_500000.json")
+            self.assertEqual(json.loads(f.read_text()), {"fetched_at": data["fetched_at"], "events": data["events"]})
+            self.assertEqual(keep_copy(data, folder, now), f)
+            old = keep_copy({"fetched_at": (now - timedelta(days=9)).isoformat(), "events": [{}]}, folder, now - timedelta(days=9))
+            self.assertTrue(old.exists())
+            keep_copy(data, folder, now)
+            self.assertFalse(old.parent.exists())
+            self.assertIsNone(keep_copy({"fetched_at": None, "events": []}, folder, now))
 
 
 if __name__ == "__main__":

@@ -7,6 +7,8 @@ Written once a day by the hosted build (python -m gexpro archive, .github/workfl
   {M}-midday.json    the usable one nearest 12:00 ET (within 30 minutes; ties: the earlier one)
   {M}-close.json     the last usable one at or before the close (within 60 minutes; early closes from marketcal)
   {M}-candidates.json  every snapshot seen for that day, so the choice can be re-derived by anyone
+  calendar.json      the ForexFactory weekly calendar as last fetched before 09:30 ET (in the 30 hours before), unchanged:
+                     what was listed before the open (from 2026-11-19; the feed has no history of its own)
   {sym}-1m.json      1-minute bars [unix s, open, high, low, close, volume]: NQ=F and ES=F for the whole Globex day
                      (18:00 ET after the previous trading day to 17:00 ET), ^NDX and ^GSPC for the cash session; futures files
                      also name the contract each stretch of bars belongs to and flag roll weeks
@@ -35,7 +37,8 @@ from gexsys import marketcal
 
 log = logging.getLogger("gexpro.archive")
 NY = marketcal.NY
-RULES_VERSION = 2                              # 2 (from 2026-11-19): Yahoo's live-quote row is no longer kept as a bar
+RULES_VERSION = 3                              # 2 (from 2026-11-19): Yahoo's live-quote row is no longer kept as a bar
+                                               # 3: calendar.json added (a missing copy is named, never waited for)
 FIRST_DAY = date(2026, 11, 18)                 # the archive starts here; earlier days are not recoverable
 PRE_OPEN_WINDOW = timedelta(hours=30)          # = gexpro.context.PRE_OPEN_WINDOW (tested)
 MIDDAY = time(12, 0)
@@ -88,6 +91,23 @@ def choose(cands: list[dict], d: date) -> dict:
     mid = sorted(((abs(t - noon), t, x) for t, x in ok if o <= t <= c and abs(t - noon) <= MIDDAY_WINDOW), key=lambda r: r[:2])
     end = [x for t, x in ok if c - CLOSE_WINDOW <= t <= c]
     return {"open": pre[-1] if pre else None, "midday": mid[0][2] if mid else None, "close": end[-1] if end else None}
+
+
+def calendar_copy(folder: Path, d: date) -> Optional[tuple[str, str]]:
+    """(file, fetched_at) of the last calendar copy fetched in [09:30 - 30 h, 09:30) ET (feeds.forexfactory.keep_copy)."""
+    o = marketcal.rth_open_dt(d)
+    best = None
+    day = (o - PRE_OPEN_WINDOW).astimezone(timezone.utc).date()
+    while day <= o.astimezone(timezone.utc).date():
+        for f in sorted((folder / day.strftime("%Y%m%d")).glob("*.json")):
+            try:
+                t = datetime.fromisoformat(json.loads(f.read_text(encoding="utf-8"))["fetched_at"])
+            except (OSError, ValueError, KeyError):
+                continue
+            if o - PRE_OPEN_WINDOW <= t < o and (best is None or t > best[2]):
+                best = (f"{f.parent.name}/{f.name}", t.isoformat(), t)
+        day += timedelta(days=1)
+    return best[:2] if best else None
 
 
 WHY = {"open": "no usable snapshot in the 30 hours before 09:30 ET", "midday": "no usable snapshot within 30 minutes of 12:00 ET",
@@ -150,9 +170,9 @@ def _json(x) -> bytes:
 
 
 def build_day(d: date, folders: dict[str, Path], now: datetime, get: Callable[[str], bytes] = _get,
-              commit: Optional[str] = None) -> tuple[Optional[dict[str, bytes]], list[str]]:
+              commit: Optional[str] = None, calendar: Optional[Path] = None) -> tuple[Optional[dict[str, bytes]], list[str]]:
     """({relative path: bytes} for days/<d>/, or None while a part is missing and it is not yet time to give up;
-    the gaps in words)."""
+    the gaps in words). A missing calendar copy is named but never waited for: after 09:30 none can appear."""
     files: dict[str, bytes] = {}
     gaps: list[str] = []
     chosen: dict = {}
@@ -187,10 +207,15 @@ def build_day(d: date, folders: dict[str, Path], now: datetime, get: Callable[[s
             files[file_name(sym)] = _json(rec)
     if gaps and now < datetime.combine(d + timedelta(days=GIVE_UP_DAYS), WRITE_AFTER, NY):
         return None, gaps
+    cal = calendar_copy(calendar, d) if calendar else None
+    if cal:
+        files["calendar.json"] = (calendar / cal[0]).read_bytes()
+    else:
+        gaps.append("calendar: no ForexFactory copy fetched in the 30 hours before 09:30 ET")
     files["manifest.json"] = _json({
         "session": d.isoformat(), "rules_version": RULES_VERSION, "written_at": now.astimezone(timezone.utc).isoformat(),
         "build_commit": commit, "early_close": d in marketcal.early_closes(d.year), "roll_week": roll_week(d),
-        "chosen": chosen, "missing": gaps,
+        "chosen": chosen, "calendar": cal and {"file": cal[0], "fetched_at": cal[1]}, "missing": gaps,
         "files": {n: {"sha256": hashlib.sha256(b).hexdigest(), "bytes": len(b)} for n, b in sorted(files.items())}})
     return {f"days/{d.isoformat()}/{n}": b for n, b in files.items()}, gaps
 
@@ -309,7 +334,7 @@ def run(state: Path, now: Optional[datetime] = None, push: bool = True, get: Cal
         commit = os.environ.get("GEXPRO_BUILD_COMMIT") or os.environ.get("GITHUB_SHA")     # the commit the deploy gate built
         new: dict[str, bytes] = {}
         for d in due_days(now, have):
-            files, gaps = build_day(d, folders, now, get=get, commit=commit)
+            files, gaps = build_day(d, folders, now, get=get, commit=commit, calendar=state / "calendar")
             if files is None:
                 log.info("archive %s not written yet: %s", d, "; ".join(gaps))
                 pending[d.isoformat()] = gaps

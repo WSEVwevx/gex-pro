@@ -6,6 +6,9 @@
 
 The feed asks for light use, so it is fetched at most every `ttl_s` (default 30 min) and the last good
 copy is kept in memory and on disk (%LOCALAPPDATA%/gexsys/ff_calendar.json). Personal use.
+
+keep_copy(): the hosted build also saves each new fetch, unchanged, under its fetch time, so the history archive can
+keep the copy that was current before each 09:30 (what was listed before the open; the feed has no history).
 """
 from __future__ import annotations
 
@@ -16,13 +19,14 @@ import threading
 import time
 import urllib.error
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Callable, Optional
 
 log = logging.getLogger("feeds.forexfactory")
 FEED_URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
 IMPACTS = ("High", "Medium", "Low", "Holiday")
+KEEP_DAYS = 7                                    # = gexpro.archive.LOOKBACK_DAYS: long enough for any due day
 
 
 def _cache_path() -> Path:
@@ -44,6 +48,25 @@ def normalize_events(raw) -> list[dict]:
                     "time": t.astimezone(timezone.utc).isoformat(), "impact": impact if impact in IMPACTS else "Low",
                     "forecast": str(e.get("forecast") or ""), "previous": str(e.get("previous") or "")})
     return sorted(out, key=lambda x: x["time"])
+
+
+def keep_copy(data: dict, folder: Path, now: Optional[datetime] = None) -> Optional[Path]:
+    """Save a fetched copy as folder/YYYYMMDD/HHMMSS_us.json (UTC, from fetched_at), once; drop folders older than
+    KEEP_DAYS. Nothing is saved without a fetch time (no copy yet)."""
+    if not data.get("fetched_at") or not data.get("events"):
+        return None
+    t = datetime.fromisoformat(data["fetched_at"]).astimezone(timezone.utc)
+    f = folder / t.strftime("%Y%m%d") / t.strftime("%H%M%S_%f.json")
+    if not f.exists():
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text(json.dumps({"fetched_at": data["fetched_at"], "events": data["events"]}), encoding="utf-8")
+    old = ((now or datetime.now(timezone.utc)) - timedelta(days=KEEP_DAYS)).strftime("%Y%m%d")
+    for d in folder.iterdir():
+        if d.is_dir() and d.name < old:
+            for x in d.glob("*.json"):
+                x.unlink()
+            d.rmdir()
+    return f
 
 
 class Calendar:
