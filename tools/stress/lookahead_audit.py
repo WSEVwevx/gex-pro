@@ -176,7 +176,7 @@ def audit_rules(bad: list[str]) -> list[str]:
             earlier = [per[k] for k in sorted(per) if k < o["session"]]
             if G[rules.choose(earlier)] != o["grid"] or len(earlier) != o["trained_on"]:
                 out.append(f"L9 rules {o['session']}_{m}: parameters not reproduced from earlier sessions only")
-    print(f"rules: {len(sessions)} session(s) with archive bars, {n} out-of-sample choice(s), {len(out)} with a violation")
+    print(f"rules: {len(sessions)} session(s) with 1-minute bars (archive or backfill), {n} out-of-sample choice(s), {len(out)} with a violation")
     return out
 
 

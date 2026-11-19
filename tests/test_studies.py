@@ -60,7 +60,7 @@ def fake_inputs(edge_level=False, survive=False):
     sp = {"definition_sha256": "b" * 64, "version": 1, "registered": 14, "tested": 1, "survivors": ["regime:NQ"] if survive else [],
           "q": 0.1, "permutations": 10000, "tests": [test]}
     ru = {"rule": "fade_first_touch", "version": 1, "definition_sha256": "c" * 64, "tries": 8, "fees_round_turn_usd": 4.0,
-          "data_from": "2026-11-18", "data_through": "2026-11-18",
+          "data_from": "2026-11-16", "data_through": "2026-11-18", "backfilled": ["2026-11-16", "2026-11-17"],
           "markets": {"NQ": {"status": "not enough data", "oos_trades": 0, "sessions": 1}, "ES": {"status": "not enough data", "oos_trades": 0}}}
     sessions = [{"session": f"2026-11-{d:02d}", "market": "NQ", "roll_week": False} for d in (16, 17, 18)]
     return lab, sp, ru, sessions
@@ -77,6 +77,8 @@ class TestPayload(unittest.TestCase):
         self.assertEqual(m["level_reaction"][0]["shifted"], {"+5": None, "-5": None})
         self.assertEqual(p["markets"]["ES"]["needs"], [])                     # no ES sessions: nothing to estimate
         self.assertEqual(p["definitions"], {"level_reaction": "a" * 64, "splits": "b" * 64, "rules": "c" * 64})
+        ru = p["studies"]["rules"]
+        self.assertEqual((ru["data_from"], ru["backfilled_from"], ru["backfilled_through"]), ("2026-11-16", "2026-11-16", "2026-11-17"))
 
     def test_evidence_names_the_study(self):
         m = ST.payload(*fake_inputs(edge_level=True, survive=True), {"NQ": 1})["markets"]["NQ"]

@@ -1454,9 +1454,9 @@ function renderStudies(){
   [...$("stMarket").children].forEach(b => b.onclick = () => { stM = b.dataset.m; store.set("gex.stm", stM); renderStudies(); });
   const M = X.markets[stM], C = M.counts, St = X.studies, edge = M.verdict.edge.length;
   const at = new Date(X.computed_at).toLocaleString("en-US", {...ET, month: "short", day: "numeric", hour: "numeric", minute: "2-digit"});
-  $("stSub").innerHTML = `<span class="trk-tag ${edge ? "" : "warn"}" style="margin-left:0">${edge ? "evidence found" : "no proven edge yet"}</span> data through ${sday(M.data_through)} · computed ${at} ET`;
+  $("stSub").innerHTML = `<span class="trk-tag ${edge ? "" : "warn"}" style="margin-left:0">${edge ? "evidence found" : "no proven edge yet"}</span> ${M.sessions} sessions, ${sday(M.data_from)} – ${sday(M.data_through)} · computed ${at} ET`;
   $("stKpis").innerHTML =
-    kpi("Sessions", num(M.sessions, 0), `${sday(M.data_from)} to ${sday(M.data_through)} · ${M.archive_sessions} archived with bars`)
+    kpi("Sessions", num(M.sessions, 0), `${sday(M.data_from)} to ${sday(M.data_through)} · ${M.archive_sessions} with 1-minute bars`)
     + kpi("Level types with 20+ touches", `${C.level_types_20} of ${C.level_types}`, "below 20 touches no rate is shown")
     + kpi("Splits tested", `${C.splits_tested} of ${C.splits_registered}`, `${St.splits.survivors.filter(x => x.endsWith(":" + stM)).length} survive · ${St.splits.registered} registered for both markets`)
     + kpi("Rule trades out of sample", `${C.oos_trades} of ${C.oos_needed}`, "hypothetical · walk-forward");
@@ -1490,9 +1490,9 @@ function renderStudies(){
   // rule tester
   const RU = St.rules, r = M.rules || {};
   $("stRuleSub").textContent = `fade first touch · v${RU.version} ${sha8(RU.sha256)} · hypothetical`;
-  const foot = `<div class="expl">Fade the first touch of a 9:30 level: entry at the next 1-minute bar's open + 1 tick, stop and target exits filled 1 tick worse (the stop first inside one bar), time exit, flat by the close, fees $${num(RU.fees_round_turn_usd, 2)} per round turn. Settings are picked on earlier sessions only (${RU.min_train_sessions} first) and scored on the next one. Tries to date: ${RU.tries} grid points. Archive bars: ${RU.data_from ? `${sday(RU.data_from)} to ${sday(RU.data_through)}` : "none yet"}. No orders are ever placed.</div>`;
+  const foot = `<div class="expl">Fade the first touch of a 9:30 level: entry at the next 1-minute bar's open + 1 tick, stop and target exits filled 1 tick worse (the stop first inside one bar), time exit, flat by the close, fees $${num(RU.fees_round_turn_usd, 2)} per round turn. Settings are picked on earlier sessions only (${RU.min_train_sessions} first) and scored on the next one. Tries to date: ${RU.tries} grid points. 1-minute bars: ${RU.data_from ? `${sday(RU.data_from)} to ${sday(RU.data_through)}` : "none yet"}${RU.backfilled_from ? ` (${sday(RU.backfilled_from)} to ${sday(RU.backfilled_through)} downloaded later from Yahoo's 30-day history, not captured on the day)` : ""}. No orders are ever placed.</div>`;
   if(r.status !== "tested"){
-    $("stRule").innerHTML = `<div class="trk-kpis st-one"><div class="kpi"><div class="eyebrow">Out-of-sample trades</div><div class="big sm">${r.oos_trades ?? 0} of ${RU.min_oos_trades}</div><div class="s"><span class="trk-tag warn" style="margin-left:0">not enough data</span> ${r.sessions ?? 0} session${r.sessions === 1 ? "" : "s"} with archive bars; nothing is scored before ${RU.min_oos_trades} out-of-sample trades</div></div></div>` + foot;
+    $("stRule").innerHTML = `<div class="trk-kpis st-one"><div class="kpi"><div class="eyebrow">Out-of-sample trades</div><div class="big sm">${r.oos_trades ?? 0} of ${RU.min_oos_trades}</div><div class="s"><span class="trk-tag warn" style="margin-left:0">not enough data</span> ${r.sessions ?? 0} session${r.sessions === 1 ? "" : "s"} with 1-minute bars; nothing is scored before ${RU.min_oos_trades} out-of-sample trades</div></div></div>` + foot;
     return;
   }
   const e = r.per_trade, ps = r.per_session, nr = r.without_roll_weeks || {};

@@ -294,4 +294,12 @@ bootstrap's bias is large), seed 20261118; the method's coverage is checked by `
 An interval that includes 0 reads "no proven edge yet". The tab also shows how many sessions each study still needs
 at the current rate.
 
+The rule tester replays futures 1-minute bars. From 2026-11-18 they come from the history archive (captured on the
+day). For 2026-10-21 to 2026-11-17 they were downloaded on 2026-11-19 from Yahoo's 30-day 1-minute history
+(`tools/backfill_bars.py`, `studies/backfill/bars/`, each file marked "backfilled" with the raw response's SHA-256).
+Those bars are outcomes only: the levels still come from each session's plan frozen at 09:30, so they add no look-ahead.
+Checked against the minute records captured on the day: every cash-session minute is present; highs and lows are equal
+on 99.54% of minutes (15,510 of 15,582), 98.46% in the worst session; the rest differ by 0.25 to 1 point (Yahoo
+revises some bars after the day). Opens were not captured on the day, so they cannot be checked this way.
+
 The system makes no predictive claim; a study that finds nothing says so.
