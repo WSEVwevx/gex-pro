@@ -2351,6 +2351,14 @@ function renderLevelHistoryChart(ss, fut){
   svg.innerHTML = g;
 }
 const day0 = s => new Date(s + "T12:00:00Z").toLocaleDateString("en-US", {weekday: "short", month: "short", day: "numeric", timeZone: "UTC"});
+// the one plan zone price is in. The flip decides the side first: when C1 sits below the flip (or P1 above it) the
+// zones would overlap, and price can only be in one ("above C1" also needs price above the flip, "below P1" below it)
+function planHere(ref, C1, P1, F){
+  if(ref == null) return null;
+  if(F == null) return C1 != null && ref >= C1 ? "above" : P1 != null && ref < P1 ? "below" : null;
+  if(ref >= F) return C1 != null && C1 > F && ref < C1 ? "upper" : C1 != null ? "above" : null;
+  return P1 != null && P1 < F && ref >= P1 ? "lower" : P1 != null ? "below" : null;
+}
 function renderPlan(w){
   const S = w && w.result && w.result.session;
   if(!S || !S.levels){ $("planCard").innerHTML = `<div class="eyebrow">Today's plan</div><div class="expl">The plan appears with the next refresh.</div>`; $("chgFeed").innerHTML = ""; return; }
@@ -2363,11 +2371,12 @@ function renderPlan(w){
   const C1 = lv.C1, P1 = lv.P1, F = lv.flip ?? lv.ZG;
   // levels are numbered by strength, not price: only name a "next" level that lies beyond C1 / P1
   const C2 = lv.C2 != null && lv.C2 > C1 ? lv.C2 : null, P2 = lv.P2 != null && lv.P2 < P1 ? lv.P2 : null;
+  const here = planHere(ref, C1, P1, F);
   const rows = [
-    C1 != null && [`Above C1 ${p(C1)}`, "positive-gamma extension: rallies tend to slow" + (C2 != null ? `; next call level ${p(C2)}` : ""), ref >= C1],
-    C1 != null && F != null && C1 > F && [`Between the flip ${p(F)} and C1 ${p(C1)}`, "positive gamma: expect two-way trade and fades back toward the middle", ref < C1 && ref >= F],
-    P1 != null && F != null && P1 < F && [`Between P1 ${p(P1)} and the flip ${p(F)}`, "negative gamma: moves can extend" + (P2 != null ? `; a break of P1 opens ${p(P2)}` : ""), ref < F && ref >= P1],
-    P1 != null && [`Below P1 ${p(P1)}`, "hedging adds to selling" + (P2 != null ? `; next put level ${p(P2)}` : ""), ref < P1],
+    C1 != null && [`Above C1 ${p(C1)}`, "positive-gamma extension: rallies tend to slow" + (C2 != null ? `; next call level ${p(C2)}` : ""), here === "above"],
+    C1 != null && F != null && C1 > F && [`Between the flip ${p(F)} and C1 ${p(C1)}`, "positive gamma: expect two-way trade and fades back toward the middle", here === "upper"],
+    P1 != null && F != null && P1 < F && [`Between P1 ${p(P1)} and the flip ${p(F)}`, "negative gamma: moves can extend" + (P2 != null ? `; a break of P1 opens ${p(P2)}` : ""), here === "lower"],
+    P1 != null && [`Below P1 ${p(P1)}`, "hedging adds to selling" + (P2 != null ? `; next put level ${p(P2)}` : ""), here === "below"],
   ].filter(Boolean);
   const day = now.toLocaleDateString("en-US", {...ET, weekday: "short", month: "short", day: "numeric"});
   const usd = ((news && news.events) || []).filter(e => e.country === "USD" && (e.impact === "High" || e.impact === "Medium")
