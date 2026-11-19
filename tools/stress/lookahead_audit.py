@@ -22,6 +22,8 @@ History archive (git branch archive, gexpro/archive.py):
       and its calendar copy was fetched before 09:30 ET
 Study replays (gexpro/reaction_lab.py):
   L7  every session the level-reaction study replays reads only plan, paste and 1-minute files that pass L1, L5 and L6
+  L8  the splits study (gexpro/splits.py) reads only archive days that pass A2 and A3 (calendar copy and 09:30
+      snapshot both before the open); its other inputs are the L7 sessions and vol closes of the previous trading day
 Tolerance: zero violations.
 """
 from __future__ import annotations
@@ -124,6 +126,7 @@ def main() -> int:
         bad.append(f"S3 history.csv and the session files differ: {diff[:6]}")
     bad += audit_archive()
     bad += audit_replay(bad)
+    bad += audit_splits(bad)
     print(f"sessions {len(sessions)}, pastes {len(pastes)}, minute records {len(minutes)}, days {days[0]} to {days[-1]}")
     print(f"violations: {len(bad)} (tolerance 0)")
     for b in bad:
@@ -140,6 +143,16 @@ def audit_replay(bad: list[str]) -> list[str]:
         used = [f"sessions/{name}.json", f"minutes/{name}.json"] + ([f"pastes/{name}.txt"] if s["has_paste"] else [])
         out += [f"L7 replay of {name} reads {f}, which failed: {b}" for f in used for b in bad if f in b]
     print(f"replay: {len({b.split()[3] for b in out})} of the study's sessions read a file with a violation")
+    return out
+
+
+def audit_splits(bad: list[str]) -> list[str]:
+    """L8: no archive day the splits study reads has an A2 or A3 violation."""
+    from gexpro import splits
+    cals, shares = splits.read_archive()
+    used = sorted(set(cals) | {d for v in shares.values() for d in v})
+    out = [f"L8 splits read {d}, which failed: {b}" for d in used for b in bad if b.startswith(("A2", "A3")) and d in b]
+    print(f"splits: {len(used)} archive day(s) read, {len(out)} with a violation")
     return out
 
 

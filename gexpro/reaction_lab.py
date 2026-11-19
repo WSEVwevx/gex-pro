@@ -18,7 +18,7 @@ import subprocess
 import sys
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 from gexsys import marketcal
 
@@ -60,6 +60,7 @@ def session_input(sess: dict, minutes: dict, paste: Optional[str], prev_close: O
         levels.update(paste_levels(paste))
     d = date.fromisoformat(sess["session"])
     return {"session": sess["session"], "market": sess["market"], "regime": plan.get("regime"), "ratio": r,
+            "plan": {k: plan.get(k) for k in ("ref", "zg", "em")},                 # index prices, for the splits study
             "open": minutes["index_open"] * r, "em": plan["em"] * r,
             "prev_close": None if prev_close is None else prev_close * r,
             "levels": {t: v * r for t, v in levels.items()}, "has_paste": bool(paste),
@@ -72,12 +73,13 @@ def _roll_week(d: date) -> bool:
     return marketcal.roll_date(d.year, m) <= d <= marketcal.quarterly_expiry(d.year, m)
 
 
-def read_branch(branch: str = BRANCH) -> dict[str, bytes]:
-    """{path: bytes} of the track record's sessions, minutes and pastes, read with one git process."""
+def read_branch(branch: str = BRANCH, want: Optional[Callable[[str], bool]] = None) -> dict[str, bytes]:
+    """{path: bytes} of a remote branch's files (default: the track record's sessions, minutes and pastes), read with
+    one git process."""
     git = lambda *a, **k: subprocess.run(["git", *a], cwd=ROOT, capture_output=True, **k).stdout
-    git("fetch", "-q", "origin", "track-record")
-    paths = [f for f in git("ls-tree", "-r", "--name-only", branch).decode().split()
-             if f.startswith(("sessions/", "minutes/", "pastes/"))]
+    git("fetch", "-q", "origin", branch.split("/", 1)[1])
+    want = want or (lambda f: f.startswith(("sessions/", "minutes/", "pastes/")))
+    paths = [f for f in git("ls-tree", "-r", "--name-only", branch).decode().split() if want(f)]
     out, buf = {}, git("cat-file", "--batch", input="".join(f"{branch}:{f}\n" for f in paths).encode())
     for f in paths:                                     # each answer: "<sha> blob <size>\n<bytes>\n"
         head, buf = buf.split(b"\n", 1)
