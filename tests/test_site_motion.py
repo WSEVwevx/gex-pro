@@ -145,6 +145,9 @@ class TestBiasPage(unittest.TestCase):
         self.assertEqual(got, [w for _, w in cases])
         self.assertEqual(JS.count('here === "'), 4)                        # each plan row asks planHere, nothing else
 
+    def test_no_failure_banner_when_the_close_is_already_shown(self):
+        """The 'data source failed' banner stays away while the market is shut and the close's numbers are shown."""
+        self.assertIn("h.last_error && !h.holds_latest ?", JS)
     def test_the_band_says_what_it_is_centred_on(self):
         """The +/-1 sigma range names its centre (the prior close in RTH), in the key strip and the plan; results
         saved before the field existed keep the old text. Both labels were measured to fit on one line at 375 px."""

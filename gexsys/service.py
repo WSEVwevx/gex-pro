@@ -51,6 +51,17 @@ def _fv(payload: str) -> str:
     return next((kv[3:] for kv in payload.split(";") if kv.startswith("fv=")), "1")
 
 
+def holds_latest(summary: dict, now: datetime) -> bool:
+    """True when the shown result already has the newest data the free feed can give: the cash market is shut
+    (the delayed quotes stay frozen at the close until the next open) and its quotes are from after the last
+    close. A failed retry then changes nothing for the trader, e.g. Cboe refusing a request in the daily break."""
+    try:
+        ref = datetime.fromisoformat(summary["ref_time"])
+    except (KeyError, TypeError, ValueError):
+        return False
+    return marketcal.session_state(now) != "RTH" and ref >= marketcal.last_close(now)
+
+
 class MarketWorker(threading.Thread):
     def __init__(self, cfg: MarketConfig, gate: Optional[NotifyGate] = None):
         self.cfg = cfg
@@ -248,6 +259,7 @@ class MarketWorker(threading.Thread):
         nxt = publish.next_slot(datetime.now(timezone.utc), self.cfg.publish)
         return {"key": self.key, "market": self.cfg.market, "source": self.cfg.source, "provider": self.label,
                 "status": status, "calc_status": summ.get("status"), "age_s": age, "last_error": self.last_error,
+                "holds_latest": holds_latest(summ, datetime.now(timezone.utc)),
                 "consecutive_failures": self.failures,
                 "session": marketcal.session_state(datetime.now(timezone.utc)),
                 "next_run_in_s": max(0.0, self.next_run - time.time()),

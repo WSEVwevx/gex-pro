@@ -525,7 +525,8 @@ function render(){
     <span class="chip">Next paste <b>${h.next_publish_et ? esc(h.next_publish_et.slice(11)) + " ET" : "-"}</b></span>
     ${(() => { const e = nextHighUSD(); return e ? `<span class="chip" title="Next ${e.impact.toLowerCase()}-impact USD event (ForexFactory)"><i class="dot ${e.impact === "High" ? "bad" : "warn"}"></i>${esc(e.title)} <b>in ${dur(Date.parse(e.time) - Date.now())}</b></span>` : ""; })()}`;
   $("banner").innerHTML = !w.result ? `<div class="banner">${h.last_error ? "The options data source failed on its last try. Nothing to show yet; retrying by itself. Details are on the Data health page." : "First calculation in progress: levels appear within a minute."}</div>`
-    : h.last_error ? `<div class="banner" title="${esc(h.last_error)}">The options data source failed on its last try. Showing the last good numbers; retrying by itself. Details are on the Data health page.</div>`
+    // closed market and the close's numbers already shown: a failed retry changes nothing (Data health still says so)
+    : h.last_error && !h.holds_latest ? `<div class="banner" title="${esc(h.last_error)}">The options data source failed on its last try. Showing the last good numbers; retrying by itself. Details are on the Data health page.</div>`
     : lag ? `<div class="banner">The hosted data was built ${ago(data.now)}. GitHub runs the refresh on a schedule that sometimes runs late; this page picks up the next build by itself.</div>` : "";
   // old data says so on each market card, not only in the banner
   document.body.classList.toggle("stale-data", !!lag);
