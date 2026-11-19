@@ -157,6 +157,15 @@ class TestBiasPage(unittest.TestCase):
         self.assertIn('<div class="eyebrow">Reference price${refAt(s.ref_time)}</div>', JS)
         self.assertNotIn('" future, live"', JS)                              # a time, not a claim that it is live
 
+    def test_one_centre_for_the_1_sigma_range(self):
+        """Levels' key strip and Today's plan centre the 1σ range on the same anchor (they differed by a point), and
+        the Bias card's wider or narrower range is labelled as the model's, not as the 1σ range."""
+        self.assertIn("const emc = em.anchor_fut ?? fut;", JS)
+        self.assertIn("`${num(emc - emd, 0)} – ${num(emc + emd, 0)} (1σ)`", JS)
+        self.assertIn("a = em.anchor_fut ?? em.anchor", JS)                    # the plan's centre
+        self.assertIn("<span>Model range</span>", JS)
+        self.assertNotIn("<span>Expected range</span><b>${num(b.range[0]", JS)
+
     def test_a_gap_in_the_replay_is_not_an_alarm(self):
         self.assertNotRegex(CSS, r"\.rp-marks s\{[^}]*(gradient|warn)")
         self.assertNotIn("no update since", JS)
