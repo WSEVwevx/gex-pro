@@ -24,6 +24,8 @@ Study replays (gexpro/reaction_lab.py):
   L7  every session the level-reaction study replays reads only plan, paste and 1-minute files that pass L1, L5 and L6
   L8  the splits study (gexpro/splits.py) reads only archive days that pass A2 and A3 (calendar copy and 09:30
       snapshot both before the open); its other inputs are the L7 sessions and vol closes of the previous trading day
+  L9  the rule tester (gexpro/rules.py) reads only archive bar days that pass A2 and A3, and every out-of-sample
+      session's parameters are recomputed here from the sessions dated strictly before it: they must match
 Tolerance: zero violations.
 """
 from __future__ import annotations
@@ -127,6 +129,7 @@ def main() -> int:
     bad += audit_archive()
     bad += audit_replay(bad)
     bad += audit_splits(bad)
+    bad += audit_rules(bad)
     print(f"sessions {len(sessions)}, pastes {len(pastes)}, minute records {len(minutes)}, days {days[0]} to {days[-1]}")
     print(f"violations: {len(bad)} (tolerance 0)")
     for b in bad:
@@ -153,6 +156,27 @@ def audit_splits(bad: list[str]) -> list[str]:
     used = sorted(set(cals) | {d for v in shares.values() for d in v})
     out = [f"L8 splits read {d}, which failed: {b}" for d in used for b in bad if b.startswith(("A2", "A3")) and d in b]
     print(f"splits: {len(used)} archive day(s) read, {len(out)} with a violation")
+    return out
+
+
+def audit_rules(bad: list[str]) -> list[str]:
+    """L9: the rule tester's archive days are clean, and each out-of-sample choice uses earlier sessions only."""
+    from gexpro import reaction_lab, rules
+    d, lab = rules.definition()[0], reaction_lab.definition()[0]["rules"]
+    fees = d["units"]["fees_round_turn_usd"]
+    sessions = rules.join(reaction_lab.load(), rules.read_bars())
+    out = [f"L9 rules read {s['session']}, which failed: {b}" for s in sessions for b in bad
+           if b.startswith(("A2", "A3")) and s["session"] in b]
+    G, n = rules.grid(d), 0
+    for m in rules.MARKETS:
+        ss = [s for s in sessions if s["market"] == m]
+        per = {s["session"]: [rules.session_trades(s, p, lab, d, fees)[0] for p in G] for s in ss}
+        for o in rules.walk_forward(sorted(ss, key=lambda s: s["session"]), d, lab, fees)["oos"]:
+            n += 1
+            earlier = [per[k] for k in sorted(per) if k < o["session"]]
+            if G[rules.choose(earlier)] != o["grid"] or len(earlier) != o["trained_on"]:
+                out.append(f"L9 rules {o['session']}_{m}: parameters not reproduced from earlier sessions only")
+    print(f"rules: {len(sessions)} session(s) with archive bars, {n} out-of-sample choice(s), {len(out)} with a violation")
     return out
 
 
