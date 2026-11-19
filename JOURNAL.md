@@ -57,3 +57,48 @@ lessons, open questions. Read the last 5 entries before deciding anything.
 - Could break: wrapping at 375 or 1366 (layout jump); a missing anchor_label on old cached results (fall back to the
   current text).
 - Worked if: both places name the centre; heights unchanged at 375 and 1366; tests pin the three labels.
+
+### Shipped (run 1)
+- PR 25, lane 38 (c2205d2): the ±1σ range names its centre ("· prior close", "Day ±1σ from prior close"). Shows
+  once a fresh chain is computed; the old text until then.
+- PR 26, lane 40 (515caf1): no "data source failed" banner when the market is shut and the close's numbers are
+  shown (health.holds_latest). From the user's screenshot at 17:30 ET in the daily break. Verified on the hosted page
+  at 17:58 ET: no banner; Data health still red.
+- PR 27, lane 41 (6d9ae97): a 403 reads "REFUSED … a free source blocking automated requests", not "check
+  credentials"; retried every 15 min, not hourly. Verified in the hosted health.
+- Lane 39 was spent on a redeploy of c2205d2 (PR 26 had a test conflict). No harm.
+- Post-deploy, each time: levels unchanged vs baseline (NQ C1 27,280; ES C1 none), slot 16:30, no horizontal
+  scroll at 1024.
+
+### Incident: Cboe blocks us (since about 22:22 UTC, 2026-11-19)
+- cdn.cboe.com now 307-redirects to cdn-api.cboe.com, which answers HTTP 403 with a Cloudflare block page. This
+  happens from this PC and from GitHub's build servers (the build at 22:20 was ok, 22:26 was down).
+- Not bypassed: no header, endpoint or retry tricks. The site shows the 16:14 ET chain with its time, which is the
+  newest the delayed feed would give until 09:30 anyway. No new paste is published without fresh data.
+- If it persists to the open, the site has no fresh levels. Needs the user: wait, or approve a look at another free
+  source (show the source, a sample and the math first, per CLAUDE.md).
+
+### Found, not fixed (next run)
+- TRUTH, top: two 1σ moves for the same 11-20 expiry in one result. Engine summary.expected_move: NQ IV 38.2% ->
+  435 pts. extras.expected_move (shown): IV 50.9% -> 703 pts. ES: 26.3% vs 34.8%. The ATM straddle (360 NQ pts mid)
+  implies about 450, closer to the engine's. Hypothesis: atm_iv() keys on the expiry date only, so on a monthly
+  expiry it may average the AM-settled monthly (T to 09:30) with the PM weekly. Not proven: saved summaries show
+  differences on 11-16/17 too (39% vs 35.5%). Needs a raw chain; Cboe is blocked. Do not change it without one
+  plus the verifier.
+- CRAFT: when the banner appears after load it pushes #levelsView down 47 px (desktop) / 84 px (phone). Now rarer
+  (PR 26), still real for a late hosted build.
+- Data health: the paste row reads "Working" while the chains are down (it is the 16:30 paste, correctly timed);
+  the summary count leaves out "Not checked yet" rows.
+- Tests: one full-suite failure at exactly 18:00:xx ET didn't reproduce (3 runs here, 1 on main). Suspect a test
+  reading the real clock at the Globex reopen. Find it.
+- ES C1 = none on 11-20 (OpEx) is real: no positive net-GEX strike within 3%.
+
+### Standard (after)
+- TRUTH 4 (centre named; the EM discrepancy is open), INSIGHT 3, CLARITY 4 (+1), CRAFT 4, RELIABILITY 3 (-1: Cboe
+  block, outside our control; the honesty of how it is shown improved), RESTRAINT 4, SAFETY 5 (no regressions, no
+  gates loosened; one pinned string updated in the open, the same check).
+
+### Lessons
+- Read the line after a dict you extend: `len(out) > 3` counted keys.
+- Test against a fixed clock: a worker test failed only because the 18:00 slot was 20 s away.
+- Measure a label at 375 px with the real 5-digit NQ prices before choosing words.
