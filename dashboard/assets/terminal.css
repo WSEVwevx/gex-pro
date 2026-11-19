@@ -286,7 +286,7 @@ body.first .card{animation:fade-in var(--t-slow) var(--ease-out)}
 .ticker:empty{min-height:16px}#tabs:empty{min-height:30px}
 #banner:empty+#levelsView #keyStrip:not(:has(.stat)){min-height:91px}#banner:empty+#levelsView #stats:not(:has(.stat)){min-height:132px}
 @media(max-width:1180px){#banner:empty+#levelsView #keyStrip:not(:has(.stat)){min-height:181px}#banner:empty+#levelsView #stats:not(:has(.stat)){min-height:264px}}
-@media(max-width:700px){.pagebar #status{flex-basis:100%}#status:empty{min-height:64px}#banner:empty+#levelsView #stats:not(:has(.stat)){min-height:280px}}
+@media(max-width:700px){.pagebar #status{flex-basis:100%;min-height:64px;align-content:flex-start}#banner:empty+#levelsView #stats:not(:has(.stat)){min-height:280px}}
 .stats.keys .v{font-size:22px}
 body:not(.notes) .stats.keys .stat .s{display:block}
 .bt-more{margin-top:12px}
