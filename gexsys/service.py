@@ -62,6 +62,9 @@ def holds_latest(summary: dict, now: datetime) -> bool:
     return marketcal.session_state(now) != "RTH" and ref >= marketcal.last_close(now)
 
 
+AUTH_RETRY_S = 900
+
+
 class MarketWorker(threading.Thread):
     def __init__(self, cfg: MarketConfig, gate: Optional[NotifyGate] = None):
         self.cfg = cfg
@@ -237,7 +240,9 @@ class MarketWorker(threading.Thread):
             interval = marketcal.refresh_interval(now, self.cfg.refresh)
             self._maybe_publish(now)
         except AuthError as e:
-            self.last_error, interval = f"AUTH: {e}", 3600      # do not hammer the provider with bad creds
+            # refused (bad key, or a free source blocking us): back off 15 min, the same request, nothing changed;
+            # an hour could miss a lifted block until well after the open
+            self.last_error, interval = f"REFUSED: {e}", AUTH_RETRY_S
             self.failures += 1
         except Exception as e:     # keep serving last good result; mark it stale via age
             log.exception("refresh failed for %s", self.key)

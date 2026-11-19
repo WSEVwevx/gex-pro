@@ -2,6 +2,7 @@
 import json
 import tempfile
 import threading
+import time
 import unittest
 import urllib.request
 from glob import glob
@@ -235,6 +236,27 @@ class TestService(unittest.TestCase):
             self.assertIs(w.result, good)
             self.assertEqual(w.health()["status"], "degraded")
             self.assertIn("disconnected", w.health()["last_error"])
+
+
+    def test_a_refusal_says_so_and_retries_in_15_minutes(self):
+        """Cboe began answering HTTP 403 on 2026-11-19 (a Cloudflare block on a free source, no key involved):
+        the message must not blame credentials, and the next try comes in 15 minutes, not an hour."""
+        from gexsys.providers.base import AuthError
+        from gexsys.service import AUTH_RETRY_S
+        with tempfile.TemporaryDirectory() as tmp:
+            w = MarketWorker(synth_cfg(tmp))
+
+            def refused(*a, **k):
+                raise AuthError("HTTP 403: the provider refused the request")
+            w.provider.fetch_snapshot = refused
+            from datetime import datetime
+            from gexsys.marketcal import NY
+            t0 = time.time()
+            w.step(datetime(2026, 11, 21, 12, 0, tzinfo=NY))          # Saturday: no paste slot nearby
+            self.assertTrue(w.health()["last_error"].startswith("REFUSED: HTTP 403"))
+            self.assertNotIn("credentials", w.health()["last_error"])
+            self.assertEqual(AUTH_RETRY_S, 900)
+            self.assertAlmostEqual(w.next_run - t0, AUTH_RETRY_S, delta=5)
 
 
 class TestIndicatorSource(unittest.TestCase):

@@ -88,6 +88,6 @@ level as a *modeled concentration of option gamma*.
 | Invalid or mismatched OCC symbols (Cboe) | dropped, with a count |
 | Crossed quotes or negative OI | the field becomes missing, with a count |
 | Provider down | last good result is still served; health shows `degraded`, then `stale`; stale alert |
-| Bad credentials | `AUTH` error, retried hourly only |
+| Refused (HTTP 401/403: a bad key, or a free source blocking automated requests) | `REFUSED` error, the same request retried every 15 min (sooner at a paste slot) |
 | Wrong market in Pine | nothing drawn; the panel names the market the paste was for |
 | Implausible mapping in Pine (a level over 8% from price) | BLOCKED, nothing drawn |
