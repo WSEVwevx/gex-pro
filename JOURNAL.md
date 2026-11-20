@@ -221,3 +221,22 @@ lessons, open questions. Read the last 5 entries before deciding anything.
 ### Run state
 - Run 2 finished. Last deployed lane 47 (22bac23). Next free lane 48. No open branches.
 - Blocked (only the user): none needed. The Pine "estimate" label is declined (D9), not blocked.
+
+## Redesign, Phase 0-1 (2026-11-19, 22:45 ET)
+- Baseline: 104 screenshots (13 pages x 1366/375 x dark/light, NQ, fold + full page) from the local site at main
+  0a83af0, taken with headless Chrome over CDP. Saved to the session scratchpad, folder `before/` (not committed).
+  Measured: index.html 41 inline styles, app.js 106 `style=`, 61 distinct hex colours in terminal.css, 177 border
+  rules. Backtesting at 375 px scrolls sideways by 2 px (scrollWidth 377).
+- Critique, the 10 worst (screenshot in brackets):
+  1. Phone: 350 px of chrome before the first number; the price is below the fold [levels-375-dark-fold].
+  2. Phone: the backup banner takes 6 lines (140 px) on every page [ladder-375-light-fold].
+  3. Everything is a bordered box with the same weight; nothing leads [levels-1366-dark-fold].
+  4. The plan, the most useful block, starts at y=490 on desktop and is off-screen on the phone.
+  5. Two strips repeat the same numbers (ticker, market strip, key-level cards) [levels-1366-dark-fold].
+  6. The Levels page is 3,953 px tall at 1366 (6,095 at 375): 11 stacked blocks.
+  7. Level history table wraps dates and "not reached" into two lines [levels-1366-light-full].
+  8. Mono everywhere, including prose and labels; small sizes (12.5 px body) [levels-1366-dark-fold].
+  9. Expiry tiles on the Live table repeat a bordered card inside a card [ladder-375-light-fold].
+  10. The sidebar's keyboard hints (LVL, LIVE...) add noise for touch and mouse users.
+- Phase 1: three directions of the Levels page with the real 22:45 ET numbers (A quiet pro, B level map first,
+  C dense refined), published at https://claude.ai/artifact/WUxFg3UWGowYyUWwbZHz33 . Asked the owner to pick.
