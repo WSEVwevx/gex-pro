@@ -242,3 +242,25 @@ lessons, open questions. Read the last 5 entries before deciding anything.
   C dense refined), published at https://claude.ai/artifact/WUxFg3UWGowYyUWwbZHz33 . Asked the owner to pick.
 - Owner's pick (23:05 ET): "A + B's level map". Logged in docs/style.md. Order: tokens, shell, Levels hero with the
   level map, other pages, polish. Merge window tonight until 09:00 ET Fri.
+
+### Redesign shipped (2026-11-20, 00:00-01:00 ET)
+- PR 38, lane 49 (380e6cd): tokens. A 4 px spacing scale, three radii, new surfaces, borderless cards, 43 rgba tints
+  -> color-mix of the semantic colour, tape/code palettes as tokens. /code-review: --ink4 on --raise was 4.42 / 4.19:1,
+  fixed; a test now checks every text tier on every surface in both themes.
+- PR 39, lane 50 (3e2c265): shell. Pages in one row under the top bar (no sidebar), market strip hidden, phone header
+  one row, sticky page row, "Copy for TradingView" pinned to the bottom on phones, short backup banner on phones.
+  Backtesting's 2-5 px sideways scroll at 375 fixed (paste table padding).
+- PR 40, lane 51 (fc07154): Levels. Headline row (price + time, regime + distance, net gamma), the plan beside a level
+  map drawn to one scale (off-scale levels pinned with an arrow and their real distance), "What changed" full width,
+  "More numbers" and "Level history" folded (remembered per viewer). DEFAULT_H re-measured. /code-review: subtitle said
+  "futures" when unmapped; a fold re-rendered the page. Both fixed.
+- PR 41, lane 52 (28005d4): 41 -> 0 inline styles in index.html; phone tables keep numbers, dates and ranges on one line.
+- Measured after: Levels 3,953 -> 2,433 px tall at 1366 (6,095 -> 4,023 at 375). At 1366x768 and 375x812 the first
+  screen shows price + time, regime, key levels, the plan with "price is here" and the paste. 52 views, no sideways
+  scroll. Tests 510 -> 524, all passing.
+- Gallery: https://claude.ai/artifact/U9aSG6UzG47sPW4p916vu4 (before/after first screens, 13 pages x 2 widths x 2 themes).
+- Not done: app.js still sets ~100 inline styles at runtime (most are runtime colours and positions); font sizes stay
+  at 8 steps; no self-hosted font (system stack); two prose phrases still wrap on phones; real-phone safe areas
+  untested.
+- Lesson: Python's open() defaults to cp1252 here; a test file with σ was emptied by a failed write. Always pass
+  encoding="utf-8".
