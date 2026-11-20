@@ -156,7 +156,7 @@ def pre_open(gex, d: date) -> dict:
                     t = datetime.fromisoformat(s["asof"])
                 except (OSError, ValueError, KeyError):
                     continue
-                usable = s.get("status") != "UNAVAILABLE" and ((s.get("extras") or {}).get("expected_move") or {}).get("daily_points")
+                usable = s.get("status") != "UNAVAILABLE" and not s.get("backup") and ((s.get("extras") or {}).get("expected_move") or {}).get("daily_points")
                 if lo <= t < open_ and usable and (best is None or t > best[0]):
                     best = (t, s)
         if best:

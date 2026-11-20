@@ -16,7 +16,7 @@ Written once a day by the hosted build (python -m gexpro archive, .github/workfl
 
 M is NQ or ES. A snapshot is the engine's saved summary, byte for byte: levels, ranked levels, expected move, regime,
 GEX profile (abs_by_strike, by_expiry), the 09:30 futures mapping (futures_map) and the chain's own time (asof).
-"Usable" is the plan's own rule (gexpro/context.py pre_open): not UNAVAILABLE and has a daily expected move.
+"Usable" is the plan's own rule (gexpro/context.py pre_open): not UNAVAILABLE, not a backup estimate, and has a daily expected move.
 
 A day is written after 17:15 ET once all its parts are in, or with its gaps named after GIVE_UP_DAYS (snapshots are
 kept 7 days in the build's state, 1-minute bars about 30 days by Yahoo). Existing days are never rewritten: this
@@ -77,7 +77,7 @@ def candidates(folder: Path, d: date) -> list[dict]:
             if lo <= t <= hi:
                 em = ((s.get("extras") or {}).get("expected_move") or {}).get("daily_points")
                 out.append({"file": f"{f.parent.name}/{f.name}", "asof": t.isoformat(), "status": s.get("status"),
-                            "usable": bool(s.get("status") != "UNAVAILABLE" and em)})
+                            "usable": bool(s.get("status") != "UNAVAILABLE" and not s.get("backup") and em)})
         day += timedelta(days=1)
     return sorted(out, key=lambda c: c["asof"])
 

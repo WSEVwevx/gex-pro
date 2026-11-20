@@ -136,11 +136,23 @@ class GexComponent:
             h = w.health()
             ok = datetime.fromtimestamp(w.last_success, timezone.utc).isoformat() if w.last_success else None
             calc = h.get("calc_status")
+            fb = getattr(w, "provider", None)
+            fb = fb if hasattr(fb, "backup") else None
+            refused = fb.refusal if fb else None
             rows.append({"name": f"{w.cfg.market} options chain", "provider": f"{w.label} ({w.cfg.source}, 15-min delayed)",
-                         "pages": ["Levels", "Live table", "Heatmap", "Bias", "TradingView paste"], "last_ok": ok,
-                         "error": w.last_error if w.failures else None, "fresh_h": 2,
-                         "note": "first refresh in progress" if not ok and not w.failures
+                         "pages": ["Levels", "Live table", "Heatmap", "Bias", "TradingView paste"],
+                         "last_ok": (datetime.fromtimestamp(fb.primary_ok, timezone.utc).isoformat() if fb.primary_ok else None) if refused else ok,
+                         "error": f"REFUSED: {refused}" if refused else w.last_error if w.failures else None, "fresh_h": 2,
+                         "note": "the OCC backup is in use" if refused and fb.last_label else "first refresh in progress" if not ok and not w.failures
                          else f"the last calculation was {calc}" if calc and calc != "OK" else None})
+            if fb:      # the backup only runs while Cboe refuses
+                bok = datetime.fromtimestamp(fb.backup_ok, timezone.utc).isoformat() if fb.backup_ok else None
+                rows.append({"name": f"{w.cfg.market} backup chain (estimate)",
+                             "provider": f"OCC open interest + Cboe VIX-family closes{' + VXN' if w.cfg.source == 'NDX' else ''} + Yahoo prices",
+                             "pages": ["Levels", "Live table", "Heatmap", "Bias"], "last_ok": bok, "error": fb.backup_error,
+                             "fresh_h": 2 if refused else None,
+                             "note": "in use on the website only (not pasted to TradingView): Cboe refuses; walls, zero gamma, C1 and P1 only, no 0DTE flip" if refused and fb.last_label
+                             else "standby: used only when Cboe refuses"})
             # the paste (every 30 min, plus 09:45): late when it is more than an hour old (two missed slots) while the futures trade
             pub = w.published or {}
             trading = marketcal.session_state(datetime.now(timezone.utc)) in ("RTH", "ETH")
