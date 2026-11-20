@@ -113,6 +113,17 @@ class TestEmptyCases(unittest.TestCase):
         self.assertEqual(m["stale"], "Levels were last calculated Fri 4:55 PM ET: older than usual for a brief.")
         self.assertIsNone(compose("nyam", ctx(), SLOT, SESSION)["markets"][0]["stale"])
 
+    def test_backup_levels_are_labelled_and_never_graded(self):
+        # while Cboe refuses, the levels come from the OCC backup (an estimate): the brief says so and is not scored
+        m = compose("nyam", ctx(market(backup=True)), SLOT, SESSION)["markets"][0]
+        self.assertTrue(m["backup"])
+        self.assertIn("NDX+QQQ options, backup estimate (Cboe refused", m["data"])
+        self.assertNotIn("15-min delayed", m["data"])
+        self.assertEqual(morning.grade(m, {"high": 28190.0, "low": 27880.0, "close": 27920.0}), [])
+        live = compose("nyam", ctx(), SLOT, SESSION)["markets"][0]
+        self.assertFalse(live["backup"])
+        self.assertNotEqual(morning.grade(live, {"high": 28190.0, "low": 27880.0, "close": 27920.0}), [])
+
 
 class TestNoHindsight(unittest.TestCase):
     def test_today_and_later_sessions_never_reach_the_brief(self):
