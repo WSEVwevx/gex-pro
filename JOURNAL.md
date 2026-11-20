@@ -240,3 +240,5 @@ lessons, open questions. Read the last 5 entries before deciding anything.
   10. The sidebar's keyboard hints (LVL, LIVE...) add noise for touch and mouse users.
 - Phase 1: three directions of the Levels page with the real 22:45 ET numbers (A quiet pro, B level map first,
   C dense refined), published at https://claude.ai/artifact/WUxFg3UWGowYyUWwbZHz33 . Asked the owner to pick.
+- Owner's pick (23:05 ET): "A + B's level map". Logged in docs/style.md. Order: tokens, shell, Levels hero with the
+  level map, other pages, polish. Merge window tonight until 09:00 ET Fri.
