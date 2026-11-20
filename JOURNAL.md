@@ -141,6 +141,9 @@ lessons, open questions. Read the last 5 entries before deciding anything.
   26->28 the exceptions), (c) leave 19 sizes. a moves 11.5 -> 12.5 on 21 rules (small labels grow, phones wrap):
   5,4,3,4,2 = 27; b 5,5,3,4,4 = 30; c 5,5,1,5,5 = 31 on the rubric, but the user's Phase 4 is a directive, not a
   choice, so c is out. Chose b: 19 sizes -> 8 tokens (--fs-xs..--fs-x3), a test keeps raw px sizes out.
+  First cut rounded whole-pixel sizes up (11->11.5, 12->12.5, 13->13.5); the local sweep found new wraps at 375 px
+  (level names 2->3 lines, "12:00 PM" on 2 lines in the calendar, Data health names). Now a size between two steps
+  takes the lower one: only 10->10.5, 20/21->22 and 26->28 grow. Re-measured at 375: the times are one line again.
   The criterion "6 or fewer" is not met (8), by decision. Undo: revert the PR.
 
 - D6. The banner that appears after load (Phase 2a). On first load render() fills the banner in the same call that

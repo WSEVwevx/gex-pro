@@ -348,7 +348,7 @@ function renderBriefings(){
   $("briefCal").innerHTML = (b.calendar || []).map(c => v2 && !(c.items || []).length          // an empty calendar is one line, not a section
     ? `<div class="expl" style="margin-top:${c === b.calendar[0] ? 0 : 10}px"><b style="color:var(--ink2)">${esc(c.title.replace(" (ET)", ""))}:</b> no high- or medium-impact events.</div>`
     : `<div class="head" style="margin:${c === b.calendar[0] ? 0 : 18}px 0 6px"><h2>${esc(c.title)}</h2></div>`
-    + ((c.items || []).map(e => `<div class="bev${oneDay ? " today" : ""}"><span class="tm">${oneDay ? "" : esc(e.day) + " "}${esc(e.clock)}</span><span class="imp ${esc(e.impact)}">${esc(e.impact === "Medium" ? "Med" : e.impact)}</span><span>${esc(e.title)} <span style="color:var(--ink3);font:var(--fs-base) var(--mono)">${esc(e.country)}</span></span><span class="fp">${esc(e.detail || "")}</span></div>`).join("")
+    + ((c.items || []).map(e => `<div class="bev${oneDay ? " today" : ""}"><span class="tm">${oneDay ? "" : esc(e.day) + " "}${esc(e.clock)}</span><span class="imp ${esc(e.impact)}">${esc(e.impact === "Medium" ? "Med" : e.impact)}</span><span>${esc(e.title)} <span style="color:var(--ink3);font:var(--fs-sm) var(--mono)">${esc(e.country)}</span></span><span class="fp">${esc(e.detail || "")}</span></div>`).join("")
        || `<div class="expl" style="margin-top:0">No high- or medium-impact events.</div>`)
     + (c.history ? `<div class="expl">${esc(c.history)}</div>` : "")).join("")
     + (v2 ? `<div class="expl">${esc(briefData(b.markets))}</div>` : "");       // where the numbers come from, once
@@ -577,7 +577,7 @@ function renderHero(w, s, L, X, ref){
     <div class="expl">${fop ? "Levels come from CME options on the " + market + " future itself, so they are already in futures prices; no conversion needed."
       : w.result.mapped ? market + " equivalent of the index price, from " + (/^measured/.test(w.result.mapped.mapping.futures_ref_mode || "") ? "the measured futures / index basis" : "the carry model") + ". Your TradingView chart uses the live price." : "Options-underlying price (no futures conversion available)."}</div>`;
   $("netCard").innerHTML = `<div class="eyebrow">Net gamma exposure</div>
-    <div class="big sm" style="color:${s.net>=0?"var(--pos)":"var(--neg)"}">${money(s.net)}<span style="font-size:var(--fs-md);color:var(--ink3)"> per 1% move</span></div>
+    <div class="big sm" style="color:${s.net>=0?"var(--pos)":"var(--neg)"}">${money(s.net)}<span style="font-size:var(--fs-base);color:var(--ink3)"> per 1% move</span></div>
     <div class="kv"><span>Expirations included</span><b>${s.basket.length} (to ${esc((s.basket.at(-1)||"").slice(5))})</b></div>
     <div class="expl">Roughly how many dollars of stock or futures dealers would trade for a 1% move. The bigger the number, the stronger the effect described on the left.</div>`;
 }
