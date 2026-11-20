@@ -130,3 +130,37 @@ lessons, open questions. Read the last 5 entries before deciding anything.
   days while Cboe is blocked. Chose b. Undo: remove `not s.get("backup")` in gexpro/context.py and gexpro/archive.py.
 - D3. How often to ask Cboe while it refuses: (a) every refresh (as built), (b) every 15 min, the worker's own
   refusal back-off. a is the heavy polling a blocking site objects to; chose b. Undo: RETRY_PRIMARY_S = 0.
+- D4. Phase 3, split app.js into modules. Options: (a) ES modules per page, (b) classic scripts cut at the section
+  lines (a pure move; classic scripts share one global scope, so inline onclick handlers keep working), (c) keep one
+  file with its 26 "// ----------" sections. Scores (TRUTH x2, REV x2, VALUE, SIMPLE, CONF): a 5,3,2,2,2 = 22
+  (imports are read-only, so every shared `let` assigned across pages would need rewriting; inline handlers break);
+  b 5,5,2,3,4 = 29 (a page's code is spread over several sections, so "one file per page" is not a pure move; it
+  adds 10+ requests, a cache list and a test loader for no trader-visible gain); c 5,5,1,5,5 = 31. Chose c.
+  The completion criterion "no JS file over 600 lines" is therefore not met, by decision. Undo: do b.
+- D5. Type scale. Options: (a) 6 steps (the target), (b) 8 steps where each old size moves at most 1 px (20->22 and
+  26->28 the exceptions), (c) leave 19 sizes. a moves 11.5 -> 12.5 on 21 rules (small labels grow, phones wrap):
+  5,4,3,4,2 = 27; b 5,5,3,4,4 = 30; c 5,5,1,5,5 = 31 on the rubric, but the user's Phase 4 is a directive, not a
+  choice, so c is out. Chose b: 19 sizes -> 8 tokens (--fs-xs..--fs-x3), a test keeps raw px sizes out.
+  First cut rounded whole-pixel sizes up (11->11.5, 12->12.5, 13->13.5); the local sweep found new wraps at 375 px
+  (level names 2->3 lines, "12:00 PM" on 2 lines in the calendar, Data health names). Now a size between two steps
+  takes the lower one: only 10->10.5, 20/21->22 and 26->28 grow. Re-measured at 375: the times are one line again.
+  The criterion "6 or fewer" is not met (8), by decision. Undo: revert the PR.
+
+- D6. The banner that appears after load (Phase 2a). On first load render() fills the banner in the same call that
+  swaps the placeholders for the data, so only placeholders move, in the frame they are replaced; it moves content when it appears later (a late hosted build, a failed refresh) while the
+  reader is at the very top. Options: (a) reserve 47/84 px always, (b) a fixed overlay, (c) no change. a wastes the
+  space on every normal visit (VALUE 1); b covers the key strip or the plan on a phone (TRUTH 4); c: the browser's
+  scroll anchoring (not disabled anywhere) keeps a scrolled reader's place, and a new warning at the top moving the
+  page is the warning doing its job. Scores: a 5,5,1,3,4 = 28; b 4,5,2,3,3 = 26; c 5,5,2,5,4 = 31. Chose c.
+  Undo: reserve the space with a min-height on #banner.
+### Shipped (run 2)
+- PR 29 (tests only): the republish test pinned to a fixed time (it failed when 18:00 ET fell between two clock reads).
+- PR 30: Data health summary also counts "not checked yet" rows.
+- PR 31, lane 42 (b70f086): the OCC backup chain. Hosted at 00:40 UTC: both markets on the backup, provider OCC, the
+  banner shows, Data health: Cboe "down", backup "partial (website only)", the paste still the 16:30 Cboe one.
+  Verifier: curve IVs exact, walls exact, zero gamma within 0.0007 pts (same dividends).
+
+### Run state
+- Phase 4 (design), branch design/type-scale; next: the local sweep result, then PR, merge, lane 43.
+- Not done: banner layout jump (decided: no change, D6), Phase 5 and 6.
+- Blocked: the Pine "estimate" label needs a TradingView compile; the browser pane has no TradingView session checked yet.
