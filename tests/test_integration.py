@@ -52,17 +52,17 @@ class TestConfig(unittest.TestCase):
 
 class TestRepublish(unittest.TestCase):
     def test_new_paste_format_republishes_at_once(self):
-        from datetime import datetime, timezone
+        from datetime import datetime, timedelta, timezone
         with tempfile.TemporaryDirectory() as tmp:
             w = MarketWorker(synth_cfg(tmp))
             w.notify_desktop = lambda *a, **k: False
-            w.step()
+            now = datetime(2026, 11, 18, 15, 10, tzinfo=timezone.utc)    # fixed: a real clock crossing a slot (18:00) failed it
+            w.step(now)
             pub = dict(w.published)
-            now = datetime.now(timezone.utc)
             w._maybe_publish(now)
             self.assertEqual(w.published["published_at"], pub["published_at"])        # same format: wait for the next slot
             w.published["payload"] = w.published["payload"].replace("fv=", "old=")    # a paste from before version 2
-            w._maybe_publish(now)
+            w._maybe_publish(now + timedelta(minutes=1))                                # the same slot
             self.assertNotEqual(w.published["published_at"], pub["published_at"])
             self.assertIn("fv=", w.published["payload"])
 
