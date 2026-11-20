@@ -450,6 +450,12 @@ body:not(.notes) .stats.keys .stat .s{display:block}
 .lib-nav{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:22px;padding-top:16px;border-top:1px solid var(--line)}
 /* Levels page: today's plan and the change feed */
 .plan-row{margin-top:var(--sp-3)}
+/* small layout helpers (instead of inline styles): spacing on the 4 px scale, legend swatches by meaning */
+.mt-2{margin-top:var(--sp-2)}.mt-3{margin-top:var(--sp-3)}.mb-0{margin-bottom:0}.mb-2{margin-bottom:var(--sp-2)}.ml-2{margin-left:var(--sp-2)}.px-4{padding-left:var(--sp-4);padding-right:var(--sp-4)}.ox-auto{overflow-x:auto}
+.acc-pos{--accent:var(--pos)}
+.sw.pos{background:var(--pos)}.sw.neg{background:var(--neg)}.sw.zg{background:var(--zg)}.sw.ink{background:var(--ink)}.sw.ink2{background:var(--ink2)}.sw.ink3{background:var(--ink3)}
+.sw.prompt{background:var(--prompt)}.sw.mp{background:var(--mp)}.sw.ag{background:var(--ag)}.sw.band{background:rgba(var(--fg-rgb),.12)}
+.sw.ln{height:2px}.sw.ln3{height:3px}.sw.cone{height:10px;opacity:.35}
 /* Levels: the headline row (no card), the level map, the folded detail */
 .lv-head{display:flex;align-items:flex-end;gap:var(--sp-3) var(--sp-8);flex-wrap:wrap;margin:var(--sp-2) 0 var(--sp-4);min-height:65px}
 .lv-head .eyebrow{white-space:nowrap}
@@ -732,6 +738,9 @@ b.good,.drv-chg .good{color:var(--good)}b.bad,.drv-chg .bad{color:var(--bad)}
   .pagebar #status .chip:nth-child(5){display:none}   /* the next data release: in the plan and on News */
   .card{padding:var(--sp-3) var(--sp-4)}
   .wide-only{display:none}
+  /* tables: a number, a date or a range never breaks across lines; a table too wide scrolls inside its own box */
+  :has(>table.trk-table){overflow-x:auto}
+  .trk-table td.m,.trk-table td:first-child,.trk-table th,.tm{white-space:nowrap}
   .lv-head{margin-bottom:var(--sp-1)}
   .banner{margin-bottom:var(--sp-2)}
   .plan-sc div{gap:2px var(--sp-2);padding:var(--sp-2) var(--sp-3)}

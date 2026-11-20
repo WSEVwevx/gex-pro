@@ -332,7 +332,7 @@ function renderBriefings(){
   if(b.sections) $("briefLead").innerHTML = b.sections.map(x => `<div class="bsec"><div class="eyebrow">${esc(x.title)}</div><p>${esc(x.text)}</p></div>`).join("");
   else if(isBrief2(b)) $("briefLead").textContent = "";      // the cards and the calendar say it once
   else $("briefLead").textContent = b.headline;
-  $("briefNews").style.display = (b.headlines || []).length ? "" : "none";
+  $("briefNews").hidden = !(b.headlines || []).length;
   $("briefNewsList").innerHTML = (b.headlines || []).map(x => `<div class="bpost"><div class="meta"><b style="color:var(--ink2)">${esc(new Date(x.day + "T12:00:00Z").toLocaleDateString("en-US", {weekday: "short", timeZone: "UTC"}))}</b>${x.source ? `<span>${esc(x.source)}</span>` : ""}${/^https:/.test(x.url || "") ? `<a href="${link(x.url)}" target="_blank" rel="noopener">open</a>` : ""}</div>${esc(x.title)}</div>`).join("");
   const col = r => r === "POSITIVE" ? "var(--pos)" : r === "NEGATIVE" ? "var(--neg)" : "var(--zg)";
   const v2 = isBrief2(b), oneDay = v2 && b.kind === "nyam", bid = (brief.history.find(h => h.slot === b.slot && h.kind === b.kind) || {}).id;
@@ -742,7 +742,7 @@ async function loadCot(){
 }
 function renderCot(){
   const s = ((cot || {}).markets || {})[market];
-  $("cotCard").style.display = s ? "" : "none";
+  $("cotCard").hidden = !s;
   if(!s) return;
   const when = new Date(s.asof + "T12:00:00Z").toLocaleDateString("en-US", {month: "short", day: "numeric", timeZone: "UTC"});
   $("cotSub").textContent = `${s.contract} · as of ${when}`;

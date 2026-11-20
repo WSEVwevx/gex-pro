@@ -47,6 +47,15 @@ class DesignTokens(unittest.TestCase):
                 for surface in ("--page", "--panel", "--panel2", "--raise"):
                     self.assertGreaterEqual(ratio(tok[ink], tok[surface]), 4.5, (ink, surface, block[:30]))
 
+    def test_no_inline_styles_in_the_page(self):
+        html = (ROOT / "dashboard" / "index.html").read_text(encoding="utf-8")
+        self.assertEqual(re.findall(r'<[^>]*\sstyle="[^"]*"', html), [])
+
+    def test_phone_tables_keep_numbers_on_one_line(self):
+        phone = CSS[CSS.index("@media(max-width:820px){"):]
+        self.assertIn(".trk-table td.m,.trk-table td:first-child,.trk-table th,.tm{white-space:nowrap}", phone)
+        self.assertIn(":has(>table.trk-table){overflow-x:auto}", phone)       # a wide table scrolls in its own box, not the page
+
     def test_cards_have_no_border(self):
         card = re.search(r"\n\.card\{[^}]*\}", CSS).group(0)
         self.assertIn("border:0", card)
