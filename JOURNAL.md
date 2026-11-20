@@ -102,3 +102,31 @@ lessons, open questions. Read the last 5 entries before deciding anything.
 - Read the line after a dict you extend: `len(out) > 3` counted keys.
 - Test against a fixed clock: a worker test failed only because the 18:00 slot was 20 s away.
 - Measure a label at 375 px with the real 5-digit NQ prices before choosing words.
+
+## 2026-11-19 run 2 (started 19:21 ET, after the close; user delegated every decision)
+
+### Baseline
+- main 8573ea9 (PR 28). Next free lane 42. Tests: 480, all pass (on main, in a clean worktree).
+- check.py: tests, pyflakes, vulture, pricing PASS; math, audit, track, site FAIL. All four fail on live data:
+  Cboe refuses (HTTP 403) and the 18:00 paste was not published (no fresh chain). Not code faults.
+- Hosted sweep 19:23 ET: 104/104 clean (13 pages x NQ/ES x 1366/375 x dark/light), 0 script errors.
+  Levels at 1366x768 NQ: price+time, regime, key strip, plan and "Copy for TradingView" all above the fold;
+  #levelsView top 173.8 px. Pane hidden: geometry only, no screenshots.
+- Hosted levels: the 16:14 ET chain (NQ ref 26,594.97); paste slot 16:30 ET.
+- Metrics: inline style= 64 in index.html, 106 in app.js; 18 distinct font sizes (CSS + JS); app.js 2,484 lines.
+- Scores: TRUTH 4, INSIGHT 3, CLARITY 4, CRAFT 4, RELIABILITY 3 (Cboe block), RESTRAINT 4, SAFETY 5.
+
+### Found in the baseline (not fixed yet)
+- Data health says "no good copy yet" for both Cboe chains while every page shows the 16:14 copy (the hosted build
+  is a fresh process: last_success is empty). The backup PR fixes the local side (Cboe's own last success).
+- No page but Data health says the source is blocked; the numbers carry their time, so nothing looks current.
+
+### Decisions
+- D1. Backup levels in TradingView. Options: (a) paste them now, (b) website only until a Pine "estimate" label is
+  compiled, (c) don't ship the backup. Scores (TRUTH x2, REV x2, VALUE, SIMPLE, CONF): a 2,4,4,4,3 = 23;
+  b 5,5,3,4,4 = 31; c 5,5,1,5,4 = 30. Chose b. Undo: drop the `backup` check in service._maybe_publish.
+- D2. Grade backup estimates in the track record? (a) yes, (b) exclude them from the open plan and the archive
+  "usable" rule. a mixes two methods in one record (TRUTH 2); b keeps the record one method (TRUTH 5), costs graded
+  days while Cboe is blocked. Chose b. Undo: remove `not s.get("backup")` in gexpro/context.py and gexpro/archive.py.
+- D3. How often to ask Cboe while it refuses: (a) every refresh (as built), (b) every 15 min, the worker's own
+  refusal back-off. a is the heavy polling a blocking site objects to; chose b. Undo: RETRY_PRIMARY_S = 0.

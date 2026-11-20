@@ -59,6 +59,22 @@ def _futures_ref(cfg: MarketConfig, snap, override: Optional[tuple], provider=No
     return None, None, "none", s, st
 
 
+def backup_trim(summary: dict) -> None:
+    """The OCC backup (no per-strike vols): keep only the levels that matched Cboe's in the 2026-11-19 comparison
+    (all-expiry zero gamma, walls, absolute-gamma and largest +GEX strikes; the first-expiry C1 and P1, within 0.06
+    expected moves) and drop the rest (0DTE flip, the lower ranks, Ab1, largest -GEX: 0.2 to 1.5 expected moves off)."""
+    summary["max_negative"] = None
+    n = (summary.get("extras") or {}).get("nearest")
+    if n:
+        n["zero_gamma"] = n["call_wall"] = n["put_wall"] = None
+        for key in ("ranked", "ranked_etf"):
+            if n.get(key):
+                n[key] = {"call": n[key].get("call", [])[:1], "put": n[key].get("put", [])[:1], "abs": []}
+    if summary.get("ranked"):
+        summary["ranked"] = {side: v[:1] for side, v in summary["ranked"].items()}
+    summary["backup"] = "OCC open interest + VIX-family vols: an estimate while Cboe refuses"
+
+
 def run_once(cfg: MarketConfig, provider, store: Optional[SnapshotStore] = None,
              alerts: Optional[AlertEngine] = None, futures_ref: Optional[tuple] = None) -> dict:
     src = SOURCES[cfg.source]
@@ -75,6 +91,8 @@ def run_once(cfg: MarketConfig, provider, store: Optional[SnapshotStore] = None,
     summary = summarize(res, cfg.levels)
     summary["extras"] = compute_extras(snap, ecfg, res)
     summary["heat"] = heat_profile(res)                    # net GEX by price band, for the heatmap history
+    if snap.source == "occ+vix":
+        backup_trim(summary)
     summary["market"] = cfg.market
     summary["options_source"] = cfg.source
     summary["tv_ref_symbol"] = src.tv_symbol

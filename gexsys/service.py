@@ -209,6 +209,8 @@ class MarketWorker(threading.Thread):
             slot = self.published_slot        # a new paste format (an update): republish now, not at the next slot
         if slot is None or not self.result or not self.result.get("pine"):
             return
+        if self.result["summary"].get("backup"):
+            return          # a backup estimate is never pasted: the indicator would show it as Cboe's delayed data
         s = self.result["mapped"] or self.result["summary"]
         zg = (s.get("zero_gamma") or {}).get("price")
         info = {"slot_et": slot.strftime("%Y-%m-%d %H:%M"), "published_at": now.isoformat(),

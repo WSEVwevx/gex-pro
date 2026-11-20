@@ -118,7 +118,15 @@ def make_provider(cfg: MarketConfig):
         return CsvProvider(**p)
     if name == "cboe":
         from .providers.cboe import CboeProvider
-        return CboeProvider(**p)
+        cboe = CboeProvider(**p)
+        if cfg.source not in ("NDX", "SPX"):
+            return cboe
+        # only when Cboe refuses (it began blocking automated requests on 2026-11-19): OCC open interest + VIX-family
+        # vols, labelled as a backup estimate (gexsys/providers/occ.py). Its downloads are cached beside the snapshots.
+        import os
+        from .providers.occ import FallbackProvider, OccProvider
+        root = Path(os.path.expandvars(str(cfg.storage.get("root", "data/snapshots"))))
+        return FallbackProvider(cboe, OccProvider(cache_dir=str(root.parent / "occ_cache")))
     from .providers.synthetic import SyntheticProvider
     return SyntheticProvider(**p)
 
