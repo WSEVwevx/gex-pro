@@ -1,7 +1,7 @@
 {
  "session": "2026-11-20",
  "market": "ES",
- "status": "pending",
+ "status": "graded",
  "plan": {
   "session": "2026-11-20",
   "market": "ES",
@@ -23,5 +23,40 @@
   "side": "negative",
   "target": 7175.83
  },
- "outcome": null
+ "outcome": {
+  "open": 7150.39,
+  "high": 7198.67,
+  "low": 6882.66,
+  "close": 6910.39,
+  "source": "Yahoo ^GSPC daily",
+  "move": -265.44,
+  "move_em": -2.04,
+  "range_em": 2.429,
+  "em_close": false,
+  "em_range": false,
+  "em_up_break": false,
+  "em_down_break": true,
+  "cw": {
+   "level": 8000.0,
+   "dist_em": 6.334,
+   "touched": false,
+   "closed_beyond": false,
+   "held": false
+  },
+  "pw": {
+   "level": 7000.0,
+   "dist_em": 1.351,
+   "touched": true,
+   "closed_beyond": true,
+   "held": false
+  },
+  "zg": {
+   "open_side": "below",
+   "crossed": false
+  },
+  "bias_hit": null,
+  "target_beat": null,
+  "magnet": null
+ },
+ "graded_at": "2026-11-20T21:22:16.712928+00:00"
 }
