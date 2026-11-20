@@ -185,6 +185,8 @@ function setPage(p){
   if(!VIEW_IDS.includes(p)) p = "levels";
   if(p !== page){ const ar = document.querySelector(".area"); if(ar) ar.scrollTop = 0; window.scrollTo(0, 0); }   // a new page opens at its top
   document.querySelectorAll("#pages button[data-p]").forEach(b => b.setAttribute("aria-selected", String(b.dataset.p === p)));
+  const tab = document.querySelector(`#pages button[data-p="${p}"]`), row = $("pages");   // on a phone the page row scrolls: keep the open page in view
+  if(tab && row.scrollWidth > row.clientWidth) row.scrollLeft = Math.max(0, tab.offsetLeft - (row.clientWidth - tab.offsetWidth) / 2);
   const arriving = p !== page || $(p + "View").hidden;
   VIEW_IDS.forEach(v => { $(v + "View").hidden = v !== p; });
   if(arriving){ const vw = $(p + "View"); vw.classList.remove("view-enter"); void vw.offsetWidth; vw.classList.add("view-enter"); }
@@ -525,7 +527,7 @@ function render(){
     <span class="chip"${bk ? ' title="No new TradingView paste while the levels are a backup estimate"' : ""}>Next paste <b>${bk ? "on hold" : h.next_publish_et ? esc(h.next_publish_et.slice(11)) + " ET" : "-"}</b></span>
     ${(() => { const e = nextHighUSD(); return e ? `<span class="chip" title="Next ${e.impact.toLowerCase()}-impact USD event (ForexFactory)"><i class="dot ${e.impact === "High" ? "bad" : "warn"}"></i>${esc(e.title)} <b>in ${dur(Date.parse(e.time) - Date.now())}</b></span>` : ""; })()}`;
   $("banner").innerHTML = !w.result ? `<div class="banner">${h.last_error ? "The options data source failed on its last try. Nothing to show yet; retrying by itself. Details are on the Data health page." : "First calculation in progress: levels appear within a minute."}</div>`
-    : s && s.backup ? `<div class="banner">Backup data: Cboe is refusing requests, so these levels are an estimate from OCC open interest and VIX-family volatility (no skew). Zero gamma, the walls, C1 and P1 are kept; the 0DTE flip, Ab1 and lower ranks are left out. The TradingView paste keeps the last Cboe levels. Details are on the Data health page.</div>`
+    : s && s.backup ? `<div class="banner"><b>Backup estimate.</b> Cboe is refusing requests, so these levels are an estimate from OCC open interest and VIX-family volatility (no skew). The TradingView paste keeps the last Cboe levels.<span class="bn-more"> Zero gamma, the walls, C1 and P1 are kept; the 0DTE flip, Ab1 and lower ranks are left out. Details are on the Data health page.</span></div>`
     // closed market and the close's numbers already shown: a failed retry changes nothing (Data health still says so)
     : h.last_error && !h.holds_latest ? `<div class="banner" title="${esc(h.last_error)}">The options data source failed on its last try. Showing the last good numbers; retrying by itself. Details are on the Data health page.</div>`
     : lag ? `<div class="banner">The hosted data was built ${ago(data.now)}. GitHub runs the refresh on a schedule that sometimes runs late; this page picks up the next build by itself.</div>` : "";
