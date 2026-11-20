@@ -40,9 +40,9 @@ try { cardH = JSON.parse(store.get(HKEY, "{}")) || {}; } catch(e) {}
 const PER_MARKET = ["levelsView", "ladderView", "heatmapView", "screenerView", "biasView"];
 const cardKey = c => { const v = c.closest("[id$=View]"); return v ? v.id + ":" + [...v.querySelectorAll(".card")].indexOf(c) + (PER_MARKET.includes(v.id) ? ":" + market : "") : null; };
 // a first visit has no heights of its own yet: it reserves the usual ones (measured on the live site at 1366 and
-// 375 px wide, 2026-11-16; Levels 2026-11-18; Heatmap phone 2026-11-19), by page and card order. They are replaced by this device's real heights after one draw.
-const DEFAULT_H = {wide: {levelsView:[128,128,128,368,209,640,573,373,373,1159],ladderView:[183,1114,224,670,348],heatmapView:[743],screenerView:[290,372,99,681],biasView:[202,635,241,240],trackView:[261,615,637,299,274,1393,374,367,367,322],briefingsView:[136,0,619,619,181,453],newsView:[646,990],indicatorView:[261,261,261,52,372],libraryView:[152,760,1366],glossaryView:[5828],healthView:[1141],backtestView:[221,261,527,552,273,167,303,644]},
-  narrow: {levelsView:[129,126,119,547,353,1008,628,375,375,1634],ladderView:[183,1299,205,670,284],heatmapView:[855],screenerView:[311,420,217,800],biasView:[342,765,422,345],trackView:[456,1217,997,345,392,1425,650,395,418,589],briefingsView:[168,0,643,620,248,472],newsView:[829,1061],indicatorView:[259,261,237,52,991],libraryView:[320,1058,1715],glossaryView:[13954],healthView:[2053],backtestView:[474,393,590,727,356,200,322,711]}};
+// 375 px wide, 2026-11-16; Levels 2026-11-19 after the redesign; Heatmap phone 2026-11-19), by page and card order. They are replaced by this device's real heights after one draw.
+const DEFAULT_H = {wide: {levelsView:[279,398,102,552,571,373,373,127,127,127,1194],ladderView:[183,1114,224,670,348],heatmapView:[743],screenerView:[290,372,99,681],biasView:[202,635,241,240],trackView:[261,615,637,299,274,1393,374,367,367,322],briefingsView:[136,0,619,619,181,453],newsView:[646,990],indicatorView:[261,261,261,52,372],libraryView:[152,760,1366],glossaryView:[5828],healthView:[1141],backtestView:[221,261,527,552,273,167,303,644]},
+  narrow: {levelsView:[313,404,94,828,618,365,365,119,116,109,1677],ladderView:[183,1299,205,670,284],heatmapView:[855],screenerView:[311,420,217,800],biasView:[342,765,422,345],trackView:[456,1217,997,345,392,1425,650,395,418,589],briefingsView:[168,0,643,620,248,472],newsView:[829,1061],indicatorView:[259,261,237,52,991],libraryView:[320,1058,1715],glossaryView:[13954],healthView:[2053],backtestView:[474,393,590,727,356,200,322,711]}};
 function reserve(){
   const usual = DEFAULT_H[innerWidth < 700 ? "narrow" : "wide"];
   document.querySelectorAll("[id$=View] .card").forEach(c => {
@@ -539,6 +539,7 @@ function render(){
   const ref = L.futures_equiv_of_ref ?? s.ref_price;
   renderHero(w, s, L, X, ref);
   renderPlan(w);
+  renderLevelMap(w, L, X, ref);
   loadLevelHistory();
   renderLadder(L, X, ref, !!w.result.mapped);
   renderChart(w, s, L, ref);
@@ -568,6 +569,12 @@ function renderHero(w, s, L, X, ref){
   const sig = zgp != null && emd ? (ref - zgp) / emd : null;
   const sigTxt = sig == null ? "" : `<div class="kv" style="margin-top:10px"><span>Price vs zero gamma</span><b>${num(Math.abs(sig), 1)}σ ${sig >= 0 ? "above" : "below"}</b></div>
     <div class="expl" style="margin-top:4px">${Math.abs(sig) < 0.3 ? "Right at the flip: the regime can change with a small move." : Math.abs(sig) < 1 ? "Within one expected move of the flip." : "More than a full expected move from the flip; the regime is well established."}</div>`;
+  const rc = {POSITIVE: "c-pos", NEGATIVE: "c-neg", INDETERMINATE: "c-zg"}[s.regime] || "c-ink3";
+  const says = {POSITIVE: "hedging leans against moves", NEGATIVE: "moves can extend", INDETERMINATE: "no clear tilt either way"}[s.regime] || "no usable estimate";
+  $("lvHead").innerHTML = `<div class="lvh-px"><div class="eyebrow">${esc(market)} ${w.result.mapped ? "futures" : esc(w.source)}${refAt(s.ref_time)}</div><div class="lvh-big">${num(ref)}</div></div>
+    <div class="lvh-rg"><div class="eyebrow"><span class="wide-only">Gamma </span>regime (model)</div><div class="lvh-regime ${rc}">${R[0]}</div>
+      <div class="lvh-sub">${sig == null ? "" : `${num(Math.abs(sig), 1)}σ ${sig >= 0 ? "above" : "below"} zero gamma · `}${says}</div></div>
+    <div class="lvh-net"><div class="eyebrow">Net gamma, all expiries</div><div class="lvh-mid ${s.net >= 0 ? "c-pos" : "c-neg"}">${money(s.net)}</div><div class="lvh-sub">per 1% move</div></div>`;
   $("regimeCard").parentElement.classList.add("accent"); $("regimeCard").parentElement.style.setProperty("--accent", R[2]);
   $("regimeCard").innerHTML = `<div class="eyebrow">Gamma regime (model)</div>
     <div class="regime"><span class="tag" style="color:${R[2]};border-color:${R[2]}">${R[1]}</span><span style="color:${R[2]}">${R[0]}</span>${changed ? '<span class="chip">changed since last update</span>' : ""}</div>
@@ -1189,6 +1196,9 @@ const HELP = {
     watch: ["A wall that keeps holding day after day is a level the market respects", "Days that closed outside the grey band were bigger than the options priced in"]},
   plan: {title: "Today's plan", tldr: "The regime, the key levels and what each side of them means, built from the latest data.",
     body: `<p>The plan uses the first expiry's levels (the same C / P / Ab as the TradingView indicator) and the gamma flip. Each line is a zone: <b>above C1</b> (positive-gamma extension), <b>between the flip and C1</b> (positive gamma: two-way trade), <b>between P1 and the flip</b> (negative gamma: moves extend) and <b>below P1</b>. The highlighted line is where price is now.</p><p><b>Day range ±1σ</b> is the range the options market prices in from the previous close. <b>Data today</b> lists the medium- and high-impact US releases still ahead; <b>Earnings ahead</b> lists drivers reporting before the next open, with the move their options price in and what that is worth in index points.</p>`},
+  level_map: {title: "Level map", tldr: "Where price sits among today's levels, drawn to scale.",
+    body: `<p>One vertical price scale, centred on the reference price and reaching 3.3 expected moves each way. Each line is a level: the <b>call wall</b> and <b>C1</b> in blue, <b>zero gamma</b> (and the 0DTE <b>flip</b> when there is one) dashed grey, <b>P1</b> and the <b>put wall</b> in orange; each label gives the distance in points and in expected moves (σ). A level beyond the scale is pinned to the edge with an arrow. The area above zero gamma is shaded blue (positive gamma), below it orange (negative gamma). The grey band is the day's ±1σ range, and the faint bars behind are the model's gamma by price.</p><p>It shows the same numbers as the cards and the plan, so you can see the distances at a glance. It is a picture of the model, not a forecast.</p>`,
+    watch: ["How far price is from zero gamma compared with the grey band", "Which wall price meets first"]},
   changes: {title: "What changed today", tldr: "Every level that moved since the 6 pm ET session start, and when.",
     body: `<p>Each line is a level that moved and stayed moved for at least two snapshots (one-off flickers are ignored): C1 / C2, P1 / P2, Ab1, the 0DTE flip, zero gamma, the walls, and the regime. <b>At the 9:30 open</b> shows where the main levels stood when the cash session began, so you can see how far the map has drifted. The TradingView indicator draws those open levels as faint ghosts.</p>`},
   glossary: {title: "Glossary", tldr: "Every term on this site and on the indicator, in one line each.",
@@ -2356,6 +2366,58 @@ function renderLevelHistoryChart(ss, fut){
   });
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.setAttribute("width", W); svg.setAttribute("height", H);
   svg.innerHTML = g;
+}
+// ---------- the level map: where price sits among today's levels, on one price scale (the price ± 3.3 expected moves).
+// Above zero gamma is shaded blue, below orange; the grey band is the day's ±1σ; the bars behind are gamma by price.
+// A level beyond the scale is pinned to the edge with an arrow, so the scale never lies about distance.
+const MAP_SPAN = 3.3;
+function niceStep(raw){ const e = 10 ** Math.floor(Math.log10(raw)); return [1, 2, 2.5, 5, 10].map(m => m * e).find(x => x >= raw); }
+function renderLevelMap(w, L, X, ref){
+  const box = $("lvMap"), lv = (w.result.session || {}).levels || {}, em = X.expected_move || {};
+  const d = em.daily_points_fut ?? em.daily_points, a = em.anchor_fut ?? em.anchor ?? ref, p = v => v && typeof v === "object" ? v.price : v;
+  if(ref == null || !d){ box.innerHTML = `<div class="expl">No map in this update: it needs the price and the day's expected move.</div>`; $("lvMapSub").textContent = ""; return; }
+  const lines = [];
+  for(const [k, v, c] of [["CW", p(L.call_wall), "pos"], ["C1", lv.C1, "pos"], ["Flip", lv.flip, "zg"], ["ZG", p(L.zero_gamma), "zg"], ["Ab1", lv.Ab1, "ag"], ["P1", lv.P1, "neg"], ["PW", p(L.put_wall), "neg"]]){
+    if(v == null || !isFinite(v)) continue;
+    const same = lines.find(l => Math.abs(l.v - v) < 0.01);          // the same price twice is one line with both names
+    same ? same.k += " · " + k : lines.push({k, v, c});
+  }
+  const W = Math.max(300, Math.round(box.clientWidth) || 560), H = W < 420 ? 290 : 300, top = 14, bot = H - 14, xr = W < 420 ? 112 : 168, xe = W - 2;
+  const lo = ref - MAP_SPAN * d, hi = ref + MAP_SPAN * d, y = v => bot - (v - lo) / (hi - lo) * (bot - top);
+  const zg = p(L.zero_gamma), yz = zg == null ? null : Math.max(top, Math.min(bot, y(zg)));
+  let g = yz == null ? "" : `<rect x="${xr}" y="${top}" width="${xe - xr}" height="${yz - top}" class="m-posz"/><rect x="${xr}" y="${yz}" width="${xe - xr}" height="${bot - yz}" class="m-negz"/>`;
+  g += `<rect x="${xr}" y="${y(a + d)}" width="${xe - xr}" height="${y(a - d) - y(a + d)}" class="m-band"/>`;
+  const pr = X.profile, base = pr && (pr.base_fut ?? pr.base), step = pr && (pr.width_fut ?? pr.width);
+  if(pr && pr.values && base != null && step){
+    const mx = Math.max(...pr.values.map(Math.abs)) || 1, bw = (xe - xr) * 0.42;
+    pr.values.forEach((v, i) => { const pv = base + i * step; if(!v || pv < lo || pv > hi) return;
+      const len = Math.abs(v) / mx * bw; g += `<rect x="${xe - len}" y="${y(pv) - 1.4}" width="${len}" height="2.8" class="m-bar ${v < 0 ? "neg" : "pos"}"/>`; });
+  }
+  const tk = niceStep(MAP_SPAN * d / 3), ticks = [];
+  for(let t = Math.ceil(lo / tk) * tk; t <= hi; t += tk){ g += `<line x1="${xr}" x2="${xe}" y1="${y(t)}" y2="${y(t)}" class="m-grid"/>`; ticks.push(t); }
+  const pins = lines.map(l => ({...l, yy: Math.max(top + 6, Math.min(bot - 6, y(l.v))), off: l.v > hi ? "↑ " : l.v < lo ? "↓ " : ""}));
+  pins.push({k: market, v: ref, px: true, yy: y(ref)});
+  pins.sort((u, v) => u.yy - v.yy);
+  pins.forEach((l, i) => { l.ly = i ? Math.max(l.yy, pins[i - 1].ly + 28) : l.yy; });   // labels never overlap
+  const shift = Math.max(0, pins.at(-1).ly - (bot - 4)); pins.forEach(l => { l.ly -= shift; });
+  for(const l of pins){
+    if(l.px){ g += `<line x1="${xr}" x2="${xe}" y1="${l.yy}" y2="${l.yy}" class="m-px"/><path d="M${xr - 10} ${l.ly} L${xr} ${l.yy}" class="m-lead px"/>
+      <rect x="0" y="${l.ly - 11}" width="${xr - 10}" height="22" rx="5" class="m-pill"/><text x="8" y="${l.ly + 4}" class="m-pillt">${W < 420 ? "" : esc(market) + " "}${num(ref)}</text>`; continue; }
+    g += `<line x1="${xr}" x2="${xe}" y1="${l.yy}" y2="${l.yy}" class="m-lv ${l.c}${l.off ? " off" : ""}${l.k.startsWith("ZG") || l.k.startsWith("Flip") ? " dash" : ""}"/>
+      <path d="M${xr - 10} ${l.ly} L${xr} ${l.yy}" class="m-lead ${l.c}"/>
+      <text x="0" y="${l.ly - 2}" class="m-k ${l.c}">${l.off}${esc(l.k)} <tspan class="m-v">${num(l.v)}</tspan></text>
+      <text x="0" y="${l.ly + 11}" class="m-d">${signed(l.v - ref, 0)} pts · ${signed((l.v - ref) / d, 1)}σ</text>`;
+  }
+  for(const t of ticks) g += `<text x="${xe - 4}" y="${y(t) - 3}" text-anchor="end" class="m-t">${num(t, 0)}</text>`;
+  if(yz != null){ g += `<text x="${xr + 6}" y="${top + 12}" class="m-z pos">POSITIVE GAMMA</text><text x="${xr + 6}" y="${bot - 5}" class="m-z neg">NEGATIVE GAMMA</text>`; }
+  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(market)} price ${num(ref)} among today's levels">${g}</svg>
+    <div class="legend"><span><i class="sw m-sw-band"></i>Day ±1σ ${num(a - d, 0)} – ${num(a + d, 0)}</span><span><i class="sw m-sw-bar"></i>Gamma by price</span><span>↑ ↓ beyond ±${MAP_SPAN}σ</span></div>`;
+  $("lvMapSub").textContent = `${w.result.mapped ? market + " futures" : w.source + " prices"} · ±${MAP_SPAN}σ around the price`;
+}
+// the two folded sections remember whether this viewer left them open; a chart drawn while folded is redrawn at its real width
+for(const id of ["lvMore", "lvHist"]){
+  const el = $(id); el.open = store.get("gex." + id, "0") === "1";
+  el.addEventListener("toggle", () => { store.set("gex." + id, el.open ? "1" : "0"); if(id === "lvHist" && el.open && data) loadLevelHistory(); });
 }
 const day0 = s => new Date(s + "T12:00:00Z").toLocaleDateString("en-US", {weekday: "short", month: "short", day: "numeric", timeZone: "UTC"});
 // the one plan zone price is in. The flip decides the side first: when C1 sits below the flip (or P1 above it) the
