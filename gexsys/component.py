@@ -70,6 +70,16 @@ def _all(workers: Iterable[MarketWorker], **extra) -> dict:
         for w in workers]))
 
 
+def _last_saved(w) -> Optional[str]:
+    """When the worker's own source last gave a usable chain, from its saved history (a fresh process, such as each
+    hosted build, has no memory of it; the history holds Cboe's own results only: a backup result is saved apart)."""
+    try:
+        s = w.store.latest(w.key, usable=True)
+    except (AttributeError, OSError):
+        return None
+    return s.get("asof") if s else None
+
+
 class GexComponent:
     name = "gex"
 
@@ -141,7 +151,8 @@ class GexComponent:
             refused = fb.refusal if fb else None
             rows.append({"name": f"{w.cfg.market} options chain", "provider": f"{w.label} ({w.cfg.source}, 15-min delayed)",
                          "pages": ["Levels", "Live table", "Heatmap", "Bias", "TradingView paste"],
-                         "last_ok": (datetime.fromtimestamp(fb.primary_ok, timezone.utc).isoformat() if fb.primary_ok else None) if refused else ok,
+                         "last_ok": (datetime.fromtimestamp(fb.primary_ok, timezone.utc).isoformat() if fb.primary_ok
+                                     else _last_saved(w)) if refused else ok,
                          "error": f"REFUSED: {refused}" if refused else w.last_error if w.failures else None, "fresh_h": 2,
                          "note": "the OCC backup is in use" if refused and fb.last_label else "first refresh in progress" if not ok and not w.failures
                          else f"the last calculation was {calc}" if calc and calc != "OK" else None})
