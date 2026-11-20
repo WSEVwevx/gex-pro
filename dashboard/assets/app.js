@@ -24,7 +24,7 @@ const offline = () => (STATIC ? "Can't reach the data file. " : "Can't reach the
 const stateHtml = (kind, title, text) => `<div class="state ${kind}"><i></i><div><b>${esc(title)}</b>${esc(text)}</div></div>`;
 
 if (location.protocol === "file:" && !STATIC) {
-  document.body.innerHTML = `<div class="wrap"><div class="banner bad" style="margin-top:40px;font-size:15px;line-height:1.7">
+  document.body.innerHTML = `<div class="wrap"><div class="banner bad" style="margin-top:40px;font-size:var(--fs-lg);line-height:1.7">
   This page only works while the GEX PRO service is running.<br>1. Double-click <b>START.bat</b> in your Options Indicator folder.<br>
   2. Your browser opens <b>http://127.0.0.1:8765</b> automatically.</div></div>`;
   throw new Error("opened as file");
@@ -243,7 +243,7 @@ function renderPosts(){
       <div class="meta"><b>${when(p.time)}</b>${kind}${counts}${p.url ? `<a href="${link(p.url)}" target="_blank" rel="noopener">open</a>` : ""}</div>
       ${p.text ? `<div class="txt" role="button" tabindex="0" onclick="this.classList.toggle('open')" title="Click to expand">${esc(p.text)}</div>` : `<div class="txt" style="color:var(--ink3)">${media ? (media.type === "video" ? "Video post" : "Image post") : "Post without text"}</div>`}
       ${media && media.preview ? `<img loading="lazy" src="${esc(media.preview)}" alt="${media.type === "video" ? "video preview" : "image"} from the post" referrerpolicy="no-referrer">` : ""}
-      ${p.link && p.link.url ? `<a href="${link(p.link.url)}" target="_blank" rel="noopener" style="font-size:12.5px">${esc(p.link.title || p.link.url)}</a>` : ""}
+      ${p.link && p.link.url ? `<a href="${link(p.link.url)}" target="_blank" rel="noopener" style="font-size:var(--fs-base)">${esc(p.link.title || p.link.url)}</a>` : ""}
       ${hot ? `<div class="tags">${p.tone ? `<span class="tone ${p.tone}" title="Keyword guess at what this post means for stocks, not a forecast">${p.tone}</span>` : ""}${p.market_words.map(w => `<span class="mw">${esc(w)}</span>`).join("")}</div>` : ""}
     </div>`; }).join("") || `<div class="expl">${postF === "market" ? "No recent posts mention market topics." : "No posts available."}</div>`;
   $("postsFoot").innerHTML = `Source: ${esc(posts.source || "-")}${posts.fetched_at ? `, updated ${ago(posts.fetched_at)}` : ""}; checked every 5 min. Yellow tags flag market topics (tariffs, the Fed, China, oil...); Bullish / Bearish is a keyword guess at the post's lean for stocks, shown only when it is clear. Posts can move futures quickly, and nothing here predicts how.${posts.error ? ` <span style="color:var(--warn)">${esc(posts.error)}</span>` : ""}`;
@@ -348,7 +348,7 @@ function renderBriefings(){
   $("briefCal").innerHTML = (b.calendar || []).map(c => v2 && !(c.items || []).length          // an empty calendar is one line, not a section
     ? `<div class="expl" style="margin-top:${c === b.calendar[0] ? 0 : 10}px"><b style="color:var(--ink2)">${esc(c.title.replace(" (ET)", ""))}:</b> no high- or medium-impact events.</div>`
     : `<div class="head" style="margin:${c === b.calendar[0] ? 0 : 18}px 0 6px"><h2>${esc(c.title)}</h2></div>`
-    + ((c.items || []).map(e => `<div class="bev${oneDay ? " today" : ""}"><span class="tm">${oneDay ? "" : esc(e.day) + " "}${esc(e.clock)}</span><span class="imp ${esc(e.impact)}">${esc(e.impact === "Medium" ? "Med" : e.impact)}</span><span>${esc(e.title)} <span style="color:var(--ink3);font:12px var(--mono)">${esc(e.country)}</span></span><span class="fp">${esc(e.detail || "")}</span></div>`).join("")
+    + ((c.items || []).map(e => `<div class="bev${oneDay ? " today" : ""}"><span class="tm">${oneDay ? "" : esc(e.day) + " "}${esc(e.clock)}</span><span class="imp ${esc(e.impact)}">${esc(e.impact === "Medium" ? "Med" : e.impact)}</span><span>${esc(e.title)} <span style="color:var(--ink3);font:var(--fs-base) var(--mono)">${esc(e.country)}</span></span><span class="fp">${esc(e.detail || "")}</span></div>`).join("")
        || `<div class="expl" style="margin-top:0">No high- or medium-impact events.</div>`)
     + (c.history ? `<div class="expl">${esc(c.history)}</div>` : "")).join("")
     + (v2 ? `<div class="expl">${esc(briefData(b.markets))}</div>` : "");       // where the numbers come from, once
@@ -577,7 +577,7 @@ function renderHero(w, s, L, X, ref){
     <div class="expl">${fop ? "Levels come from CME options on the " + market + " future itself, so they are already in futures prices; no conversion needed."
       : w.result.mapped ? market + " equivalent of the index price, from " + (/^measured/.test(w.result.mapped.mapping.futures_ref_mode || "") ? "the measured futures / index basis" : "the carry model") + ". Your TradingView chart uses the live price." : "Options-underlying price (no futures conversion available)."}</div>`;
   $("netCard").innerHTML = `<div class="eyebrow">Net gamma exposure</div>
-    <div class="big sm" style="color:${s.net>=0?"var(--pos)":"var(--neg)"}">${money(s.net)}<span style="font-size:13px;color:var(--ink3)"> per 1% move</span></div>
+    <div class="big sm" style="color:${s.net>=0?"var(--pos)":"var(--neg)"}">${money(s.net)}<span style="font-size:var(--fs-md);color:var(--ink3)"> per 1% move</span></div>
     <div class="kv"><span>Expirations included</span><b>${s.basket.length} (to ${esc((s.basket.at(-1)||"").slice(5))})</b></div>
     <div class="expl">Roughly how many dollars of stock or futures dealers would trade for a 1% move. The bigger the number, the stronger the effect described on the left.</div>`;
 }

@@ -220,6 +220,13 @@ class TestBiasPage(unittest.TestCase):
         self.assertNotRegex(CSS, r"\.rp-marks s\{[^}]*(gradient|warn)")
         self.assertNotIn("no update since", JS)
 
+    def test_every_font_size_is_on_the_type_scale(self):
+        """19 sizes (10 to 26 px, half-pixel steps) became 8 tokens in terminal.css; a raw px size is a new step."""
+        import re
+        for name, src in (("terminal.css", CSS), ("app.js", JS), ("index.html", HTML)):
+            self.assertEqual(re.findall(r"font(?:-size)?: ?(?:[1-9]00 )?[0-9.]+px", src), [], name)
+        self.assertEqual(len(set(re.findall(r"--fs-[a-z0-9]+:", CSS))), 8)
+
     def test_health_count_names_every_row(self):
         """Data health: with problems, the summary named only them (e.g. "2 of 25 need attention") while "Not checked
         yet" rows were listed below but counted nowhere; it now adds ", 3 not checked yet"."""
