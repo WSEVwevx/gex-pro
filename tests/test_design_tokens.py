@@ -56,6 +56,23 @@ class DesignTokens(unittest.TestCase):
         self.assertIn(".trk-table td.m,.trk-table td:first-child,.trk-table th,.tm{white-space:nowrap}", phone)
         self.assertIn(":has(>table.trk-table){overflow-x:auto}", phone)       # a wide table scrolls in its own box, not the page
 
+    def test_past_news_events_stay_readable(self):
+        self.assertNotRegex(CSS, r"\.ev\.past\{[^}]*opacity")                # a fade drops text below 4.5:1
+        self.assertIn(".ev.past,.ev.past :is(.tm,.cur,.fp,.fp b,.imp){color:var(--ink3)}", CSS)   # ink3 is in the contrast test
+
+    def test_phone_level_history_tags_sit_under_their_number(self):
+        phone = CSS[CSS.index("@media(max-width:820px){"):]
+        self.assertIn("#lhTable td.m>.trk-tag,#lhTable td.m>.dim{display:block;width:fit-content;margin:2px 0 0 auto}", phone)
+        self.assertIn('class="trk-log" id="lhTable"', (ROOT / "dashboard" / "index.html").read_text(encoding="utf-8"))
+
+    def test_phone_post_list_is_shorter_than_the_screen(self):
+        phone = CSS[CSS.index("@media(max-width:820px){"):]
+        self.assertIn(".posts{max-height:60vh}", phone)
+
+    def test_level_history_date_labels_start_inside_the_chart(self):
+        js = (ROOT / "dashboard" / "assets" / "app.js").read_text(encoding="utf-8")
+        self.assertIn('g += `<text x="${Math.max(cx, pl + 16)}" y="${H - 8}" text-anchor="middle"', js)
+
     def test_cards_have_no_border(self):
         card = re.search(r"\n\.card\{[^}]*\}", CSS).group(0)
         self.assertIn("border:0", card)

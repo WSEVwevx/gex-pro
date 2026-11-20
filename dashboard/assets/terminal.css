@@ -306,7 +306,6 @@ body:not(.notes) .stats.keys .stat .s{display:block}
 /* news */
 .news-day{margin-top:14px;font-size:var(--fs-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--ink3);font-weight:650;padding-bottom:6px;border-bottom:1px solid var(--line)}
 .ev{display:grid;grid-template-columns:70px 60px 44px 1fr auto;gap:10px;align-items:center;padding:8px 6px;border-bottom:1px solid var(--line);font-size:var(--fs-base)}
-.ev.past{opacity:.4}
 .ev.next{background:color-mix(in srgb,var(--pos) 8%,transparent);box-shadow:inset 2px 0 0 var(--pos);border-radius:var(--r-2)}
 .ev .tm{font:var(--fs-sm) var(--mono);color:var(--ink2)}
 .imp{font-size:var(--fs-xs);font-weight:700;padding:1px 7px;border-radius:var(--r-1);text-align:center;border:1px solid}
@@ -316,6 +315,8 @@ body:not(.notes) .stats.keys .stat .s{display:block}
 .ev .cur{font:600 var(--fs-sm) var(--mono);color:var(--ink3)}
 .ev .fp{font:var(--fs-sm) var(--mono);color:var(--ink3);text-align:right;white-space:nowrap}
 .ev .fp b{color:var(--ink2);font-weight:600}
+/* a past event is quieter but still readable: the third text tier (4.5:1 or more), not a fade */
+.ev.past,.ev.past :is(.tm,.cur,.fp,.fp b,.imp){color:var(--ink3)}.ev.past .imp{background:none;border-color:var(--line2)}
 .posts{max-height:820px;overflow-y:auto;margin-right:-8px;padding-right:8px}
 .post{padding:12px 0;border-bottom:1px solid var(--line);display:grid;gap:7px}
 .post .meta{display:flex;gap:8px;align-items:center;font-size:var(--fs-sm);color:var(--ink3);flex-wrap:wrap}
@@ -740,6 +741,8 @@ b.good,.drv-chg .good{color:var(--good)}b.bad,.drv-chg .bad{color:var(--bad)}
   .wide-only{display:none}
   /* tables: a number, a date or a range never breaks across lines; a table too wide scrolls inside its own box */
   :has(>table.trk-table){overflow-x:auto}
+  #lhTable td.m>.trk-tag,#lhTable td.m>.dim{display:block;width:fit-content;margin:2px 0 0 auto}   /* the tag under its number, so numbers line up */
+  .posts{max-height:60vh}                /* a scroll box shorter than the screen, so the page still scrolls around it */
   .trk-table td.m,.trk-table td:first-child,.trk-table th,.tm{white-space:nowrap}
   .lv-head{margin-bottom:var(--sp-1)}
   .banner{margin-bottom:var(--sp-2)}

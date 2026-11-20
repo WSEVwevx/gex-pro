@@ -10,10 +10,13 @@ from gexsys.normalize import normalize
 from gexsys.providers.cboe import CboeProvider, ProviderError
 from tests.util import chain, contract
 
+# an expiry a month after the run date: a fixed date turns into an expired chain the evening it passes
+EXP = (datetime.now(timezone.utc) + timedelta(days=30)).strftime("%y%m%d")
+
 
 def _raw(price, ts=None, n=3):
     ts = ts or datetime.now(timezone.utc) - timedelta(minutes=20)
-    opts = [{"option": f"SPXW261120C0{7600 + 25 * i}000", "iv": 0.2, "gamma": 0.001, "open_interest": 100,
+    opts = [{"option": f"SPXW{EXP}C0{7600 + 25 * i}000", "iv": 0.2, "gamma": 0.001, "open_interest": 100,
              "bid": 1.0, "ask": 1.2, "volume": 1} for i in range(n)]
     return {"timestamp": ts.strftime("%Y-%m-%d %H:%M:%S"), "data": {"current_price": price, "options": opts}}
 
@@ -21,7 +24,7 @@ def _raw(price, ts=None, n=3):
 def _etf(price):
     r = _raw(price)
     for o in r["data"]["options"]:
-        o["option"] = "SPY261120C00760000"
+        o["option"] = f"SPY{EXP}C00760000"
     return r
 
 

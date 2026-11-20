@@ -2362,7 +2362,7 @@ function renderLevelHistoryChart(ss, fut){
       if(inside(p[k])) g += `<line x1="${cx - half}" x2="${cx + half}" y1="${y(p[k])}" y2="${y(p[k])}" stroke="${c}" stroke-width="2.5"${k === "zg" ? ` stroke-dasharray="3 2"` : ""}/>`;
     g += `<rect x="${cx - bw / 2}" y="${pt}" width="${bw}" height="${H - pt - pb}" fill="transparent"/></g>`;
     if(i % Math.max(1, Math.ceil(ss.length / Math.max(2, Math.floor((W - pl - pr) / 70)))) === 0 || i === ss.length - 1)
-      g += `<text x="${cx}" y="${H - 8}" text-anchor="middle" fill="var(--ink4)" font-size="10.5" font-family="var(--mono)">${esc(new Date(s.session + "T12:00:00Z").toLocaleDateString("en-US", {month: "numeric", day: "numeric", timeZone: "UTC"}))}</text>`;
+      g += `<text x="${Math.max(cx, pl + 16)}" y="${H - 8}" text-anchor="middle" fill="var(--ink4)" font-size="10.5" font-family="var(--mono)">${esc(new Date(s.session + "T12:00:00Z").toLocaleDateString("en-US", {month: "numeric", day: "numeric", timeZone: "UTC"}))}</text>`;
   });
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.setAttribute("width", W); svg.setAttribute("height", H);
   svg.innerHTML = g;
