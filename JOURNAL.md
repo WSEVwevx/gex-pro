@@ -186,8 +186,31 @@ lessons, open questions. Read the last 5 entries before deciding anything.
   CRAFT 4 (+consistency), RELIABILITY 4 (+1: fresh levels while Cboe blocks), RESTRAINT 5 (+1: nothing added for
   show; three phases declined on evidence), SAFETY 5.
 - Stopped: no remaining candidate scores 2.0 (Phase 8 rule).
-- Next 3: (1) the expected-move discrepancy once a raw Cboe chain is available; (2) inline styles to classes, one
+- Next 3: (1) RESOLVED below (the two 1σ moves are two different quantities; the shown one is right); (2) inline styles to classes, one
   page per PR, only where a class is reused; (3) revisit page merges when there is evidence of use.
+
+### Run 2, continued ("keep going")
+- PR 34, lane 46 (b543932): the NY AM / Asia briefs label backup levels "backup estimate (...; not graded)" instead
+  of "15-min delayed", and grade() skips them (they would have been scored into scores.jsonl from Fri 11-20 09:00).
+- PR 35, lane 47 (22bac23): Data health takes Cboe's last success from its saved history when the process has none
+  (each hosted build is fresh). Hosted now: "Last try failed, worked 22:20 UTC" instead of "no good copy yet".
+- Checked: the backup banner shows on every page (Levels, Live table, Bias, Indicator...), not only Levels.
+- RESOLVED (by code, the open TRUTH item): the "two 1σ moves". extras.expected_moves already takes each expiry's IV
+  from contracts with that exact expiration time (no AM/PM mixing: the hypothesis was wrong). The engine's
+  summary.expected_move is a different quantity: the nearest expiration from now. On 11-19 that was the AM-settled
+  monthly (settles at the 09:30 open, so it excludes Friday's session); the straddle quoted as support (360 mid) was
+  that same AM contract. The site and the indicator show only the extras number (Pine reads emd; the paste's `em`
+  token from the engine is parsed but never drawn). So the ±705 shown was the PM contract's full-session move: the
+  right one for "today's range". Proof on the backup chain (flat IV per expiry): both IVs equal (NQ 42.46%), points
+  differ only by time span (engine: now -> expiry 415; extras: last close -> 16:00 ET 574). Not proven: the small
+  IV gap on 11-16/17 (engine 39% vs 35.5%) in the unshown engine number (engine IV vs vendor IV); needs a raw chain.
+- D10. Backup pastes, revisited with new evidence: the installed indicator prints the paste's `st` in warning colour
+  in its data row ("DL 5m ESTIMATE"), so st=ESTIMATE would label a backup paste without a Pine change; its info
+  text would still say "15-min delayed". Options (TRUTH x2, REV x2, VALUE, SIMPLE, CONF): website only 5,5,2,4,4 = 30
+  (no new TradingView levels while blocked); paste with st=ESTIMATE 4,5,4,4,4 = 30. A tie goes to the more
+  conservative: website only stays. Undo/change: in export.pine_payload send st "ESTIMATE" when summary["backup"],
+  and drop the backup check in service._maybe_publish.
+- Stopped again: the remaining candidates (inline styles to classes 1.3, page merges 0.3) score under 2.0.
 
 ### Lessons (run 2)
 - An architecture test caught gexsys importing feeds: write the provider against its own package.
@@ -196,5 +219,5 @@ lessons, open questions. Read the last 5 entries before deciding anything.
 - Rounding sizes up to a scale wraps phone labels; take the lower step.
 
 ### Run state
-- Run 2 finished. Last deployed lane 45 (72b436a). Next free lane 46. No open branches of this run after this PR.
+- Run 2 finished. Last deployed lane 47 (22bac23). Next free lane 48. No open branches.
 - Blocked (only the user): none needed. The Pine "estimate" label is declined (D9), not blocked.
