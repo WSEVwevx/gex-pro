@@ -207,14 +207,16 @@ def market_brief(m: dict, record: list, session: str, now: datetime, kind: str =
         t = _t(m["asof"])
         if t > now:                                        # no hindsight: a brief never holds data newer than itself
             raise ValueError(f"{m['market']} levels are stamped {t.isoformat()}, after the brief ({now.isoformat()})")
-        data = (f"{m.get('options', '')} options, {'real time' if m.get('quality') == 'RT' else '15-min delayed'}, calculated "
-                f"{_clock(t)} ET; open interest from the last close.")
+        feed = ("backup estimate (Cboe refused: OCC open interest with one VIX-family vol per expiry, no skew; not graded)"
+                if m.get("backup") else "real time" if m.get("quality") == "RT" else "15-min delayed")
+        data = f"{m.get('options', '')} options, {feed}, calculated {_clock(t)} ET; open interest from the last close."
         if (now - t).total_seconds() > STALE_S:
             stale = f"Levels were last calculated {t:%a} {_clock(t)} ET: older than usual for a brief."
     return {"market": m["market"], "price": m["price"], "regime": m.get("regime"), "zero_gamma": m.get("zero_gamma"), "asof": m.get("asof"),
             "sigma": reg["sigma"], "regime_line": reg["line"], "history": reg["history"], "history_n": reg["n"],
             "levels": key_levels(m), "range": rng, "changes": changes_block(m),
             "yesterday": yesterday_block(m["market"], record, session), "data": data, "stale": stale,
+            "backup": bool(m.get("backup")),
             # what the grade needs, frozen with the brief
             "claims": {"factor": m.get("factor") or 1.0, "offset": m.get("offset") or 0.0, "em": em.get("daily"),
                        "range_ref": reg["range_ref"]}}
@@ -256,6 +258,8 @@ def _phi(x: float) -> float:
 def grade(mb: dict, outcome: dict) -> list:
     """Score one market's brief against its session: [{"type", "hit", "base"}]. `outcome` is the Track record's
     (index open/high/low/close); the brief's futures prices are taken back to index points with its own factor."""
+    if mb.get("backup"):
+        return []                                          # an estimate from the backup chain is never graded
     c = mb.get("claims") or {}
     f, off, em = c.get("factor") or 1.0, c.get("offset") or 0.0, c.get("em")
     if not em or not all(outcome.get(k) is not None for k in ("high", "low", "close")):

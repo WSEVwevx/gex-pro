@@ -64,6 +64,7 @@ def market_snapshot(w) -> dict | None:
                "weekly": em.get("weekly_points_fut", em.get("weekly_points")), "weekly_expiry": em.get("weekly_expiry")},
         "bias": {k: b.get(k) for k in ("bias", "confidence", "day_type", "target", "range", "summary")} if b else None,
         "delta": r.get("delta"),
+        "backup": bool(s.get("backup")),              # an estimate from the OCC backup (gexsys/providers/occ.py)
     }
 
 
