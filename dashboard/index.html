@@ -77,17 +77,14 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
 
     <!-- LEVELS -->
     <div id="levelsView">
+      <!-- the 5-second answer: price and its time, the regime, the key levels, the plan beside the level map -->
+      <section class="lv-head" id="lvHead"><div class="eyebrow">Reference price</div><div class="skeleton">Loading</div></section>
       <section class="stats keys" id="keyStrip" data-help="ladder"></section>
-      <section class="hero">
-        <div class="card" data-help="regime"><div id="regimeCard"><div class="eyebrow">Gamma regime (model)</div><div class="skeleton">Loading</div></div></div>
-        <div class="card" data-help="reference"><div id="priceCard"><div class="eyebrow">Reference price</div><div class="skeleton">Loading</div></div></div>
-        <div class="card" data-help="net_gex"><div id="netCard"><div class="eyebrow">Net gamma exposure</div><div class="skeleton">Loading</div></div></div>
-      </section>
       <section class="grid2 plan-row">
         <div class="card" data-help="plan"><div id="planCard"><div class="skeleton">Loading</div></div></div>
-        <div class="card" data-help="changes"><div class="head"><h2>What changed today</h2><span class="sub" id="chgSub"></span></div><div class="chg" id="chgFeed"></div></div>
+        <div class="card lv-map-card" data-help="level_map"><div class="head"><h2>Level map</h2><span class="sub" id="lvMapSub"></span></div><div class="lv-map" id="lvMap"><div class="skeleton">Loading</div></div></div>
       </section>
-      <section class="stats" id="stats" data-help="stats"></section>
+      <section class="card lv-chg" data-help="changes"><div class="head"><h2>What changed today</h2><span class="sub" id="chgSub"></span></div><div class="chg" id="chgFeed"></div></section>
       <section class="main">
         <div class="card" data-help="ladder">
           <div class="head"><h2>Levels</h2><span class="spacer"></span>
@@ -106,13 +103,23 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
           <div class="card" data-help="by_expiry"><div class="head"><h2>Gamma by expiration</h2></div><div id="byExpiry"></div></div>
         </div>
       </section>
-      <section class="card" data-help="level_history" style="margin-top:12px">
+      <details class="lv-more" id="lvMore"><summary>More numbers <span>regime, reference price, net gamma, dealer flows</span></summary>
+        <section class="hero">
+          <div class="card" data-help="regime"><div id="regimeCard"><div class="eyebrow">Gamma regime (model)</div><div class="skeleton">Loading</div></div></div>
+          <div class="card" data-help="reference"><div id="priceCard"><div class="eyebrow">Reference price</div><div class="skeleton">Loading</div></div></div>
+          <div class="card" data-help="net_gex"><div id="netCard"><div class="eyebrow">Net gamma exposure</div><div class="skeleton">Loading</div></div></div>
+        </section>
+        <section class="stats" id="stats" data-help="stats"></section>
+      </details>
+      <details class="lv-more" id="lvHist"><summary>Level history <span>past sessions against their levels</span></summary>
+      <section class="card" data-help="level_history">
         <div class="head"><h2>Level history</h2><span class="sub" id="lhSub"></span></div>
         <div class="chartwrap" id="lhWrap"><svg id="lhChart" role="img" aria-label="Each past session's range and close against its zero gamma, call wall and put wall"></svg></div>
         <div class="legend"><span><i class="sw" style="background:var(--pos)"></i>Call wall</span><span><i class="sw" style="background:var(--neg)"></i>Put wall</span><span><i class="sw" style="background:var(--zg)"></i>Zero gamma</span><span><i class="sw" style="background:rgba(var(--fg-rgb),.12)"></i>±1σ expected move</span><span><i class="sw" style="background:var(--ink3)"></i>Day's range and close</span></div>
         <div class="trk-log" id="lhTable"></div>
         <div class="expl" id="lhNote"></div>
       </section>
+      </details>
       <p class="foot" id="foot"></p>
     </div>
 
