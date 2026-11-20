@@ -304,6 +304,12 @@ class TestNeverPastedNorGraded(unittest.TestCase):
     def test_the_site_says_it_is_an_estimate(self):
         js = (ROOT / "dashboard/assets/app.js").read_text(encoding="utf-8")
         self.assertTrue(re.search(r"s\.backup \?.*levels are an estimate.*TradingView paste keeps the last Cboe levels", js))
+        # every "15-min delayed" wording has a backup branch: the header chip, the Live table subtitle and its volume card
+        self.assertIn('Options <b>${bk ? "backup estimate" : rt ? "real time" : "15-min delayed"}</b>', js)
+        self.assertIn('${s.backup ? "OCC backup estimate (open interest only)" : "Cboe 15-min delayed"}', js)
+        self.assertIn("no volume while Cboe refuses", js)
+        self.assertIn('Next paste <b>${bk ? "on hold"', js)                       # no paste is published from the backup
+        self.assertIn('Math.abs(x) < 0.5 * 10 ** -d ? ""', js)                 # no "-0.00 pts"
 
 
 if __name__ == "__main__":

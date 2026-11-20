@@ -4,7 +4,7 @@ const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;
 const link = u => /^https?:[/][/]/i.test(String(u ?? "").trim()) ? esc(String(u).trim()) : "#";
 const num = (x, d=2) => x == null || !isFinite(x) ? "-" : Number(x).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
 const money = x => x == null || !isFinite(x) ? "-" : (x<0?"-":"+") + "$" + (Math.abs(x)>=1e9 ? num(Math.abs(x)/1e9,2)+"B" : num(Math.abs(x)/1e6,0)+"M");
-const signed = (x, d=2) => x == null || !isFinite(x) ? "" : (x>=0?"+":"-") + num(Math.abs(x), d);
+const signed = (x, d=2) => x == null || !isFinite(x) ? "" : (Math.abs(x) < 0.5 * 10 ** -d ? "" : x > 0 ? "+" : "-") + num(Math.abs(x), d);   // no "-0.00"
 const store = { get(k, d){ try { return localStorage.getItem(k) ?? d; } catch(e){ return d; } }, set(k, v){ try { localStorage.setItem(k, v); } catch(e){} } };
 
 // Static mode: the hosted copy (python -m gexsys build-site) reads files that a scheduled job rewrites,
@@ -517,12 +517,12 @@ function render(){
   const open = sessionLabel(new Date())[0] !== "Futures closed";          // builds every 3-6 min while open, hourly otherwise
   const lag = STATIC && built > (open ? 20 : 90);
   const svc = h.status === "ok" && !lag ? "ok" : h.status === "starting" ? "" : "warn";
-  const used = (s && s.provider) || w.provider, rt = s && s.ref_quality === "RT";
+  const used = (s && s.provider) || w.provider, rt = s && s.ref_quality === "RT", bk = s && s.backup;
   const opts = s ? esc(s.options_source || w.source) + (s.etf ? "+" + esc(s.etf) : "") : esc(w.source);
   $("status").innerHTML = `<span class="chip"><i class="dot ${svc}"></i>Data <b>${esc(used)}</b> · ${opts}</span>
-    <span class="chip">Options <b>${rt ? "real time" : "15-min delayed"}</b></span>
+    <span class="chip">Options <b>${bk ? "backup estimate" : rt ? "real time" : "15-min delayed"}</b></span>
     ${s ? `<span class="chip">Updated <b>${ago(s.asof)}</b></span>` : ""}
-    <span class="chip">Next paste <b>${h.next_publish_et ? esc(h.next_publish_et.slice(11)) + " ET" : "-"}</b></span>
+    <span class="chip"${bk ? ' title="No new TradingView paste while the levels are a backup estimate"' : ""}>Next paste <b>${bk ? "on hold" : h.next_publish_et ? esc(h.next_publish_et.slice(11)) + " ET" : "-"}</b></span>
     ${(() => { const e = nextHighUSD(); return e ? `<span class="chip" title="Next ${e.impact.toLowerCase()}-impact USD event (ForexFactory)"><i class="dot ${e.impact === "High" ? "bad" : "warn"}"></i>${esc(e.title)} <b>in ${dur(Date.parse(e.time) - Date.now())}</b></span>` : ""; })()}`;
   $("banner").innerHTML = !w.result ? `<div class="banner">${h.last_error ? "The options data source failed on its last try. Nothing to show yet; retrying by itself. Details are on the Data health page." : "First calculation in progress: levels appear within a minute."}</div>`
     : s && s.backup ? `<div class="banner">Backup data: Cboe is refusing requests, so these levels are an estimate from OCC open interest and VIX-family volatility (no skew). Zero gamma, the walls, C1 and P1 are kept; the 0DTE flip, Ab1 and lower ranks are left out. The TradingView paste keeps the last Cboe levels. Details are on the Data health page.</div>`
@@ -1800,7 +1800,7 @@ function renderLiveTable(){
     };
     el.onmouseleave = () => { tip.style.opacity = 0; };
   });
-  $("ldSub").textContent = `${num(LD.width * fac, 1)}-pt rows in ${w.market} prices · ${all ? "all expirations" : `${ldSel.size} expiration${ldSel.size === 1 ? "" : "s"}`} · Cboe 15-min delayed`;
+  $("ldSub").textContent = `${num(LD.width * fac, 1)}-pt rows in ${w.market} prices · ${all ? "all expirations" : `${ldSel.size} expiration${ldSel.size === 1 ? "" : "s"}`} · ${s.backup ? "OCC backup estimate (open interest only)" : "Cboe 15-min delayed"}`;
   // side panel
   const T = LD.rows.reduce((t, row) => { sum(row).forEach((x, j) => t[j] += x); return t; }, [0, 0, 0, 0, 0, 0]);
   const gT = E.reduce((a, e, i) => a + (on(i) ? e.net : 0), 0), dT = E.reduce((a, e, i) => a + (on(i) ? e.dex : 0), 0);
@@ -1816,10 +1816,10 @@ function renderLiveTable(){
   const act = rows.reduce((b, x) => x.v[4] + x.v[5] > b.v[4] + b.v[5] ? x : b, rows[0]);
   $("ldActivity").innerHTML = `<div class="metrics">
     <div class="metric"><div class="eyebrow">Put/call OI</div><div class="v">${pcOI == null ? "-" : num(pcOI, 2)}</div><div class="s">${pcOI == null ? "" : pcOI > 1 ? "more puts open" : "more calls open"}</div></div>
-    <div class="metric"><div class="eyebrow">Put/call volume</div><div class="v">${pcV == null ? "-" : num(pcV, 2)}</div><div class="s">${pcV == null ? "" : pcV > 1 ? "puts trading more today" : "calls trading more today"}</div></div>
-    <div class="metric"><div class="eyebrow">Most traded strike</div><div class="v">${num(act.f, 0)}</div><div class="s">${num(act.v[4] + act.v[5], 0)} contracts today</div></div>
+    <div class="metric"><div class="eyebrow">Put/call volume</div><div class="v">${s.backup || pcV == null ? "-" : num(pcV, 2)}</div><div class="s">${s.backup ? "unavailable" : pcV == null ? "" : pcV > 1 ? "puts trading more today" : "calls trading more today"}</div></div>
+    <div class="metric"><div class="eyebrow">Most traded strike</div><div class="v">${s.backup ? "-" : num(act.f, 0)}</div><div class="s">${s.backup ? "unavailable" : num(act.v[4] + act.v[5], 0) + " contracts today"}</div></div>
     <div class="metric"><div class="eyebrow">Biggest GEX strike</div><div class="v">${num(rows.reduce((b, x) => Math.abs(x.v[0]) > Math.abs(b.v[0]) ? x : b, rows[0]).f, 0)}</div><div class="s">in the rows shown</div></div></div>
-    <div class="expl">Open interest is as of yesterday's close; volume is today's, 15-min delayed.</div>`;
+    <div class="expl">${s.backup ? "Backup estimate: open interest from OCC as of the last close; no volume while Cboe refuses." : "Open interest is as of yesterday's close; volume is today's, 15-min delayed."}</div>`;
 }
 
 // ---------- market tape: real quotes (Yahoo, exchange data delayed), scrolling across the top
