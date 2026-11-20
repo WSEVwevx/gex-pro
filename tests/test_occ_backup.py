@@ -250,6 +250,22 @@ class TestHealthRows(unittest.TestCase):
         fb.primary_ok = time.time() - 7200                                # Cboe worked before it refused
         self.assertEqual(self.rows(fb)["NQ options chain"], "failing")
 
+    def test_a_fresh_process_reads_cboes_last_success_from_its_history(self):
+        # each hosted build is a new process: without this the Cboe row said "no good copy yet" beside 16:14's levels
+        import time
+        from gexsys.storage import SnapshotStore
+        fb = FallbackProvider(Fake(), Fake())
+        fb.refusal, fb.last_label, fb.backup_ok = "HTTP 403", "OCC", time.time()
+        with tempfile.TemporaryDirectory() as tmp:
+            w = worker(fb)
+            w.store, w.key = SnapshotStore(tmp), "NQ-CBOE"
+            w.store.save("NQ-CBOE", {"asof": "2026-11-19T21:14:59+00:00", "status": "OK"})
+            g = GexComponent([])
+            g.workers = {"NQ-CBOE": w}
+            row = next(r for r in g.sources() if r["name"] == "NQ options chain")
+        self.assertEqual(row["last_ok"], "2026-11-19T21:14:59+00:00")
+        self.assertEqual(status(row, datetime.now(timezone.utc)), "failing")
+
     def test_standby_is_waiting_and_cboe_ok(self):
         got = self.rows(FallbackProvider(Fake(), Fake()))
         self.assertEqual(got["NQ options chain"], "ok")
