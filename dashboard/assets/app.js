@@ -485,7 +485,7 @@ function renderSources(){
   if(STATIC && sources.now) rows.unshift({name: "Hosted site", provider: "GitHub Actions", pages: ["Every page"], last_ok: sources.now,
     status: buildLag(sources.now) ? "late" : "ok", detail: "Rebuilt about every 3 minutes in cash hours, every 6 minutes overnight while futures trade, and hourly when they are closed."});
   const n = rows.filter(r => !["ok", "waiting"].includes(r.status)).length, wait = rows.filter(r => r.status === "waiting").length;
-  $("hlSub").textContent = sources.error || (n ? `${n} of ${rows.length} need attention` : wait ? `${rows.length - wait} working, ${wait} not checked yet`
+  $("hlSub").textContent = sources.error || (n ? `${n} of ${rows.length} need attention` + (wait ? `, ${wait} not checked yet` : "") : wait ? `${rows.length - wait} working, ${wait} not checked yet`
     : `All ${rows.length} working`) + (sources.now ? ` · checked ${ago(sources.now)}` : "");
   const rank = {down: 0, failing: 1, late: 2, partial: 3, waiting: 4, ok: 5};          // problems first, otherwise the order stays
   rows.sort((a, b) => (rank[a.status] ?? 5) - (rank[b.status] ?? 5));

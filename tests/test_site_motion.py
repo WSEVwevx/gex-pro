@@ -220,6 +220,11 @@ class TestBiasPage(unittest.TestCase):
         self.assertNotRegex(CSS, r"\.rp-marks s\{[^}]*(gradient|warn)")
         self.assertNotIn("no update since", JS)
 
+    def test_health_count_names_every_row(self):
+        """Data health: with problems, the summary named only them (e.g. "2 of 25 need attention") while "Not checked
+        yet" rows were listed below but counted nowhere; it now adds ", 3 not checked yet"."""
+        self.assertIn("`${n} of ${rows.length} need attention` + (wait ? `, ${wait} not checked yet` : \"\")", JS)
+
 
 if __name__ == "__main__":
     unittest.main()
