@@ -40,10 +40,10 @@ def _rows(key):
 
 # (name, url, headers, check(bytes) -> short description, backup name or None)
 SOURCES = [
-    ("Cboe NDX options", f"{CBOE}/options/_NDX.json", PLAIN, lambda b: _json(b, lambda d: f"{len(d['data']['options'])} contracts"), None),
-    ("Cboe QQQ options", f"{CBOE}/options/QQQ.json", PLAIN, lambda b: _json(b, lambda d: f"{len(d['data']['options'])} contracts"), None),
-    ("Cboe SPX options", f"{CBOE}/options/_SPX.json", PLAIN, lambda b: _json(b, lambda d: f"{len(d['data']['options'])} contracts"), None),
-    ("Cboe SPY options", f"{CBOE}/options/SPY.json", PLAIN, lambda b: _json(b, lambda d: f"{len(d['data']['options'])} contracts"), None),
+    ("Cboe NDX options", f"{CBOE}/options/_NDX.json", PLAIN, lambda b: _json(b, lambda d: f"{len(d['data']['options'])} contracts"), "OCC NDX open interest"),
+    ("Cboe QQQ options", f"{CBOE}/options/QQQ.json", PLAIN, lambda b: _json(b, lambda d: f"{len(d['data']['options'])} contracts"), "OCC QQQ open interest"),
+    ("Cboe SPX options", f"{CBOE}/options/_SPX.json", PLAIN, lambda b: _json(b, lambda d: f"{len(d['data']['options'])} contracts"), "OCC SPX open interest"),
+    ("Cboe SPY options", f"{CBOE}/options/SPY.json", PLAIN, lambda b: _json(b, lambda d: f"{len(d['data']['options'])} contracts"), "OCC SPY open interest"),
     ("Cboe NDX quote", f"{CBOE}/quotes/_NDX.json", prices.UA, lambda b: _json(b, lambda d: f"close {d['data']['close']}"), None),
     ("Cboe NDX 1-minute", f"{CBOE}/charts/intraday/_NDX.json", prices.UA, lambda b: _json(b, _rows("data")), None),
     ("Cboe SPX daily history", f"{CBOE}/charts/historical/_SPX.json", prices.UA, lambda b: _json(b, _rows("data")), "Yahoo ^GSPC daily"),
@@ -53,6 +53,10 @@ SOURCES = [
      lambda b: f"{sum(1 for l in b.decode(errors='replace').splitlines() if l.startswith('NDX'))} series", None),
     ("OCC SPX open interest", "https://marketdata.theocc.com/series-search?symbolType=U&symbol=SPX", PLAIN,
      lambda b: f"{sum(1 for l in b.decode(errors='replace').splitlines() if l.startswith('SPX'))} series", None),
+    ("OCC QQQ open interest", "https://marketdata.theocc.com/series-search?symbolType=U&symbol=QQQ", PLAIN,
+     lambda b: f"{sum(1 for l in b.decode(errors='replace').splitlines() if l.startswith('QQQ'))} series", None),
+    ("OCC SPY open interest", "https://marketdata.theocc.com/series-search?symbolType=U&symbol=SPY", PLAIN,
+     lambda b: f"{sum(1 for l in b.decode(errors='replace').splitlines() if l.startswith('SPY'))} series", None),
     ("Cboe VIX1D history", "https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX1D_History.csv", prices.UA,
      lambda b: f"{len(list(csv.reader(io.StringIO(b.decode()))))} rows", None),
     ("Yahoo NQ=F 1-minute", YAHOO.format(s="NQ%3DF"), PLAIN, lambda b: _json(b, lambda d: f"{len(d['chart']['result'][0]['timestamp'])} bars"), "carry model"),

@@ -153,6 +153,18 @@ lessons, open questions. Read the last 5 entries before deciding anything.
   scroll anchoring (not disabled anywhere) keeps a scrolled reader's place, and a new warning at the top moving the
   page is the warning doing its job. Scores: a 5,5,1,3,4 = 28; b 4,5,2,3,3 = 26; c 5,5,2,5,4 = 31. Chose c.
   Undo: reserve the space with a min-height on #banner.
+- D7. Phase 5 (Levels hierarchy): the baseline sweep found price+time, regime, key strip, plan and the paste button
+  all above the fold at 1366x768 already. Rearranging a page that meets its criterion: VALUE 1, risk 2. No change.
+- D8. Phase 6 (13 pages -> about 8). Candidates scored value x confidence / (size x risk):
+  - Drop the Live table's "Key levels" card: it sits beside the strike table as its context; a trader reading
+    strikes would miss it (safeguard 8). 2x2/(1x2) = 2.0 but VALUE of removal is negative. Kept.
+  - Merge Track record "How price reacted" with Backtesting "Levels vs random levels": two different methods (live
+    5/15/60-min outcomes vs a pre-registered turn rate with a bootstrap interval), not one shown twice. 3x2/(2x2) = 1.5.
+  - The page merges (Today / Evidence / Context / Learn): no usage data, 13 tabs with redirects, high risk:
+    3x2/(5x4) = 0.3. None reach 2.0; not done. Revisit with evidence of what people use.
+- D9. The Pine "estimate" label: the in-app browser has no TradingView session (an anonymous default chart). More
+  decisive: indicators already installed would still print "15-min delayed" for an OCC paste, and their version
+  is unknown, so backup pastes stay off whatever the new Pine says. Not done; backup stays website-only.
 ### Shipped (run 2)
 - PR 29 (tests only): the republish test pinned to a fixed time (it failed when 18:00 ET fell between two clock reads).
 - PR 30: Data health summary also counts "not checked yet" rows.
@@ -160,7 +172,29 @@ lessons, open questions. Read the last 5 entries before deciding anything.
   banner shows, Data health: Cboe "down", backup "partial (website only)", the paste still the 16:30 Cboe one.
   Verifier: curve IVs exact, walls exact, zero gamma within 0.0007 pts (same dividends).
 
+- PR 32, lane 45 (72b436a): the type scale (19 font sizes -> 8). Lane 43 and 44 built b70f086: 43 after a GitHub
+  merge error (PR not merged), 44 dispatched 11 s after main's tests started (the deploy takes the newest TESTED
+  commit). Lane 45 built 72b436a. Hosted: --fs-base 12.5px, no horizontal scroll, banner shown.
+- This PR: the probe links each Cboe chain to its OCC backup (WARN "backup in use", not FAIL) and probes OCC QQQ/SPY.
+
+### Run 2 report
+- Tests 480 -> 503. check.py on main: tests, pyflakes, vulture, pricing, audit PASS (audit now passes: the backup
+  gives a chain); math, track, site FAIL on Cboe's block only (no raw Cboe chain; the paste is the 16:30 one).
+- Hosted sweep: 104/104 clean at baseline; local sweep 104/104 clean after the type scale (its wraps fixed).
+- Font sizes 19 -> 8 (target 6: D5). Inline styles unchanged (64 / 106): not reached. app.js 2,484 lines, kept (D4).
+- Standard after: TRUTH 4 (backup labelled; EM discrepancy still open, no raw chain), INSIGHT 3, CLARITY 4,
+  CRAFT 4 (+consistency), RELIABILITY 4 (+1: fresh levels while Cboe blocks), RESTRAINT 5 (+1: nothing added for
+  show; three phases declined on evidence), SAFETY 5.
+- Stopped: no remaining candidate scores 2.0 (Phase 8 rule).
+- Next 3: (1) the expected-move discrepancy once a raw Cboe chain is available; (2) inline styles to classes, one
+  page per PR, only where a class is reused; (3) revisit page merges when there is evidence of use.
+
+### Lessons (run 2)
+- An architecture test caught gexsys importing feeds: write the provider against its own package.
+- sed -i in Git Bash strips CR: restore CRLF files with Python, and check git diff --stat for whole-file changes.
+- Wait for main's tests by sha, not "the latest run": a deploy dispatched seconds early builds the previous commit.
+- Rounding sizes up to a scale wraps phone labels; take the lower step.
+
 ### Run state
-- Phase 4 (design), branch design/type-scale; next: the local sweep result, then PR, merge, lane 43.
-- Not done: banner layout jump (decided: no change, D6), Phase 5 and 6.
-- Blocked: the Pine "estimate" label needs a TradingView compile; the browser pane has no TradingView session checked yet.
+- Run 2 finished. Last deployed lane 45 (72b436a). Next free lane 46. No open branches of this run after this PR.
+- Blocked (only the user): none needed. The Pine "estimate" label is declined (D9), not blocked.
