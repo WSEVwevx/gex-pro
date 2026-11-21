@@ -369,3 +369,23 @@ lessons, open questions. Read the last 5 entries before deciding anything.
 - A live session, a zero-gamma crossing, an early close or a roll week (fixtures only).
 - Scrolling smoothness (not measured); the hosted site's own load timings (measured on local copies of the same files).
 - The Geist font: still on hold until the owner OKs the download.
+
+## 2026-11-21 next level: scored backlog (Sat 21 Nov, 15:50 ET, market closed)
+Prompt: `docs/prompts/next-level.md`. Score = value to the trader (1-5) × confidence (0-1) ÷ (size 1-5 × risk 1-3),
+estimated before starting. PR 69 (lane 77) closed the two audit lows first.
+
+| # | Item | V | C | S | R | Score |
+|---|------|---|---|---|---|-------|
+| 1 | Nasdaq option chain in the Source probe (proven from GitHub: run 44947737421) | 3 | 0.9 | 1 | 1 | 2.70 |
+| 2 | Throttled-network load measurement (Slow 4G), budget written down | 2 | 0.9 | 1 | 1 | 1.80 |
+| 3 | A missing archive snapshot shown on Data health (the 2026-11-20 ES midday gap went unnoticed) | 3 | 0.8 | 2 | 1 | 1.20 |
+| 4 | Screen-reader text version of the gamma field | 2 | 0.7 | 2 | 1 | 0.70 |
+| 5 | Study: leave out matched call/put pairs from Net DEX / GEX (labelled alternative only if supported) | 4 | 0.5 | 3 | 1 | 0.67 |
+| 6 | Study: walls hold or break, against a null of random strikes the same distance away | 5 | 0.4 | 3 | 1 | 0.67 |
+| 7 | Backup skew from Nasdaq QQQ/SPY mid prices (implied vol per strike; new formula, verifier first) | 4 | 0.6 | 4 | 2 | 0.30 |
+| 8 | NDXP same-day volume from Nasdaq as a 0DTE cross-check | 3 | 0.5 | 3 | 2 | 0.25 |
+| 9 | Inline styles in `app.js`, 57 -> under 15 | 1 | 0.8 | 3 | 2 | 0.13 |
+
+Limits of the Nasdaq source, from a full pull on 21 Nov: NDX lists only NDXP (PM-settled weeklies, 1,921 rows, five
+expiries to 30 Nov), no AM monthly; SPX is "Symbol not exists"; SPY lists 3,014 rows across the dates asked for.
+Prices are as of the prior close on a weekend. Items 7-8 need a CLAUDE.md wireframe and the owner's review before code.
