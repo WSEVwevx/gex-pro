@@ -63,6 +63,13 @@ class Sweep2(unittest.TestCase):
         # 2026-11-21 sweep: the marks are UTC midnights (evening before in ET), so an ET date read one day early
         self.assertIn('day: new Intl.DateTimeFormat("en-US", {timeZone: "UTC", month: "short", day: "numeric"}),', JS)
 
+    def test_the_heatmap_reframes_after_a_resize(self):
+        self.assertIn("if(w >= 100 && Math.abs(w - hmW) > 40){ hmW = w; clearTimeout(hmRT); hmRT = setTimeout(() => { hmReset = true; renderHeatmap(); }, 200); }", JS)
+
+    def test_the_first_view_keeps_its_span(self):
+        # the first load showed the library's default zoom (~155 bars) instead of "2 days"
+        self.assertIn("requestAnimationFrame(() => requestAnimationFrame(() => hmChart.timeScale().setVisibleLogicalRange({from, to: n + ro2})));", JS)
+
     def test_backup_volume_is_unavailable_not_zero(self):
         self.assertIn('${s.backup ? "volume unavailable (backup estimate)" : `volume calls', JS)
 
