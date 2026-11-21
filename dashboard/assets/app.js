@@ -576,6 +576,27 @@ const slotTxt = slot => slot.slice(0, 10) === new Date().toLocaleDateString("en-
   : `${new Date(slot.slice(0, 10) + "T12:00:00Z").toLocaleDateString("en-US", {timeZone: "UTC", weekday: "short", month: "short", day: "numeric"})}, ${slot.slice(11)} ET`;
 // the time of the price every level is measured from (after the close it is the 16:00 print, not a live quote)
 const refAt = t => t ? ` · ${new Date(t).toLocaleString("en-US", {...ET, month: "short", day: "numeric", hour: "numeric", minute: "2-digit"})} ET` : "";
+// The sentence under the price (redesign Phase 4): fixed templates only, never AI. Every number in it is on the page
+// in the same units (the key levels' "pts above · σ"), measured from the price above it, with that price's time.
+// It describes the market; it never says buy, sell, should, target or will (tests/test_sentence.py).
+const SAY_GAMMA = {POSITIVE: ["modeled dealer gamma is positive", ", where hedging tends to lean against moves"],
+                   NEGATIVE: ["modeled dealer gamma is negative", ", where hedging tends to add to moves"],
+                   INDETERMINATE: ["modeled dealer gamma is close to balanced", ", with no clear tilt"]};
+const lvPrice = v => v && typeof v === "object" ? v.price : v;
+function stateSentence(o){
+  // "330 pts (0.3σ) below": the same distance and σ the key-level tiles show; a level on the price reads "at"
+  // from = "level": where the level is from the price; from = "price": where the price is from the level
+  const gap = (v, from = "level") => { const d = Math.abs(v - o.ref), pts = num(d, 0);
+    return pts === "0" ? null : `${pts} pts${o.emd ? ` (${num(d / o.emd, 1)}σ)` : ""} ${(v > o.ref) === (from === "level") ? "above" : "below"}`; };
+  const [g, why] = SAY_GAMMA[o.regime] || ["modeled dealer gamma is unavailable", ""];
+  const range = /\+\/-([\d.]+%)/.exec(o.zgStatus || "");
+  const first = o.zg != null ? `${o.m} is ${gap(o.zg, "price") || "at"} zero gamma (${num(o.zg)}); ${g}${why}.`
+    : /^NO CROSSING/i.test(o.zgStatus || "") ? `${o.m} has no zero-gamma crossing within ${range ? "±" + range[1] : "the modeled range"} of the price; ${g}${why ? " throughout that range" : ""}${why}.`
+    : `Zero gamma for ${o.m} is unavailable; ${g}${why}.`;
+  const wall = (name, v) => v == null ? `the ${name} is unavailable` : `the ${name}, ${num(v)}, is ${gap(v) || "at the price"}`;
+  const second = wall("put wall", o.pw) + "; " + wall("call wall", o.cw) + ".";
+  return (o.backup ? "Backup estimate: " : "") + first + " " + second[0].toUpperCase() + second.slice(1);
+}
 function renderHero(w, s, L, X, ref){
   const R = {POSITIVE:["Positive gamma","+","var(--pos)","Modeled dealers are long gamma, so their hedging leans against moves. That tends to mean tighter ranges and more mean reversion."],
              NEGATIVE:["Negative gamma","-","var(--neg)","Modeled dealers are short gamma, so their hedging follows the move. That tends to mean wider ranges and more trend days."],
@@ -593,7 +614,9 @@ function renderHero(w, s, L, X, ref){
   $("lvHead").innerHTML = `<div class="lvh-px"><div class="eyebrow">${esc(market)} ${w.result.mapped ? "equiv. of " + esc(w.source) : esc(w.source)}${refAt(s.ref_time)}</div><div class="lvh-big">${num(ref)}</div>${mp ? `<div class="lvh-sub">${esc(w.source)} ${num(mp.source_ref, 2)} × basis ${num(mp.factor, 5)}, not the live futures price</div>` : ""}</div>
     <div class="lvh-rg"><div class="eyebrow"><span class="wide-only">Gamma </span>regime (model)</div><div class="lvh-regime ${rc}">${R[0]}</div>
       <div class="lvh-sub">${sig == null ? "" : `${num(Math.abs(sig), 1)}σ ${sig >= 0 ? "above" : "below"} zero gamma · `}${says}</div></div>
-    <div class="lvh-net"><div class="eyebrow">Net gamma, all expiries</div><div class="lvh-mid ${s.net >= 0 ? "c-pos" : "c-neg"}">${money(s.net)}</div><div class="lvh-sub">per 1% move</div></div>`;
+    <div class="lvh-net"><div class="eyebrow">Net gamma, all expiries</div><div class="lvh-mid ${s.net >= 0 ? "c-pos" : "c-neg"}">${money(s.net)}</div><div class="lvh-sub">per 1% move</div></div>
+    <p class="lvh-say" id="lvSay">${esc(stateSentence({m: market, regime: s.regime, ref, zg: zgp, zgStatus: L.zero_gamma_status || s.zero_gamma_status,
+      emd, cw: lvPrice(L.call_wall), pw: lvPrice(L.put_wall), backup: !!s.backup}))}</p>`;
   $("regimeCard").parentElement.classList.add("accent"); $("regimeCard").parentElement.style.setProperty("--accent", R[2]);
   $("regimeCard").innerHTML = `<div class="eyebrow">Gamma regime (model)</div>
     <div class="regime"><span class="tag" style="border-color:${R[2]}">${R[1]}</span><span style="color:${R[2]}">${R[0]}</span>${changed ? '<span class="chip">changed since last update</span>' : ""}</div>
