@@ -465,12 +465,13 @@ body:not(.notes) .stats.keys .stat .s{display:block}
 .sw.prompt{background:var(--prompt)}.sw.mp{background:var(--mp)}.sw.ag{background:var(--ag)}.sw.band{background:rgba(var(--fg-rgb),.12)}
 .sw.ln{height:2px}.sw.ln3{height:3px}.sw.cone{height:10px;opacity:.35}
 /* Levels: the headline row (no card), the level map, the folded detail */
-.lv-head{display:flex;align-items:flex-end;gap:var(--sp-3) var(--sp-8);flex-wrap:wrap;margin:var(--sp-2) 0 var(--sp-4);min-height:65px}
+.lv-head{display:flex;align-items:flex-end;gap:var(--sp-3) var(--sp-8);flex-wrap:wrap;margin:var(--sp-2) 0 var(--sp-4);min-height:138px}
 .lv-head .eyebrow{white-space:nowrap}
 .lvh-big{font:600 var(--fs-x3)/1.1 var(--mono);letter-spacing:-.02em;margin-top:var(--sp-1);white-space:nowrap}
 .lvh-regime{font-size:var(--fs-x2);font-weight:650;line-height:1.2;margin-top:var(--sp-1);white-space:nowrap}
 .lvh-mid{font:600 var(--fs-xl)/1.3 var(--mono);margin-top:var(--sp-1);white-space:nowrap}
 .lvh-sub{font-size:var(--fs-sm);color:var(--ink2);margin-top:2px}
+.lvh-say{flex:0 0 100%;margin:0;padding-right:max(0px,calc(100% - 78ch));font-size:var(--fs-base);line-height:1.5;color:var(--ink2);text-wrap:pretty}
 .c-pos{color:var(--pos)}.c-neg{color:var(--neg)}.c-zg{color:var(--zg)}.c-ink3{color:var(--ink3)}
 body.stale-data #lvHead .lvh-px .eyebrow::after{content:var(--stale-text);margin-left:8px;font:600 var(--fs-xs) var(--mono);text-transform:none;color:var(--warn)}
 .stats.keys{background:transparent;box-shadow:none;border-radius:0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
@@ -746,9 +747,10 @@ b.good,.drv-chg .good{color:var(--good)}b.bad,.drv-chg .bad{color:var(--bad)}
   .botbar{display:flex}
   .pagebar h1{display:none}              /* the page row above already names the page */
   .banner .bn-more{display:none}         /* the short form; the rest is on the Data health page */
-  .lv-head{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:0 var(--sp-4);margin:var(--sp-1) 0 var(--sp-2);min-height:74px}
+  .lv-head{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:0 var(--sp-4);margin:var(--sp-1) 0 var(--sp-2);min-height:173px}
   .lv-head .eyebrow{white-space:normal}
   .lv-head .lvh-net{display:none}        /* in "More numbers" on a phone */
+  .lvh-say{grid-column:1/-1;margin-top:var(--sp-2);font-size:var(--fs-sm)}
   .lvh-big{font-size:var(--fs-x2)}.lvh-regime{font-size:var(--fs-lg)}
   .stats.keys{margin:0 0 var(--sp-2)}
   #banner:empty+#levelsView #keyStrip:not(:has(.stat)){min-height:150px}
