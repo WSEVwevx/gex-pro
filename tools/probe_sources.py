@@ -49,6 +49,14 @@ SOURCES = [
     ("Cboe SPX daily history", f"{CBOE}/charts/historical/_SPX.json", prices.UA, lambda b: _json(b, _rows("data")), "Yahoo ^GSPC daily"),
     ("Cboe VIX history", "https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv", prices.UA,
      lambda b: f"{len(list(csv.reader(io.StringIO(b.decode()))))} rows", None),
+    # candidates (2026-11-21): Nasdaq's option-chain JSON (bid/ask/volume/OI per strike) to cross-check Cboe and give the
+    # OCC backup skew and volume. Not used by the app yet; the probe decides whether it answers GitHub.
+    ("Nasdaq NDX options (candidate)", "https://api.nasdaq.com/api/quote/NDX/option-chain?assetclass=index&limit=60&excode=oprac&callput=callput&money=all&type=all",
+     {**PLAIN, "Accept": "application/json"}, lambda b: _json(b, lambda d: f"{d['data']['totalRecord']} contracts"), None),
+    ("Nasdaq QQQ options (candidate)", "https://api.nasdaq.com/api/quote/QQQ/option-chain?assetclass=etf&limit=60&excode=oprac&callput=callput&money=all&type=all",
+     {**PLAIN, "Accept": "application/json"}, lambda b: _json(b, lambda d: f"{d['data']['totalRecord']} contracts"), None),
+    ("Nasdaq SPY options (candidate)", "https://api.nasdaq.com/api/quote/SPY/option-chain?assetclass=etf&limit=60&excode=oprac&callput=callput&money=all&type=all",
+     {**PLAIN, "Accept": "application/json"}, lambda b: _json(b, lambda d: f"{d['data']['totalRecord']} contracts"), None),
     ("OCC NDX open interest", "https://marketdata.theocc.com/series-search?symbolType=U&symbol=NDX", PLAIN,
      lambda b: f"{sum(1 for l in b.decode(errors='replace').splitlines() if l.startswith('NDX'))} series", None),
     ("OCC SPX open interest", "https://marketdata.theocc.com/series-search?symbolType=U&symbol=SPX", PLAIN,
