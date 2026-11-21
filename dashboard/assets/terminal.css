@@ -115,6 +115,7 @@ a{color:var(--ink2)}
 .area>div[id$="View"]>:first-child{margin-top:6px}          /* every page starts the same distance under its title */
 .pagebar{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:10px 0 9px;background:var(--page);border-bottom:1px solid var(--line);margin-bottom:12px}
 .pagebar h1{margin:0;font-size:var(--fs-xl);font-weight:650;letter-spacing:.01em;min-width:110px}
+[hidden]{display:none!important}         /* a component's own display never shows what the page hid */
 .seg{display:flex;background:var(--panel2);border:0;border-radius:var(--r-2);padding:3px;gap:2px}
 .seg button{background:none;border:0;padding:4px 14px;border-radius:var(--r-2);color:var(--ink3);font:700 var(--fs-sm) var(--mono);letter-spacing:.05em}
 .seg button:hover{color:var(--ink)}
