@@ -24,7 +24,7 @@ const offline = () => (STATIC ? "Can't reach the data file. " : "Can't reach the
 const stateHtml = (kind, title, text) => `<div class="state ${kind}"><i></i><div><b>${esc(title)}</b>${esc(text)}</div></div>`;
 
 if (location.protocol === "file:" && !STATIC) {
-  document.body.innerHTML = `<div class="wrap"><div class="banner bad" style="margin-top:40px;font-size:var(--fs-lg);line-height:1.7">
+  document.body.innerHTML = `<div class="wrap"><div class="banner bad fatal">
   This page only works while the GEX PRO service is running.<br>1. Double-click <b>START.bat</b> in your Options Indicator folder.<br>
   2. Your browser opens <b>http://127.0.0.1:8765</b> automatically.</div></div>`;
   throw new Error("opened as file");
@@ -204,8 +204,7 @@ function setPage(p){
   page = p;
   settle();
   $("pageTitle").textContent = (PAGES.find(x => x[0] === p) || ["", "Levels"])[1];
-  $("tabs").style.display = NO_MARKET_PAGES.includes(p) ? "none" : "";
-  $("status").style.display = NO_MARKET_PAGES.includes(p) ? "none" : "";
+  $("tabs").hidden = $("status").hidden = NO_MARKET_PAGES.includes(p);
   $("density").hidden = $("phaseLab").hidden = p !== "levels";
   document.querySelectorAll("#botbar [data-p]").forEach(b => b.dataset.p === p ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current"));
   $("explain").classList.contains("open") && openExplain(PAGE_HELP[p] || "regime");
@@ -256,12 +255,12 @@ function renderPosts(){
     const counts = p.counts ? `<span>${num(p.counts.likes, 0)} likes · ${num(p.counts.retruths, 0)} ReTruths</span>` : "";
     return `<div class="post${hot ? " hot" : ""}">
       <div class="meta"><b>${when(p.time)}</b>${kind}${counts}${p.url ? `<a href="${link(p.url)}" target="_blank" rel="noopener">open</a>` : ""}</div>
-      ${p.text ? `<div class="txt" role="button" tabindex="0" onclick="this.classList.toggle('open')" title="Click to expand">${esc(p.text)}</div>` : `<div class="txt" style="color:var(--ink3)">${media ? (media.type === "video" ? "Video post" : "Image post") : "Post without text"}</div>`}
+      ${p.text ? `<div class="txt" role="button" tabindex="0" onclick="this.classList.toggle('open')" title="Click to expand">${esc(p.text)}</div>` : `<div class="txt c-ink3">${media ? (media.type === "video" ? "Video post" : "Image post") : "Post without text"}</div>`}
       ${media && media.preview ? `<img loading="lazy" src="${esc(media.preview)}" alt="${media.type === "video" ? "video preview" : "image"} from the post" referrerpolicy="no-referrer">` : ""}
-      ${p.link && p.link.url ? `<a href="${link(p.link.url)}" target="_blank" rel="noopener" style="font-size:var(--fs-base)">${esc(p.link.title || p.link.url)}</a>` : ""}
+      ${p.link && p.link.url ? `<a class="fs-base" href="${link(p.link.url)}" target="_blank" rel="noopener">${esc(p.link.title || p.link.url)}</a>` : ""}
       ${hot ? `<div class="tags">${p.tone ? `<span class="tone ${p.tone}" title="Keyword guess at what this post means for stocks, not a forecast">${p.tone}</span>` : ""}${p.market_words.map(w => `<span class="mw">${esc(w)}</span>`).join("")}</div>` : ""}
     </div>`; }).join("") || `<div class="expl">${postF === "market" ? "No recent posts mention market topics." : "No posts available."}</div>`;
-  $("postsFoot").innerHTML = `Source: ${esc(posts.source || "-")}${posts.fetched_at ? `, updated ${ago(posts.fetched_at)}` : ""}; checked every 5 min. Yellow tags flag market topics (tariffs, the Fed, China, oil...); Bullish / Bearish is a keyword guess at the post's lean for stocks, shown only when it is clear. Posts can move futures quickly, and nothing here predicts how.${posts.error ? ` <span style="color:var(--warn)">${esc(posts.error)}</span>` : ""}`;
+  $("postsFoot").innerHTML = `Source: ${esc(posts.source || "-")}${posts.fetched_at ? `, updated ${ago(posts.fetched_at)}` : ""}; checked every 5 min. Yellow tags flag market topics (tariffs, the Fed, China, oil...); Bullish / Bearish is a keyword guess at the post's lean for stocks, shown only when it is clear. Posts can move futures quickly, and nothing here predicts how.${posts.error ? ` <span class="c-warn">${esc(posts.error)}</span>` : ""}`;
 }
 
 // ---------- Briefings page: NY AM and Asia session write-ups
@@ -291,7 +290,7 @@ function briefMarket2(m, grades, kind){
   }
   const g = (grades || []).filter(x => x.market === m.market);
   return `<section class="card bm b2 accent" style="--accent:${col}">
-    <div class="head" style="margin-bottom:0"><h2>${esc(m.market)}</h2><span class="chip" style="color:${col}">${esc({POSITIVE: "positive gamma", NEGATIVE: "negative gamma"}[m.regime] || "balanced gamma")}</span><span class="spacer"></span>${go("levels", "Levels")}</div>
+    <div class="head mb-0"><h2>${esc(m.market)}</h2><span class="chip" style="color:${col}">${esc({POSITIVE: "positive gamma", NEGATIVE: "negative gamma"}[m.regime] || "balanced gamma")}</span><span class="spacer"></span>${go("levels", "Levels")}</div>
     <div class="b2-px"><b>${num(m.price)}</b>${m.sigma == null ? "" : `<span><b style="color:${col}">${num(Math.abs(m.sigma), 1)}σ ${m.sigma >= 0 ? "above" : "below"}</b> zero gamma ${num(m.zero_gamma)}</span>`}</div>
     <p class="b2-p">${esc(m.history)} ${go("track", "Track record")}</p>
     <div class="eyebrow b2-eb">The three levels that matter</div>
@@ -302,7 +301,7 @@ function briefMarket2(m, grades, kind){
     <div class="eyebrow b2-eb">${kind === "asia" ? "Last session, graded" : "Yesterday, graded"}</div>
     <p class="b2-p">${m.yesterday ? esc(m.yesterday.text) : "No earlier session in the track record yet."}</p>
     ${g.length ? `<div class="eyebrow b2-eb">This brief, graded after the close</div><div class="b2-gr">${g.map(x => `<span class="trk-tag ${x.hit ? "good" : "bad"}">${x.hit ? "✓" : "✗"} ${B2_TAG[x.type] || esc(x.type)}</span>`).join("")}</div>` : ""}
-    ${m.stale ? `<div class="expl" style="color:var(--warn)">${esc(m.stale)}</div>` : ""}</section>`;
+    ${m.stale ? `<div class="expl c-warn">${esc(m.stale)}</div>` : ""}</section>`;
 }
 // one line for where every number comes from: "NDX+QQQ (9:01 AM) and SPX+SPY (9:01 AM) options, 15-min delayed; ..."
 function briefData(ms){
@@ -337,7 +336,7 @@ function renderBriefings(){
   $("briefHead").style.setProperty("--accent", b.kind === "asia" ? "var(--oi)" : "var(--pos)");
   $("briefKicker").textContent = weekly ? "The week in prices" : b.kind === "asia" ? "Night session · Asia open" : "Before the US open";
   $("briefTitle").textContent = weekly ? `${b.title} · week ending ${when({month: "short", day: "numeric"})}` : isBrief2(b) ? `${b.kind === "asia" ? "Asia brief · for" : "NY AM brief ·"} ${when({weekday: "short", month: "short", day: "numeric"})}` : `${b.title} · ${when({weekday: "long", month: "short", day: "numeric"})} session`;
-  $("briefSides").style.display = weekly ? "none" : "";      // no calendar or posts in a recap
+  $("briefSides").hidden = weekly;      // no calendar or posts in a recap
   $("briefHead").classList.toggle("b2h", isBrief2(b));
   $("briefMeta").innerHTML = `<span class="chip">Written <b>${new Date(b.generated_at).toLocaleString("en-US", {...ET, weekday:"short", hour:"numeric", minute:"2-digit"})} ET</b></span>`
     + (b.late ? `<span class="chip" title="The app wasn't running at the scheduled time, so this was written when it started"><i class="dot warn"></i>Written late</span>` : "") + nxt
@@ -346,14 +345,14 @@ function renderBriefings(){
   else if(isBrief2(b)) $("briefLead").textContent = "";      // the cards and the calendar say it once
   else $("briefLead").textContent = b.headline;
   $("briefNews").hidden = !(b.headlines || []).length;
-  $("briefNewsList").innerHTML = (b.headlines || []).map(x => `<div class="bpost"><div class="meta"><b style="color:var(--ink2)">${esc(new Date(x.day + "T12:00:00Z").toLocaleDateString("en-US", {weekday: "short", timeZone: "UTC"}))}</b>${x.source ? `<span>${esc(x.source)}</span>` : ""}${/^https:/.test(x.url || "") ? `<a href="${link(x.url)}" target="_blank" rel="noopener">open</a>` : ""}</div>${esc(x.title)}</div>`).join("");
+  $("briefNewsList").innerHTML = (b.headlines || []).map(x => `<div class="bpost"><div class="meta"><b class="c-ink2">${esc(new Date(x.day + "T12:00:00Z").toLocaleDateString("en-US", {weekday: "short", timeZone: "UTC"}))}</b>${x.source ? `<span>${esc(x.source)}</span>` : ""}${/^https:/.test(x.url || "") ? `<a href="${link(x.url)}" target="_blank" rel="noopener">open</a>` : ""}</div>${esc(x.title)}</div>`).join("");
   const col = r => r === "POSITIVE" ? "var(--pos)" : r === "NEGATIVE" ? "var(--neg)" : "var(--zg)";
   const v2 = isBrief2(b), oneDay = v2 && b.kind === "nyam", bid = (brief.history.find(h => h.slot === b.slot && h.kind === b.kind) || {}).id;
   $("briefMarkets").innerHTML = v2 ? b.markets.map(m => briefMarket2(m, ((brief.score || {}).grades || {})[bid], b.kind)).join("")
     : (b.markets || []).map(m => `<section class="card bm accent" style="--accent:${col(m.regime)}">
-    <div class="head" style="margin-bottom:0"><h2>${esc(m.market)}</h2><span class="chip" style="color:${col(m.regime)}">${esc((m.regime || "").toLowerCase())} gamma</span></div>
+    <div class="head mb-0"><h2>${esc(m.market)}</h2><span class="chip" style="color:${col(m.regime)}">${esc((m.regime || "").toLowerCase())} gamma</span></div>
     <div class="hl">${esc(m.headline)}</div>
-    <div class="blv">${(m.levels || []).map(l => `<div><span>${esc(l.name)}</span><b>${num(l.price)} <span style="color:var(--ink3);font-weight:500">${signed(l.price - m.price, 1)}</span></b></div>`).join("")}</div>
+    <div class="blv">${(m.levels || []).map(l => `<div><span>${esc(l.name)}</span><b>${num(l.price)} <span class="c-ink3 fw-500">${signed(l.price - m.price, 1)}</span></b></div>`).join("")}</div>
     ${m.range ? `<div class="bsec"><div class="eyebrow">Expected range</div><p>${esc(m.range.text)}</p></div>` : ""}
     ${m.odte ? `<div class="bsec"><div class="eyebrow">0DTE levels</div><p>${esc(m.odte)}</p></div>` : ""}
     ${m.bias ? `<div class="bsec"><div class="eyebrow">Bias</div><p>${esc(m.bias)}</p></div>` : ""}
@@ -361,15 +360,15 @@ function renderBriefings(){
     ${(m.changes || []).length ? `<div class="bsec"><div class="eyebrow">What changed</div>${m.changes.map(c => `<p>${esc(c)}</p>`).join("")}</div>` : ""}
     ${m.data ? `<div class="expl">${esc(m.data)}</div>` : ""}</section>`).join("");
   $("briefCal").innerHTML = (b.calendar || []).map(c => v2 && !(c.items || []).length          // an empty calendar is one line, not a section
-    ? `<div class="expl" style="margin-top:${c === b.calendar[0] ? 0 : 10}px"><b style="color:var(--ink2)">${esc(c.title.replace(" (ET)", ""))}:</b> no high- or medium-impact events.</div>`
+    ? `<div class="expl" style="margin-top:${c === b.calendar[0] ? 0 : 10}px"><b class="c-ink2">${esc(c.title.replace(" (ET)", ""))}:</b> no high- or medium-impact events.</div>`
     : `<div class="head" style="margin:${c === b.calendar[0] ? 0 : 18}px 0 6px"><h2>${esc(c.title)}</h2></div>`
-    + ((c.items || []).map(e => `<div class="bev${oneDay ? " today" : ""}"><span class="tm">${oneDay ? "" : esc(e.day) + " "}${esc(e.clock)}</span><span class="imp ${esc(e.impact)}">${esc(e.impact === "Medium" ? "Med" : e.impact)}</span><span>${esc(e.title)} <span style="color:var(--ink3);font:var(--fs-sm) var(--mono)">${esc(e.country)}</span></span><span class="fp">${esc(e.detail || "")}</span></div>`).join("")
-       || `<div class="expl" style="margin-top:0">No high- or medium-impact events.</div>`)
+    + ((c.items || []).map(e => `<div class="bev${oneDay ? " today" : ""}"><span class="tm">${oneDay ? "" : esc(e.day) + " "}${esc(e.clock)}</span><span class="imp ${esc(e.impact)}">${esc(e.impact === "Medium" ? "Med" : e.impact)}</span><span>${esc(e.title)} <span class="c-ink3 mono-sm">${esc(e.country)}</span></span><span class="fp">${esc(e.detail || "")}</span></div>`).join("")
+       || `<div class="expl mt-0">No high- or medium-impact events.</div>`)
     + (c.history ? `<div class="expl">${esc(c.history)}</div>` : "")).join("")
     + (v2 ? `<div class="expl">${esc(briefData(b.markets))}</div>` : "");       // where the numbers come from, once
   $("briefPostsTitle").textContent = v2 ? "How the NY AM brief has scored" : (b.posts || {}).title || "Market-moving posts";
-  $("briefPosts").innerHTML = v2 ? briefScore(brief.score) : ((b.posts || {}).items || []).map(x => `<div class="bpost"><div class="meta"><b style="color:var(--ink2)">${esc(x.clock)} ET</b>${x.tone ? `<span class="tone ${esc(x.tone)}">${esc(x.tone)}</span>` : ""}${(x.words || []).map(w => `<span class="mw">${esc(w)}</span>`).join("")}${x.url ? `<a href="${link(x.url)}" target="_blank" rel="noopener">open</a>` : ""}</div>${esc(x.text)}</div>`).join("")
-    || `<div class="expl" style="margin-top:0">No market-related posts in this window.</div>`;
+  $("briefPosts").innerHTML = v2 ? briefScore(brief.score) : ((b.posts || {}).items || []).map(x => `<div class="bpost"><div class="meta"><b class="c-ink2">${esc(x.clock)} ET</b>${x.tone ? `<span class="tone ${esc(x.tone)}">${esc(x.tone)}</span>` : ""}${(x.words || []).map(w => `<span class="mw">${esc(w)}</span>`).join("")}${x.url ? `<a href="${link(x.url)}" target="_blank" rel="noopener">open</a>` : ""}</div>${esc(x.text)}</div>`).join("")
+    || `<div class="expl mt-0">No market-related posts in this window.</div>`;
 }
 
 $("briefMarkets").addEventListener("click", e => {
@@ -464,7 +463,7 @@ function renderNews(){
   $("news").innerHTML = html || `<div class="expl">No ${impactF === "high" ? "high-impact " : impactF === "med" ? "high- or medium-impact " : ""}${curF === "all" ? "" : curF + " "}events this week. Try a wider filter above.</div>`;
   const nh = nextHighUSD();
   $("newsNext").textContent = nh ? `Next ${nh.impact === "High" ? "high" : "medium"}-impact USD: ${nh.title}, ${new Date(nh.time).toLocaleDateString("en-US", {...ET, weekday:"short"})} ${etTime(nh.time)} ET (in ${dur(Date.parse(nh.time) - now)})` : "";
-  $("newsFoot").innerHTML = `Source: <a href="https://www.forexfactory.com/calendar" target="_blank" rel="noopener" style="color:var(--ink2)">ForexFactory calendar</a> (weekly export feed), checked every 30 min${news.fetched_at ? `, last updated ${ago(news.fetched_at)}` : ""}. Times in ET. F = forecast, P = previous; the feed has no actual results - see ForexFactory for those.${news.error ? ` <span style="color:var(--warn)">${esc(news.error)}</span>` : ""}`;
+  $("newsFoot").innerHTML = `Source: <a class="c-ink2" href="https://www.forexfactory.com/calendar" target="_blank" rel="noopener">ForexFactory calendar</a> (weekly export feed), checked every 30 min${news.fetched_at ? `, last updated ${ago(news.fetched_at)}` : ""}. Times in ET. F = forecast, P = previous; the feed has no actual results - see ForexFactory for those.${news.error ? ` <span class="c-warn">${esc(news.error)}</span>` : ""}`;
 }
 
 let stamp = null;
@@ -608,8 +607,8 @@ function renderHero(w, s, L, X, ref){
   // distance to zero gamma measured in today's expected moves: < 0.3 means price sits right at the flip
   const zgp = L.zero_gamma && L.zero_gamma.price, emx = X.expected_move || {}, emd = emx.daily_points_fut ?? emx.daily_points;
   const sig = zgp != null && emd ? (ref - zgp) / emd : null;
-  const sigTxt = sig == null ? "" : `<div class="kv" style="margin-top:10px"><span>Price vs zero gamma</span><b>${num(Math.abs(sig), 1)}σ ${sig >= 0 ? "above" : "below"}</b></div>
-    <div class="expl" style="margin-top:4px">${Math.abs(sig) < 0.3 ? "Right at the flip: the regime can change with a small move." : Math.abs(sig) < 1 ? "Within one expected move of the flip." : "More than a full expected move from the flip; the regime is well established."}</div>`;
+  const sigTxt = sig == null ? "" : `<div class="kv mt-3"><span>Price vs zero gamma</span><b>${num(Math.abs(sig), 1)}σ ${sig >= 0 ? "above" : "below"}</b></div>
+    <div class="expl mt-1">${Math.abs(sig) < 0.3 ? "Right at the flip: the regime can change with a small move." : Math.abs(sig) < 1 ? "Within one expected move of the flip." : "More than a full expected move from the flip; the regime is well established."}</div>`;
   const rc = {POSITIVE: "c-pos", NEGATIVE: "c-neg", INDETERMINATE: "c-zg"}[s.regime] || "c-ink3";
   const says = {POSITIVE: "hedging leans against moves", NEGATIVE: "moves can extend", INDETERMINATE: "no clear tilt either way"}[s.regime] || "no usable estimate";
   const mp = w.result.mapped && w.result.mapped.mapping;     // the headline is the index converted with the frozen basis
@@ -630,7 +629,7 @@ function renderHero(w, s, L, X, ref){
     <div class="expl">${fop ? "Levels come from CME options on the " + market + " future itself, so they are already in futures prices; no conversion needed."
       : w.result.mapped ? market + " equivalent of the index price, from " + (/^measured/.test(w.result.mapped.mapping.futures_ref_mode || "") ? "the measured futures / index basis" : "the carry model") + ". Your TradingView chart uses the live price." : "Options-underlying price (no futures conversion available)."}</div>`;
   $("netCard").innerHTML = `<div class="eyebrow">Net gamma exposure</div>
-    <div class="big sm" style="color:${s.net>=0?"var(--pos)":"var(--neg)"}">${money(s.net)}<span style="font-size:var(--fs-base);color:var(--ink3)"> per 1% move</span></div>
+    <div class="big sm" style="color:${s.net>=0?"var(--pos)":"var(--neg)"}">${money(s.net)}<span class="fs-base c-ink3"> per 1% move</span></div>
     <div class="kv"><span>Expirations included</span><b>${s.basket.length} (to ${esc((s.basket.at(-1)||"").slice(5))})</b></div>
     <div class="expl">Roughly how many dollars of stock or futures dealers would trade for a 1% move. The bigger the number, the stronger the effect described on the left.</div>`;
 }
@@ -738,10 +737,10 @@ function renderChart(w, s, L, ref){
     if(!bars.length) return;
     let best = 0; bars.forEach((b, i) => { if(Math.abs(y(b.p) - py) < Math.abs(y(bars[best].p) - py)) best = i; });
     const b = bars[best];
-    tip.innerHTML = `${num(b.p)} <span style="color:var(--ink3)">(${esc(w.source)} ${num(b.k,0)})</span><br><span style="color:${b.net>=0?"var(--pos)":"var(--neg)"}">${money(b.net)}</span> per 1%`;
-    tip.style.opacity = 1; tip.style.left = Math.min(e.clientX - r.left + 14, W - 190) + "px"; tip.style.top = (y(b.p) - 18) + "px";
+    tip.innerHTML = `${num(b.p)} <span class="c-ink3">(${esc(w.source)} ${num(b.k,0)})</span><br><span class="${b.net>=0? "c-pos" : "c-neg"}">${money(b.net)}</span> per 1%`;
+    tipAt(tip, Math.min(e.clientX - r.left + 14, W - 190), (y(b.p) - 18));
   };
-  svg.onmouseleave = () => { tip.style.opacity = 0; };
+  svg.onmouseleave = () => { tip.classList.remove("on"); };
 }
 
 const POINT_VALUE = {NQ: 20, MNQ: 2, ES: 50, MES: 5};        // $ per index point per futures contract
@@ -882,16 +881,16 @@ function drawBias(b, col){
   svg.setAttribute("width", W); svg.setAttribute("height", H); svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
   svg.innerHTML = g;
   $("pathSw").style.background = col; $("coneSw").style.background = col;
-  document.querySelectorAll("#biasLegend [data-lv]").forEach(el => { el.style.display = (lv.some(([n]) => n === el.dataset.lv) || off.some(m => m.names.includes(el.dataset.lv))) ? "" : "none"; });   // only what is shown
+  document.querySelectorAll("#biasLegend [data-lv]").forEach(el => { el.hidden = !(lv.some(([n]) => n === el.dataset.lv) || off.some(m => m.names.includes(el.dataset.lv))); });   // only what is shown
   const tip = $("biasTip");
   svg.onmousemove = e => {
     const r = svg.getBoundingClientRect(), mx = (e.clientX - r.left - padL) / (W - padL - padR) * T;
     let i = 0; b.path.forEach((p, k) => { if(Math.abs(p[0] - mx) < Math.abs(b.path[i][0] - mx)) i = k; });
     const p = b.path[i], c = b.cone[i];
-    tip.innerHTML = `${clock(p[0])} ET<br>Base case <b style="color:${col}">${num(p[1], 0)}</b><br><span style="color:var(--ink3)">1σ ${num(c[1],0)} – ${num(c[2],0)}</span>`;
-    tip.style.opacity = 1; tip.style.left = Math.min(x(p[0]) + 12, W - 170) + "px"; tip.style.top = (y(p[1]) - 30) + "px";
+    tip.innerHTML = `${clock(p[0])} ET<br>Base case <b style="color:${col}">${num(p[1], 0)}</b><br><span class="c-ink3">1σ ${num(c[1],0)} – ${num(c[2],0)}</span>`;
+    tipAt(tip, Math.min(x(p[0]) + 12, W - 170), (y(p[1]) - 30));
   };
-  svg.onmouseleave = () => { tip.style.opacity = 0; };
+  svg.onmouseleave = () => { tip.classList.remove("on"); };
 }
 
 // ---------- Bias replay: the session's levels as the site had them, minute by minute (gexsys/timeline.py).
@@ -1007,7 +1006,7 @@ function drawReplay(){
   $("rpSlider").setAttribute("aria-valuetext", `${rpTime(tl, m * 60)} Eastern`);
   $("rpRead").innerHTML = `<b>${rpTime(tl, m * 60)}</b> · ` + (seen == null ? "no levels yet" : age > RP_GAP_S ? `levels as of ${rpTime(tl, seen)}` : `levels ${rpTime(tl, seen)}`);
   if(ref == null){
-    svg.innerHTML = `<text x="${W / 2}" y="${H / 2}" text-anchor="middle" style="fill:var(--ink3)">Nothing saved yet at this time</text>`;
+    svg.innerHTML = `<text class="f-ink3" x="${W / 2}" y="${H / 2}" text-anchor="middle">Nothing saved yet at this time</text>`;
     return;
   }
   // the price axis: only what was known by m. It is held steady while dragging: levels count when they are near the
@@ -1049,8 +1048,8 @@ function drawReplay(){
   // the cursor at m
   g += `<line x1="${x(m)}" x2="${x(m)}" y1="${padT}" y2="${H-padB}" stroke="${col}" stroke-width="1.2"/>`;
   if(px.length) g += `<circle cx="${x(px.at(-1)[0] + 1)}" cy="${y(ref)}" r="4" fill="var(--ink)" stroke="var(--panel)" stroke-width="2"/>`;
-  g += `<text x="${Math.min(x(m) + 6, W - padR - 44)}" y="${padT + 12}" style="fill:var(--ink2)">${esc(clock(m))}</text>`;
-  if(age != null && age > RP_GAP_S) g += `<text x="${padL + 8}" y="${padT + 12}" style="fill:var(--ink3)">levels held since ${esc(rpTime(tl, seen))}: no newer ones were saved</text>`;
+  g += `<text class="f-ink2" x="${Math.min(x(m) + 6, W - padR - 44)}" y="${padT + 12}">${esc(clock(m))}</text>`;
+  if(age != null && age > RP_GAP_S) g += `<text class="f-ink3" x="${padL + 8}" y="${padT + 12}">levels held since ${esc(rpTime(tl, seen))}: no newer ones were saved</text>`;
   // labels: the values in force at m (same-price levels share one), with the last change if it is under 15 min old
   const lastMove = c => {
     for(let k = i; k > 0; k--) if(rows[k].at(-1) & (1 << c))           // the options level moved, not just the basis
@@ -1069,7 +1068,7 @@ function drawReplay(){
   let last = -1e9;
   inn.sort((a, c) => y(a.p) - y(c.p)).forEach(gp => {
     const ly = Math.max(y(gp.p) + 4, last + 14); last = ly;
-    const mv = gp.mv ? ` <tspan style="fill:var(--ink2)">${gp.mv > 0 ? "▲" : "▼"}</tspan>` : "";      // moved in the last 15 min
+    const mv = gp.mv ? ` <tspan class="f-ink2">${gp.mv > 0 ? "▲" : "▼"}</tspan>` : "";      // moved in the last 15 min
     g += `<text x="${W-padR+8}" y="${ly}" style="fill:${gp.color}">${esc(gp.names.map(nm).join(" · "))} ${num(gp.p,0)}${mv}</text>`;
   });
   const edge = (gp, ly, arrow) => `<text x="${W-padR-6}" y="${ly}" text-anchor="end" style="fill:${gp.color}">${arrow} ${esc(gp.names.map(nm).join(" · "))} ${num(gp.p,0)} (${gp.p > ref ? "+" : ""}${num(gp.p - ref,0)})</text>`;
@@ -1078,7 +1077,7 @@ function drawReplay(){
   rp.idx = i;
   svg.setAttribute("width", W); svg.setAttribute("height", H); svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
   svg.innerHTML = g;
-  document.querySelectorAll("#biasLegend [data-lv]").forEach(el => { el.style.display = live.some(([n]) => n === el.dataset.lv) ? "" : "none"; });
+  document.querySelectorAll("#biasLegend [data-lv]").forEach(el => { el.hidden = !live.some(([n]) => n === el.dataset.lv); });
   // hover: what was known at the hovered minute, never past m
   const tip = $("biasTip");
   svg.onmousemove = e => {
@@ -1087,10 +1086,10 @@ function drawReplay(){
     let k = -1;
     while(k + 1 <= i && rows[k + 1][0] <= mm) k++;
     const lv = k >= 0 ? cols.map((n, c) => [n, rows[k][c + 1], k > 0 && rows[k - 1][c + 1] != null && (rows[k].at(-1) & (1 << c)) ? rows[k][c + 1] - rows[k - 1][c + 1] : 0]).filter(([, v]) => v != null) : [];
-    tip.innerHTML = `${clock(mm)} ET${bar ? `<br>Price <b>${num(bar[1])}</b>` : ""}${lv.map(([n, v, d]) => `<br><span style="color:${BIAS_LC[n]}">${esc(n)}</span> ${num(v)}${d ? ` <span style="color:var(--ink3)">${d > 0 ? "+" : ""}${num(d)}</span>` : ""}`).join("")}`;
-    tip.style.opacity = 1; tip.style.left = Math.min(x(mm) + 12, W - 190) + "px"; tip.style.top = (bar ? Math.max(0, y(bar[1]) - 30) : padT) + "px";
+    tip.innerHTML = `${clock(mm)} ET${bar ? `<br>Price <b>${num(bar[1])}</b>` : ""}${lv.map(([n, v, d]) => `<br><span style="color:${BIAS_LC[n]}">${esc(n)}</span> ${num(v)}${d ? ` <span class="c-ink3">${d > 0 ? "+" : ""}${num(d)}</span>` : ""}`).join("")}`;
+    tipAt(tip, Math.min(x(mm) + 12, W - 190), (bar ? Math.max(0, y(bar[1]) - 30) : padT));
   };
-  svg.onmouseleave = () => { tip.style.opacity = 0; };
+  svg.onmouseleave = () => { tip.classList.remove("on"); };
 }
 (() => {
   const s = $("rpSlider");
@@ -1112,14 +1111,14 @@ function renderExpiry(s){
   $("byExpiry").innerHTML = rows.length ? `<table><tr><th>Expiration</th><th>Net gamma</th><th style="width:38%">Share of total</th></tr>${rows.map(([e, v]) => {
     const dLbl = new Date(e + "T12:00:00Z").toLocaleDateString("en-US", {weekday:"short", month:"short", day:"numeric", timeZone:"UTC"});
     return `<tr><td>${esc(dLbl)}</td><td class="m" style="color:${v.net >= 0 ? "var(--pos)" : "var(--neg)"}">${money(v.net)}</td>
-      <td><span class="xbar" style="width:${Math.max(2, 100 * v.abs / mx * 0.7)}%;background:${v.net >= 0 ? "var(--pos)" : "var(--neg)"}"></span> <span class="m" style="color:var(--ink3)">${s.gross ? num(100 * v.abs / s.gross, 0) : "-"}%</span></td></tr>`; }).join("")}</table>` : `<div>${stateHtml("empty", "Nothing to list yet", "This table fills from the options chain. It appears with the next refresh, about a minute while the market is open.")}</div>`;
+      <td><span class="xbar" style="width:${Math.max(2, 100 * v.abs / mx * 0.7)}%;background:${v.net >= 0 ? "var(--pos)" : "var(--neg)"}"></span> <span class="m c-ink3">${s.gross ? num(100 * v.abs / s.gross, 0) : "-"}%</span></td></tr>`; }).join("")}</table>` : `<div>${stateHtml("empty", "Nothing to list yet", "This table fills from the options chain. It appears with the next refresh, about a minute while the market is open.")}</div>`;
 }
 
 function renderMaxPain(X){
   const mp = (X.max_pain || []).slice(0, 8);
   $("maxpain").innerHTML = mp.length ? `<table><tr><th>Expiration</th><th>Max pain</th><th>Open interest</th></tr>${mp.map(m => {
     const d = new Date(m.expiration + "T12:00:00Z").toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric",timeZone:"UTC"});
-    return `<tr><td>${esc(d)}</td><td class="m" style="color:var(--mp)">${num(m.price)}</td><td class="m">${num(m.oi,0)}</td></tr>`; }).join("")}</table>` : `<div>${stateHtml("empty", "Nothing to list yet", "This table fills from the options chain. It appears with the next refresh, about a minute while the market is open.")}</div>`;
+    return `<tr><td>${esc(d)}</td><td class="m c-mp">${num(m.price)}</td><td class="m">${num(m.oi,0)}</td></tr>`; }).join("")}</table>` : `<div>${stateHtml("empty", "Nothing to list yet", "This table fills from the options chain. It appears with the next refresh, about a minute while the market is open.")}</div>`;
 }
 
 // =====================================================================================================
@@ -1165,7 +1164,7 @@ function sessionLabel(d){
 }
 function tickClock(){
   const d = new Date(), [lab, cls] = sessionLabel(d);
-  $("clock").innerHTML = `<i class="dot ${cls}" style="display:inline-block;margin-right:6px"></i>${d.toLocaleTimeString("en-US", {...ET, hour12:false})} ET · ${lab}`;
+  $("clock").innerHTML = `<i class="dot dot-inl ${cls}"></i>${d.toLocaleTimeString("en-US", {...ET, hour12:false})} ET · ${lab}`;
 }
 setInterval(tickClock, 1000); tickClock();
 
@@ -1178,9 +1177,9 @@ function renderTicker(){
     const rg = {POSITIVE: "+GAMMA", NEGATIVE: "-GAMMA", INDETERMINATE: "FLIP"}[s.regime] || "-";
     return `<div class="tk${w.market === market ? " on" : ""}" data-m="${esc(w.market)}" title="Switch to ${esc(w.market)} (${w.market === "NQ" ? "N" : "E"})">
       <span class="sym">${esc(w.market)}</span><span class="px">${num(ref)}</span><span class="rg ${esc(s.regime)}">${rg}</span>
-      <span><em>ZG</em> <b>${num(pickP(L.zero_gamma), 0)}</b></span><span><em>CW</em> <b style="color:var(--pos)">${num(pickP(L.call_wall), 0)}</b></span>
-      <span><em>PW</em> <b style="color:var(--neg)">${num(pickP(L.put_wall), 0)}</b></span><span><em>EM</em> <b>±${num(emd, 0)}</b></span>
-      <span><em>NET</em> <b style="color:${s.net >= 0 ? "var(--pos)" : "var(--neg)"}">${money(s.net)}</b></span></div>`;
+      <span><em>ZG</em> <b>${num(pickP(L.zero_gamma), 0)}</b></span><span><em>CW</em> <b class="c-pos">${num(pickP(L.call_wall), 0)}</b></span>
+      <span><em>PW</em> <b class="c-neg">${num(pickP(L.put_wall), 0)}</b></span><span><em>EM</em> <b>±${num(emd, 0)}</b></span>
+      <span><em>NET</em> <b class="${s.net >= 0 ? "c-pos" : "c-neg"}">${money(s.net)}</b></span></div>`;
   }).join("");
   $("ticker").innerHTML = cells;          // data source, age and next paste are on each market page's header
   [...$("ticker").querySelectorAll(".tk[data-m]")].forEach(el => el.onclick = () => setMarket(el.dataset.m));
@@ -1329,8 +1328,8 @@ function openExplain(key){
   const rel = [...document.querySelectorAll(`#${page}View [data-help]`)].map(e => e.dataset.help).filter((k, i, a) => HELP[k] && k !== key && a.indexOf(k) === i);
   const lesson = (window.GEX_LIBRARY || {lessons: []}).lessons.find(l => l.id === ((window.GEX_LIBRARY || {}).forHelp || {})[key]);
   $("exMore").innerHTML = (lesson ? `<button class="ex-learn" data-lesson="${esc(lesson.id)}"><span class="eyebrow">Learn the basics</span><b>${esc(lesson.title)}</b><span>${lesson.minutes} min lesson in the Library →</span></button>` : "")
-    + (rel.length ? `<span class="eyebrow" style="width:100%">Also on this page</span>` + rel.map(k => `<button data-k="${k}">${esc(HELP[k].title)}</button>`).join("") : "")
-    + (() => { const ts = glTermsIn(h.title + " " + h.tldr + " " + h.body); return ts.length ? `<span class="eyebrow" style="width:100%">Terms in the glossary</span>` + ts.map(t => `<button data-g="${esc(t)}">${esc(t)}</button>`).join("") : ""; })();
+    + (rel.length ? `<span class="eyebrow w-100">Also on this page</span>` + rel.map(k => `<button data-k="${k}">${esc(HELP[k].title)}</button>`).join("") : "")
+    + (() => { const ts = glTermsIn(h.title + " " + h.tldr + " " + h.body); return ts.length ? `<span class="eyebrow w-100">Terms in the glossary</span>` + ts.map(t => `<button data-g="${esc(t)}">${esc(t)}</button>`).join("") : ""; })();
   [...$("exMore").querySelectorAll("button[data-g]")].forEach(b => b.onclick = () => openGlossary(b.dataset.g));
   [...$("exMore").querySelectorAll("button[data-k]")].forEach(b => b.onclick = () => openExplain(b.dataset.k));
   const lb = $("exMore").querySelector("[data-lesson]");
@@ -1482,7 +1481,7 @@ function renderLibrary(){
   $("libToc").innerHTML = LIB.chapters.map(([ck, ct]) => {
     const ls = visible.filter(l => l.chapter === ck);
     return ls.length ? `<div class="toc-ch">${esc(ct)}</div>` + ls.map(l => `<button class="toc-l${l.id === libLesson ? " on" : ""}" data-l="${esc(l.id)}"><i class="${libRead.has(l.id) ? "rd" : ""}"></i><span>${esc(l.title)}</span><em>${l.minutes}m</em></button>`).join("") : "";
-  }).join("") || `<div class="expl" style="margin:8px">No lesson matches "${esc(q)}".</div>`;
+  }).join("") || `<div class="expl m-2">No lesson matches "${esc(q)}".</div>`;
   [...$("libToc").querySelectorAll("[data-l]")].forEach(b => b.onclick = () => openLesson(b.dataset.l));
   const i = Math.max(0, LIB.lessons.findIndex(l => l.id === libLesson)), L = LIB.lessons[i];
   if(!L){ $("libArticle").innerHTML = ""; return; }
@@ -1567,7 +1566,7 @@ function renderStudies(){
   [...$("stMarket").children].forEach(b => b.onclick = () => { stM = b.dataset.m; store.set("gex.stm", stM); renderStudies(); });
   const M = X.markets[stM], C = M.counts, St = X.studies, edge = M.verdict.edge.length;
   const at = new Date(X.computed_at).toLocaleString("en-US", {...ET, month: "short", day: "numeric", hour: "numeric", minute: "2-digit"});
-  $("stSub").innerHTML = `<span class="trk-tag ${edge ? "" : "warn"}" style="margin-left:0">${edge ? "evidence found" : "no proven edge yet"}</span> ${M.sessions} sessions, ${sday(M.data_from)} – ${sday(M.data_through)} · computed ${at} ET`;
+  $("stSub").innerHTML = `<span class="trk-tag ${edge ? "" : "warn"} ml-0">${edge ? "evidence found" : "no proven edge yet"}</span> ${M.sessions} sessions, ${sday(M.data_from)} – ${sday(M.data_through)} · computed ${at} ET`;
   $("stKpis").innerHTML =
     kpi("Sessions", num(M.sessions, 0), `${sday(M.data_from)} to ${sday(M.data_through)} · ${M.archive_sessions} with 1-minute bars`)
     + kpi("Level types with 20+ touches", `${C.level_types_20} of ${C.level_types}`, "below 20 touches no rate is shown")
@@ -1597,7 +1596,7 @@ function renderStudies(){
       const gs = Object.entries(t.groups).map(([g, v]) => `${esc(g.toLowerCase().replace(/_/g, " "))} ${v.sessions}${v.difference != null && v.interval ? ` (${sgn(v.difference)}, ${ivTxt(v.interval)})` : ""}`).join(" · ");
       const un = Object.values(t.unavailable || {}).reduce((a, b) => a + b, 0);
       const why = un ? `<div class="dim">${un} unavailable: ${esc(Object.keys(t.unavailable)[0])}</div>` : "";
-      const res = t.status === "tested" ? `<span class="trk-tag ${t.survives ? "good" : ""}" style="margin-left:0">${esc(t.verdict)}</span><div class="dim">p ${num(t.p_value, 3)}</div>` : `<span class="dim">${t.status === "unavailable" ? "unavailable: over 10% of shuffles left a group with no touch" : esc(t.status)}</span>`;
+      const res = t.status === "tested" ? `<span class="trk-tag ${t.survives ? "good" : ""} ml-0">${esc(t.verdict)}</span><div class="dim">p ${num(t.p_value, 3)}</div>` : `<span class="dim">${t.status === "unavailable" ? "unavailable: over 10% of shuffles left a group with no touch" : esc(t.status)}</span>`;
       return `<tr><td>${SPLIT_NAME[t.split] || esc(t.split)}</td><td>${gs}${why}</td><td>${res}</td></tr>`;
     }).join("")}</table><div class="expl">Tested only when every group has 20 sessions; ${SP.permutations.toLocaleString("en-US")} permutations of whole sessions; Benjamini-Hochberg at q = ${num(SP.q, 2)} across every test run.</div>`;
   // rule tester
@@ -1605,7 +1604,7 @@ function renderStudies(){
   $("stRuleSub").textContent = `fade first touch · v${RU.version} ${sha8(RU.sha256)} · hypothetical`;
   const foot = `<div class="expl">Fade the first touch of a 9:30 level: entry at the next 1-minute bar's open + 1 tick, stop and target exits filled 1 tick worse (the stop first inside one bar), time exit, flat by the close, fees $${num(RU.fees_round_turn_usd, 2)} per round turn. Settings are picked on earlier sessions only (${RU.min_train_sessions} first) and scored on the next one. Tries to date: ${RU.tries} grid points. 1-minute bars: ${RU.data_from ? `${sday(RU.data_from)} to ${sday(RU.data_through)}` : "none yet"}${RU.backfilled_from ? ` (${sday(RU.backfilled_from)} to ${sday(RU.backfilled_through)} downloaded later from Yahoo's 30-day history, not captured on the day)` : ""}. No orders are ever placed.</div>`;
   if(r.status !== "tested"){
-    $("stRule").innerHTML = `<div class="trk-kpis st-one"><div class="kpi"><div class="eyebrow">Out-of-sample trades</div><div class="big sm">${r.oos_trades ?? 0} of ${RU.min_oos_trades}</div><div class="s"><span class="trk-tag warn" style="margin-left:0">not enough data</span> ${r.sessions ?? 0} session${r.sessions === 1 ? "" : "s"} with 1-minute bars; nothing is scored before ${RU.min_oos_trades} out-of-sample trades</div></div></div>` + foot;
+    $("stRule").innerHTML = `<div class="trk-kpis st-one"><div class="kpi"><div class="eyebrow">Out-of-sample trades</div><div class="big sm">${r.oos_trades ?? 0} of ${RU.min_oos_trades}</div><div class="s"><span class="trk-tag warn ml-0">not enough data</span> ${r.sessions ?? 0} session${r.sessions === 1 ? "" : "s"} with 1-minute bars; nothing is scored before ${RU.min_oos_trades} out-of-sample trades</div></div></div>` + foot;
     return;
   }
   const e = r.per_trade, ps = r.per_session, nr = r.without_roll_weeks || {};
@@ -1698,7 +1697,7 @@ function renderTrack(){
     const rb = rebuilt(s) ? `<span class="trk-tag" title="Frozen later from saved snapshots; the data is timestamped ${esc(new Date(p.asof).toLocaleString("en-US", {...ET, month: "short", day: "numeric", hour: "numeric", minute: "2-digit"}))} ET, before the open">rebuilt</span>` : "";
     const fix = s.correction ? `<span class="trk-tag" title="Graded first on the 15:59 minute bar (${esc(num(s.correction.recorded, 2))}), which misses the closing print. Shown here on the official close, ${esc(num(s.correction.official, 2))}. The original grade stays in the public record.">corrected</span>` : "";
     return `<tr><td>${esc(day)}</td><td>${esc(s.market)}</td><td><span style="color:${regCol}">${esc(reg)}</span> · ${esc(p.bias || "-")}</td><td class="m">${num(p.ref, 2)}</td><td class="m">${num(p.em, 0)}</td>
-      <td class="m">${o ? `${num(o.close, 2)} <span style="color:${o.move >= 0 ? "var(--good)" : "var(--bad)"}">${signed(o.move_em, 2)}σ</span>` : "-"}</td>
+      <td class="m">${o ? `${num(o.close, 2)} <span class="${o.move >= 0 ? "c-good" : "c-bad"}">${signed(o.move_em, 2)}σ</span>` : "-"}</td>
       <td>${o ? yes(o.em_close) : "-"}</td><td>${o ? wall(o.cw) : "-"}</td><td>${o ? wall(o.pw) : "-"}</td><td>${o ? yes(o.bias_hit, "right", "wrong") : "-"}</td><td>${tail}${rb}${fix}</td></tr>`;
   }).join("")}</table>` : `<div>${stateHtml("empty", "No sessions yet", "A session is added when its plan is frozen before the 9:30 ET open, and graded after the close.")}</div>`;
   renderBacktest();
@@ -1727,9 +1726,9 @@ function renderTrackMoves(ss){
   svg.onmousemove = e => {
     const i = Math.max(0, Math.min(rows.length - 1, Math.floor((e.clientX - svg.getBoundingClientRect().left - pl) / bw))), s = rows[i], o = s.outcome;
     tip.innerHTML = `<b>${esc(s.session)} ${esc(s.market)}</b><br>Move ${signed(o.move, 0)} pts · ${signed(o.move_em, 2)}σ<br>${o.em_close ? "Closed inside the band" : "Closed outside the band"} · ${esc((s.plan.regime || "").toLowerCase())} gamma`;
-    tip.style.opacity = 1; tip.style.left = Math.min(pl + i * bw + 12, W - 230) + "px"; tip.style.top = "14px";
+    tipAt(tip, Math.min(pl + i * bw + 12, W - 230), 14);
   };
-  svg.onmouseleave = () => { tip.style.opacity = 0; };
+  svg.onmouseleave = () => { tip.classList.remove("on"); };
 }
 // the same results split by gamma regime and by the plan's confidence, counted from the sessions in view
 // level reactions (trackrecord/reactions.py): first touch of each level vs random strikes at the same distance
@@ -1741,14 +1740,14 @@ function renderReactions(){
   if(!R || !R.types){ $("trkRxSub").textContent = ""; $("trkRx").innerHTML = `<div class="expl">Starts once a graded session's 1-minute prices are saved.</div>`; return; }
   const need = R.rules.min_touches;
   $("trkRxSub").textContent = `${R.days} session${R.days === 1 ? "" : "s"} · NQ and ES together · after ${rxH} min`;
-  const rate = c => c.rate == null ? `<span class="dim">-</span>` : `<b title="${c.ci ? `95% range ${pct(c.ci[0])} to ${pct(c.ci[1])} (${c.k} of ${c.n})` : `${c.k} of ${c.n}`}">${pct(c.rate)}</b> <span class="dim" style="white-space:nowrap">vs ${pct(c.random)}</span>`;
+  const rate = c => c.rate == null ? `<span class="dim">-</span>` : `<b title="${c.ci ? `95% range ${pct(c.ci[0])} to ${pct(c.ci[1])} (${c.k} of ${c.n})` : `${c.k} of ${c.n}`}">${pct(c.rate)}</b> <span class="dim nowrap">vs ${pct(c.random)}</span>`;
   const VERDICT = {bounce: ["good", "bounces more"], break: ["warn", "breaks more"], fewer_bounces: ["bad", "bounces less"],
                    fewer_breaks: ["good", "breaks less"], none: ["", "no edge"]};
   const rows = R.types.map(t => { const c = t.h[rxH]; if(!c) return "";
     const [cls, word] = c.verdict === "few" ? ["", `too few (${c.touches}/${need})`] : VERDICT[c.verdict] || ["", c.verdict];
-    return `<tr><td>${esc(t.name)}</td><td class="m">${c.touches}</td><td class="m">${rate(c.bounce)}</td><td class="m">${rate(c.break)}</td><td style="text-align:left"><span class="trk-tag ${cls}" style="margin-left:0">${word}</span></td></tr>`; }).join("");
+    return `<tr><td>${esc(t.name)}</td><td class="m">${c.touches}</td><td class="m">${rate(c.bounce)}</td><td class="m">${rate(c.break)}</td><td class="ta-l"><span class="trk-tag ${cls} ml-0">${word}</span></td></tr>`; }).join("");
   $("trkRx").innerHTML = `<table class="trk-table rx-table"><tr><th>Level</th><th>Touches</th><th>Bounced</th><th>Broke</th><th title="Compared with random strikes at the same distance">Vs random</th></tr>${rows}</table>
-    <div class="expl" style="margin-top:8px">A bounce or break means price moved at least a quarter of the move normally expected in ${rxH} minutes, back from or through the level; anything less is a stall. A verdict needs ${need}+ touches and a difference from random strikes that survives testing every level type and horizon at once (Holm correction, with errors clustered by day as NQ and ES move together): on random-walk test days at most 5% of pages show any false verdict. A real 13-point edge typically takes about 120 sessions to confirm. The four key levels go back to ${esc(R.since || "the start")}${R.full_since && R.full_since !== R.since ? `; the other level types to ${esc(R.full_since)}, when full 9:30 pastes began to be saved` : ""}.</div>`;
+    <div class="expl mt-2">A bounce or break means price moved at least a quarter of the move normally expected in ${rxH} minutes, back from or through the level; anything less is a stall. A verdict needs ${need}+ touches and a difference from random strikes that survives testing every level type and horizon at once (Holm correction, with errors clustered by day as NQ and ES move together): on random-walk test days at most 5% of pages show any false verdict. A real 13-point edge typically takes about 120 sessions to confirm. The four key levels go back to ${esc(R.since || "the start")}${R.full_since && R.full_since !== R.since ? `; the other level types to ${esc(R.full_since)}, when full 9:30 pastes began to be saved` : ""}.</div>`;
 }
 function renderTrackSplit(ss){
   const done = ss.filter(s => s.plan && s.outcome), tally = (rows, f) => { const v = rows.map(f).filter(x => x != null); return {k: v.filter(Boolean).length, n: v.length}; };
@@ -1802,9 +1801,9 @@ function renderBacktest(){
   svg.onmousemove = e => {
     const i = Math.max(0, Math.min(ys.length - 1, Math.floor((e.clientX - svg.getBoundingClientRect().left - pl) / bw))), r = ys[i];
     tip.innerHTML = `<b>${r.year}</b> · ${r.n} sessions<br>Close inside <b>${pct(r.close_in.rate)}</b> · whole range ${pct(r.range_in.rate)}<br>Broke up ${pct(r.up_break.rate)} · down ${pct(r.down_break.rate)} · avg ${esc(B.vol_index)} ${num(r.avg_vol, 1)}`;
-    tip.style.opacity = 1; tip.style.left = Math.min(pl + i * bw + 12, W - 250) + "px"; tip.style.top = "14px";
+    tipAt(tip, Math.min(pl + i * bw + 12, W - 250), 14);
   };
-  svg.onmouseleave = () => { tip.style.opacity = 0; };
+  svg.onmouseleave = () => { tip.classList.remove("on"); };
   // distribution of moves vs the normal curve
   const hst = B.hist, dw = $("btDistWrap"), ds = $("btDist"), DW = Math.max(dw.clientWidth, 280), DH = 260, nb = hst.counts.length;
   const top = Math.max(...hst.counts, ...hst.normal) * 1.08, bx = i => pl + i / nb * (DW - pl - pr), by = v => pt + (1 - v / top) * (DH - pt - pb);
@@ -1819,9 +1818,9 @@ function renderBacktest(){
   ds.onmousemove = e => {
     const i = Math.max(0, Math.min(nb - 1, Math.floor((e.clientX - ds.getBoundingClientRect().left - pl) / (bx(1) - bx(0))))), a = -hst.edge + i * hst.bin;
     dt.innerHTML = `${i === 0 ? "below " + signed(a + hst.bin, 2) : i === nb - 1 ? "above " + signed(a, 2) : `${signed(a, 2)} to ${signed(a + hst.bin, 2)}`}σ<br>Actual <b>${hst.counts[i]}</b> · normal ${num(hst.normal[i], 0)}`;
-    dt.style.opacity = 1; dt.style.left = Math.min(bx(i) + 12, DW - 190) + "px"; dt.style.top = "14px";
+    tipAt(dt, Math.min(bx(i) + 12, DW - 190), 14);
   };
-  ds.onmouseleave = () => { dt.style.opacity = 0; };
+  ds.onmouseleave = () => { dt.classList.remove("on"); };
   // by vol level
   $("btVolSub").textContent = `${B.vol_index} the evening before, in five equal groups`;
   $("btVol").innerHTML = `<table class="trk-table"><tr><th>${esc(B.vol_index)} level</th><th>Sessions</th><th>Close inside</th><th>Whole range inside</th><th>Broke above</th><th>Broke below</th><th>Avg |move|</th></tr>${B.by_vol.map(r =>
@@ -1902,12 +1901,12 @@ function renderLiveTable(){
   [...$("ldRows").children].forEach(el => {
     el.onmouseenter = () => {
       const x = rows[Number(el.dataset.i)], v = x.v, ls = at.get(Number(el.dataset.i)) || [];
-      tip.innerHTML = `<b>${num(x.f, 2)}</b> <span style="color:var(--ink3)">(${esc(s.options_source || w.source)} ${num(x.k, 0)})</span>
-        <br>Net GEX <b style="color:${v[0] >= 0 ? "var(--pos)" : "var(--neg)"}">${money(v[0])}</b> per 1% · net DEX ${compact(v[1])}
+      tip.innerHTML = `<b>${num(x.f, 2)}</b> <span class="c-ink3">(${esc(s.options_source || w.source)} ${num(x.k, 0)})</span>
+        <br>Net GEX <b class="${v[0] >= 0 ? "c-pos" : "c-neg"}">${money(v[0])}</b> per 1% · net DEX ${compact(v[1])}
         <br>OI calls ${num(v[2], 0)} / puts ${num(v[3], 0)} · volume calls ${num(v[4], 0)} / puts ${num(v[5], 0)}${ls.length ? `<br>${ls.map(l => esc(l.code + " " + l.name + (l.share ? ` (${num(100 * l.share, 1)}% of gamma)` : ""))).join("<br>")}` : ""}`;
-      tip.style.opacity = 1; tip.style.left = "170px"; tip.style.top = (el.offsetTop + el.offsetHeight + 40) + "px";
+      tipAt(tip, 170, (el.offsetTop + el.offsetHeight + 40));
     };
-    el.onmouseleave = () => { tip.style.opacity = 0; };
+    el.onmouseleave = () => { tip.classList.remove("on"); };
   });
   $("ldSub").textContent = `${num(LD.width * fac, 1)}-pt rows in ${w.market} prices · ${all ? "all expirations" : `${ldSel.size} expiration${ldSel.size === 1 ? "" : "s"}`} · ${s.backup ? "OCC backup estimate (open interest only)" : "Cboe 15-min delayed"}`;
   // side panel
@@ -1915,11 +1914,11 @@ function renderLiveTable(){
   const gT = E.reduce((a, e, i) => a + (on(i) ? e.net : 0), 0), dT = E.reduce((a, e, i) => a + (on(i) ? e.dex : 0), 0);
   $("ldPrice").innerHTML = `<div class="eyebrow">${esc(w.market)} · ${esc((s.options_source || w.source) + (s.etf ? "+" + s.etf : ""))}${refAt(s.ref_time)}</div>
     <div class="big">${num(ref, 2)}</div>
-    <div class="ld-cards"><div><div class="eyebrow">Net GEX</div><b style="color:${gT >= 0 ? "var(--pos)" : "var(--neg)"}">${money(gT)}</b><span>per 1% move</span></div>
-      <div><div class="eyebrow">Net DEX</div><b style="color:${dT >= 0 ? "var(--pos)" : "var(--neg)"}">${compact(dT)}</b><span>dealer delta, $</span></div></div>
-    <div class="expl" style="margin-top:8px">${all ? "All expirations" : "Selected expirations only"}. Regime (all expirations): <b>${esc((s.regime || "").toLowerCase())}</b>.</div>`;
+    <div class="ld-cards"><div><div class="eyebrow">Net GEX</div><b class="${gT >= 0 ? "c-pos" : "c-neg"}">${money(gT)}</b><span>per 1% move</span></div>
+      <div><div class="eyebrow">Net DEX</div><b class="${dT >= 0 ? "c-pos" : "c-neg"}">${compact(dT)}</b><span>dealer delta, $</span></div></div>
+    <div class="expl mt-2">${all ? "All expirations" : "Selected expirations only"}. Regime (all expirations): <b>${esc((s.regime || "").toLowerCase())}</b>.</div>`;
   const lvs = lv.filter((l, i, a) => a.findIndex(z => z.code === l.code) === i).sort((a, b) => b.p - a.p);
-  $("ldLevels").innerHTML = `<div class="ld-list">${lvs.map(l => `<div><b class="ld-chip ${l.cls}">${esc(l.code)}</b><span${l.share ? ` title="${num(100 * l.share, 1)}% of gamma"` : ""}>${esc(l.name)}</span><em>${num(l.p, 2)}</em><i style="color:${l.p >= ref ? "var(--pos)" : "var(--neg)"}">${signed((l.p / ref - 1) * 100, 2)}%</i></div>`).join("")}
+  $("ldLevels").innerHTML = `<div class="ld-list">${lvs.map(l => `<div><b class="ld-chip ${l.cls}">${esc(l.code)}</b><span${l.share ? ` title="${num(100 * l.share, 1)}% of gamma"` : ""}>${esc(l.name)}</span><em>${num(l.p, 2)}</em><i class="${l.p >= ref ? "c-pos" : "c-neg"}">${signed((l.p / ref - 1) * 100, 2)}%</i></div>`).join("")}
     <div class="now"><b class="ld-chip now">PX</b><span>${esc(w.market)} ${w.result.mapped ? "equiv. of " + esc(w.source) : "price"}</span><em>${num(ref, 2)}</em><i></i></div></div>`;
   const pcOI = T[2] ? T[3] / T[2] : null, pcV = T[4] ? T[5] / T[4] : null;
   const act = rows.reduce((b, x) => x.v[4] + x.v[5] > b.v[4] + b.v[5] ? x : b, rows[0]);
@@ -1957,6 +1956,8 @@ let hmSpan = store.get("gex.hmspan2", "2d");        // visible range: today's se
 let hmReset = true;          // next draw starts at the latest candles with auto-scaled prices (open, market or timeframe change)
 let hmTf = store.get("gex.hmtf", "5m"), hmOpacity = Number(store.get("gex.hmop", "50")), hmShowLv = store.get("gex.hmlv", "1") === "1";
 const hmUrl = () => STATIC ? `data/heatmap-${market}-${hmTf}.json` : `/api/heatmap?market=${encodeURIComponent(market)}&tf=${hmTf}`;
+// a chart tooltip: shown (class "on") at x, y inside its chart; hidden by removing "on"
+const tipAt = (el, x, y) => { el.classList.add("on"); Object.assign(el.style, {left: x + "px", top: y + "px"}); };
 const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 // any CSS colour (hex, rgb() or the OKLCH tokens) as [r, g, b]: painted on a 1-pixel canvas and read back, because
 // getComputedStyle returns OKLCH as OKLCH and the chart library (lightweight-charts 4.2) cannot parse it
@@ -2295,18 +2296,18 @@ function renderHeatmap(){
 }
 function hmHover(p){
   const tip = $("hmTip");
-  if(!p || !p.time || !p.point || !hm){ tip.style.opacity = 0; return; }
+  if(!p || !p.time || !p.point || !hm){ tip.classList.remove("on"); return; }
   const price = hmCandles.coordinateToPrice(p.point.y);
   let col = null; for(const c of hm.columns){ if(hmSnap(hm._times, c.t) <= p.time) col = c; else break; }
-  if(price == null || !col){ tip.style.opacity = 0; return; }
+  if(price == null || !col){ tip.classList.remove("on"); return; }
   if(p.time - col.t > HM_GAP_S){
-    tip.innerHTML = `<b>${num(price, 2)}</b> · no GEX saved for this time<br><span style="color:var(--ink3)">the newest saved snapshot is ${esc(new Date(col.t * 1000).toLocaleString("en-US", {...ET, weekday: "short", hour: "numeric", minute: "2-digit"}))} ET</span>`;
-    tip.style.opacity = 1; tip.style.left = Math.min(p.point.x + 16, $("hmChart").clientWidth - 260) + "px"; tip.style.top = Math.max(8, p.point.y - 60) + "px"; return; }
+    tip.innerHTML = `<b>${num(price, 2)}</b> · no GEX saved for this time<br><span class="c-ink3">the newest saved snapshot is ${esc(new Date(col.t * 1000).toLocaleString("en-US", {...ET, weekday: "short", hour: "numeric", minute: "2-digit"}))} ET</span>`;
+    tipAt(tip, Math.min(p.point.x + 16, $("hmChart").clientWidth - 260), Math.max(8, p.point.y - 60)); return; }
   const j = Math.round(((price - hm.offset) / hm.factor - col.base) / col.w), v = col.v[j];
   const when = new Date(col.t * 1000).toLocaleString("en-US", {...ET, weekday: "short", hour: "numeric", minute: "2-digit"});
-  tip.innerHTML = `<b>${num(price, 2)}</b> · snapshot ${esc(when)} ET<br>${v == null ? "outside the saved range" : col.rel ? `relative gamma ${signed(v, 0)} (older snapshot)` : `net GEX <b style="color:${v >= 0 ? "var(--pos)" : "var(--neg)"}">${money(v * 1e6)}</b> per 1%`}`
-    + `<br><span style="color:var(--ink3)">ZG ${num(col.zg * hm.factor + hm.offset, 0)} · CW ${num(col.cw * hm.factor + hm.offset, 0)} · PW ${num(col.pw * hm.factor + hm.offset, 0)}</span>`;
-  tip.style.opacity = 1; tip.style.left = Math.min(p.point.x + 16, $("hmChart").clientWidth - 260) + "px"; tip.style.top = Math.max(8, p.point.y - 60) + "px";
+  tip.innerHTML = `<b>${num(price, 2)}</b> · snapshot ${esc(when)} ET<br>${v == null ? "outside the saved range" : col.rel ? `relative gamma ${signed(v, 0)} (older snapshot)` : `net GEX <b class="${v >= 0 ? "c-pos" : "c-neg"}">${money(v * 1e6)}</b> per 1%`}`
+    + `<br><span class="c-ink3">ZG ${num(col.zg * hm.factor + hm.offset, 0)} · CW ${num(col.cw * hm.factor + hm.offset, 0)} · PW ${num(col.pw * hm.factor + hm.offset, 0)}</span>`;
+  tipAt(tip, Math.min(p.point.x + 16, $("hmChart").clientWidth - 260), Math.max(8, p.point.y - 60));
 }
 window.__hmTheme = () => { if(hmChart) renderHeatmap(); };
 window.__hmOpen = () => { hmReset = true; if(data) loadHeatmap(); };
