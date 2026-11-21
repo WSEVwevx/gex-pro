@@ -333,3 +333,39 @@ lessons, open questions. Read the last 5 entries before deciding anything.
 - A live day with a zero-gamma crossing, an early close or a roll week (fixtures only).
 - The self-hosted Geist font: on hold until the owner OKs downloading it. System faces meanwhile.
 - openmarket.xyz, suggested by the owner: it has no public data endpoint and needs a sign-in, so it fails the "free, no account, answers from GitHub" rules.
+
+## 2026-11-21 redesign 2040: Phases 6-7 (Sat 21 Nov, 09:00-13:30 ET, market closed)
+
+### Shipped (PR, lane)
+- **59** (lane 67) sweep fixes: Heatmap profile width on phones, honest axis-label legend, inert closed drawer, Live table contrast, "60 min" ages, the bottom bar's paste date.
+- **60** (lane 68) phone tap targets: every small control gets a 44 px hit box, nothing moves.
+- **61** (lane 69) inline styles to classes: 122 -> 57 lines of `app.js` that set a style. Tooltips show through `tipAt` and `.tip.on`; toggles use `hidden`. The review caught two lost colours (`c-good` / `c-bad` missing; `.tk b` outranked `.c-pos`): colour classes are now doubled-class.
+- **62** (lane 70) "Latest bias, no session today" on a day without a session; Heatmap axis thousands separators; Screener chart "as of". A duplicate `const day` blanked the whole site locally while every test passed: a test now parses every script with `node --check`.
+- **63** (lane 71) sweep 2: Heatmap day labels were a day early (UTC-midnight marks formatted in ET); backup volume says "unavailable", not 0; the Screener "as of" carries its day and the tab reads "Last session".
+- **64** (lane 72) Heatmap: the first view keeps its chosen span (it showed the library's default ~13 hours instead of "2 days"); a real resize re-frames it.
+- **65** (lane 73) Net DEX labelled as a model. The verifier matched ES +$2,902B and NQ +$220B to the dollar; about $2,150B of ES is matched SPX call/put pairs (box spreads) that the "dealers long calls, short puts" convention counts as full long delta. The engine is unchanged; the card says "modelled dealer delta" and the help gives the caveat. The owner chose this.
+- **66** (lane 74) 8 font sizes, all tokens (one off-scale size, the Briefings price 24 -> 22 px); the logo's colours from tokens (now themed in light).
+- **67** (lane 75) CLS 0 on a warm load (below).
+- **68** (lane 76) the final audit's findings: a first visit waits for the first data draw (it jumped 71 px at 1366, 143 px at 375); every compact dollar amount shows "$" (Net DEX read "+220.37B" beside "-$3.24B").
+
+### Phase 7: the proof
+- **Performance budget** (headless Chrome over CDP, 1 cold + 3 warm loads per width, the same hosted data files served locally for both builds; before = ecbae09, after = efa3359):
+  - CLS warm, 1366: 0.12 / 0.08 / 0.08 before, 0 / 0 / 0 after; 375: 0 before and after. First visit: 0.04 at 1366 after PR 67 (the banner's height was not known yet); 0 at both widths after PR 68, which keeps a first visit hidden until the first data draw.
+  - Largest paint, warm median: about 100 ms at both widths, before and after (budget 1.5 s).
+  - Sizes, gzip: JS + CSS +9.0 KB (budget 60 KB); fonts 0 KB (budget 120 KB).
+  - Main measured 0.10-0.50 at 1366 before PR 67. Causes: card heights were keyed by position and the day-aware Levels order moved cards after saving (Level history got the plan row's 1,273 px); the area painted before `app.js` laid it out; the banner and headline grew with the data; the clock, paste date and tabs changed width; the level history svg was 150 px empty. Each is held by `tests/test_no_jump_at_load.py`.
+- **10-second test**: all five answers on the first screen at 1366 and 375, dark and light (price vs zero gamma and both wall distances in the sentence; freshness in the status strip; backup on the hatched banner and in the sentence; the paste in the top bar or the phone's bottom bar). On a day without a session the field sits below Level history; on a session day it follows the headline.
+- **Gallery**: every page's first screen before and after, both widths, both themes, with the marked 10-second test and the budget: https://claude.ai/artifact/8CjDgoEXWaEbbuR5RkpBz5 (private).
+- **Final audit** (ui-auditor, hosted, 104 page checks: 13 pages × NQ/ES × 1366/375 × dark/light): 0 high, 1 medium, 2 low, no script errors. The medium (first-visit jump) and one low (Net DEX without "$") are fixed in PR 68. Left: the Live table's expirations help lists 2026-12-18 twice (SPX AM and SPXW PM) with no root to tell them apart; a phone's "2 days" Heatmap squeezes the candles.
+- **Done-means numbers**: 0 inline styles in `index.html`; every colour from a token (the browser's `theme-color` meta is the one literal); 8 font sizes; CLS 0 warm; budget met. Not met: "under 15 places in `app.js` that set styles". 57 remain, nearly all data-driven (band and gauge positions in %, bar widths, colours chosen per value, custom properties such as `--accent`, height reservations). Moving them to classes would mean a class per value; kept, and held at 57 by `tests/test_inline_styles.py`.
+
+### Removed (not silently)
+- "Today's" on the Bias card on a day without a session; the "Today · 5m" Screener tab label (now "Last session · 5m").
+- The literal hex colours in the logo SVG.
+
+### Not verified
+- A real phone (swipe, field tap, iOS safe areas); phone captures are Chrome's mobile emulation.
+- A screen reader.
+- A live session, a zero-gamma crossing, an early close or a roll week (fixtures only).
+- Scrolling smoothness (not measured); the hosted site's own load timings (measured on local copies of the same files).
+- The Geist font: still on hold until the owner OKs the download.

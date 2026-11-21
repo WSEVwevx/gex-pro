@@ -518,6 +518,7 @@ function renderSources(){
 function ago(iso){ const m = (Date.now() - Date.parse(iso))/60000, r = Math.round(m); return m < 1 ? "just now" : r < 60 ? `${r} min ago` : `${Math.floor(r/60)} h ${r%60} min ago`; }
 
 function render(){
+  document.documentElement.classList.remove("booting");                  // drawn in this same task: no frame with old heights
   const ws = data.workers, markets = [...new Set(ws.map(w => w.market))];
   if(!markets.includes(market)) market = markets[0];
   $("tabs").innerHTML = markets.map(m => `<button role="tab" aria-selected="${m===market}" data-m="${m}">${m}</button>`).join("");
@@ -1838,7 +1839,7 @@ let ldSel = (() => { try { return new Set(JSON.parse(store.get("gex.ldsel", "[]"
 let ldRowsN = Number(store.get("gex.ldrows", "51"));
 const MON = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 const ldDate = d => d === "other" ? "LATER" : `${MON[Number(d.slice(5, 7)) - 1]} ${Number(d.slice(8, 10))}`;
-const compact = x => x == null || !isFinite(x) ? "-" : (x < 0 ? "-" : "+") + (Math.abs(x) >= 1e9 ? num(Math.abs(x) / 1e9, 2) + "B" : Math.abs(x) >= 1e6 ? num(Math.abs(x) / 1e6, 1) + "M" : num(Math.abs(x) / 1e3, 0) + "K");
+const compact = x => x == null || !isFinite(x) ? "-" : (x < 0 ? "-" : "+") + "$" + (Math.abs(x) >= 1e9 ? num(Math.abs(x) / 1e9, 2) + "B" : Math.abs(x) >= 1e6 ? num(Math.abs(x) / 1e6, 1) + "M" : num(Math.abs(x) / 1e3, 0) + "K");
 function renderLiveTable(){
   const w = curW();
   if(!w || !w.result){ $("ldRows").innerHTML = `<div>${stateHtml("empty", "No table yet", "The live table is built from the options chain. It appears with the first calculation, within a minute.")}</div>`; return; }
@@ -2669,7 +2670,9 @@ function calNotes(d, cal){
 const cal0 = (() => { try { return JSON.parse(store.get("gex.cal", "null")); } catch(e){ return null; } })();
 orderLevels(cal0 ? sessionPhase(new Date(), cal0).phase : null);        // a first visit: the usual order and no label
 document.querySelectorAll("#tabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.m === market)));   // the saved market, before data
-document.documentElement.classList.remove("booting");                    // heights reserved and the order set: show the area
+// heights reserved and the order set: show the area. A first visit has no saved heights for the banner and the
+// headline, so it waits for the first data draw (render) instead; the head script shows it after 1.5 s regardless
+if(Object.keys(cardH).length) document.documentElement.classList.remove("booting");
 const day0 = s => new Date(s + "T12:00:00Z").toLocaleDateString("en-US", {weekday: "short", month: "short", day: "numeric", timeZone: "UTC"});
 // the one plan zone price is in. The flip decides the side first: when C1 sits below the flip (or P1 above it) the
 // zones would overlap, and price can only be in one ("above C1" also needs price above the flip, "below P1" below it)
