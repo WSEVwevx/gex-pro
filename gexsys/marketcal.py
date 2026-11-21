@@ -215,6 +215,34 @@ def roll_date(year: int, month: int) -> date:
     return third_friday(year, month) - timedelta(days=8)
 
 
+def roll_week(d: date) -> bool:
+    """The 8 days before a quarterly expiry (the conventional roll date to the expiry, inclusive)."""
+    m = ((d.month - 1) // 3 + 1) * 3
+    return roll_date(d.year, m) <= d <= quarterly_expiry(d.year, m)
+
+
+def sessions_ahead(d: date, n: int) -> list[date]:
+    """The trading day before d, then d's (if it trades) and the following trading days: n days in all."""
+    out, x = [previous_trading_day(d)], d
+    while len(out) < n:
+        if is_trading_day(x):
+            out.append(x)
+        x += timedelta(days=1)
+    return out
+
+
+def state_changes(start: datetime, end: datetime) -> list[tuple[datetime, str]]:
+    """session_state at start, then every minute it changes up to end."""
+    out: list[tuple[datetime, str]] = []
+    t = start.replace(second=0, microsecond=0)
+    while t <= end:
+        s = session_state(t)
+        if not out or out[-1][1] != s:
+            out.append((t, s))
+        t += timedelta(minutes=1)
+    return out
+
+
 def front_contract(root: str, on: date) -> str:
     """Active (post-roll) quarterly contract, e.g. front_contract('NQ', date(2026,12,10)) -> 'NQH7'."""
     y, m = on.year, on.month

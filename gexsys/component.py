@@ -59,7 +59,17 @@ def _calendar(now: datetime) -> dict:
     return {"holidays": days(marketcal.nyse_holidays), "early_closes": days(marketcal.early_closes),
             # holidays when the futures still trade until 13:00, and evenings with no session (before New Year's Day...)
             "globex_mornings": sorted(d.isoformat() for d in hol if marketcal.globex_morning(d)),
-            "no_evening": sorted((d - timedelta(days=1)).isoformat() for d in hol if not marketcal.globex_morning(d))}
+            "no_evening": sorted((d - timedelta(days=1)).isoformat() for d in hol if not marketcal.globex_morning(d)),
+            # the cash sessions around now and every change of the futures session over the next 9 days, in UTC:
+            # the page reads open, close and state from here and never assumes a time
+            "sessions": [{"date": d.isoformat(), "open": _utc(marketcal.rth_open_dt(d)), "close": _utc(marketcal.rth_close_dt(d)),
+                          "early": d in marketcal.early_closes(d.year), "roll_week": marketcal.roll_week(d)}
+                         for d in marketcal.sessions_ahead(now.astimezone(marketcal.NY).date(), 8)],
+            "states": [[_utc(t), s] for t, s in marketcal.state_changes(now - timedelta(days=1), now + timedelta(days=9))]}
+
+
+def _utc(t: datetime) -> str:
+    return t.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 def _all(workers: Iterable[MarketWorker], **extra) -> dict:

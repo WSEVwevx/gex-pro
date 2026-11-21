@@ -1096,19 +1096,32 @@ const pickP = v => v && typeof v === "object" ? v.price : v;
 const curW = () => data && (data.workers.find(x => x.market === market && x.result) || data.workers.find(x => x.market === market));
 
 // ---------- clock and session state (New York)
+// Times come only from the build's market calendar (gexsys/marketcal.py via data.calendar): the state changes and the
+// cash sessions in UTC. Without them the page says the session is unknown instead of assuming 09:30 or 16:00.
+const etDay = d => d.toLocaleDateString("en-CA", ET);
+function calState(d, cal){
+  const st = (cal && cal.states) || [];
+  if(!st.length || d < Date.parse(st[0][0])) return null;
+  let i = 0; while(i + 1 < st.length && Date.parse(st[i + 1][0]) <= d) i++;
+  // past the last change the export is too old to say (it covers 9 days)
+  return i === st.length - 1 && d - Date.parse(st[i][0]) > 3 * 864e5 ? null : {state: st[i][1], next: st[i + 1] ? Date.parse(st[i + 1][0]) : null, then: st[i + 1] ? st[i + 1][1] : null};
+}
+function sessionPhase(d, cal){
+  const ss = (cal && cal.sessions) || [], day = etDay(d), s = ss.find(x => x.date === day);
+  if(!ss.length) return {phase: "session times unavailable"};
+  if(!s){ const nx = ss.find(x => x.date > day); return {phase: "no cash session today", next: nx}; }
+  const t = +d, o = Date.parse(s.open), c = Date.parse(s.close);
+  return {phase: t < o ? "before the open" : t < c ? "cash session" : "after the close", session: s};
+}
 function sessionLabel(d){
-  const t = new Date(d.toLocaleString("en-US", ET)), wd = t.getDay(), m = t.getHours() * 60 + t.getMinutes();
-  // holidays and 13:00 closes come from the server's market calendar
-  const day = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
-  const cal = (data && data.calendar) || {}, early = (cal.early_closes || []).includes(day);
-  if((cal.globex_mornings || []).includes(day) && m < 13 * 60) return ["Globex · holiday session", "warn"];   // futures trade until 13:00
-  if((cal.holidays || []).includes(day) && m < 18 * 60) return ["Market holiday", "bad"];
-  if((cal.no_evening || []).includes(day) && m >= 18 * 60) return ["Futures closed", "bad"];
-  if(wd === 6 || (wd === 0 && m < 18 * 60) || (wd === 5 && m >= 17 * 60)) return ["Futures closed", "bad"];
-  if(early && m >= 13 * 60 + 15) return ["Futures closed", "bad"];
-  if(wd >= 1 && wd <= 5 && m >= 570 && m < (early ? 780 : 960)) return ["US cash open", "ok"];
-  if(m >= 17 * 60 && m < 18 * 60) return ["Daily break", "warn"];
-  return [m >= 960 || m < 240 ? "Globex · Asia" : "Globex · Europe", "warn"];
+  const cal = (data && data.calendar) || {}, cs = calState(+d, cal);
+  if(!cs) return ["Session unknown", "warn"];
+  if(cs.state === "RTH") return ["US cash open", "ok"];
+  if(cs.state === "HOLIDAY") return ["Market holiday", "bad"];
+  if(cs.state === "CLOSED") return cs.next && cs.next - d <= 3600e3 ? ["Daily break", "warn"] : ["Futures closed", "bad"];
+  if(cs.then === "HOLIDAY") return ["Globex · holiday session", "warn"];     // a holiday morning: futures trade on to the halt
+  const sp = sessionPhase(d, cal), h = +d.toLocaleString("en-US", {...ET, hour: "numeric", hour12: false}) % 24;
+  return [sp.phase === "before the open" && h >= 4 ? "Globex · Europe" : "Globex · Asia", "warn"];
 }
 function tickClock(){
   const d = new Date(), [lab, cls] = sessionLabel(d);
@@ -2458,8 +2471,7 @@ function renderPlan(w){
   const lv = S.levels, s = w.result.summary, X = (w.result.mapped || s).extras || {}, em = X.expected_move || {};
   const ref = (w.result.mapped || {}).futures_equiv_of_ref ?? s.ref_price, k = market === "ES" ? "es" : "nq";
   const p = x => x == null ? "-" : num(x, 0), d = (em.daily_points_fut ?? em.daily_points), a = em.anchor_fut ?? em.anchor;
-  const now = new Date(), t = new Date(now.toLocaleString("en-US", ET)), mins = t.getHours() * 60 + t.getMinutes();
-  const phase = t.getDay() === 0 || t.getDay() === 6 ? "weekend" : mins < 570 ? "before the open" : mins < 960 ? "cash session" : "after the close";
+  const now = new Date(), phase = sessionPhase(now, data && data.calendar).phase;
   // where price sits, and what each side of it means
   const C1 = lv.C1, P1 = lv.P1, F = lv.flip ?? lv.ZG;
   // levels are numbered by strength, not price: only name a "next" level that lies beyond C1 / P1

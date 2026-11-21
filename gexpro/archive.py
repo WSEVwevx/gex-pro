@@ -150,8 +150,7 @@ def contract_segments(root: str, bars: list[list]) -> list[dict]:
 
 def roll_week(d: date) -> bool:
     """The 8 days before a quarterly expiry (the conventional roll date to the expiry, inclusive)."""
-    m = ((d.month - 1) // 3 + 1) * 3
-    return marketcal.roll_date(d.year, m) <= d <= marketcal.quarterly_expiry(d.year, m)
+    return marketcal.roll_week(d)
 
 
 def _get(url: str) -> bytes:
