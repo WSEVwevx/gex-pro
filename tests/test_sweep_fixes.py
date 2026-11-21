@@ -23,7 +23,10 @@ class Ages(unittest.TestCase):
 
 class Heatmap(unittest.TestCase):
     def test_the_profile_leaves_room_for_candles_on_a_phone(self):
-        self.assertIn('const hmGexW = () => Math.min(190, Math.round(Math.max(300, $("hmChart").clientWidth - 80) * 0.38));', JS)
+        # final audit 2026-11-21: from the plot's real width (no 300 px floor), a smaller share under 400 px
+        self.assertIn('const hmGexW = () => { const p = hmPlotW(); return Math.min(190, Math.round(p * (p < 400 ? 0.28 : 0.38))); };', JS)
+        self.assertIn('const hmPlotW = () => (hmChart && hmChart.timeScale().width()) || Math.max(100, $("hmChart").clientWidth - 80);', JS)
+        self.assertNotIn("Math.max(300, $(\"hmChart\").clientWidth - 80)", JS)
         fn = JS.split("function renderHeatmap(){", 1)[1].split("\n}\n", 1)[0]
         self.assertNotRegex(fn, r"\b190\s*[*/]|[*/-]\s*190\b")              # every use goes through hmGexW()
 
