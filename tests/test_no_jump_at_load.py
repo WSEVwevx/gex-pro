@@ -28,7 +28,18 @@ class NoJumpAtLoad(unittest.TestCase):
         self.assertIn('document.documentElement.classList.add("booting");', head)
         self.assertIn('setTimeout(function(){ document.documentElement.classList.remove("booting"); }, 1500);', head)
         self.assertIn(".booting .area{visibility:hidden}", CSS)
-        self.assertLess(JS.index("orderLevels(cal0 ?"), JS.index('document.documentElement.classList.remove("booting");'))
+        self.assertLess(JS.index("orderLevels(cal0 ?"), JS.index('if(Object.keys(cardH).length) document.documentElement.classList.remove("booting");'))
+
+    def test_a_first_visit_waits_for_the_first_draw(self):
+        # final audit 2026-11-21: with no saved heights the banner (0 -> 59 px) and headline (138 -> 144) pushed the
+        # plan down 71 px as the data arrived
+        self.assertIn('if(Object.keys(cardH).length) document.documentElement.classList.remove("booting");', JS)
+        fn = JS.split("function render(){", 1)[1][:200]
+        self.assertTrue(fn.lstrip().startswith('document.documentElement.classList.remove("booting");'))
+
+    def test_dollar_amounts_say_dollars(self):
+        # final audit: Net DEX read "+220.37B" beside "-$3.24B"
+        self.assertIn('(x < 0 ? "-" : "+") + "$" + (', JS)
 
     def test_banner_and_headline_keep_their_height(self):
         self.assertIn('<div id="banner" data-reserve></div>', HTML)
