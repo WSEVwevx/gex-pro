@@ -1311,7 +1311,7 @@ const HELP = {
   ladder_activity: {title: "Chain activity", tldr: "Who is positioned, and what is trading today.",
     body: `<p>Put/call ratios over the selected expirations and the rows shown: above 1 means more puts. Open interest is from yesterday's close; volume is today's.</p>`},
   heatmap: {title: "GEX heatmap", tldr: "Futures candles with dealer gamma painted behind them, snapshot by snapshot.",
-    body: `<p>Behind the candles is the net dealer gamma from every GEX PRO snapshot, each one shown from the moment it was taken until the next, with neighbouring price bands blended into soft zones (hover for the exact value at any price and time). <b>Today</b>, <b>2 days</b> (the default) and <b>All</b> (about a week) pick how much price action is shown. <b>Blue</b> = positive gamma (hedging leans against moves, so price tends to stall or pin there); <b>orange</b> = negative gamma (hedging adds to moves). Brighter = more gamma.</p><p>The lines are the call wall (blue) and put wall (orange) wherever they held for an hour or more; the ZG, CW and PW labels on the price axis are where zero gamma and the walls were in the latest saved snapshot. Times are New York time; a dashed line marks each 9:30 cash open.</p><p>The space right of the last candle shows <b>GEX</b> with the latest saved snapshot's time: that snapshot as bars (right = more gamma, blue or orange by sign), with today's key levels from the first expiry: C1 / C2, P1 / P2, Ab1 and the 0DTE flip, the same levels the TradingView indicator draws. <b>Today / 2 days / All</b> sets how much history is in view; the colour scale under the chart says how much gamma the brightest colour means. Watch how price reacts when it reaches a bright band, and how the bands move during the day. Hover anywhere for the numbers.</p><p>Candles: Yahoo Finance, delayed. Gamma: Cboe options, 15-min delayed, mapped to futures with today's basis. History builds up as snapshots are saved (about 12 days in the app, 5 on the hosted site).</p>`,
+    body: `<p>Behind the candles is the net dealer gamma from every GEX PRO snapshot, each one shown from the moment it was taken until the next, with neighbouring price bands blended into soft zones (hover for the exact value at any price and time). <b>Today</b>, <b>2 days</b> (the default) and <b>All</b> (about a week) pick how much price action is shown. <b>Blue</b> = positive gamma (hedging leans against moves, so price tends to stall or pin there); <b>orange</b> = negative gamma (hedging adds to moves). Brighter = more gamma.</p><p>The lines are the call wall (blue) and put wall (orange) wherever they held for an hour or more; the ZG, CW and PW labels on the price axis are where zero gamma and the walls were in the latest saved snapshot. Times are New York time; a dashed line marks each 9:30 cash open.</p><p>The space right of the last candle shows <b>GEX</b> with the latest saved snapshot's time: that snapshot as bars (right = more gamma, blue or orange by sign), with today's key levels from the first expiry: C1 / C2, P1 / P2, Ab1 and the 0DTE flip, the same levels the TradingView indicator draws. <b>Today / 2 days / All</b> sets how much history is in view; the colour scale under the chart says how much gamma the brightest colour means. Watch how price reacts when it reaches a bright band, and how the bands move during the day. Hover anywhere for the numbers.</p><p><b>Hatched ground</b> means no GEX was saved for that time: the newest snapshot is more than 90 minutes older than the candle (for example while Cboe refuses requests, since the backup estimate is not saved). The page leaves it uncoloured rather than stretch an old snapshot over it.</p><p>Candles: Yahoo Finance, delayed. Gamma: Cboe options, 15-min delayed, mapped to futures with today's basis. History builds up as snapshots are saved (about 12 days in the app, 5 on the hosted site).</p>`,
     watch: ["Price stalling at a bright blue band = positive-gamma support or resistance", "Price slicing through orange = negative gamma, moves can extend"]},
   paste: {title: "The scheduled paste", tldr: "One text block that carries all levels to TradingView.",
     body: `<p>Published every 30 minutes (:00 and :30 ET), plus 09:45 ET. One paste holds NQ and ES; each chart draws only its own market. The indicator marks levels stale after 90 minutes.</p>`},
@@ -1958,7 +1958,12 @@ let hmReset = true;          // next draw starts at the latest candles with auto
 let hmTf = store.get("gex.hmtf", "5m"), hmOpacity = Number(store.get("gex.hmop", "50")), hmShowLv = store.get("gex.hmlv", "1") === "1";
 const hmUrl = () => STATIC ? `data/heatmap-${market}-${hmTf}.json` : `/api/heatmap?market=${encodeURIComponent(market)}&tf=${hmTf}`;
 const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
-function rgbOf(c){ const d = document.createElement("i"); d.style.color = c; document.body.appendChild(d); const v = getComputedStyle(d).color; d.remove(); return (v.match(/[\d.]+/g) || [0, 0, 0]).slice(0, 3).map(Number); }
+// any CSS colour (hex, rgb() or the OKLCH tokens) as [r, g, b]: painted on a 1-pixel canvas and read back, because
+// getComputedStyle returns OKLCH as OKLCH and the chart library (lightweight-charts 4.2) cannot parse it
+const RGB_PX = document.createElement("canvas").getContext("2d", {willReadFrequently: true});
+function rgbOf(c){ RGB_PX.clearRect(0, 0, 1, 1); RGB_PX.fillStyle = "#000"; RGB_PX.fillStyle = c; RGB_PX.fillRect(0, 0, 1, 1); return [...RGB_PX.getImageData(0, 0, 1, 1).data.slice(0, 3)]; }
+// a token for the chart library: always rgb()
+const lcVar = n => `rgb(${rgbOf(cssVar(n)).join(",")})`;
 async function loadHeatmap(){
   if(!window.LightweightCharts){ $("hmMsg").textContent = "The chart library could not load (it comes from unpkg.com). Check your connection and refresh."; $("hmMsg").hidden = false; return; }
   const want = market + hmTf;
@@ -2035,6 +2040,20 @@ function hmSmooth(cols, k = 3){
 // Each candle shows the latest snapshot at or before it. A band's middle rows keep its own value and only its edge
 // rows blend a quarter of the neighbouring band, so bands stay crisp with soft edges when the image is stretched
 const HM_ROWS = 4, HM_FLOOR = 0.18;
+// a candle more than 90 minutes after the newest saved snapshot has no GEX: it gets the hatched "no saved GEX" ground
+// instead of an old snapshot's colour (the hosted build runs every few minutes while futures trade, hourly when closed)
+const HM_GAP_S = 5400;
+// the runs of candles with no saved GEX, as [first, last] candle indexes
+function hmGaps(times, cols){
+  const out = []; let ci = -1;
+  for(let k = 0; k < times.length; k++){
+    while(ci + 1 < cols.length && (cols[ci + 1]._bar == null || cols[ci + 1]._bar <= times[k])) ci++;
+    if(ci < 0 || times[k] - cols[ci].t <= HM_GAP_S) continue;
+    const last = out[out.length - 1];
+    last && last[1] === k - 1 ? last[1] = k : out.push([k, k]);
+  }
+  return out;
+}
 function hmAtlas(pos, neg, maxA){
   const C = hm._cols, times = hm._times, N = times.length;
   if(!C.length || !N) return null;
@@ -2050,6 +2069,7 @@ function hmAtlas(pos, neg, maxA){
     while(ci + 1 < C.length && (C[ci + 1]._bar == null || C[ci + 1]._bar <= times[k])) ci++;
     if(ci < 0) continue;                                   // before the first snapshot: no heat
     const c = C[ci], scale = c.rel ? 99 : hm._scale;
+    if(times[k] - c.t > HM_GAP_S) continue;                // no saved GEX this late: the hatched ground, not old colour
     if(done !== ci){ for(let b = 0; b < B; b++) band[b + 1] = c.v[Math.round((hi - b * w - c.base) / c.w)] || 0; done = ci; }
     for(let r = 0; r < H; r++){
       const b = Math.floor(r / HM_ROWS) + 1, sub = r % HM_ROWS;
@@ -2092,6 +2112,23 @@ class HeatPrimitive {
         if(xa != null && xb != null && ya != null && yb != null){
           ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
           ctx.drawImage(A.cv, 0, 0, A.N, A.H, xa * hr, ya * vr, (xb - xa) * hr, (yb - ya) * vr);
+        }
+        // the stretches with no saved GEX: a hatched ground that says so, never an old snapshot's colour
+        if(x0 != null && xn != null){
+          const Hb = sc.bitmapSize.height, pc = document.createElement("canvas"), st = Math.max(6, Math.round(8 * hr));
+          pc.width = pc.height = st;
+          const pg = pc.getContext("2d"); pg.strokeStyle = `rgba(${cssVar("--fg-rgb")},.16)`; pg.lineWidth = Math.max(1, hr);
+          pg.beginPath(); pg.moveTo(0, st); pg.lineTo(st, 0); pg.stroke();
+          ctx.save(); ctx.fillStyle = ctx.createPattern(pc, "repeat");
+          ctx.font = `600 ${Math.round(10.5 * vr)}px ${cssVar("--mono") || "monospace"}`;
+          for(const [k0, k1] of hm._gaps){
+            const ga = (x0 + (xn - x0) * k0 / Math.max(1, A.N - 1) - half) * hr, gb = (x0 + (xn - x0) * k1 / Math.max(1, A.N - 1) + half) * hr;
+            ctx.fillRect(ga, 0, gb - ga, Hb);
+            const txt = "no saved GEX";
+            if(gb - ga > ctx.measureText(txt).width + 16 * hr){
+              ctx.fillStyle = `rgba(${cssVar("--fg-rgb")},.6)`; ctx.fillText(txt, ga + 8 * hr, Hb - 10 * vr); ctx.fillStyle = ctx.createPattern(pc, "repeat"); }
+          }
+          ctx.restore();
         }
       }
       // session markers: a faint line at each 09:30 ET cash open, with the day on top
@@ -2160,7 +2197,7 @@ class HeatPrimitive {
   }
 }
 function hmColors(){
-  return {layout: {background: {type: "solid", color: cssVar("--panel")}, textColor: cssVar("--ink3"), fontFamily: cssVar("--mono"), fontSize: 11},
+  return {layout: {background: {type: "solid", color: lcVar("--panel")}, textColor: lcVar("--ink3"), fontFamily: cssVar("--mono"), fontSize: 11},
     grid: {vertLines: {visible: false}, horzLines: {visible: false}},
     rightPriceScale: {borderColor: `rgba(${cssVar("--fg-rgb")},.1)`}, timeScale: {borderColor: `rgba(${cssVar("--fg-rgb")},.1)`, timeVisible: true, secondsVisible: false},
     crosshair: {mode: 0, vertLine: {color: `rgba(${cssVar("--fg-rgb")},.3)`}, horzLine: {color: `rgba(${cssVar("--fg-rgb")},.3)`}}};
@@ -2179,6 +2216,7 @@ function renderHeatmap(){
   const vals = hm.columns.filter(c => !c.rel).flatMap(c => c.v.map(Math.abs)).filter(v => v > 0).sort((a, b) => a - b);
   hm._scale = vals.length ? vals[Math.floor(vals.length * 0.97)] || 1 : 1;
   hm._cols = hmSmooth(hmPerBar(hm.columns, hm._times), hmTf === "1m" ? 3 : hmTf === "5m" ? 2 : 1);
+  hm._gaps = hmGaps(hm._times, hm._cols);
   hm._atlasKey = null;                                     // the heat image is rebuilt from these columns on the next draw
   const ses = hmSessions(hm._times);
   hm._opens = ses.opens; hm._starts = ses.starts;
@@ -2201,7 +2239,7 @@ function renderHeatmap(){
     // two days of 1-minute bars (~2,700) must fit the width: below the library's default minimum bar spacing
     // (0.5 px) it ignores the requested range and falls back to its default zoom
     hmChart.applyOptions({timeScale: {minBarSpacing: 0.05}});
-    hmCandles = hmChart.addCandlestickSeries({upColor: cssVar("--good"), downColor: cssVar("--bad"), borderVisible: false, wickUpColor: cssVar("--good"), wickDownColor: cssVar("--bad"),
+    hmCandles = hmChart.addCandlestickSeries({upColor: lcVar("--good"), downColor: lcVar("--bad"), borderVisible: false, wickUpColor: lcVar("--good"), wickDownColor: lcVar("--bad"),
       priceLineVisible: true, priceLineStyle: LC.LineStyle.Dotted, priceLineWidth: 1});
     hmPrim = new HeatPrimitive(); hmCandles.attachPrimitive(hmPrim);
     hmChart.subscribeCrosshairMove(hmHover);
@@ -2257,6 +2295,9 @@ function hmHover(p){
   const price = hmCandles.coordinateToPrice(p.point.y);
   let col = null; for(const c of hm.columns){ if(hmSnap(hm._times, c.t) <= p.time) col = c; else break; }
   if(price == null || !col){ tip.style.opacity = 0; return; }
+  if(p.time - col.t > HM_GAP_S){
+    tip.innerHTML = `<b>${num(price, 2)}</b> · no GEX saved for this time<br><span style="color:var(--ink3)">the newest saved snapshot is ${esc(new Date(col.t * 1000).toLocaleString("en-US", {...ET, weekday: "short", hour: "numeric", minute: "2-digit"}))} ET</span>`;
+    tip.style.opacity = 1; tip.style.left = Math.min(p.point.x + 16, $("hmChart").clientWidth - 260) + "px"; tip.style.top = Math.max(8, p.point.y - 60) + "px"; return; }
   const j = Math.round(((price - hm.offset) / hm.factor - col.base) / col.w), v = col.v[j];
   const when = new Date(col.t * 1000).toLocaleString("en-US", {...ET, weekday: "short", hour: "numeric", minute: "2-digit"});
   tip.innerHTML = `<b>${num(price, 2)}</b> · snapshot ${esc(when)} ET<br>${v == null ? "outside the saved range" : col.rel ? `relative gamma ${signed(v, 0)} (older snapshot)` : `net GEX <b style="color:${v >= 0 ? "var(--pos)" : "var(--neg)"}">${money(v * 1e6)}</b> per 1%`}`
@@ -2383,7 +2424,7 @@ function renderStockChart(c){
     scSeries = scChart.addCandlestickSeries({borderVisible: false, priceLineVisible: true});
     $("scBox").appendChild($("scMsg"));
   } else scChart.applyOptions(hmColors());
-  const up = cssVar("--good"), dn = cssVar("--bad"), ext = `rgba(${cssVar("--fg-rgb")},.35)`, [s0, s1] = c.session || [];
+  const up = lcVar("--good"), dn = lcVar("--bad"), ext = `rgba(${cssVar("--fg-rgb")},.35)`, [s0, s1] = c.session || [];
   scSeries.applyOptions({upColor: up, downColor: dn, wickUpColor: up, wickDownColor: dn});
   // pre-market and after-hours candles in grey, so the cash session stands out
   scSeries.setData(bars.map(([t, o, h, l, cl]) => {
@@ -2391,7 +2432,7 @@ function renderStockChart(c){
     return Object.assign({time: scRange === "daily" ? chartTimeET(t) - chartTimeET(t) % 86400 : chartTimeET(t), open: o, high: h, low: l, close: cl}, out ? {color: ext, wickColor: ext} : {});
   }));
   if(scPrev){ scSeries.removePriceLine(scPrev); scPrev = null; }
-  if(scRange === "intraday" && c.prev) scPrev = scSeries.createPriceLine({price: c.prev, color: cssVar("--ink3"), lineStyle: LC.LineStyle.Dashed, lineWidth: 1, title: "prev close"});
+  if(scRange === "intraday" && c.prev) scPrev = scSeries.createPriceLine({price: c.prev, color: lcVar("--ink3"), lineStyle: LC.LineStyle.Dashed, lineWidth: 1, title: "prev close"});
   scChart.timeScale().applyOptions({timeVisible: scRange === "intraday", secondsVisible: false});
   // dragging the price axis turns auto-fit off for good; every new stock or range starts fitted to its own prices
   scSeries.priceScale().applyOptions({autoScale: true});
