@@ -41,8 +41,8 @@ const PER_MARKET = ["levelsView", "ladderView", "heatmapView", "screenerView", "
 const cardKey = c => { const v = c.closest("[id$=View]"); return v ? v.id + ":" + [...v.querySelectorAll(".card")].indexOf(c) + (PER_MARKET.includes(v.id) ? ":" + market : "") : null; };
 // a first visit has no heights of its own yet: it reserves the usual ones (measured on the live site at 1366 and
 // 375 px wide, every page re-measured 2026-11-20 after the redesign, NQ, folds closed), by page and card order. They are replaced by this device's real heights after one draw.
-const DEFAULT_H = {wide: {levelsView:[207,418,102,577,571,373,373,124,124,124,1228],ladderView:[184,797,220,328,312],heatmapView:[648],screenerView:[291,370,97,679],biasView:[200,633,220,238],trackView:[259,578,635,297,272,1661,370,365,365,320],backtestView:[221,260,528,536,291,165,301,803],briefingsView:[448,292,0,0],newsView:[651,988],indicatorView:[217,217,217,67,369],libraryView:[155,628,1371],glossaryView:[5493],healthView:[1515]},
-  narrow: {levelsView:[186,482,94,894,618,365,365,81,116,109,1757],ladderView:[184,892,193,320,272],heatmapView:[879],screenerView:[304,389,146,754],biasView:[332,731,393,368],trackView:[446,891,823,334,291,2528,637,384,407,359],backtestView:[464,252,566,718,385,275,312,834],briefingsView:[1029,303,0,0],newsView:[787,718],indicatorView:[252,251,254,95,980],libraryView:[317,1066,1726],glossaryView:[13616],healthView:[2870]}};
+const DEFAULT_H = {wide: {levelsView:[207,434,102,577,571,373,373,124,124,124,1228],ladderView:[184,797,220,328,312],heatmapView:[648],screenerView:[291,370,97,679],biasView:[200,633,220,238],trackView:[259,578,635,297,272,1661,370,365,365,320],backtestView:[221,260,528,536,291,165,301,803],briefingsView:[448,292,0,0],newsView:[651,988],indicatorView:[217,217,217,67,369],libraryView:[155,628,1371],glossaryView:[5493],healthView:[1515]},
+  narrow: {levelsView:[186,514,94,894,618,365,365,81,116,109,1757],ladderView:[184,892,193,320,272],heatmapView:[879],screenerView:[304,389,146,754],biasView:[332,731,393,368],trackView:[446,891,823,334,291,2528,637,384,407,359],backtestView:[464,252,566,718,385,275,312,834],briefingsView:[1029,303,0,0],newsView:[787,718],indicatorView:[252,251,254,95,980],libraryView:[317,1066,1726],glossaryView:[13616],healthView:[2870]}};
 function reserve(){
   const usual = DEFAULT_H[innerWidth < 700 ? "narrow" : "wide"];
   document.querySelectorAll("[id$=View] .card").forEach(c => {
@@ -2476,7 +2476,9 @@ function renderLevelHistoryChart(ss, fut){
 // A level beyond the scale is pinned to the edge with an arrow, so the scale never lies about distance.
 const MAP_SPAN = 3.3;
 function niceStep(raw){ const e = 10 ** Math.floor(Math.log10(raw)); return [1, 2, 2.5, 5, 10].map(m => m * e).find(x => x >= raw); }
-const PROBE_HINT = "Point at the field, or tap it, for the gamma at any price.";
+const PROBE_HINT = "Point at the field for the gamma at any price; tap or click to measure from the price.";
+// the tape's words: the distance from the price in points, percent and expected moves (σ), signed (+ = above)
+const tapeText = (name, v, ref, d) => `${name ? name + " " : ""}${num(v)} is ${signed(v - ref, 0) || "0"} pts · ${signed((v - ref) / ref * 100, 2) || "0.00"}% · ${d ? (signed((v - ref) / d, 1) || "0.0") + "σ" : "σ unavailable"} from the price ${num(ref)}`;
 // the total curve at a price, straight between its two nearest points; off its range: null (never extrapolated)
 function fieldAt(curve, at){
   for(let i = 1; i < curve.length; i++){ const [p0, n0] = curve[i - 1], [p1, n1] = curve[i];
@@ -2536,19 +2538,32 @@ function renderLevelMap(w, L, X, ref){
     + `${zg == null ? "The model found no zero-gamma crossing in its range." : `It crosses zero at ${num(zg)}.`} `
     + `${deep ? `Deepest strike tone: ${num(deep[0], 0)}, ${deep[1] < 0 ? "negative" : "positive"}.` : ""} `
     + lines.map(l => `${l.k} ${num(l.v)}, ${signed(l.v - ref, 0)} pts.`).join(" ");
-  g += `<line x1="${xr}" x2="${xe}" y1="0" y2="0" class="m-probe-ln" visibility="hidden"/>`;
+  g += `<line x1="${xr}" x2="${xe}" y1="0" y2="0" class="m-probe-ln" visibility="hidden"/><g class="m-tape" visibility="hidden"></g>`;
   box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(market)} price ${num(ref)} in the gamma field among today's levels">${g}</svg>
     <p class="vh">${esc(words)}</p>
-    <div class="m-probe" aria-live="polite">${PROBE_HINT}</div>
+    <div class="m-probe">${PROBE_HINT}</div><div class="m-tapeout" aria-live="polite"></div>
     <div class="legend"><span><i class="sw m-sw-band"></i>Day ±1σ ${num(a - d, 0)} – ${num(a + d, 0)}</span><span><i class="sw m-sw-tone"></i>Strike gamma</span><span><i class="sw m-sw-curve ln"></i>Total if price were there</span><span>↑ ↓ beyond ±${MAP_SPAN}σ</span></div>`;
   // the probe: point or tap anywhere on the field for the exact numbers at that price
   const svg = box.querySelector && box.querySelector("svg"), out = svg && box.querySelector(".m-probe"), ln = svg && svg.querySelector(".m-probe-ln");
-  if(svg) svg.onpointermove = svg.onpointerdown = e => {
+  // the tape (from Signal): a tap or click measures from the price to a level (it snaps to one within 10 px) or to that
+  // price, and stays drawn until the next tap
+  const tape = svg && svg.querySelector(".m-tape"), xt = xm + 24;
+  const at = yy => hi - (yy - top) / (bot - top) * (hi - lo);
+  if(svg) svg.onpointermove = e => {
     const r = svg.getBoundingClientRect(), yy = (e.clientY - r.top) * H / r.height;
-    if(yy < top || yy > bot){ ln.setAttribute("visibility", "hidden"); out.textContent = PROBE_HINT; return; }
-    const at = hi - (yy - top) / (bot - top) * (hi - lo), b = bins.find(q => Math.abs(q[0] - at) <= step / 2), tot = fieldAt(curve, at);
+    if(yy < top || yy > bot){ ln.setAttribute("visibility", "hidden"); return; }
+    const v = at(yy), b = bins.find(q => Math.abs(q[0] - v) <= step / 2), tot = fieldAt(curve, v);
     ln.setAttribute("y1", yy); ln.setAttribute("y2", yy); ln.setAttribute("visibility", "visible");
-    out.textContent = `${num(at, 0)} · ${signed(at - ref, 0)} pts · strike gamma ${!b ? "none saved here" : b[2] ? "about " + money(b[1]) : "under 1% of the largest"} · total if price were here ${tot == null ? "unavailable" : money(tot)} (per 1% move)`;
+    out.textContent = `${num(v, 0)} · ${signed(v - ref, 0)} pts · strike gamma ${!b ? "none saved here" : b[2] ? "about " + money(b[1]) : "under 1% of the largest"} · total if price were here ${tot == null ? "unavailable" : money(tot)} (per 1% move)`;
+  };
+  if(svg) svg.onpointerdown = e => {
+    const r = svg.getBoundingClientRect(), yy = (e.clientY - r.top) * H / r.height;
+    if(yy < top || yy > bot) return;
+    const near = lines.filter(l => l.v >= lo && l.v <= hi && Math.abs(y(l.v) - yy) <= 10).sort((u, v) => Math.abs(y(u.v) - yy) - Math.abs(y(v.v) - yy))[0];
+    const v = near ? near.v : at(yy), y0 = y(ref), y1 = y(v);
+    tape.innerHTML = `<line x1="${xt}" x2="${xt}" y1="${y0}" y2="${y1}"/><line x1="${xt - 5}" x2="${xt + 5}" y1="${y0}" y2="${y0}"/><line x1="${xt - 5}" x2="${xt + 5}" y1="${y1}" y2="${y1}"/>`;
+    tape.setAttribute("visibility", "visible");
+    box.querySelector(".m-tapeout").textContent = "Tape: " + tapeText(near ? near.k : "", v, ref, d);
   };
   $("lvMapSub").textContent = `${w.result.mapped ? market + " equiv. of " + w.source : w.source + " prices"} · ±${MAP_SPAN}σ around the price`;
 }
