@@ -25,5 +25,13 @@ class TypeScale(unittest.TestCase):
         self.assertEqual(JS.count('parseFloat(cssVar("--fs-xs")) || 10.5'), 3)
 
 
+class Colours(unittest.TestCase):
+    def test_no_raw_colour_outside_the_tokens(self):
+        html = (ROOT / "dashboard" / "index.html").read_text(encoding="utf-8")
+        body = html.split('<meta name="theme-color"', 1)[1].split(">", 1)[1]   # the browser's theme-color must be literal
+        self.assertNotRegex(body, r'#[0-9a-fA-F]{3,6}"|rgba?\(\d')
+        self.assertNotIn('"#a78bfa"', JS)
+
+
 if __name__ == "__main__":
     unittest.main()

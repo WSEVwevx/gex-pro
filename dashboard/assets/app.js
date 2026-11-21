@@ -2232,7 +2232,7 @@ function renderHeatmap(){
   hm._marks = !rk ? [] : [
     ...(rk.call || []).slice(0, 2).map((x, i) => ({p: fut(x.price), label: "C" + (i + 1), col: cssVar("--pos")})),
     ...(rk.put || []).slice(0, 2).map((x, i) => ({p: fut(x.price), label: "P" + (i + 1), col: cssVar("--neg")})),
-    ...(rk.abs || []).slice(0, 1).map(x => ({p: fut(x.price), label: "Ab1", col: cssVar("--ag") || "#a78bfa"})),
+    ...(rk.abs || []).slice(0, 1).map(x => ({p: fut(x.price), label: "Ab1", col: cssVar("--ag")})),
     ...(nr.zero_gamma && nr.zero_gamma.price != null ? [{p: fut(nr.zero_gamma.price), label: "0D flip", col: cssVar("--zg")}] : [])];
   // merge marks at the same price into one label (C1 · Ab1)
   hm._marks = hm._marks.reduce((a, m) => { const o = a.find(x => Math.abs(x.p - m.p) < 0.5); if(o) o.label += " · " + m.label; else a.push({...m}); return a; }, []);

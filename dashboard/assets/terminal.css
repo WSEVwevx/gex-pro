@@ -65,6 +65,7 @@ a{color:var(--ink2)}
 .topbar{grid-area:top;display:flex;align-items:center;gap:12px;padding:0 16px;background:var(--bar);border-bottom:1px solid var(--line)}
 .brand{display:flex;align-items:center;gap:9px;font-weight:650;font-size:var(--fs-lg);letter-spacing:.01em;flex:none;margin-right:var(--sp-2)}
 .brand .pro{font-weight:800;letter-spacing:.04em;color:var(--pos)}
+.brand .lg-bg{fill:var(--raise);stroke:var(--line2)}.brand .lg-c{fill:var(--pos)}.brand .lg-z{fill:var(--zg)}.brand .lg-p{fill:var(--neg)}
 .spacer{flex:1}
 .clock{font:600 var(--fs-base) var(--mono);color:var(--ink2);padding:4px 10px;border-radius:var(--r-2);background:var(--panel2);white-space:nowrap}
 
