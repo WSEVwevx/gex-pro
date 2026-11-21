@@ -334,7 +334,7 @@ window.GEX_LIBRARY = (() => {
     ["Vega", "How much an option's price changes per 1 point of implied volatility.", "implied-volatility", "Greeks", "Library"],
     ["Vanna", "How delta changes when implied volatility changes. Falling IV usually makes dealers buy back hedges (supportive).", "vanna-charm", "Greeks", "Levels page stats (Full panel)"],
     ["Charm", "How delta changes as time passes. Drives hedging flows into the close and into expirations.", "vanna-charm", "Greeks", "Levels page stats, indicator panel"],
-    ["DEX (delta exposure)", "Dealers' dollar delta at a strike: how much underlying they hold to hedge it right now.", "delta", "Greeks", "Live table Net DEX"],
+    ["DEX (delta exposure)", "Dealers' dollar delta at a strike: how much underlying they hold to hedge it right now. On this site it is modelled (dealers long every call, short every put), so matched call/put pairs such as box spreads inflate it.", "delta", "Greeks", "Live table Net DEX"],
     // ---- dealers
     ["Dealer / market maker", "A firm that quotes option prices and hedges to stay neutral. Their hedging is what GEX tries to model.", "dealers", "Dealers & positioning", "Library"],
     ["Hedging", "Trading the underlying (stock, ETF or futures) to cancel an option position's direction risk.", "dealers", "Dealers & positioning", "Library"],
