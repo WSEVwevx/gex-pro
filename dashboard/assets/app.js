@@ -2123,7 +2123,7 @@ class HeatPrimitive {
           const pg = pc.getContext("2d"); pg.strokeStyle = `rgba(${cssVar("--fg-rgb")},.16)`; pg.lineWidth = Math.max(1, hr);
           pg.beginPath(); pg.moveTo(0, st); pg.lineTo(st, 0); pg.stroke();
           ctx.save(); ctx.fillStyle = ctx.createPattern(pc, "repeat");
-          ctx.font = `600 ${Math.round(10.5 * vr)}px ${cssVar("--mono") || "monospace"}`;
+          ctx.font = `600 ${Math.round((parseFloat(cssVar("--fs-xs")) || 10.5) * vr)}px ${cssVar("--mono") || "monospace"}`;
           for(const [k0, k1] of hm._gaps){
             const ga = (x0 + (xn - x0) * k0 / Math.max(1, A.N - 1) - half) * hr, gb = (x0 + (xn - x0) * k1 / Math.max(1, A.N - 1) + half) * hr;
             ctx.fillRect(ga, 0, gb - ga, Hb);
@@ -2135,7 +2135,7 @@ class HeatPrimitive {
         }
       }
       // session markers: a faint line at each 09:30 ET cash open, with the day on top
-      const Hpx = sc.bitmapSize.height, fs = Math.round(10.5 * vr);
+      const Hpx = sc.bitmapSize.height, fs = Math.round((parseFloat(cssVar("--fs-xs")) || 10.5) * vr);
       ctx.font = `600 ${fs}px ${cssVar("--mono") || "monospace"}`;
       ctx.fillStyle = ctx.strokeStyle = `rgba(${cssVar("--fg-rgb")},.28)`;
       ctx.lineWidth = Math.max(1, Math.round(vr)); ctx.setLineDash([3 * hr, 4 * hr]);
@@ -2201,7 +2201,7 @@ class HeatPrimitive {
 }
 const hmGexW = () => Math.min(190, Math.round(Math.max(300, $("hmChart").clientWidth - 80) * 0.38));
 function hmColors(){
-  return {layout: {background: {type: "solid", color: lcVar("--panel")}, textColor: lcVar("--ink3"), fontFamily: cssVar("--mono"), fontSize: 11},
+  return {layout: {background: {type: "solid", color: lcVar("--panel")}, textColor: lcVar("--ink3"), fontFamily: cssVar("--mono"), fontSize: parseFloat(cssVar("--fs-xs")) || 10.5},
     grid: {vertLines: {visible: false}, horzLines: {visible: false}},
     rightPriceScale: {borderColor: `rgba(${cssVar("--fg-rgb")},.1)`}, timeScale: {borderColor: `rgba(${cssVar("--fg-rgb")},.1)`, timeVisible: true, secondsVisible: false},
     crosshair: {mode: 0, vertLine: {color: `rgba(${cssVar("--fg-rgb")},.3)`}, horzLine: {color: `rgba(${cssVar("--fg-rgb")},.3)`}}};
@@ -2232,7 +2232,7 @@ function renderHeatmap(){
   hm._marks = !rk ? [] : [
     ...(rk.call || []).slice(0, 2).map((x, i) => ({p: fut(x.price), label: "C" + (i + 1), col: cssVar("--pos")})),
     ...(rk.put || []).slice(0, 2).map((x, i) => ({p: fut(x.price), label: "P" + (i + 1), col: cssVar("--neg")})),
-    ...(rk.abs || []).slice(0, 1).map(x => ({p: fut(x.price), label: "Ab1", col: cssVar("--ag") || "#a78bfa"})),
+    ...(rk.abs || []).slice(0, 1).map(x => ({p: fut(x.price), label: "Ab1", col: cssVar("--ag")})),
     ...(nr.zero_gamma && nr.zero_gamma.price != null ? [{p: fut(nr.zero_gamma.price), label: "0D flip", col: cssVar("--zg")}] : [])];
   // merge marks at the same price into one label (C1 · Ab1)
   hm._marks = hm._marks.reduce((a, m) => { const o = a.find(x => Math.abs(x.p - m.p) < 0.5); if(o) o.label += " · " + m.label; else a.push({...m}); return a; }, []);
