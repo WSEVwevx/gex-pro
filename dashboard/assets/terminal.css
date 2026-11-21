@@ -1,18 +1,22 @@
-/* GEX PRO terminal. Data colours: blue = positive gamma / calls, orange = negative gamma / puts,
-   grey = zero gamma, green = volume, gold = max pain, violet = open interest. UI chrome stays neutral. */
+/* GEX PRO, design language "Meridian" (docs/style.md). Surfaces and ink are OKLCH tones of one night-glass (dark) or
+   porcelain (light) material; depth is lightness, not borders. Data colours: blue = positive gamma / calls, orange =
+   negative gamma / puts, grey = zero gamma, green = volume, gold = max pain, violet = open interest. They stay hex
+   because the TradingView indicator uses the same eight values (tests/test_pine_static.py). */
 :root{
   --fs-xs:10.5px; --fs-sm:11.5px; --fs-base:12.5px; --fs-md:13.5px; --fs-lg:15px; --fs-xl:17px; --fs-x2:22px; --fs-x3:28px;   /* the type scale: every font size is one of these (old sizes between two steps took the lower one) */
   --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:20px; --sp-6:24px; --sp-7:32px; --sp-8:40px;   /* spacing: a 4 px grid */
   --r-1:4px; --r-2:7px; --r-3:12px;                     /* radius: small controls and tags / buttons and inputs / cards */
-  --page:#0b0d10; --panel:#111419; --panel2:#161a20; --raise:#1d2229; --bar:#0b0d10;   /* surfaces: page < card < raised */
+  --page:oklch(0.165 0.012 260); --panel:oklch(0.2 0.014 260); --panel2:oklch(0.235 0.015 260); --raise:oklch(0.275 0.016 260); --bar:oklch(0.165 0.012 260);   /* surfaces: page < card < raised */
   --line:rgba(var(--fg-rgb),.06); --line2:rgba(var(--fg-rgb),.11); --line3:rgba(var(--fg-rgb),.18);
-  --ink:#eceef1; --ink2:#a9afb9; --ink3:#8e95a0; --ink4:#878e99;      /* every text tier is at least 4.5:1 on a panel */
+  --ink:oklch(0.955 0.005 85); --ink2:oklch(0.82 0.012 260); --ink3:oklch(0.75 0.013 260); --ink4:oklch(0.73 0.013 260);      /* every text tier is at least 4.5:1 on every surface */
   --pos:#3987e5; --neg:#d95926; --vol:#199e70; --mp:#c98500; --oi:#9085e9; --zg:#b9bec7; --em:#8b95a5;
-  --good:#22b35e; --warn:#e6c35c; --bad:#e05a5a; --prompt:#e6b450;
-  --fg-rgb:255,255,255; --sunk:#0e1115; --sunk2:#090b0e; --top-bg:#0b0d10; --pagebar:rgba(11,13,16,.96);
-  --kpi-bg:rgba(17,20,25,.92); --tip-bg:rgba(22,26,32,.97); --overlay:rgba(3,5,8,.7);
-  --shadow:rgba(0,0,0,.55); --shadow2:rgba(0,0,0,.5); --btn-fg:#07090c; --ag:#e6e6e6;
-  --bad-fg:#f2a3a3; --high-fg:#ff8a80; color-scheme:dark;
+  --good:oklch(0.72 0.15 150); --warn:oklch(0.84 0.12 90); --bad:oklch(0.68 0.17 25); --prompt:oklch(0.8 0.12 80);
+  /* trust: a backup estimate has its own material (a warm plate with a fine hatch) and always says so in words */
+  --backup-bg:oklch(0.29 0.04 75); --backup-ink:oklch(0.88 0.07 85); --backup-hatch:oklch(0.88 0.07 85 / 0.1);
+  --fg-rgb:255,255,255; --sunk:oklch(0.18 0.012 260); --sunk2:oklch(0.15 0.01 260); --top-bg:oklch(0.165 0.012 260); --pagebar:oklch(0.165 0.012 260 / 0.96);
+  --kpi-bg:oklch(0.2 0.014 260 / 0.92); --tip-bg:oklch(0.235 0.015 260 / 0.97); --overlay:oklch(0.1 0.01 260 / 0.7);
+  --shadow:oklch(0 0 0 / 0.55); --shadow2:oklch(0 0 0 / 0.5); --btn-fg:oklch(0.13 0.01 260); --ag:#e6e6e6;
+  --bad-fg:oklch(0.8 0.09 20); --high-fg:oklch(0.76 0.14 28); color-scheme:dark;
   --card-shadow:none;                                    /* cards have no border: a fill in dark, a soft lift in light */
   --tape-bg:#0b0d10; --tape-bg2:#111419; --tape-dim:#8a93a1; --tape-ink:#e8ecf2; --tape-up:#22c55e; --tape-dn:#ef4444; --tape-line:rgba(255,255,255,.06);   /* the quote tape is dark in both themes */
   --code-ln:#353d49; --code-ink:#cfd6e0; --code-c:#5f6b7c; --code-s:#8fd1b0; --code-n:#e0a85c; --code-k:#b59cf5; --code-f:#7fb2f0; --code-ns:#8ab4c8;   /* the indicator source, a dark editor in both themes */
@@ -36,16 +40,17 @@ a{color:var(--ink2)}
 
 /* light mode: the same tokens, a paper palette (toggle in the top bar; saved per browser) */
 :root[data-theme="light"]{
-  --page:#f5f6f8; --panel:#ffffff; --panel2:#f7f8fa; --raise:#ebeef2; --bar:#ffffff;
+  --page:oklch(0.972 0.006 85); --panel:oklch(0.995 0.003 85); --panel2:oklch(0.958 0.007 85); --raise:oklch(0.93 0.009 85); --bar:oklch(0.995 0.003 85);
   --line:rgba(15,23,42,.09); --line2:rgba(15,23,42,.15); --line3:rgba(15,23,42,.24);
-  --ink:#0f172a; --ink2:#334155; --ink3:#5b6779; --ink4:#5d6879;
+  --ink:oklch(0.22 0.014 260); --ink2:oklch(0.38 0.016 260); --ink3:oklch(0.48 0.015 260); --ink4:oklch(0.49 0.015 260);
   --pos:#2b6fc9; --neg:#c44716; --vol:#11805a; --mp:#996500; --oi:#6f62d8; --zg:#6b7280; --em:#64748b;
-  --good:#11803f; --warn:#8f6a00; --bad:#cc3a3a; --prompt:#9a610e;
-  --fg-rgb:15,23,42; --sunk:#f6f8fb; --sunk2:#f1f4f8; --top-bg:#ffffff; --pagebar:rgba(243,245,248,.94);
-  --kpi-bg:rgba(255,255,255,.92); --tip-bg:rgba(255,255,255,.98); --overlay:rgba(15,23,42,.35);
-  --shadow:rgba(15,23,42,.18); --shadow2:rgba(15,23,42,.16); --btn-fg:#ffffff; --ag:#1f2937;
-  --bad-fg:#b42318; --high-fg:#c62828; color-scheme:light;
-  --card-shadow:0 1px 2px rgba(15,23,42,.05),0 0 0 1px rgba(15,23,42,.05);
+  --good:oklch(0.49 0.13 150); --warn:oklch(0.5 0.11 85); --bad:oklch(0.52 0.18 25); --prompt:oklch(0.5 0.11 70);
+  --backup-bg:oklch(0.93 0.035 80); --backup-ink:oklch(0.38 0.07 70); --backup-hatch:oklch(0.38 0.07 70 / 0.08);
+  --fg-rgb:31,35,48; --sunk:oklch(0.965 0.006 85); --sunk2:oklch(0.955 0.007 85); --top-bg:oklch(0.995 0.003 85); --pagebar:oklch(0.972 0.006 85 / 0.94);
+  --kpi-bg:oklch(0.995 0.003 85 / 0.92); --tip-bg:oklch(0.995 0.003 85 / 0.98); --overlay:oklch(0.22 0.014 260 / 0.35);
+  --shadow:oklch(0.22 0.014 260 / 0.18); --shadow2:oklch(0.22 0.014 260 / 0.16); --btn-fg:oklch(0.995 0.003 85); --ag:#1f2937;
+  --bad-fg:oklch(0.48 0.17 27); --high-fg:oklch(0.5 0.18 27); color-scheme:light;
+  --card-shadow:0 1px 2px oklch(0.22 0.014 260 / 0.05),0 0 0 1px oklch(0.22 0.014 260 / 0.05);
 }
 :root[data-theme="light"] .code{--sunk2:var(--tape-bg2)}           /* the indicator's source keeps its dark editor look */
 :root[data-theme="light"] .regime{text-shadow:none}
