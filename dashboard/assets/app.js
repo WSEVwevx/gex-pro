@@ -1835,6 +1835,8 @@ function renderBacktest(){
 
 
 // ---------- GEX live table: net DEX / GEX / OI / volume by strike, for the expirations you pick
+// two expirations can share a date (the AM-settled monthly and the PM-settled weekly root): the tooltip says which
+const ldSettle = tag => /AM/.test(tag || "") ? ", AM-settled monthly (settles on the opening prints)" : /M/.test(tag || "") ? ", PM-settled (settles on the close)" : "";
 let ldSel = (() => { try { return new Set(JSON.parse(store.get("gex.ldsel", "[]"))); } catch(e){ return new Set(); } })();
 let ldRowsN = Number(store.get("gex.ldrows", "51"));
 const MON = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
@@ -1855,7 +1857,7 @@ function renderLiveTable(){
   const emax = Math.max(1, ...E.map(e => Math.abs(e.net)));
   $("ldStrip").innerHTML = E.map((e, i) => {
     const h = Math.max(3, Math.round(Math.abs(e.net) / emax * 34)), pos = e.net >= 0;
-    return `<button class="ld-exp${on(i) ? " on" : ""}" data-i="${i}" type="button" title="${esc(e.date === "other" ? "Every later expiration in the basket" : e.date)}: net GEX ${esc(money(e.net))}, net DEX ${esc(compact(e.dex))}">
+    return `<button class="ld-exp${on(i) ? " on" : ""}" data-i="${i}" type="button" title="${esc(e.date === "other" ? "Every later expiration in the basket" : e.date + ldSettle(e.tag))}: net GEX ${esc(money(e.net))}, net DEX ${esc(compact(e.dex))}">
       <span class="ld-d">${ldDate(e.date)}</span><span class="ld-dte">${e.dte == null ? "rest" : num(e.dte, 1) + " DTE"}</span><span class="ld-tag">${esc(e.tag || "")}</span>
       <i class="ld-dot" style="background:${pos ? "var(--pos)" : "var(--neg)"}"></i>
       <span class="ld-mini"><i style="height:${h}px;background:${pos ? "var(--pos)" : "var(--neg)"}"></i></span><span class="ld-v ${pos ? "pos" : "neg"}">${compact(e.net)}</span></button>`;
@@ -2202,7 +2204,10 @@ class HeatPrimitive {
     });
   }
 }
-const hmGexW = () => Math.min(190, Math.round(Math.max(300, $("hmChart").clientWidth - 80) * 0.38));
+// the plot's real width (the chart minus its price axis); the old 300 px floor overstated a phone's plot, and the
+// profile then took nearly half of it (final audit 2026-11-21: "2 days" squeezed on a 375 px phone)
+const hmPlotW = () => (hmChart && hmChart.timeScale().width()) || Math.max(100, $("hmChart").clientWidth - 80);
+const hmGexW = () => { const p = hmPlotW(); return Math.min(190, Math.round(p * (p < 400 ? 0.28 : 0.38))); };
 function hmColors(){
   return {layout: {background: {type: "solid", color: lcVar("--panel")}, textColor: lcVar("--ink3"), fontFamily: cssVar("--mono"), fontSize: parseFloat(cssVar("--fs-xs")) || 10.5},
     grid: {vertLines: {visible: false}, horzLines: {visible: false}},
@@ -2291,7 +2296,7 @@ function renderHeatmap(){
     const young = st.length > 1 && n && hm._times[n - 1] - hm._times[st[st.length - 1]] < 3 * 3600 ? 1 : 0;
     const from = Math.max(0, (hmSpan === "all" ? 0 : st[Math.max(0, st.length - (hmSpan === "2d" ? 2 : 1) - young)] || 0) - 2);
     // pick the right offset so the profile space is hmGexW() once the candles fill the rest of the width
-    const plot = Math.max(300, $("hmChart").clientWidth - 80), bars = Math.max(1, n - from), gw = hmGexW();
+    const plot = hmPlotW(), bars = Math.max(1, n - from), gw = hmGexW();
     const ro2 = Math.max(16, Math.round(gw * bars / Math.max(100, plot - gw)));
     hmChart.timeScale().applyOptions({rightOffset: ro2});
     hmChart.timeScale().setVisibleLogicalRange({from, to: n + ro2});
