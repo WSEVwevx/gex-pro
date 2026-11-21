@@ -106,10 +106,11 @@ def main() -> int:
     hard = []
     for name, ok, msg, dt, backup in rows:
         covered = not ok and backup and ok_by.get(backup, backup in ("carry model", "weights saved with the app"))
-        mark = "OK  " if ok else "WARN" if covered else "FAIL"
+        candidate = not ok and name.endswith("(candidate)")      # not used by the app yet: it can't break the site
+        mark = "OK  " if ok else "WARN" if covered or candidate else "FAIL"
         if mark == "FAIL":
             hard.append(name)
-        print(f"{mark} {name:32s} {dt:5.1f}s  {msg}" + (f"  (backup in use: {backup})" if covered else ""))
+        print(f"{mark} {name:32s} {dt:5.1f}s  {msg}" + (f"  (backup in use: {backup})" if covered else "  (candidate, not used yet)" if candidate else ""))
     print("RESULT:", "PASS" if not hard else "FAIL - " + ", ".join(hard))
     return 1 if hard else 0
 
