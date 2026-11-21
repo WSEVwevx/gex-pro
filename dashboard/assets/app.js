@@ -794,10 +794,12 @@ function renderCot(){
   $("cotBody").innerHTML = `<table class="trk-table"><tr><th>Group</th><th>Net</th><th>Week</th><th>Rank</th><th>Reading</th></tr>
     ${s.groups.map(g => `<tr><td>${esc(g.name)}</td><td class="m">${n(g.net)}</td><td class="m">${n(g.change)}</td><td class="m"><span class="rk"><i style="width:${Math.max(0, Math.min(100, g.rank))}%"></i></span><b>${num(g.rank, 0)}%</b></td><td class="trk-mean">${esc(g.label)}</td></tr>`).join("")}</table>`;
 }
+// no cash session today (weekend, holiday): the card shows the latest bias and says so
+const biasDay = () => sessionPhase(new Date(), data && data.calendar).phase === "no cash session today" ? "Latest bias, no session today" : "Today's bias";
 function renderBias(w){
   loadCot(); renderCot();
-  const b = w.result.bias;
-  if(!b){ $("biasCard").innerHTML = `<div class="eyebrow">Today's bias</div><div>${stateHtml("empty", "No bias yet", "It needs today's levels and an expected move. It appears with the next refresh that has both.")}</div>`; return; }
+  const b = w.result.bias, dayLab = biasDay();
+  if(!b){ $("biasCard").innerHTML = `<div class="eyebrow">${dayLab}</div><div>${stateHtml("empty", "No bias yet", "It needs today's levels and an expected move. It appears with the next refresh that has both.")}</div>`; return; }
   const col = BIAS_COLOR[b.bias], ref = b.ref;
   const tm = iso => new Date(iso).toLocaleTimeString("en-US", {...ET, hour:"numeric", minute:"2-digit"});
   const card = $("biasCard").parentElement; card.classList.add("accent"); card.style.setProperty("--accent", col);
@@ -805,7 +807,7 @@ function renderBias(w){
   const drift = b.target - ref;
   const lean = {Bullish: "Positioning leans up.", Bearish: "Positioning leans down.", Neutral: "No directional lean."}[b.bias];
   const moves = {positive: "Moves are likely to be capped (positive gamma).", negative: "Moves are likely to extend (negative gamma)."}[b.side] || "Price is at the flip: the day type depends on which side of zero gamma it holds.";
-  $("biasCard").innerHTML = `<div class="eyebrow">Today's bias (positioning model)</div>
+  $("biasCard").innerHTML = `<div class="eyebrow">${dayLab} (positioning model)</div>
     <div class="bv-top">
       <div class="bv-call"><div class="regime"><span class="tag" style="border-color:${col}">${b.bias === "Bullish" ? "▲" : b.bias === "Bearish" ? "▼" : "◆"}</span><span style="color:${col}">${b.bias}</span><span class="chip">${b.confidence} confidence</span></div>
         <div class="bv-day"><span>Day type</span><b>${esc(b.day_type)}</b></div></div>
@@ -1997,7 +1999,7 @@ function hmAsOf(h, tf){
     + ` · candles ${tf}, delayed${c ? `, last ${etTime(c[0] * 1000)} ET` : ""}`;
 }
 function hmTimeOpts(){
-  return {localization: {timeFormatter: t => hmFmt.full.format(new Date(t * 1000)) + " ET"},
+  return {localization: {timeFormatter: t => hmFmt.full.format(new Date(t * 1000)) + " ET", priceFormatter: p => num(p, 2)},
     timeScale: {tickMarkFormatter: (t, type) => type < 3 ? hmFmt.day.format(new Date(t * 1000)) : hmFmt.hm.format(new Date(t * 1000))}};
 }
 // cash opens (09:30 ET, a marker each day) and futures-session starts (the first bar after 18:00 ET or after a gap)
@@ -2424,6 +2426,8 @@ function renderStockChart(c){
   const bars = (scRange === "daily" ? c.daily : c.intraday) || [];
   if(!bars.length){ $("scMsg").hidden = false; $("scMsg").textContent = scRange === "daily" ? "No daily bars yet." : "No bars today yet (they start with the pre-market)."; return; }
   $("scMsg").hidden = true;
+  const tl = bars[bars.length - 1][0] * 1000;
+  $("scInfo").insertAdjacentHTML("beforeend", `<span class="dim">as of ${scRange === "daily" ? esc(new Date(tl).toLocaleDateString("en-US", {...ET, month: "short", day: "numeric"})) : esc(etTime(tl)) + " ET"}</span>`);
   if(!scChart){
     scChart = LC.createChart($("scBox"), Object.assign({autoSize: true}, hmColors()));
     scSeries = scChart.addCandlestickSeries({borderVisible: false, priceLineVisible: true});
