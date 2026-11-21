@@ -1341,15 +1341,41 @@ const COMMANDS = [
   {code: "GLOSSARY", desc: "Open the A-Z glossary", run: () => setPage("glossary")},
   {code: "PASTES", desc: "Past days' 9:30 level pastes, for backtesting", run: showPastes},
 ];
+// the command bar also finds today's levels (the same prices as Levels, in the same units) and every glossary term
+const CMD_LEVELS = [["CW", "Call wall", s => pickP(s.call_wall)], ["PW", "Put wall", s => pickP(s.put_wall)], ["ZG", "Zero gamma", s => pickP(s.zero_gamma)],
+  ["AG", "Abs gamma", s => pickP(s.abs_gamma)], ["C1", "C1, first expiry", (s, lv) => lv.C1], ["P1", "P1, first expiry", (s, lv) => lv.P1],
+  ["AB1", "Ab1, first expiry", (s, lv) => lv.Ab1], ["FLIP", "0DTE flip", (s, lv) => lv.flip]];
+function cmdLevels(){
+  const w = curW(), r = w && w.result; if(!r) return [];
+  const s = r.mapped || r.summary, lv = (r.session && r.session.levels) || {}, ref = (r.mapped || {}).futures_equiv_of_ref ?? s.ref_price;
+  return CMD_LEVELS.map(([code, name, get]) => { const v = get(s, lv);
+    return {code, kind: "Level", desc: v == null ? `${market} ${name}: unavailable (Levels says why)` : `${market} ${name} ${num(v, 2)} · ${signed(v - ref, 0)} pts from ${num(ref, 2)}`,
+      run: () => { setPage("levels"); const el = $("lvMap"); if(el) el.scrollIntoView({block: "center"}); }}; });
+}
+const cmdTerms = () => LIB.glossary.map(([t, d]) => ({code: t, kind: "Term", desc: d, run: () => openGlossary(t)}));
+// ranking: an exact or starting code, a level named in words, a word in a description, then terms; at most 12, terms from 2 letters
+function cmdSearch(q, pool){
+  q = q.trim().toLowerCase();
+  if(!q) return pool.filter(c => !c.kind);
+  const score = c => { const code = c.code.toLowerCase(), desc = c.desc.toLowerCase();
+    if(code === q) return 0; if(code.startsWith(q)) return 1; if(new RegExp("\\b" + q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).test(desc)) return 2;
+    return desc.includes(q) || code.includes(q) ? 3 : 9; };
+  const rank = c => { const s = score(c); return c.kind === "Level" && s === 2 ? .4 : s + (c.kind === "Term" ? .5 : 0); };   // a level named in words beats the term of that name
+  return pool.filter(c => (c.kind !== "Term" || q.length >= 2) && score(c) < 9).map((c, i) => [rank(c), i, c])
+    .sort((a, b) => a[0] - b[0] || a[1] - b[1]).slice(0, 12).map(x => x[2]);
+}
 let cmdSel = 0;
-function cmdMatches(q){ q = q.trim().toUpperCase(); return q ? COMMANDS.filter(c => c.code.startsWith(q) || c.desc.toUpperCase().includes(q)) : COMMANDS; }
+function cmdMatches(q){ return cmdSearch(q, [...COMMANDS, ...cmdLevels(), ...cmdTerms()]); }
 function renderCmdList(){
-  const ms = cmdMatches($("cmd").value), list = $("cmdList");
-  if(document.activeElement !== $("cmd")){ list.hidden = true; return; }
+  const ms = cmdMatches($("cmd").value), list = $("cmdList"), box = $("cmd");
+  if(document.activeElement !== box){ list.hidden = true; box.setAttribute("aria-expanded", "false"); return; }
   cmdSel = Math.min(cmdSel, Math.max(0, ms.length - 1));
-  list.innerHTML = ms.map((c, i) => `<div class="${i === cmdSel ? "on" : ""}" data-i="${i}" role="option"><b>${esc(c.code)}</b><span>${esc(c.desc)}</span><span>↵</span></div>`).join("") || `<div><b>?</b><span>No command. Try GEX, VOL, NQ, COPY</span><span></span></div>`;
-  list.hidden = false;
+  list.innerHTML = ms.map((c, i) => `<div class="${i === cmdSel ? "on" : ""}" data-i="${i}" id="cmdOpt${i}" role="option" aria-selected="${i === cmdSel}"><b>${esc(c.kind === "Term" ? "TERM" : c.code)}</b><span>${c.kind === "Term" ? `<em>${esc(c.code)}</em> ` : ""}${esc(c.desc)}</span><span>${c.kind || "↵"}</span></div>`).join("")
+    || `<div role="option" aria-disabled="true"><b>?</b><span>Nothing found. Try a page (LIVE), a level (CW) or a term (gamma)</span><span></span></div>`;
+  list.hidden = false; box.setAttribute("aria-expanded", "true");
+  box.setAttribute("aria-activedescendant", ms.length ? "cmdOpt" + cmdSel : "");
   [...list.querySelectorAll("[data-i]")].forEach(el => el.onmousedown = e => { e.preventDefault(); runCmd(ms[Number(el.dataset.i)]); });
+  const on = list.querySelector(".on"); if(on) on.scrollIntoView({block: "nearest"});
 }
 function runCmd(c){ if(!c) return; $("cmd").value = ""; $("cmd").blur(); $("cmdList").hidden = true; c.run(); }
 $("cmd").addEventListener("input", () => { cmdSel = 0; renderCmdList(); });
@@ -1359,12 +1385,12 @@ $("cmd").addEventListener("keydown", e => {
   const ms = cmdMatches($("cmd").value);
   if(e.key === "ArrowDown"){ cmdSel = Math.min(ms.length - 1, cmdSel + 1); renderCmdList(); e.preventDefault(); }
   else if(e.key === "ArrowUp"){ cmdSel = Math.max(0, cmdSel - 1); renderCmdList(); e.preventDefault(); }
-  else if(e.key === "Enter"){ const exact = COMMANDS.find(c => c.code === $("cmd").value.trim().toUpperCase()); runCmd(exact || ms[cmdSel]); e.preventDefault(); }
+  else if(e.key === "Enter"){ runCmd(ms[cmdSel]); e.preventDefault(); }          // an exact code ranks first
   else if(e.key === "Escape"){ $("cmd").value = ""; $("cmd").blur(); }
 });
 
 // ---------- keyboard
-const KEYS = [["/  or  Ctrl+K", "Command line"], ["1 - 9, 0", "Pages (Levels, Live table, Heatmap, Screener, Bias, Track record, Briefings, News, Indicator, Library); GLOS opens the Glossary"],
+const KEYS = [["/  or  Ctrl+K", "Search pages, levels, terms and commands"], ["1 - 9, 0", "Pages (Levels, Live table, Heatmap, Screener, Bias, Track record, Briefings, News, Indicator, Library); GLOS opens the Glossary"],
   ["N  /  E", "Switch to NQ / ES"], ["X", "Explain this page"], ["T", "Light / dark mode"], ["D", "Notes under numbers on / off"], ["C", "Copy the TradingView paste"], ["?", "This list"], ["Esc", "Close panels"]];
 function showKeys(on){ $("keys").hidden = !on; if(on) $("keysGrid").innerHTML = KEYS.map(([k, d]) => `<kbd>${esc(k)}</kbd><span>${esc(d)}</span>`).join(""); }
 $("keysBtn").onclick = () => showKeys(true);

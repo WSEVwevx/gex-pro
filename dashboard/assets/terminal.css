@@ -67,12 +67,14 @@ a{color:var(--ink2)}
 .cmd{position:relative;flex:1;min-width:0;max-width:560px;display:flex;align-items:center;background:var(--page);border:1px solid var(--line2);border-radius:var(--r-2);height:34px}
 .cmd:focus-within{border-color:color-mix(in srgb,var(--prompt) 55%,transparent);box-shadow:0 0 0 3px color-mix(in srgb,var(--prompt) 8%,transparent)}
 .cmd .prompt{font:700 var(--fs-md) var(--mono);color:var(--prompt);padding:0 6px 0 12px}
-.cmd input{flex:1;min-width:0;width:100%;background:none;border:0;outline:0;color:var(--ink);font:500 var(--fs-base) var(--mono);letter-spacing:.02em;text-transform:uppercase}
+.cmd input{flex:1;min-width:0;width:100%;background:none;border:0;outline:0;color:var(--ink);font:500 var(--fs-base) var(--sans)}
 .cmd input::placeholder{text-transform:none;color:var(--ink4);letter-spacing:0}
-.cmdlist{position:absolute;top:38px;left:0;right:0;z-index:40;background:var(--panel2);border:1px solid var(--line2);border-radius:var(--r-2);box-shadow:0 18px 40px -12px var(--shadow);overflow:hidden;max-height:360px;overflow-y:auto}
+.cmdlist{position:absolute;top:38px;left:0;right:0;min-width:min(520px,calc(100vw - 32px));z-index:40;background:var(--panel2);border:1px solid var(--line2);border-radius:var(--r-2);box-shadow:0 18px 40px -12px var(--shadow);overflow:hidden;max-height:360px;overflow-y:auto}
 .cmdlist div{display:grid;grid-template-columns:64px 1fr auto;gap:10px;padding:8px 12px;font-size:var(--fs-base);color:var(--ink2);cursor:pointer}
 .cmdlist div b{font:700 var(--fs-sm) var(--mono);color:var(--prompt)}
 .cmdlist div span:last-child{color:var(--ink4);font-size:var(--fs-sm)}
+.cmdlist div span:nth-child(2){min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cmdlist em{font-style:normal;font-weight:600;color:var(--ink)}
 .cmdlist div.on,.cmdlist div:hover{background:var(--raise);color:var(--ink)}
 
 /* ticker strip */
