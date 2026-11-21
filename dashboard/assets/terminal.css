@@ -488,6 +488,8 @@ body.stale-data #lvHead .lvh-px .eyebrow::after{content:var(--stale-text);margin
 .m-band{fill:rgba(var(--fg-rgb),.07)}.m-sw-band{background:rgba(var(--fg-rgb),.14)}
 .m-tone.neg{fill:var(--neg)}.m-tone.pos{fill:var(--pos)}.m-sw-tone{background:linear-gradient(90deg,var(--neg),var(--pos))}
 .m-axis{stroke:var(--ink3);stroke-width:1}.m-curve{fill:none;stroke:var(--ink2);stroke-width:1.75;stroke-linejoin:round}.m-sw-curve{background:var(--ink2)}
+.m-tape line{stroke:var(--prompt);stroke-width:2}
+.m-tapeout{min-height:1.5em;font:600 var(--fs-xs) var(--mono);color:var(--prompt)}
 .m-bead{fill:var(--ink);stroke:var(--panel);stroke-width:2.5}.m-probe-ln{stroke:var(--ink3);stroke-dasharray:2 3;pointer-events:none}
 .lv-map svg{touch-action:pan-y}.m-probe{min-height:1.5em;margin-top:var(--sp-1);font:var(--fs-xs) var(--mono);color:var(--ink2)}
 .vh{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
@@ -760,7 +762,7 @@ b.good,.drv-chg .good{color:var(--good)}b.bad,.drv-chg .bad{color:var(--bad)}
   .lv-head .eyebrow{white-space:normal}
   .lv-head .lvh-net{display:none}        /* in "More numbers" on a phone */
   .lvh-say{grid-column:1/-1;margin-top:var(--sp-2);font-size:var(--fs-sm)}
-  .m-probe{min-height:4.5em}
+  .m-probe{min-height:4.5em}.m-tapeout{min-height:3em}
   .lvh-big{font-size:var(--fs-x2)}.lvh-regime{font-size:var(--fs-lg)}
   .stats.keys{margin:0 0 var(--sp-2)}
   #banner:empty+#levelsView #keyStrip:not(:has(.stat)){min-height:150px}

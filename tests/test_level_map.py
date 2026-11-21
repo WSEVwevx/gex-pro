@@ -140,7 +140,7 @@ class Field(unittest.TestCase):
         self.assertIn(f"NQ 26,594.97. Total modeled gamma at the price: +${here / 1e9:.2f}B per 1% move.", words)
         self.assertIn("It crosses zero at 27,361.75.", words)
         self.assertIn("Deepest strike tone: 26,500, positive.", words)
-        self.assertIn('aria-live="polite">Point at the field, or tap it, for the gamma at any price.</div>', svg)
+        self.assertIn('<div class="m-probe">Point at the field for the gamma at any price; tap or click to measure from the price.</div><div class="m-tapeout" aria-live="polite"></div>', svg)
 
     def test_no_profile_draws_no_curve_and_says_unavailable(self):
         svg = draw()["svg"]
@@ -149,10 +149,27 @@ class Field(unittest.TestCase):
 
     def test_the_probe_reads_the_same_scale_back(self):
         fn = piece("function renderLevelMap(")
-        self.assertIn("const at = hi - (yy - top) / (bot - top) * (hi - lo)", fn)       # the inverse of y(v)
+        self.assertIn("const at = yy => hi - (yy - top) / (bot - top) * (hi - lo);", fn)       # the inverse of y(v)
         self.assertIn("y = v => bot - (v - lo) / (hi - lo) * (bot - top)", fn)
         self.assertIn('total if price were here ${tot == null ? "unavailable" : money(tot)}', fn)
         self.assertIn('strike gamma ${!b ? "none saved here" : b[2] ? "about " + money(b[1]) : "under 1% of the largest"}', fn)
+
+    def test_the_tape_measures_in_points_percent_and_sigma(self):
+        line = next(l for l in JS.splitlines() if l.startswith("const tapeText ="))
+        src = "\n".join([next(l for l in JS.splitlines() if l.startswith(p)) for p in ("const num =", "const signed =")] + [line,
+              "console.log(JSON.stringify([tapeText('CW', 28881.5, 25099.91, 1254.33), tapeText('', 24770, 25099.91, 1254.33),"
+              " tapeText('', 25099.91, 25099.91, 1254.33), tapeText('PW', 24770, 25099.91, null)]))"])
+        a, b, c, e = json.loads(subprocess.run(["node"], input=src, capture_output=True, encoding="utf-8", check=True).stdout)
+        # 3,781.59 / 25,099.91 = 15.066%, / 1,254.33 = 3.01σ; 329.91 / 25,099.91 = 1.314%, / 1,254.33 = 0.26σ
+        self.assertEqual(a, "CW 28,881.50 is +3,782 pts · +15.07% · +3.0σ from the price 25,099.91")
+        self.assertEqual(b, "24,770.00 is -330 pts · -1.31% · -0.3σ from the price 25,099.91")
+        self.assertEqual(c, "25,099.91 is 0 pts · 0.00% · 0.0σ from the price 25,099.91")
+        self.assertEqual(e, "PW 24,770.00 is -330 pts · -1.31% · σ unavailable from the price 25,099.91")
+
+    def test_the_tape_snaps_to_a_level_within_ten_pixels(self):
+        fn = piece("function renderLevelMap(")
+        self.assertIn("lines.filter(l => l.v >= lo && l.v <= hi && Math.abs(y(l.v) - yy) <= 10)", fn)
+        self.assertIn('box.querySelector(".m-tapeout").textContent = "Tape: " + tapeText(near ? near.k : "", v, ref, d);', fn)
 
     def test_the_curve_is_never_extrapolated(self):
         self.assertEqual(fieldAt([[1, 10], [3, 30]], 2), 20)
