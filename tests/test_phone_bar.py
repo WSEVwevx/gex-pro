@@ -53,5 +53,15 @@ class Width(unittest.TestCase):
         self.assertEqual(head, "minmax(0,1fr) auto")
 
 
+class TouchTargets(unittest.TestCase):
+    def test_small_controls_get_a_44px_hit_box_on_phones(self):
+        # the sweep of 2026-11-21 measured "?" 22 px, NQ/ES 21 px, theme 30 px, page row 41 px; the drawing keeps its size
+        for rule in ('.ex::after{content:"";position:absolute;inset:-12px}',            # 22 + 2 x 12 = 46
+                     ':is(.theme-btn,.explain-tab)::after{content:"";position:absolute;inset:-8px -6px}',   # 30 + 16
+                     ':is(.seg button,.linkbtn)::after{content:"";position:absolute;inset:-11px 0}',       # 22 + 22
+                     ".side{min-height:44px}", ".hm-ctl{min-height:44px;"):
+            self.assertIn(rule, PHONE)
+
+
 if __name__ == "__main__":
     unittest.main()
