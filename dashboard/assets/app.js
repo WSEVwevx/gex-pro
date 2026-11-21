@@ -40,9 +40,9 @@ try { cardH = JSON.parse(store.get(HKEY, "{}")) || {}; } catch(e) {}
 const PER_MARKET = ["levelsView", "ladderView", "heatmapView", "screenerView", "biasView"];
 const cardKey = c => { const v = c.closest("[id$=View]"); return v ? v.id + ":" + [...v.querySelectorAll(".card")].indexOf(c) + (PER_MARKET.includes(v.id) ? ":" + market : "") : null; };
 // a first visit has no heights of its own yet: it reserves the usual ones (measured on the live site at 1366 and
-// 375 px wide, 2026-11-16; Levels 2026-11-19 after the redesign; Heatmap phone 2026-11-19), by page and card order. They are replaced by this device's real heights after one draw.
-const DEFAULT_H = {wide: {levelsView:[279,398,102,552,571,373,373,127,127,127,1194],ladderView:[183,1114,224,670,348],heatmapView:[743],screenerView:[290,372,99,681],biasView:[202,635,241,240],trackView:[261,615,637,299,274,1393,374,367,367,322],briefingsView:[136,0,619,619,181,453],newsView:[646,990],indicatorView:[261,261,261,52,372],libraryView:[152,760,1366],glossaryView:[5828],healthView:[1141],backtestView:[221,261,527,552,273,167,303,644]},
-  narrow: {levelsView:[313,404,94,828,618,365,365,119,116,109,1677],ladderView:[183,1299,205,670,284],heatmapView:[855],screenerView:[311,420,217,800],biasView:[342,765,422,345],trackView:[456,1217,997,345,392,1425,650,395,418,589],briefingsView:[168,0,643,620,248,472],newsView:[829,1061],indicatorView:[259,261,237,52,991],libraryView:[320,1058,1715],glossaryView:[13954],healthView:[2053],backtestView:[474,393,590,727,356,200,322,711]}};
+// 375 px wide, every page re-measured 2026-11-20 after the redesign, NQ, folds closed), by page and card order. They are replaced by this device's real heights after one draw.
+const DEFAULT_H = {wide: {levelsView:[207,398,102,577,571,373,373,124,124,124,1228],ladderView:[184,797,220,328,312],heatmapView:[648],screenerView:[291,370,97,679],biasView:[200,633,220,238],trackView:[259,578,635,297,272,1661,370,365,365,320],backtestView:[221,260,528,536,291,165,301,803],briefingsView:[448,292,0,0],newsView:[651,988],indicatorView:[217,217,217,67,369],libraryView:[155,628,1371],glossaryView:[5493],healthView:[1515]},
+  narrow: {levelsView:[186,431,94,894,618,365,365,81,116,109,1757],ladderView:[184,892,193,320,272],heatmapView:[879],screenerView:[304,389,146,754],biasView:[332,731,393,368],trackView:[446,891,823,334,291,2528,637,384,407,359],backtestView:[464,252,566,718,385,275,312,834],briefingsView:[1029,303,0,0],newsView:[787,718],indicatorView:[252,251,254,95,980],libraryView:[317,1066,1726],glossaryView:[13616],healthView:[2870]}};
 function reserve(){
   const usual = DEFAULT_H[innerWidth < 700 ? "narrow" : "wide"];
   document.querySelectorAll("[id$=View] .card").forEach(c => {
@@ -581,7 +581,7 @@ function renderHero(w, s, L, X, ref){
     <div class="lvh-net"><div class="eyebrow">Net gamma, all expiries</div><div class="lvh-mid ${s.net >= 0 ? "c-pos" : "c-neg"}">${money(s.net)}</div><div class="lvh-sub">per 1% move</div></div>`;
   $("regimeCard").parentElement.classList.add("accent"); $("regimeCard").parentElement.style.setProperty("--accent", R[2]);
   $("regimeCard").innerHTML = `<div class="eyebrow">Gamma regime (model)</div>
-    <div class="regime"><span class="tag" style="color:${R[2]};border-color:${R[2]}">${R[1]}</span><span style="color:${R[2]}">${R[0]}</span>${changed ? '<span class="chip">changed since last update</span>' : ""}</div>
+    <div class="regime"><span class="tag" style="border-color:${R[2]}">${R[1]}</span><span style="color:${R[2]}">${R[0]}</span>${changed ? '<span class="chip">changed since last update</span>' : ""}</div>
     <div class="expl">${R[3]}</div>${sigTxt}`;
   const fop = /_FOP$/.test(w.source);                 // levels straight from CME options on the future
   $("priceCard").innerHTML = `<div class="eyebrow">Reference price${refAt(s.ref_time)}</div>
@@ -719,7 +719,7 @@ function renderStats(w, s, L, X){
   const zgWhy = /^NO CROSSING/i.test(L.zero_gamma_status || s.zero_gamma_status || "") ? "no crossing near price" : L.zero_gamma_status || s.zero_gamma_status || "";
   $("keyStrip").innerHTML = key("Zero gamma (est.)", p(L.zero_gamma), "var(--zg)", zgWhy) + key("Call wall", p(L.call_wall), "var(--pos)")
     + key("Put wall", p(L.put_wall), "var(--neg)")
-    + tile("Expected move today", emd == null ? "-" : "±" + num(emd, 0), emd == null ? "" : `${num(emc - emd, 0)} – ${num(emc + emd, 0)} ${em.anchor_label ? "· " + esc(em.anchor_label) : "(1σ)"}`, "var(--em)");
+    + tile("Expected move today", emd == null ? "-" : "±" + num(emd, 0), emd == null ? "" : `${num(emc - emd, 0)} – ${num(emc + emd, 0)} ${em.anchor_label ? "· " + esc(em.anchor_label) : "(1σ)"}`);   // ink: --em text read 4.4:1 in light
   const hedge = ct(s.net), charm = ct(g.charm_flow_usd_per_day), vanna = ct(g.vanna_usd_per_vol_pt == null ? null : -g.vanna_usd_per_vol_pt);
   const cts = x => num(Math.abs(x), 0) + " " + market;
   $("stats").innerHTML = [
@@ -768,7 +768,7 @@ function renderBias(w){
   const moves = {positive: "Moves are likely to be capped (positive gamma).", negative: "Moves are likely to extend (negative gamma)."}[b.side] || "Price is at the flip: the day type depends on which side of zero gamma it holds.";
   $("biasCard").innerHTML = `<div class="eyebrow">Today's bias (positioning model)</div>
     <div class="bv-top">
-      <div class="bv-call"><div class="regime"><span class="tag" style="color:${col};border-color:${col}">${b.bias === "Bullish" ? "▲" : b.bias === "Bearish" ? "▼" : "◆"}</span><span style="color:${col}">${b.bias}</span><span class="chip">${b.confidence} confidence</span></div>
+      <div class="bv-call"><div class="regime"><span class="tag" style="border-color:${col}">${b.bias === "Bullish" ? "▲" : b.bias === "Bearish" ? "▼" : "◆"}</span><span style="color:${col}">${b.bias}</span><span class="chip">${b.confidence} confidence</span></div>
         <div class="bv-day"><span>Day type</span><b>${esc(b.day_type)}</b></div></div>
       <div class="bv-gauge" role="img" aria-label="Score ${sg(b.score)}. Bearish at ${sg(-BIAS_FLIP)} or less, bullish at ${sg(BIAS_FLIP)} or more.">
         <div class="bv-ends"><span>Bearish</span><b>Score <em style="color:${col}">${sg(b.score)}</em></b><span>Bullish</span></div>
@@ -819,7 +819,9 @@ function drawBias(b, col){
     (acc[k] = acc[k] || {p, names: [], color: LC[n]}).names.push(n);
     return acc;
   }, {}));
-  const labels = [...merged(lv).map(m => [m.p, `${m.names.map(nm).join(" · ")} ${num(m.p,0)}`, m.color]), [b.target, `${nm("Base case")} ${num(b.target,0)}`, col]];
+  const fits = t => t.length * 6.4 <= padR - 12;          // ~6.4 px a character at the chart's 11 px font
+  const named = (names, p) => { const t = `${names.map(nm).join(" · ")} ${num(p,0)}`; return fits(t) ? t : `${names.map(n => SHORT[n] || n).join(" · ")} ${num(p,0)}`; };
+  const labels = [...merged(lv).map(m => [m.p, named(m.names, m.p), m.color]), [b.target, named(["Base case"], b.target), col]];
   let last = -1e9;
   labels.sort((a, c) => y(a[0]) - y(c[0])).forEach(([p, t, c]) => { const ly = Math.max(y(p) + 4, last + 14); last = ly; g += `<text x="${W-padR+8}" y="${ly}" style="fill:${c}">${esc(t)}</text>`; });
   // levels too far away to draw at this scale: named at the edge they lie beyond (farthest outermost), with their distance
@@ -1130,7 +1132,14 @@ function renderTicker(){
   $("ticker").innerHTML = cells;          // data source, age and next paste are on each market page's header
   [...$("ticker").querySelectorAll(".tk[data-m]")].forEach(el => el.onclick = () => setMarket(el.dataset.m));
 }
-function setMarket(m){ market = m; store.set("gex.market", m); render(); }
+function setMarket(m){
+  market = m; store.set("gex.market", m);
+  // the per-page market toggles follow the site's switch (each page's own toggle can still pick another, or All)
+  trkM = btM = stM = m; store.set("gex.trkm", m); store.set("gex.btm", m); store.set("gex.stm", m);
+  render();
+  if(trk && page === "track") renderTrack();          // a closed page redraws when it is opened (setPage)
+  if(studies && page === "backtest") renderStudies();
+}
 
 // ---------- explain drawer: plain-English help for every module
 const HELP = {
@@ -2008,11 +2017,16 @@ class HeatPrimitive {
       ctx.font = `600 ${fs}px ${cssVar("--mono") || "monospace"}`;
       ctx.fillStyle = ctx.strokeStyle = `rgba(${cssVar("--fg-rgb")},.28)`;
       ctx.lineWidth = Math.max(1, Math.round(vr)); ctx.setLineDash([3 * hr, 4 * hr]);
+      // a day's label is drawn only where it clears the previous one and the GEX label on the right (phones, 2 days)
+      const gx0 = lastX == null ? null : lastX + bar * 2;        // where the GEX label goes, when it is drawn (below)
+      const gexX = gx0 != null && hm._profile && W / hr - gx0 - 6 >= 50 ? gx0 * hr : Infinity;
+      let labEnd = -Infinity;
       for(const [t, lbl] of hm._opens || []){
         const x = ts.timeToCoordinate(t); if(x == null) continue;
         const X = Math.round(x * hr) + .5;
         ctx.beginPath(); ctx.moveTo(X, fs + 6 * vr); ctx.lineTo(X, Hpx); ctx.stroke();
-        ctx.fillText(lbl + " open", X + 4 * hr, fs + 2 * vr);
+        const txt = lbl + " open", x0 = X + 4 * hr, x1 = x0 + ctx.measureText(txt).width;
+        if(x0 >= 0 && x0 >= labEnd + 8 * hr && x1 <= gexX - 8 * hr){ ctx.fillText(txt, x0, fs + 2 * vr); labEnd = x1; }
       }
       ctx.setLineDash([]);
       // the latest GEX profile and today's key levels, in the space right of the last candle
@@ -2031,7 +2045,7 @@ class HeatPrimitive {
         ctx.globalAlpha = 1;
         ctx.fillStyle = `rgba(${cssVar("--fg-rgb")},.45)`;
         const pt = new Date(P.t * 1000);       // the profile's own time: after a Cboe outage it is not "now"
-        ctx.fillText(`GEX ${hmFmt.wd.format(pt)} ${hmFmt.hm.format(pt)}`, Math.round(px0 * hr), fs + 2 * vr);
+        ctx.fillText(`GEX ${pt.toLocaleDateString("en-US", {...ET, weekday: "short"})} ${hmFmt.hm.format(pt)}`, Math.round(px0 * hr), fs + 2 * vr);
         if(hmShowLv) for(const m of hm._marks || []){
           const y = this.series.priceToCoordinate(m.p); if(y == null) continue;
           const Y = Math.round(y * vr) + .5;
@@ -2204,7 +2218,7 @@ function renderScreener(){
   const top = by[0], bot = by[by.length - 1], up = T.up || 0, dn = T.down || 0;
   const sg = (x, d = 1) => `<b class="${x > 0 ? "good" : x < 0 ? "bad" : ""}">${signed(x, d)}</b>`;
   $("drvSum").innerHTML = `
-    <div class="drv-fut"><div class="eyebrow">${market} future</div><div class="big">${F ? num(F.price, 2) : "-"}</div>
+    <div class="drv-fut"><div class="eyebrow">${market} future${scr.fetched ? ` · fetched ${etTime(scr.fetched)} ET` : ""}</div><div class="big">${F ? num(F.price, 2) : "-"}</div>
       <div class="drv-chg">${F ? sg(F.change, 2) + ` pts · ${signed(F.pct, 2)}%` : ""}</div></div>
     <div class="drv-kv"><span>Top ${T.names || 0} stocks' move</span>${sg(pts)} <em>pts of ${market}</em></div>
     <div class="drv-kv"><span>They make up</span><b>${num(T.weight, 1)}%</b> <em>of the ${market === "ES" ? "S&P 500" : "Nasdaq-100"}</em></div>
