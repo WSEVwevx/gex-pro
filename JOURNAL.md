@@ -389,3 +389,34 @@ estimated before starting. PR 69 (lane 77) closed the two audit lows first.
 Limits of the Nasdaq source, from a full pull on 21 Nov: NDX lists only NDXP (PM-settled weeklies, 1,921 rows, five
 expiries to 30 Nov), no AM monthly; SPX is "Symbol not exists"; SPY lists 3,014 rows across the dates asked for.
 Prices are as of the prior close on a weekend. Items 7-8 need a CLAUDE.md wireframe and the owner's review before code.
+
+## 2026-11-21 next level: results (Sat 21 Nov, 15:45-16:30 ET, market closed)
+- **69** (lane 77) the two audit lows: expiry titles name the settlement; the phone Heatmap's candles 117 -> 166 px.
+- **70** the prompt and the scored backlog. **71** the Nasdaq option chain in the Source probe as a candidate; a
+  failing candidate warns instead of failing the run (lane 78 deploys 70-71).
+- **Backlog 2, throttled network** (headless Chrome, Slow 4G: 150 ms, 1.6 Mbit/s, CPU ×4, hosted site, 1 cold + 2 warm):
+  1366 cold first paint 1,520 ms, largest paint 2,448 ms, CLS 0.028 (the banner); warm 360-372 ms, CLS 0. 375 cold
+  372 ms largest paint (the sentence), warm 428-632 ms, CLS 0. The 1,500 ms first-screen budget holds on a warm load
+  and misses on a cold 1366 load. Waterfall: the page, then 160 KB of scripts (done 1.5 s), then `stamp.txt`, then
+  `all.json` (147 KB gzip). Tried: start the stamp and data from the head script. With gzip served locally (3 runs
+  each) largest paint went 2.40 -> 2.25 s but first-visit CLS rose 0 -> 0.08: not shipped. What would help:
+  `by_strike` is 52 KB of `all.json` (26 KB per market) and isn't needed for the first screen; load it with its page.
+- **Backlog 3, missing snapshot**: already shown. Data health's History archive row is "failing" and names
+  "2026-11-20 (ES midday snapshot: no usable snapshot within 30 minutes of 12:00 ET)". The backlog's premise was wrong.
+- **Backlog 5, matched call/put pairs** (engine's own OCC path on the 21 Nov files, as of the 20 Nov close; matched =
+  min(call OI, put OI) per root, expiry, strike, removed from both sides):
+
+  | | Net DEX | Gross GEX | Net GEX | Call wall | Put wall | Abs gamma |
+  |---|---|---|---|---|---|---|
+  | NQ all | $220.4B | 13.66B | -3.23B | 25850 | 24700 | 27000 |
+  | NQ unmatched | $105.9B | 8.47B | -3.23B | 25850 | 24700 | 27000 |
+  | ES all | $2,901.9B | 202.06B | -44.23B | 7000 | 6200 | 7000 |
+  | ES unmatched | $750.4B | 86.74B | -44.23B | 8100 | 6200 | 6200 |
+
+  Net GEX is unchanged by construction (under "dealers long calls, short puts" a matched pair's gammas cancel), so
+  zero gamma can't move. The removed DEX matches the verifier's independent recount to the $0.1B (ES $2,151.5B, NQ
+  $114.5B). Verdict: **not shipped.** Removing pairs also removes straddles and two-sided interest at round strikes:
+  the ES call wall jumps to 8100, 17% above spot, which no trader would call the wall. Net DEX stays "modelled" with
+  its caveat. One day of data (n = 1 per market); there's nothing to say about prediction.
+- **Not done:** backlog 4 (screen-reader text), 6 (wall hold/break study: the archive starts 2026-11-18 and Cboe
+  chains stopped on 19 Nov, too few sessions for any threshold), 7-9.
