@@ -264,3 +264,40 @@ lessons, open questions. Read the last 5 entries before deciding anything.
   untested.
 - Lesson: Python's open() defaults to cp1252 here; a test file with σ was emptied by a failed write. Always pass
   encoding="utf-8".
+
+## 2026-11-21 redesign 2040: Phases 0-1 (started Fri 20 Nov 23:00 ET, after the close)
+
+### Baseline
+- main ecbae09 (PR 45). Next free lane 57. Tests 556, all pass.
+- Cboe refuses, so levels come from the OCC backup.
+- Phase 0 study: `docs/redesign/phase0-study.md`. Its high and medium defects were fixed in PRs 44 and 45 before Phase 1.
+
+### Phase 1: three directions
+- Built on a snapshot of the hosted data taken Fri 20 Nov, 11:12 PM ET. It shows Levels at 1366 and 375 in both themes, a level-reactions page, the signature interaction, and a wireframe with exact math for each direction.
+- The directions:
+  - **Meridian:** price as a bead on a vertical axis; the gamma field as tone.
+  - **Strata:** time × price landscape, with a scrub replay.
+  - **Signal:** wayfinding. The sentence is the headline and price is a line with stops.
+- Artifact: https://claude.ai/artifact/SzFNBPfhFKhy2tRskiMF6e (private).
+- The user told me to make the Phase 1 decisions myself ("proceed with all phases and questions without my input").
+
+### Decision: Meridian, with two borrowed pieces
+- **Why Meridian:**
+  - The first screen at both widths answers the 10-second questions: the price, the sentence, the backup plate, the field and the nearer wall.
+  - Its vertical price axis matches the TradingView chart the trader reads beside it.
+- **From Strata:** the time × price landscape becomes the Heatmap page, with hatched "no saved GEX" ground and the scrub replay. It was rejected for Levels for two reasons:
+  - it pushes the plan below the fold;
+  - it is honest only where snapshots exist, and on Fri 20 Nov none exist after Thu 17:20 ET.
+- **From Signal:** the measuring tape, which shows Δ pts, % and σ from price to a chosen level.
+- **Cut:**
+  - Signal's 30 px sentence as the headline: on a phone it pushed the price and the plan below the first screen.
+  - Meridian's dial arcs on the reactions page: they carried nothing the numbers did not. Use bars with n instead.
+
+### Decision: the session-calendar export, yes
+- `all.json.calendar` already carries holidays, early closes, Globex mornings and no-evening days from `marketcal`.
+- It does not carry today's open and close times. `app.js` renderPlan hard-codes 570 and 960 minutes and weekends, a CLAUDE.md breach.
+- The export adds the open and close instants in UTC for today and the next session, early closes included, from `marketcal`. The page compares the time now with them.
+- Own PR, with tests.
+
+### Open
+- The tape overlaps the P1 label on Signal's desktop line. That is moot now that Signal was not picked.
