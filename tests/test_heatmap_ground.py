@@ -1,7 +1,6 @@
 """The Heatmap (2040 redesign, Phase 5): a candle with no saved GEX gets a hatched ground that says so, never an old
 snapshot's colour; the chart library gets rgb() colours (it cannot parse the OKLCH tokens); hidden controls stay hidden."""
 import json
-import re
 import shutil
 import subprocess
 import unittest
