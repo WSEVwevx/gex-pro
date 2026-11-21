@@ -418,6 +418,15 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
     </div>
   </main>
 
+  <!-- phone: one-thumb bar (the page row at the top keeps every page, in the same order) -->
+  <nav class="botbar" id="botbar" aria-label="Quick actions">
+    <button type="button" data-p="levels"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5h14M3 10h9M3 15h12"/></svg><span>Levels</span></button>
+    <button type="button" data-p="ladder"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 4h14M3 8h14M3 12h14M3 16h14"/></svg><span>Live</span></button>
+    <button type="button" data-p="heatmap"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 4h4v4H3zM8 4h4v4H8zM13 4h4v4h-4zM3 9h4v4H3zM8 9h4v4H8zM13 9h4v4h-4z"/></svg><span>Heatmap</span></button>
+    <button type="button" id="bbSearch"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="5"/><path d="M13 13l4 4"/></svg><span>Search</span></button>
+    <button type="button" id="bbCopy" class="bb-copy"><b>Copy paste</b><span id="bbCopyT">for TradingView</span></button>
+  </nav>
+
   <!-- explain panel: plain-English help for whatever you point at -->
   <aside class="explain" id="explain" aria-hidden="true" aria-label="Explanation">
     <div class="ex-head"><div><div class="eyebrow" id="exKicker">Explain</div><h3 id="exTitle">-</h3></div>

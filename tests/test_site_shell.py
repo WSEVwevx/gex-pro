@@ -23,10 +23,15 @@ class Shell(unittest.TestCase):
             self.assertRegex(HTML, rf'<button role="tab" data-p="{p}"[^>]*>.*?<kbd>[A-Z?]+</kbd>', p)   # the codes stay for the command line
 
     def test_the_paste_is_pinned_on_a_phone(self):
-        copy = re.search(r"#copyAll\{[^}]*\}", PHONE).group(0)
-        self.assertIn("position:fixed", copy)
-        self.assertIn("env(safe-area-inset-bottom", copy)
-        self.assertRegex(PHONE, r"\.area\{[^}]*padding:0 var\(--sp-4\) 88px")   # the last line is never under the bar
+        # the paste is in the phone's bottom bar (2040 redesign): fixed, above the home indicator, with its date
+        bar = re.search(r"(?m)^\.botbar\{[^}]*\}", CSS).group(0)
+        self.assertIn("position:fixed", bar)
+        self.assertIn("bottom:0", bar)
+        self.assertIn("env(safe-area-inset-bottom", bar)
+        self.assertIn(".botbar{display:flex}", PHONE)
+        self.assertIn('<button type="button" id="bbCopy" class="bb-copy"><b>Copy paste</b><span id="bbCopyT">', HTML)
+        self.assertIn('$("bbCopyT").textContent = anyPub ? slotTxt(ws.find(w=>w.published).published.slot_et)', JS)
+        self.assertRegex(PHONE, r"\.area\{[^}]*padding:0 var\(--sp-4\) calc\(88px \+ env\(safe-area-inset-bottom,0px\)\)")   # the last line is never under the bar
 
     def test_the_short_backup_label_keeps_what_matters(self):
         line = next(l for l in JS.splitlines() if "s && s.backup ?" in l)
