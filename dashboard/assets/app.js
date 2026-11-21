@@ -2243,6 +2243,11 @@ function renderHeatmap(){
     // two days of 1-minute bars (~2,700) must fit the width: below the library's default minimum bar spacing
     // (0.5 px) it ignores the requested range and falls back to its default zoom
     hmChart.applyOptions({timeScale: {minBarSpacing: 0.05}});
+    // a real width change (window resize, phone rotation) re-frames the chosen span; the library alone keeps the old
+    // bar spacing, so a wider window showed empty days on the left (sweep 2026-11-21)
+    let hmW = $("hmChart").clientWidth, hmRT = 0;
+    new ResizeObserver(() => { const w = $("hmChart").clientWidth;
+      if(w >= 100 && Math.abs(w - hmW) > 40){ hmW = w; clearTimeout(hmRT); hmRT = setTimeout(() => { hmReset = true; renderHeatmap(); }, 200); } }).observe($("hmChart"));
     hmCandles = hmChart.addCandlestickSeries({upColor: lcVar("--good"), downColor: lcVar("--bad"), borderVisible: false, wickUpColor: lcVar("--good"), wickDownColor: lcVar("--bad"),
       priceLineVisible: true, priceLineStyle: LC.LineStyle.Dotted, priceLineWidth: 1});
     hmPrim = new HeatPrimitive(); hmCandles.attachPrimitive(hmPrim);
@@ -2287,6 +2292,8 @@ function renderHeatmap(){
     const ro2 = Math.max(16, Math.round(gw * bars / Math.max(100, plot - gw)));
     hmChart.timeScale().applyOptions({rightOffset: ro2});
     hmChart.timeScale().setVisibleLogicalRange({from, to: n + ro2});
+    // autoSize measures the box a frame later and then keeps its default zoom: set the span again once it has
+    requestAnimationFrame(() => requestAnimationFrame(() => hmChart.timeScale().setVisibleLogicalRange({from, to: n + ro2})));
   }
   if(hm._key === market + hmTf) hmMarket = hm._key;
   const rel = hm.columns.filter(c => c.rel).length;
