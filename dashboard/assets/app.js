@@ -542,16 +542,18 @@ function render(){
     <span class="chip"${bk ? ' title="No new TradingView paste while the levels are a backup estimate"' : ""}>Next paste <b>${bk ? "on hold" : h.next_publish_et ? esc(h.next_publish_et.slice(11)) + " ET" : "-"}</b></span>
     ${(() => { const e = nextHighUSD(); return e ? `<span class="chip" title="Next ${e.impact.toLowerCase()}-impact USD event (ForexFactory)"><i class="dot ${e.impact === "High" ? "bad" : "warn"}"></i>${esc(e.title)} <b>in ${dur(Date.parse(e.time) - Date.now())}</b></span>` : ""; })()}`;
   $("banner").innerHTML = !w.result ? `<div class="banner">${h.last_error ? "The options data source failed on its last try. Nothing to show yet; retrying by itself. Details are on the Data health page." : "First calculation in progress: levels appear within a minute."}</div>`
-    : s && s.backup ? `<div class="banner"><b>Backup estimate.</b> Cboe is refusing requests, so these levels are an estimate from OCC open interest and VIX-family volatility (no skew). The TradingView paste keeps the last Cboe levels.<span class="bn-more"> It gives the walls, C1, P1 and zero gamma when price is near a crossing; it has no 0DTE flip and no first-expiry Ab1 or lower ranks. Details are on the Data health page.</span></div>`
+    : s && s.backup ? `<div class="banner backup"><b>Backup estimate.</b> Cboe is refusing requests, so these levels are an estimate from OCC open interest and VIX-family volatility (no skew). The TradingView paste keeps the last Cboe levels.<span class="bn-more"> It gives the walls, C1, P1 and zero gamma when price is near a crossing; it has no 0DTE flip and no first-expiry Ab1 or lower ranks. Details are on the Data health page.</span></div>`
     // closed market and the close's numbers already shown: a failed retry changes nothing (Data health still says so)
     : h.last_error && !h.holds_latest ? `<div class="banner" title="${esc(h.last_error)}">The options data source failed on its last try. Showing the last good numbers; retrying by itself. Details are on the Data health page.</div>`
     : lag ? `<div class="banner">The hosted data was built ${ago(data.now)}. GitHub runs the refresh on a schedule that sometimes runs late; this page picks up the next build by itself.</div>` : "";
   // old data says so on each market card, not only in the banner
   document.body.classList.toggle("stale-data", !!lag);
+  document.body.classList.toggle("backup-data", !!(s && s.backup));
   document.body.style.setProperty("--stale-text", lag ? `"data from ${lastGood()} ET"` : '""');
   if(!w.result) return;
   const L = w.result.mapped || s, X = L.extras || {};
   const ref = L.futures_equiv_of_ref ?? s.ref_price;
+  $("phaseLab").textContent = [phaseBase, ...calNotes(new Date(), data.calendar)].filter(Boolean).join(" · ");
   renderHero(w, s, L, X, ref);
   renderPlan(w);
   renderLevelMap(w, L, X, ref);
@@ -2573,11 +2575,21 @@ setDensity(store.get("gex.density", "work"), false);
 const LV_LEAD = {"before the open": ["lvHead", "planRow"], "after the close": ["lvHead", "lvHist"], "no cash session today": ["lvHead", "lvHist"]};
 const LV_PHASE = {"before the open": "Before the open: the plan leads", "cash session": "Cash session",
   "after the close": "After the close: how the levels held leads", "no cash session today": "No cash session today: how the levels held leads"};
+let phaseBase = "";
 function orderLevels(phase){
   const v = $("levelsView"), lead = LV_LEAD[phase] || [];
   [...lead].reverse().forEach(id => v.prepend($(id)));
   if(lead.includes("lvHist") && !document.body.classList.contains("dens-glance")) openFold("lvHist");
-  $("phaseLab").textContent = LV_PHASE[phase] || "";
+  $("phaseLab").textContent = phaseBase = LV_PHASE[phase] || "";
+}
+// today's session (or, with none today, the next one): an early close and the roll week, in words, from marketcal
+function calNotes(d, cal){
+  const sp = sessionPhase(d, cal), s = sp.session || sp.next, out = [];
+  if(!s) return out;
+  const t = new Date(s.close).toLocaleTimeString("en-US", {...ET, hour: "numeric", minute: "2-digit"});
+  if(s.early) out.push(`${sp.session ? "Early close today" : "Next session closes early"}, ${t} ET`);
+  if(s.roll_week) out.push("Futures roll week: levels use the frozen 9:30 basis");
+  return out;
 }
 const cal0 = (() => { try { return JSON.parse(store.get("gex.cal", "null")); } catch(e){ return null; } })();
 orderLevels(cal0 ? sessionPhase(new Date(), cal0).phase : null);        // a first visit: the usual order and no label
