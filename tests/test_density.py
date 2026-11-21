@@ -21,7 +21,7 @@ class Density(unittest.TestCase):
         rule = re.search(r"\.dens-glance #levelsView>:is\(([^)]*)\)\{display:none\}", CSS).group(1).split(",")
         self.assertEqual(rule, [".lv-chg", ".main", ".lv-more"])
         # the banner (backup, stale) sits outside #levelsView; the price and its time, the key levels and the plan stay
-        self.assertLess(HTML.index('<div id="banner"></div>'), HTML.index('<div id="levelsView">'))
+        self.assertLess(HTML.index('<div id="banner" data-reserve></div>'), HTML.index('<div id="levelsView">'))
         for keep in ("lv-head", "stats keys", "plan-row"):
             self.assertNotIn("." + keep.split()[0], rule)
 

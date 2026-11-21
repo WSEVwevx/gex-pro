@@ -38,15 +38,17 @@ const HKEY = "gex.h." + Math.round(innerWidth / 40);
 let cardH = {};
 try { cardH = JSON.parse(store.get(HKEY, "{}")) || {}; } catch(e) {}
 const PER_MARKET = ["levelsView", "ladderView", "heatmapView", "screenerView", "biasView"];
-const cardKey = c => { const v = c.closest("[id$=View]"); return v ? v.id + ":" + [...v.querySelectorAll(".card")].indexOf(c) + (PER_MARKET.includes(v.id) ? ":" + market : "") : null; };
+const cardKey = c => { if(c.hasAttribute("data-reserve")) return c.id; const v = c.closest("[id$=View]"); return v ? v.id + ":" + (c.dataset.ci ?? [...v.querySelectorAll(".card")].indexOf(c)) + (PER_MARKET.includes(v.id) ? ":" + market : "") : null; };
 // a first visit has no heights of its own yet: it reserves the usual ones (measured on the live site at 1366 and
 // 375 px wide, every page re-measured 2026-11-20 after the redesign, NQ, folds closed), by page and card order. They are replaced by this device's real heights after one draw.
 const DEFAULT_H = {wide: {levelsView:[207,434,102,577,571,373,373,124,124,124,1228],ladderView:[184,797,220,328,312],heatmapView:[648],screenerView:[291,370,97,679],biasView:[200,633,220,238],trackView:[259,578,635,297,272,1661,370,365,365,320],backtestView:[221,260,528,536,291,165,301,803],briefingsView:[448,292,0,0],newsView:[651,988],indicatorView:[217,217,217,67,369],libraryView:[155,628,1371],glossaryView:[5493],healthView:[1515]},
   narrow: {levelsView:[186,514,94,894,618,365,365,81,116,109,1757],ladderView:[184,892,193,320,272],heatmapView:[879],screenerView:[304,389,146,754],biasView:[332,731,393,368],trackView:[446,891,823,334,291,2528,637,384,407,359],backtestView:[464,252,566,718,385,275,312,834],briefingsView:[1029,303,0,0],newsView:[787,718],indicatorView:[252,251,254,95,980],libraryView:[317,1066,1726],glossaryView:[13616],healthView:[2870]}};
+// each card's place in the page as written: the key for its height even after the Levels order moves it
+document.querySelectorAll("[id$=View]").forEach(v => v.querySelectorAll(".card").forEach((c, i) => { c.dataset.ci = i; }));
 function reserve(){
   const usual = DEFAULT_H[innerWidth < 700 ? "narrow" : "wide"];
-  document.querySelectorAll("[id$=View] .card").forEach(c => {
-    const v = c.closest("[id$=View]"), h = cardH[cardKey(c)] || (usual[v.id] || [])[[...v.querySelectorAll(".card")].indexOf(c)];
+  document.querySelectorAll("[id$=View] .card, [data-reserve]").forEach(c => {      // [data-reserve]: the banner keeps its last height
+    const v = c.closest("[id$=View]"), h = cardH[cardKey(c)] || (v ? (usual[v.id] || [])[c.dataset.ci] : 0);
     c.style.minHeight = h ? h + "px" : "";
   });
 }
@@ -59,7 +61,7 @@ function settle(){                                           // after a page has
   settleT = setTimeout(() => {
     const v = document.querySelector("[id$=View]:not([hidden])");
     if(!v) return;
-    v.querySelectorAll(".card").forEach(c => {
+    [...v.querySelectorAll(".card"), ...[...document.querySelectorAll("[data-reserve]")].filter(e => e.offsetParent)].forEach(c => {
       if([...c.querySelectorAll(".skeleton")].some(k => k.offsetParent)) return;     // still loading: keep the reservation
       c.style.minHeight = "";
       cardH[cardKey(c)] = Math.round(c.getBoundingClientRect().height);
@@ -2666,6 +2668,8 @@ function calNotes(d, cal){
 }
 const cal0 = (() => { try { return JSON.parse(store.get("gex.cal", "null")); } catch(e){ return null; } })();
 orderLevels(cal0 ? sessionPhase(new Date(), cal0).phase : null);        // a first visit: the usual order and no label
+document.querySelectorAll("#tabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.m === market)));   // the saved market, before data
+document.documentElement.classList.remove("booting");                    // heights reserved and the order set: show the area
 const day0 = s => new Date(s + "T12:00:00Z").toLocaleDateString("en-US", {weekday: "short", month: "short", day: "numeric", timeZone: "UTC"});
 // the one plan zone price is in. The flip decides the side first: when C1 sits below the flip (or P1 above it) the
 // zones would overlap, and price can only be in one ("above C1" also needs price above the flip, "below P1" below it)

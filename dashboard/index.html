@@ -8,6 +8,8 @@
 <meta name="color-scheme" content="dark light">
 <script>/* theme before first paint: saved choice, else the system setting */
 try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"); document.documentElement.dataset.theme = t; } catch(e) { document.documentElement.dataset.theme = "dark"; }
+document.documentElement.classList.add("booting");   /* the area shows once app.js has laid it out: no jump at load */
+setTimeout(function(){ document.documentElement.classList.remove("booting"); }, 1500);   /* even if app.js fails */
 </script>
 <link rel="icon" type="image/svg+xml" href="assets/icon.svg">
 <!-- installable app: home-screen icon, full-screen window -->
@@ -70,17 +72,17 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
   <main class="area">
     <div class="pagebar">
       <h1 id="pageTitle">Levels</h1>
-      <div class="seg" role="tablist" id="tabs" aria-label="Market"></div>
+      <div class="seg" role="tablist" id="tabs" aria-label="Market"><button role="tab" aria-selected="false" data-m="NQ">NQ</button><button role="tab" aria-selected="false" data-m="ES">ES</button></div>
       <div class="seg dens" id="density" role="group" aria-label="Detail"><button type="button" data-d="glance" aria-pressed="false" title="The price, the plan, the map and the paste">Glance</button><button type="button" data-d="work" aria-pressed="true" title="Today's full screen">Work</button><button type="button" data-d="study" aria-pressed="false" title="Everything, with history and the full numbers open">Study</button></div>
       <span class="phase-lab" id="phaseLab"></span>
       <div class="chips" id="status"></div>
     </div>
-    <div id="banner"></div>
+    <div id="banner" data-reserve></div>
 
     <!-- LEVELS -->
     <div id="levelsView">
       <!-- the 5-second answer: price and its time, the regime, the key levels, the plan beside the level map -->
-      <section class="lv-head" id="lvHead"><div class="eyebrow">Reference price</div><div class="skeleton">Loading</div></section>
+      <section class="lv-head" id="lvHead" data-reserve><div class="eyebrow">Reference price</div><div class="skeleton">Loading</div></section>
       <section class="stats keys" id="keyStrip" data-help="ladder"></section>
       <section class="grid2 plan-row" id="planRow">
         <div class="card" data-help="plan"><div id="planCard"><div class="skeleton">Loading</div></div></div>

@@ -116,7 +116,12 @@ a{color:var(--ink2)}
 .area>div[id$="View"]>:first-child{margin-top:6px}          /* every page starts the same distance under its title */
 .pagebar{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:10px 0 9px;background:var(--page);border-bottom:1px solid var(--line);margin-bottom:12px}
 .pagebar h1{margin:0;font-size:var(--fs-xl);font-weight:650;letter-spacing:.01em;min-width:110px}
-[hidden]{display:none!important}         /* a component's own display never shows what the page hid */
+[hidden]{display:none!important}
+/* until app.js has reserved heights and set the Levels order (it removes .booting; the head script does after 1.5 s anyway) */
+.booting .area{visibility:hidden}
+/* the top bar's text arrives after the first paint: room for the usual widest clock and paste date, so nothing beside them moves */
+@media(min-width:1181px){.topbar .clock{min-width:248px}#copyAll{min-width:296px}.pagebar{min-height:50px}}
+#lhChart{height:230px}   /* the height renderLevelHistoryChart draws (H): an empty svg is 150 px, and the legend under it jumped */         /* a component's own display never shows what the page hid */
 .seg{display:flex;background:var(--panel2);border:0;border-radius:var(--r-2);padding:3px;gap:2px}
 .seg button{background:none;border:0;padding:4px 14px;border-radius:var(--r-2);color:var(--ink3);font:700 var(--fs-sm) var(--mono);letter-spacing:.05em}
 .seg button:hover{color:var(--ink)}
