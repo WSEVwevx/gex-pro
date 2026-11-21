@@ -154,5 +154,27 @@ class TestPasteRow(unittest.TestCase):
             self.assertEqual(status(row, datetime.now(timezone.utc)), want, state)
 
 
+    def test_the_paste_on_hold_while_cboe_refuses_is_not_working(self):
+        """20 Nov 2026: Cboe refused all day, the site still offered Thursday's 16:30 paste, and the row said "Working"."""
+        import time
+        from types import SimpleNamespace
+        from unittest import mock
+        from gexsys.component import GexComponent
+        fb = SimpleNamespace(backup=object(), refusal="HTTP 403", primary_ok=time.time() - 30 * 3600, last_label="OCC",
+                             backup_ok=time.time(), backup_error=None)
+        w = SimpleNamespace(cfg=SimpleNamespace(market="NQ", source="NDX"), label="CBOE", last_success=time.time(), failures=0,
+                            last_error=None, health=lambda: {"status": "ok", "calc_status": "OK"}, provider=fb,
+                            published={"slot_et": "2026-11-19 16:30", "published_at": (datetime.now(timezone.utc) - timedelta(hours=29)).isoformat()})
+        g = GexComponent([])
+        g.workers = {"NQ-CBOE": w}
+        with mock.patch("gexsys.marketcal.session_state", return_value="CLOSED"):
+            rows = {r["name"]: r for r in g.sources()}
+        paste = rows["NQ TradingView paste"]
+        self.assertEqual(status(paste, datetime.now(timezone.utc)), "partial")
+        self.assertEqual(paste["note"], "on hold while Cboe refuses: the paste on the site is still the 2026-11-19 16:30 ET one")
+        self.assertNotIn("Heatmap", rows["NQ backup chain (estimate)"]["pages"])      # the backup is not saved, so never drawn there
+        self.assertIn("Heatmap", rows["NQ options chain"]["pages"])
+
+
 if __name__ == "__main__":
     unittest.main()
