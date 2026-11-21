@@ -301,3 +301,35 @@ lessons, open questions. Read the last 5 entries before deciding anything.
 
 ### Open
 - The tape overlaps the P1 label on Signal's desktop line. That is moot now that Signal was not picked.
+
+## 2026-11-21 redesign 2040: Phases 2-5 so far (Sat 21 Nov, 00:30-02:00 ET, market closed)
+
+### Shipped (PR, lane)
+- **47** the session calendar export (sessions with UTC open and close, early and roll-week flags; state changes). The page clock and the Levels phase come from it, not from 09:30 / 16:00.
+- **48** the OKLCH Meridian tokens (`docs/style.md` rewritten).
+- **49** the command bar (pages, commands, today's levels, glossary terms; combobox ARIA).
+- **50** density (Glance / Work / Study) and the day-aware Levels order.
+- **51** (lane 59) the phone bottom bar and the price swipe. It also fixed a live defect from PR 44: a 375 px phone laid every page out at 439 px.
+- **52** (lane 60) the sentence under the price, from fixed templates. The verifier confirmed 24 of 24 numbers.
+- **53** (lane 61) the gamma field: strike tone, total curve, bead, probe and a text version. The verifier confirmed 6 of 6 numbers.
+- **54** (lane 62) the states: the backup plate, ageing ink, and early-close and roll-week notes from the calendar.
+- **55** (lane 63) Signal's measuring tape. The verifier confirmed 8 of 8 numbers.
+- **56** (lane 64) the Heatmap: the hatched "no saved GEX" ground. It also fixed two live defects.
+
+### Defects found after merge (and the tests that now hold them)
+- PR 48: lightweight-charts 4.2 cannot parse `oklch()`. The Heatmap and the Screener stock chart were blank on the hosted site until PR 56. The chart now gets `rgb()` read back from a painted pixel (`tests/test_heatmap_ground.py`).
+- PR 50: `.seg{display:flex}` beat `hidden`, so the density buttons showed on every page. A global `[hidden]` rule fixes it.
+- Lesson: the unit tests read the source and never draw a chart. A token change has to be swept in a browser on every page, with the console read, before merge. The ui-auditor sweep now runs after each shell or token PR.
+- Lesson: `sed -i` in Git Bash rewrote terminal.css's CRLF endings to LF (caught before commit, restored). Edit CRLF files with Python byte replacements only.
+
+### Removed (not silently)
+- The floating phone copy button became the bottom bar's "Copy paste" with its date.
+- The faint gamma-by-price bars on the level map became the tone strip on the meridian, with exact values on the probe.
+- The Heatmap's colour for candles more than 90 minutes after the newest snapshot became the hatched ground. That colour was an old snapshot stretched forward.
+
+### Not verified so far
+- A real phone: the swipe, the tap on the field, iOS safe areas.
+- A screen reader reading the field's text version.
+- A live day with a zero-gamma crossing, an early close or a roll week (fixtures only).
+- The self-hosted Geist font: on hold until the owner OKs downloading it. System faces meanwhile.
+- openmarket.xyz, suggested by the owner: it has no public data endpoint and needs a sign-in, so it fails the "free, no account, answers from GitHub" rules.
