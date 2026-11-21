@@ -160,7 +160,7 @@ class GexComponent:
                 bok = datetime.fromtimestamp(fb.backup_ok, timezone.utc).isoformat() if fb.backup_ok else None
                 rows.append({"name": f"{w.cfg.market} backup chain (estimate)",
                              "provider": f"OCC open interest + Cboe VIX-family closes{' + VXN' if w.cfg.source == 'NDX' else ''} + Yahoo prices",
-                             "pages": ["Levels", "Live table", "Heatmap", "Bias"], "last_ok": bok, "error": fb.backup_error,
+                             "pages": ["Levels", "Live table", "Bias"], "last_ok": bok, "error": fb.backup_error,      # not saved, so not on the Heatmap
                              "fresh_h": 2 if refused else None,
                              "note": "in use on the website only (not pasted to TradingView): Cboe refuses; walls, zero gamma, C1 and P1 only, no 0DTE flip" if refused and fb.last_label
                              else "standby: used only when Cboe refuses"})
@@ -170,6 +170,8 @@ class GexComponent:
             rows.append({"name": f"{w.cfg.market} TradingView paste", "provider": "GEX PRO (every 30 min and 09:45 ET, from the options chain)",
                          "pages": ["Copy for TradingView", "Indicator"], "last_ok": pub.get("published_at"),
                          "error": None, "fresh_h": 1 if trading else None,
+                         # on hold while Cboe refuses (the backup is never pasted): "partly", not "Working"
+                         "note": f"on hold while Cboe refuses: the paste on the site is still the {pub['slot_et']} ET one" if refused and pub.get("slot_et") else None,
                          "detail": f"the paste on the site is the {pub['slot_et']} ET one" if pub.get("slot_et") else None})
             # the website's index -> futures conversion: the measured NQ=F / ^NDX basis, or the carry model when
             # Yahoo's minute bars fail (that model sat ~20 NQ / 6 ES points below the market, stress test C1)

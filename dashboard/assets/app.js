@@ -404,7 +404,7 @@ function renderIndicator(){
   $("indChanges").innerHTML = (ind.changes || []).map(c => `<div class="change"><code>${esc(c.commit)}</code><span>${esc(c.message)}</span><span class="when">${new Date(c.date).toLocaleDateString("en-US", {...ET, month:"short", day:"numeric"})} · ${ago(c.date)}</span></div>`).join("")
     || `<div>${stateHtml("empty", "No change history here", "The list of recent script changes comes from the project's git history, which this copy was built without. The script itself is current.")}</div>`;
   const pub = data && data.workers.find(w => w.published);
-  $("indPasteTime").textContent = pub ? `${pub.published.slot_et.slice(11)} ET paste` : "Waiting for the first paste";
+  $("indPasteTime").textContent = pub ? `${slotTxt(pub.published.slot_et)} paste` : "Waiting for the first paste";
 }
 async function copyCode(){
   if(!ind) return;
@@ -509,7 +509,7 @@ function render(){
   [...$("tabs").children].forEach(b => b.onclick = () => setMarket(b.dataset.m));
   const anyPub = ws.some(w => w.published);
   $("copyAll").disabled = !anyPub;
-  $("copyAll").textContent = anyPub ? `Copy for TradingView · ${ws.find(w=>w.published).published.slot_et.slice(11)} ET` : "Copy for TradingView";
+  $("copyAll").textContent = anyPub ? `Copy for TradingView · ${slotTxt(ws.find(w=>w.published).published.slot_et)}` : "Copy for TradingView";
 
   const w = ws.find(x => x.market === market && x.result) || ws.find(x => x.market === market);
   const h = w.health;
@@ -527,7 +527,7 @@ function render(){
     <span class="chip"${bk ? ' title="No new TradingView paste while the levels are a backup estimate"' : ""}>Next paste <b>${bk ? "on hold" : h.next_publish_et ? esc(h.next_publish_et.slice(11)) + " ET" : "-"}</b></span>
     ${(() => { const e = nextHighUSD(); return e ? `<span class="chip" title="Next ${e.impact.toLowerCase()}-impact USD event (ForexFactory)"><i class="dot ${e.impact === "High" ? "bad" : "warn"}"></i>${esc(e.title)} <b>in ${dur(Date.parse(e.time) - Date.now())}</b></span>` : ""; })()}`;
   $("banner").innerHTML = !w.result ? `<div class="banner">${h.last_error ? "The options data source failed on its last try. Nothing to show yet; retrying by itself. Details are on the Data health page." : "First calculation in progress: levels appear within a minute."}</div>`
-    : s && s.backup ? `<div class="banner"><b>Backup estimate.</b> Cboe is refusing requests, so these levels are an estimate from OCC open interest and VIX-family volatility (no skew). The TradingView paste keeps the last Cboe levels.<span class="bn-more"> Zero gamma, the walls, C1 and P1 are kept; the 0DTE flip, Ab1 and lower ranks are left out. Details are on the Data health page.</span></div>`
+    : s && s.backup ? `<div class="banner"><b>Backup estimate.</b> Cboe is refusing requests, so these levels are an estimate from OCC open interest and VIX-family volatility (no skew). The TradingView paste keeps the last Cboe levels.<span class="bn-more"> It gives the walls, C1, P1 and zero gamma when price is near a crossing; it has no 0DTE flip and no first-expiry Ab1 or lower ranks. Details are on the Data health page.</span></div>`
     // closed market and the close's numbers already shown: a failed retry changes nothing (Data health still says so)
     : h.last_error && !h.holds_latest ? `<div class="banner" title="${esc(h.last_error)}">The options data source failed on its last try. Showing the last good numbers; retrying by itself. Details are on the Data health page.</div>`
     : lag ? `<div class="banner">The hosted data was built ${ago(data.now)}. GitHub runs the refresh on a schedule that sometimes runs late; this page picks up the next build by itself.</div>` : "";
@@ -556,6 +556,9 @@ function render(){
     These are proxy levels from index and ETF options, not NQ/ES futures options, and not trading advice.`;
 }
 
+// a paste slot ("2026-11-19 16:30" ET): the time alone if it is today's, else with its day, so an old paste never reads as today's
+const slotTxt = slot => slot.slice(0, 10) === new Date().toLocaleDateString("en-CA", ET) ? `${slot.slice(11)} ET`
+  : `${new Date(slot.slice(0, 10) + "T12:00:00Z").toLocaleDateString("en-US", {timeZone: "UTC", weekday: "short", month: "short", day: "numeric"})}, ${slot.slice(11)} ET`;
 // the time of the price every level is measured from (after the close it is the 16:00 print, not a live quote)
 const refAt = t => t ? ` · ${new Date(t).toLocaleString("en-US", {...ET, month: "short", day: "numeric", hour: "numeric", minute: "2-digit"})} ET` : "";
 function renderHero(w, s, L, X, ref){
@@ -571,7 +574,8 @@ function renderHero(w, s, L, X, ref){
     <div class="expl" style="margin-top:4px">${Math.abs(sig) < 0.3 ? "Right at the flip: the regime can change with a small move." : Math.abs(sig) < 1 ? "Within one expected move of the flip." : "More than a full expected move from the flip; the regime is well established."}</div>`;
   const rc = {POSITIVE: "c-pos", NEGATIVE: "c-neg", INDETERMINATE: "c-zg"}[s.regime] || "c-ink3";
   const says = {POSITIVE: "hedging leans against moves", NEGATIVE: "moves can extend", INDETERMINATE: "no clear tilt either way"}[s.regime] || "no usable estimate";
-  $("lvHead").innerHTML = `<div class="lvh-px"><div class="eyebrow">${esc(market)} ${w.result.mapped ? "futures" : esc(w.source)}${refAt(s.ref_time)}</div><div class="lvh-big">${num(ref)}</div></div>
+  const mp = w.result.mapped && w.result.mapped.mapping;     // the headline is the index converted with the frozen basis
+  $("lvHead").innerHTML = `<div class="lvh-px"><div class="eyebrow">${esc(market)} ${w.result.mapped ? "equiv. of " + esc(w.source) : esc(w.source)}${refAt(s.ref_time)}</div><div class="lvh-big">${num(ref)}</div>${mp ? `<div class="lvh-sub">${esc(w.source)} ${num(mp.source_ref, 2)} × basis ${num(mp.factor, 5)}, not the live futures price</div>` : ""}</div>
     <div class="lvh-rg"><div class="eyebrow"><span class="wide-only">Gamma </span>regime (model)</div><div class="lvh-regime ${rc}">${R[0]}</div>
       <div class="lvh-sub">${sig == null ? "" : `${num(Math.abs(sig), 1)}σ ${sig >= 0 ? "above" : "below"} zero gamma · `}${says}</div></div>
     <div class="lvh-net"><div class="eyebrow">Net gamma, all expiries</div><div class="lvh-mid ${s.net >= 0 ? "c-pos" : "c-neg"}">${money(s.net)}</div><div class="lvh-sub">per 1% move</div></div>`;
@@ -711,8 +715,9 @@ function renderStats(w, s, L, X){
   const p = v => v && typeof v === "object" ? v.price : v, emd = em.daily_points_fut ?? em.daily_points;
   const emc = em.anchor_fut ?? fut;                     // the range's centre: the same anchor the plan, ladder and levels use
   const away = v => v == null ? "" : `${num(Math.abs(v - fut), 0)} pts ${v >= fut ? "above" : "below"}${emd ? ` · ${num(Math.abs(v - fut) / emd, 1)}σ` : ""}`;
-  const key = (k, v, color) => tile(k, v == null ? "-" : num(v), away(v), color);
-  $("keyStrip").innerHTML = key("Zero gamma (est.)", p(L.zero_gamma), "var(--zg)") + key("Call wall", p(L.call_wall), "var(--pos)")
+  const key = (k, v, color, why) => tile(k, v == null ? "-" : num(v), v == null ? "unavailable" + (why ? ": " + esc(why) : "") : away(v), color);
+  const zgWhy = /^NO CROSSING/i.test(L.zero_gamma_status || s.zero_gamma_status || "") ? "no crossing near price" : L.zero_gamma_status || s.zero_gamma_status || "";
+  $("keyStrip").innerHTML = key("Zero gamma (est.)", p(L.zero_gamma), "var(--zg)", zgWhy) + key("Call wall", p(L.call_wall), "var(--pos)")
     + key("Put wall", p(L.put_wall), "var(--neg)")
     + tile("Expected move today", emd == null ? "-" : "±" + num(emd, 0), emd == null ? "" : `${num(emc - emd, 0)} – ${num(emc + emd, 0)} ${em.anchor_label ? "· " + esc(em.anchor_label) : "(1σ)"}`, "var(--em)");
   const hedge = ct(s.net), charm = ct(g.charm_flow_usd_per_day), vanna = ct(g.vanna_usd_per_vol_pt == null ? null : -g.vanna_usd_per_vol_pt);
@@ -1240,11 +1245,11 @@ const HELP = {
   ladder_side: {title: "Net exposure", tldr: "Totals for the expirations selected.",
     body: `<p>Net GEX and net DEX added up over the selected expirations (all strikes, not just the rows shown). The regime line always uses every expiration.</p>`},
   ladder_levels: {title: "Key levels", tldr: "Every level on the table, highest first, with its distance from price.",
-    body: `<p>C = call walls ranked by positive net GEX, P = put walls ranked by negative net GEX, Ab = most total gamma, ZG = zero gamma, CW / PW = the main walls, EM = today's expected move.</p>`},
+    body: `<p>+G = the strikes near price with the most positive net GEX, −G = the most negative, AG = the most total gamma, each over every expiry (so they are not the indicator's first-expiry C1 / P1 / Ab1). ZG = zero gamma, CW / PW = the main walls, EM = today's expected move.</p>`},
   ladder_activity: {title: "Chain activity", tldr: "Who is positioned, and what is trading today.",
     body: `<p>Put/call ratios over the selected expirations and the rows shown: above 1 means more puts. Open interest is from yesterday's close; volume is today's.</p>`},
   heatmap: {title: "GEX heatmap", tldr: "Futures candles with dealer gamma painted behind them, snapshot by snapshot.",
-    body: `<p>Behind the candles is the net dealer gamma from every GEX PRO snapshot, each one shown from the moment it was taken until the next, with neighbouring price bands blended into soft zones (hover for the exact value at any price and time). <b>Today</b>, <b>2 days</b> (the default) and <b>All</b> (about a week) pick how much price action is shown. <b>Blue</b> = positive gamma (hedging leans against moves, so price tends to stall or pin there); <b>orange</b> = negative gamma (hedging adds to moves). Brighter = more gamma.</p><p>The lines are the call wall (blue) and put wall (orange) wherever they held for an hour or more; the ZG, CW and PW labels on the price axis are where zero gamma and the walls are now. Times are New York time; a dashed line marks each 9:30 cash open.</p><p>The space right of the last candle shows <b>GEX now</b>: the latest snapshot as bars (right = more gamma, blue or orange by sign), with today's key levels from the first expiry: C1 / C2, P1 / P2, Ab1 and the 0DTE flip, the same levels the TradingView indicator draws. <b>Today / 2 days / All</b> sets how much history is in view; the colour scale under the chart says how much gamma the brightest colour means. Watch how price reacts when it reaches a bright band, and how the bands move during the day. Hover anywhere for the numbers.</p><p>Candles: Yahoo Finance, delayed. Gamma: Cboe options, 15-min delayed, mapped to futures with today's basis. History builds up as snapshots are saved (about 12 days in the app, 5 on the hosted site).</p>`,
+    body: `<p>Behind the candles is the net dealer gamma from every GEX PRO snapshot, each one shown from the moment it was taken until the next, with neighbouring price bands blended into soft zones (hover for the exact value at any price and time). <b>Today</b>, <b>2 days</b> (the default) and <b>All</b> (about a week) pick how much price action is shown. <b>Blue</b> = positive gamma (hedging leans against moves, so price tends to stall or pin there); <b>orange</b> = negative gamma (hedging adds to moves). Brighter = more gamma.</p><p>The lines are the call wall (blue) and put wall (orange) wherever they held for an hour or more; the ZG, CW and PW labels on the price axis are where zero gamma and the walls were in the latest saved snapshot. Times are New York time; a dashed line marks each 9:30 cash open.</p><p>The space right of the last candle shows <b>GEX</b> with the latest saved snapshot's time: that snapshot as bars (right = more gamma, blue or orange by sign), with today's key levels from the first expiry: C1 / C2, P1 / P2, Ab1 and the 0DTE flip, the same levels the TradingView indicator draws. <b>Today / 2 days / All</b> sets how much history is in view; the colour scale under the chart says how much gamma the brightest colour means. Watch how price reacts when it reaches a bright band, and how the bands move during the day. Hover anywhere for the numbers.</p><p>Candles: Yahoo Finance, delayed. Gamma: Cboe options, 15-min delayed, mapped to futures with today's basis. History builds up as snapshots are saved (about 12 days in the app, 5 on the hosted site).</p>`,
     watch: ["Price stalling at a bright blue band = positive-gamma support or resistance", "Price slicing through orange = negative gamma, moves can extend"]},
   paste: {title: "The scheduled paste", tldr: "One text block that carries all levels to TradingView.",
     body: `<p>Published every 30 minutes (:00 and :30 ET), plus 09:45 ET. One paste holds NQ and ES; each chart draws only its own market. The indicator marks levels stale after 90 minutes.</p>`},
@@ -1779,9 +1784,10 @@ function renderLiveTable(){
   const addL = (p, code, name, cls, share) => { if(p != null && isFinite(p)) lv.push({p, code, name, cls, share}); };
   addL(pickP(L.zero_gamma), "ZG", "Zero gamma", "zg"); addL(pickP(L.call_wall), "CW", "Call wall", "pos"); addL(pickP(L.put_wall), "PW", "Put wall", "neg");
   const rk = s.ranked || {};
-  (rk.call || []).forEach((x, i) => addL(fut(x.price), "C" + (i + 1), `Call wall ${i + 1}`, "pos", x.share));
-  (rk.put || []).forEach((x, i) => addL(fut(x.price), "P" + (i + 1), `Put wall ${i + 1}`, "neg", x.share));
-  (rk.abs || []).forEach((x, i) => addL(fut(x.price), "Ab" + (i + 1), `Abs gamma ${i + 1}`, "ag", x.share));
+  // strikes ranked near price over every expiry: named apart from the indicator's first-expiry C1 / P1 / Ab1
+  (rk.call || []).forEach((x, i) => addL(fut(x.price), "+G" + (i + 1), `Most +GEX near price${i ? " #" + (i + 1) : ""}`, "pos", x.share));
+  (rk.put || []).forEach((x, i) => addL(fut(x.price), "−G" + (i + 1), `Most −GEX near price${i ? " #" + (i + 1) : ""}`, "neg", x.share));
+  (rk.abs || []).forEach((x, i) => addL(fut(x.price), "AG" + (i + 1), `Most gamma near price${i ? " #" + (i + 1) : ""}`, "ag", x.share));
   const X = (L.extras || {}).expected_move || {};
   const emd = X.daily_points_fut || X.daily_points, ema = X.anchor_fut || X.anchor;
   if(emd && ema){ addL(ema + emd, "EM+", "Expected high", "em"); addL(ema - emd, "EM-", "Expected low", "em"); }
@@ -1823,7 +1829,7 @@ function renderLiveTable(){
     <div class="expl" style="margin-top:8px">${all ? "All expirations" : "Selected expirations only"}. Regime (all expirations): <b>${esc((s.regime || "").toLowerCase())}</b>.</div>`;
   const lvs = lv.filter((l, i, a) => a.findIndex(z => z.code === l.code) === i).sort((a, b) => b.p - a.p);
   $("ldLevels").innerHTML = `<div class="ld-list">${lvs.map(l => `<div><b class="ld-chip ${l.cls}">${esc(l.code)}</b><span${l.share ? ` title="${num(100 * l.share, 1)}% of gamma"` : ""}>${esc(l.name)}</span><em>${num(l.p, 2)}</em><i style="color:${l.p >= ref ? "var(--pos)" : "var(--neg)"}">${signed((l.p / ref - 1) * 100, 2)}%</i></div>`).join("")}
-    <div class="now"><b class="ld-chip now">PX</b><span>${esc(w.market)} price</span><em>${num(ref, 2)}</em><i></i></div></div>`;
+    <div class="now"><b class="ld-chip now">PX</b><span>${esc(w.market)} ${w.result.mapped ? "equiv. of " + esc(w.source) : "price"}</span><em>${num(ref, 2)}</em><i></i></div></div>`;
   const pcOI = T[2] ? T[3] / T[2] : null, pcV = T[4] ? T[5] / T[4] : null;
   const act = rows.reduce((b, x) => x.v[4] + x.v[5] > b.v[4] + b.v[5] ? x : b, rows[0]);
   $("ldActivity").innerHTML = `<div class="metrics">
@@ -2024,7 +2030,8 @@ class HeatPrimitive {
         });
         ctx.globalAlpha = 1;
         ctx.fillStyle = `rgba(${cssVar("--fg-rgb")},.45)`;
-        ctx.fillText("GEX now", Math.round(px0 * hr), fs + 2 * vr);
+        const pt = new Date(P.t * 1000);       // the profile's own time: after a Cboe outage it is not "now"
+        ctx.fillText(`GEX ${hmFmt.wd.format(pt)} ${hmFmt.hm.format(pt)}`, Math.round(px0 * hr), fs + 2 * vr);
         if(hmShowLv) for(const m of hm._marks || []){
           const y = this.series.priceToCoordinate(m.p); if(y == null) continue;
           const Y = Math.round(y * vr) + .5;
@@ -2142,7 +2149,8 @@ function renderHeatmap(){
   }
   if(hm._key === market + hmTf) hmMarket = hm._key;
   const rel = hm.columns.filter(c => c.rel).length;
-  $("hmSub").textContent = `${market} futures · ${hmAsOf(hm, hmTf)}`;
+  const hw = data && data.workers.find(x => x.market === market && x.result), hbk = hw && hw.result.summary.backup;
+  $("hmSub").textContent = `${market} futures · ${hmAsOf(hm, hmTf)}${hbk ? " · Cboe snapshots only: the backup estimate is not saved, so no GEX after the last one" : ""}`;
   $("hmNote").textContent = rel ? `${rel} older snapshot${rel === 1 ? "" : "s"} shown at relative strength` : "";
   $("hmScale").innerHTML = `<i class="hm-ramp"></i>brightest ≈ ±${money(hm._scale * 1e6).replace(/^[+-]/, "")} of gamma per 1% move`;
   hmPrim.requestUpdate && hmPrim.requestUpdate();
@@ -2402,7 +2410,7 @@ function renderLevelMap(w, L, X, ref){
   const shift = Math.max(0, pins.at(-1).ly - (bot - 4)); pins.forEach(l => { l.ly -= shift; });
   for(const l of pins){
     if(l.px){ g += `<line x1="${xr}" x2="${xe}" y1="${l.yy}" y2="${l.yy}" class="m-px"/><path d="M${xr - 10} ${l.ly} L${xr} ${l.yy}" class="m-lead px"/>
-      <rect x="0" y="${l.ly - 11}" width="${xr - 10}" height="22" rx="5" class="m-pill"/><text x="8" y="${l.ly + 4}" class="m-pillt">${W < 420 ? "" : esc(market) + " "}${num(ref)}</text>`; continue; }
+      <rect x="0" y="${l.ly - 11}" width="${xr - 10}" height="22" rx="5" class="m-pill"/><text x="8" y="${l.ly + 4}" class="m-pillt">${W < 420 ? "" : esc(market) + (w.result.mapped ? " eq. " : " ")}${num(ref)}</text>`; continue; }
     g += `<line x1="${xr}" x2="${xe}" y1="${l.yy}" y2="${l.yy}" class="m-lv ${l.c}${l.off ? " off" : ""}${l.k.startsWith("ZG") || l.k.startsWith("Flip") ? " dash" : ""}"/>
       <path d="M${xr - 10} ${l.ly} L${xr} ${l.yy}" class="m-lead ${l.c}"/>
       <text x="0" y="${l.ly - 2}" class="m-k ${l.c}">${l.off}${esc(l.k)} <tspan class="m-v">${num(l.v)}</tspan></text>
@@ -2412,7 +2420,7 @@ function renderLevelMap(w, L, X, ref){
   if(yz != null){ g += `<text x="${xr + 6}" y="${top + 12}" class="m-z pos">POSITIVE GAMMA</text><text x="${xr + 6}" y="${bot - 5}" class="m-z neg">NEGATIVE GAMMA</text>`; }
   box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(market)} price ${num(ref)} among today's levels">${g}</svg>
     <div class="legend"><span><i class="sw m-sw-band"></i>Day ±1σ ${num(a - d, 0)} – ${num(a + d, 0)}</span><span><i class="sw m-sw-bar"></i>Gamma by price</span><span>↑ ↓ beyond ±${MAP_SPAN}σ</span></div>`;
-  $("lvMapSub").textContent = `${w.result.mapped ? market + " futures" : w.source + " prices"} · ±${MAP_SPAN}σ around the price`;
+  $("lvMapSub").textContent = `${w.result.mapped ? market + " equiv. of " + w.source : w.source + " prices"} · ±${MAP_SPAN}σ around the price`;
 }
 // the two folded sections remember whether this viewer left them open; a chart drawn while folded is redrawn at its real width
 for(const id of ["lvMore", "lvHist"]){
@@ -2459,10 +2467,11 @@ function renderPlan(w){
   const R = {POSITIVE: ["positive", "var(--pos)"], NEGATIVE: ["negative", "var(--neg)"]}[lv.regime] || ["balanced", "var(--zg)"];
   $("planCard").innerHTML = `<div class="head"><h2>Today's plan</h2><span class="sub">${esc(day)} · ${esc(market)} · ${esc(phase)}</span></div>
     <div class="plan-kv"><span>Regime</span><b style="color:${R[1]}">${R[0]} gamma</b><span>Price${refAt(s.ref_time)}</span><b class="m">${num(ref, 2)}</b>
-      <span>${em.anchor_label ? "Day ±1σ from " + esc(em.anchor_label) : "Day range ±1σ"}</span><b class="m">${d && a ? p(a - d) + " – " + p(a + d) : "-"}</b><span>Ab1 (magnet)</span><b class="m">${p(lv.Ab1)}</b></div>
+      <span>${em.anchor_label ? "Day ±1σ from " + esc(em.anchor_label) : "Day range ±1σ"}</span><b class="m">${d && a ? p(a - d) + " – " + p(a + d) : "-"}</b><span>Ab1 (magnet)</span><b class="m">${lv.Ab1 != null ? p(lv.Ab1) : s.backup ? "not in the backup" : "-"}</b></div>
     <div class="plan-sc">${rows.map(([when, what, here]) => `<div class="${here ? "here" : ""}"><b>${esc(when)}</b><span>${esc(what)}</span>${here ? '<em>price is here</em>' : ""}</div>`).join("")}</div>
     ${usd.length ? `<div class="plan-ev"><span class="eyebrow">Data today (ET)</span>${usd.map(e => `<span class="${e.impact === "High" ? "hi" : ""}">${esc(new Date(e.time).toLocaleTimeString("en-US", {...ET, hour: "numeric", minute: "2-digit"}))} ${esc(e.title)}</span>`).join("")}</div>` : ""}
     ${earn.length ? `<div class="plan-ev"><span class="eyebrow">Earnings ahead</span>${earn.map(r => `<span>${esc(r.symbol)} ${esc(earnTxt(r.earnings))}: ±${num(r.earn_move.pct, 1)}% ≈ ±${num(Math.abs(r["earn_pts_" + k]), 0)} ${esc(market)} pts</span>`).join("")}</div>` : ""}
+    ${P1 != null && P1 > ref ? `<div class="expl">P1 ${p(P1)} is above the price: the first expiry's most negative-gamma strike is now above it.</div>` : ""}${C1 != null && C1 < ref ? `<div class="expl">C1 ${p(C1)} is below the price: the first expiry's most positive-gamma strike is now below it.</div>` : ""}
     <div class="expl">Levels and zones from the first expiry, the same as the indicator's C / P / Ab; the regime counts every expiry. A plan, not a prediction: news can override any level.</div>`;
   // the change feed
   const nm = {C1: "C1", C2: "C2", P1: "P1", P2: "P2", Ab1: "Ab1", flip: "0DTE flip", ZG: "Zero gamma", CW: "Call wall", PW: "Put wall", regime: "Regime"};

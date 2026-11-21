@@ -70,7 +70,8 @@ class LevelMap(unittest.TestCase):
             self.assertTrue(all(0 < v < H for v in ys), ys)
 
     def test_the_subtitle_names_the_prices_it_uses(self):
-        self.assertEqual(draw()["sub"], "NQ futures · ±3.3σ around the price")
+        self.assertEqual(draw()["sub"], "NQ equiv. of NDX · ±3.3σ around the price")
+        self.assertIn(">NQ eq. 26,594.97</text>", draw()["svg"])           # the pill names the converted price too
         unmapped = {"source": "NDX", "result": {"session": W_["result"]["session"]}}
         self.assertEqual(draw(w=unmapped)["sub"], "NDX prices · ±3.3σ around the price")
 
@@ -83,7 +84,7 @@ class LevelMap(unittest.TestCase):
         self.assertIn('data-help="level_map"', (ROOT / "dashboard" / "index.html").read_text(encoding="utf-8"))
         self.assertIn("  level_map: {title:", JS)
         self.assertIn("body.stale-data #lvHead .lvh-px .eyebrow::after{content:var(--stale-text)", CSS)
-        self.assertIn('<div class="lvh-px"><div class="eyebrow">${esc(market)} ${w.result.mapped ? "futures" : esc(w.source)}${refAt(s.ref_time)}</div>', JS)
+        self.assertIn('<div class="lvh-px"><div class="eyebrow">${esc(market)} ${w.result.mapped ? "equiv. of " + esc(w.source) : esc(w.source)}${refAt(s.ref_time)}</div>', JS)
 
 
 if __name__ == "__main__":
