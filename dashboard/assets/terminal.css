@@ -118,7 +118,7 @@ a{color:var(--ink2)}
 .seg{display:flex;background:var(--panel2);border:0;border-radius:var(--r-2);padding:3px;gap:2px}
 .seg button{background:none;border:0;padding:4px 14px;border-radius:var(--r-2);color:var(--ink3);font:700 var(--fs-sm) var(--mono);letter-spacing:.05em}
 .seg button:hover{color:var(--ink)}
-.seg button[aria-selected=true]{background:var(--raise);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line2)}
+.seg button:is([aria-selected=true],[aria-pressed=true]){background:var(--raise);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line2)}
 .chips{display:flex;gap:6px;flex-wrap:wrap}
 .chip{display:inline-flex;align-items:center;gap:5px;font-size:var(--fs-sm);color:var(--ink3);padding:0 10px;border-left:1px solid var(--line2);white-space:nowrap}
 .chips>.chip:first-child{border-left:0;padding-left:0}
@@ -493,6 +493,10 @@ body.stale-data #lvHead .lvh-px .eyebrow::after{content:var(--stale-text);margin
 .m-z{font-size:var(--fs-xs);font-weight:650;letter-spacing:.06em}.m-z.pos{fill:var(--pos)}.m-z.neg{fill:var(--neg)}
 .lv-chg{margin-top:var(--sp-3)}
 .lv-more{margin-top:var(--sp-3)}
+/* density (Levels only): Glance keeps the price, the key levels, the plan, the map and the paste; Study opens the folds */
+.dens-glance #levelsView>:is(.lv-chg,.main,.lv-more){display:none}
+.phase-lab{font:var(--fs-sm) var(--sans);color:var(--ink3)}
+.seg.dens button{font:600 var(--fs-sm) var(--sans);letter-spacing:0}
 .lv-more>summary{cursor:pointer;list-style:none;display:flex;align-items:baseline;gap:var(--sp-3);padding:var(--sp-3) var(--sp-1);border-top:1px solid var(--line);font-weight:650;font-size:var(--fs-md);color:var(--ink)}
 .lv-more>summary::-webkit-details-marker{display:none}
 .lv-more>summary::before{content:"+";font:600 var(--fs-md) var(--mono);color:var(--ink3);width:12px}
