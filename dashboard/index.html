@@ -135,7 +135,7 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
           <label class="hm-ctl"><input type="checkbox" id="hmLevels" checked> Levels</label></div>
         <div class="hm-chart" id="hmChart"><div class="hm-msg" id="hmMsg"><span class="skeleton sk-line">Loading the chart</span></div><div class="tip hm-tip" id="hmTip"></div></div>
         <div class="legend"><span><i class="sw pos"></i>positive gamma (hedging calms moves)</span><span><i class="sw neg"></i>negative gamma (hedging adds to moves)</span>
-          <span><i class="sw pos ln"></i>call wall</span><span><i class="sw neg ln"></i>put wall</span><span>ZG · CW · PW labels on the price axis = now</span><span>right edge: the latest GEX profile with today's C / P / Ab levels</span>
+          <span><i class="sw pos ln"></i>call wall</span><span><i class="sw neg ln"></i>put wall</span><span>ZG · CW · PW labels on the price axis: the newest saved snapshot (its time is over the profile)</span><span>right edge: the latest GEX profile with today's C / P / Ab levels</span>
           <span class="hm-scale" id="hmScale"></span>
           <span class="hm-note" id="hmNote"></span></div>
       </section>
@@ -428,7 +428,7 @@ try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-s
   </nav>
 
   <!-- explain panel: plain-English help for whatever you point at -->
-  <aside class="explain" id="explain" aria-hidden="true" aria-label="Explanation">
+  <aside class="explain" id="explain" aria-hidden="true" inert aria-label="Explanation">
     <div class="ex-head"><div><div class="eyebrow" id="exKicker">Explain</div><h3 id="exTitle">-</h3></div>
       <button class="ex-close" id="exClose" aria-label="Close">×</button></div>
     <div class="ex-body" id="exBody"></div>
