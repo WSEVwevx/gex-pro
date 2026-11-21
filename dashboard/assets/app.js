@@ -172,6 +172,17 @@ async function copyFrom(url, what){
   await copyText(text, `Copied ${what}. In TradingView: indicator settings > Levels payload > Ctrl+A, Ctrl+V > OK.`);
 }
 $("copyAll").onclick = () => copyFrom(pineUrl(""), "the scheduled update for NQ and ES");
+// the phone's bottom bar: pages, search (the command bar over the top bar) and the paste
+document.querySelectorAll("#botbar [data-p]").forEach(b => b.onclick = () => setPage(b.dataset.p));
+$("bbCopy").onclick = () => $("copyAll").click();
+$("bbSearch").onclick = () => { document.body.classList.add("cmd-open"); $("cmd").focus(); };
+$("cmd").addEventListener("blur", () => setTimeout(() => document.body.classList.remove("cmd-open"), 150));
+// a sideways swipe on the price (only there: never a table or the page row) switches NQ and ES; the buttons stay
+(() => { let x0 = null, y0 = 0;
+  $("lvHead").addEventListener("touchstart", e => { const t = e.touches[0]; x0 = t.clientX; y0 = t.clientY; }, {passive: true});
+  $("lvHead").addEventListener("touchend", e => { if(x0 == null) return; const t = e.changedTouches[0], dx = t.clientX - x0, dy = t.clientY - y0; x0 = null;
+    if(Math.abs(dx) >= 60 && Math.abs(dx) > 2 * Math.abs(dy)) setMarket(market === "NQ" ? "ES" : "NQ"); }, {passive: true});
+})();
 $("tableToggle").onclick = () => { showTable = !showTable; render(); };
 
 // ---------- pages: Levels | News
@@ -196,6 +207,7 @@ function setPage(p){
   $("tabs").style.display = NO_MARKET_PAGES.includes(p) ? "none" : "";
   $("status").style.display = NO_MARKET_PAGES.includes(p) ? "none" : "";
   $("density").hidden = $("phaseLab").hidden = p !== "levels";
+  document.querySelectorAll("#botbar [data-p]").forEach(b => b.dataset.p === p ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current"));
   $("explain").classList.contains("open") && openExplain(PAGE_HELP[p] || "regime");
   if(p === "briefings") loadBriefings();
   if(p === "news") renderNews();
@@ -512,6 +524,7 @@ function render(){
   const anyPub = ws.some(w => w.published);
   $("copyAll").disabled = !anyPub;
   $("copyAll").textContent = anyPub ? `Copy for TradingView · ${slotTxt(ws.find(w=>w.published).published.slot_et)}` : "Copy for TradingView";
+  $("bbCopy").disabled = !anyPub; $("bbCopyT").textContent = anyPub ? slotTxt(ws.find(w=>w.published).published.slot_et) : "not available yet";
 
   const w = ws.find(x => x.market === market && x.result) || ws.find(x => x.market === market);
   const h = w.health;
@@ -1382,7 +1395,7 @@ function renderCmdList(){
   [...list.querySelectorAll("[data-i]")].forEach(el => el.onmousedown = e => { e.preventDefault(); runCmd(ms[Number(el.dataset.i)]); });
   const on = list.querySelector(".on"); if(on) on.scrollIntoView({block: "nearest"});
 }
-function runCmd(c){ if(!c) return; $("cmd").value = ""; $("cmd").blur(); $("cmdList").hidden = true; c.run(); }
+function runCmd(c){ if(!c) return; $("cmd").value = ""; $("cmd").blur(); $("cmdList").hidden = true; document.body.classList.remove("cmd-open"); c.run(); }
 $("cmd").addEventListener("input", () => { cmdSel = 0; renderCmdList(); });
 $("cmd").addEventListener("focus", renderCmdList);
 $("cmd").addEventListener("blur", () => setTimeout(() => { $("cmdList").hidden = true; }, 120));
@@ -1391,7 +1404,7 @@ $("cmd").addEventListener("keydown", e => {
   if(e.key === "ArrowDown"){ cmdSel = Math.min(ms.length - 1, cmdSel + 1); renderCmdList(); e.preventDefault(); }
   else if(e.key === "ArrowUp"){ cmdSel = Math.max(0, cmdSel - 1); renderCmdList(); e.preventDefault(); }
   else if(e.key === "Enter"){ runCmd(ms[cmdSel]); e.preventDefault(); }          // an exact code ranks first
-  else if(e.key === "Escape"){ $("cmd").value = ""; $("cmd").blur(); }
+  else if(e.key === "Escape"){ $("cmd").value = ""; $("cmd").blur(); document.body.classList.remove("cmd-open"); }
 });
 
 // ---------- keyboard
