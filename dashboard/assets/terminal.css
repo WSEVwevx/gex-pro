@@ -757,6 +757,13 @@ b.good,.drv-chg .good{color:var(--good)}b.bad,.drv-chg .bad{color:var(--bad)}
   .side .spacer,.side .side-help,.side-label~.side-label{display:none}
   .area{overflow:visible;padding:0 var(--sp-4) calc(88px + env(safe-area-inset-bottom,0px))}   /* nothing ends under the bottom bar */
   .botbar{display:flex}
+  /* touch: every control gets a 44 px target; the drawing stays the same size (an invisible hit box around it) */
+  .side{min-height:44px}
+  :is(.head .ex,.theme-btn,.explain-tab,.seg button,.linkbtn){position:relative}
+  .ex::after{content:"";position:absolute;inset:-12px}
+  :is(.theme-btn,.explain-tab)::after{content:"";position:absolute;inset:-8px -6px}
+  :is(.seg button,.linkbtn)::after{content:"";position:absolute;inset:-11px 0}
+  .hm-ctl{min-height:44px;display:inline-flex;align-items:center}
   .pagebar h1{display:none}              /* the page row above already names the page */
   .banner .bn-more{display:none}         /* the short form; the rest is on the Data health page */
   .lv-head{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:0 var(--sp-4);margin:var(--sp-1) 0 var(--sp-2);min-height:173px}
