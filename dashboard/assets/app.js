@@ -195,6 +195,7 @@ function setPage(p){
   $("pageTitle").textContent = (PAGES.find(x => x[0] === p) || ["", "Levels"])[1];
   $("tabs").style.display = NO_MARKET_PAGES.includes(p) ? "none" : "";
   $("status").style.display = NO_MARKET_PAGES.includes(p) ? "none" : "";
+  $("density").hidden = $("phaseLab").hidden = p !== "levels";
   $("explain").classList.contains("open") && openExplain(PAGE_HELP[p] || "regime");
   if(p === "briefings") loadBriefings();
   if(p === "news") renderNews();
@@ -463,6 +464,7 @@ async function load(){
       data = await (await (st ? fetch(`${API.all}?b=${encodeURIComponent(st)}`) : fetchFresh(API.all))).json();
       stamp = st;
     }
+    if(data.calendar && data.calendar.sessions) store.set("gex.cal", JSON.stringify({sessions: data.calendar.sessions}));   // the next visit orders Levels by it
     render(); if(page === "indicator") renderIndicator();
   }
   catch(e){ $("banner").innerHTML = `<div class="banner bad">${offline()}</div>`; }
@@ -1340,6 +1342,9 @@ const COMMANDS = [
   {code: "LEARN", desc: "Start the beginner course", run: () => openLesson(LIB.lessons[0].id)},
   {code: "GLOSSARY", desc: "Open the A-Z glossary", run: () => setPage("glossary")},
   {code: "PASTES", desc: "Past days' 9:30 level pastes, for backtesting", run: showPastes},
+  {code: "GLANCE", desc: "Levels at a glance: price, key levels, plan, map", run: () => { setDensity("glance"); setPage("levels"); }},
+  {code: "WORK", desc: "Levels: today's full screen", run: () => { setDensity("work"); setPage("levels"); }},
+  {code: "STUDY", desc: "Levels with history and every number open", run: () => { setDensity("study"); setPage("levels"); }},
 ];
 let cmdSel = 0;
 function cmdMatches(q){ q = q.trim().toUpperCase(); return q ? COMMANDS.filter(c => c.code.startsWith(q) || c.desc.toUpperCase().includes(q)) : COMMANDS; }
@@ -2450,10 +2455,36 @@ function renderLevelMap(w, L, X, ref){
   $("lvMapSub").textContent = `${w.result.mapped ? market + " equiv. of " + w.source : w.source + " prices"} · ±${MAP_SPAN}σ around the price`;
 }
 // the two folded sections remember whether this viewer left them open; a chart drawn while folded is redrawn at its real width
+const foldAuto = new Set();                                 // a fold opened by the page, not the viewer, is not remembered
 for(const id of ["lvMore", "lvHist"]){
   const el = $(id); el.open = store.get("gex." + id, "0") === "1";
-  el.addEventListener("toggle", () => { store.set("gex." + id, el.open ? "1" : "0"); if(id === "lvHist" && el.open && data) loadLevelHistory(); });
+  el.addEventListener("toggle", () => { if(!foldAuto.delete(id)) store.set("gex." + id, el.open ? "1" : "0"); if(id === "lvHist" && el.open && data) loadLevelHistory(); });
 }
+const openFold = id => { if($(id).open) return; foldAuto.add(id); $(id).open = true; };     // toggle fires later, once
+// ---------- Levels: density (Glance / Work / Study) and the order of the day
+// Both are set once, at load, before anything is drawn, so nothing jumps. The phase comes from the market calendar the
+// last visit saved (data.calendar, from marketcal); a first visit keeps the session order. The nav never changes.
+const DENSITY = ["glance", "work", "study"];
+function setDensity(d, save = true){
+  if(!DENSITY.includes(d)) d = "work";
+  if(save) store.set("gex.density", d);
+  document.body.classList.remove(...DENSITY.map(x => "dens-" + x)); document.body.classList.add("dens-" + d);
+  document.querySelectorAll("#density button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.d === d)));
+  if(d === "study") ["lvMore", "lvHist"].forEach(openFold);
+}
+document.querySelectorAll("#density button").forEach(b => b.onclick = () => setDensity(b.dataset.d));
+setDensity(store.get("gex.density", "work"), false);
+const LV_LEAD = {"before the open": ["lvHead", "planRow"], "after the close": ["lvHead", "lvHist"], "no cash session today": ["lvHead", "lvHist"]};
+const LV_PHASE = {"before the open": "Before the open: the plan leads", "cash session": "Cash session",
+  "after the close": "After the close: how the levels held leads", "no cash session today": "No cash session today: how the levels held leads"};
+function orderLevels(phase){
+  const v = $("levelsView"), lead = LV_LEAD[phase] || [];
+  [...lead].reverse().forEach(id => v.prepend($(id)));
+  if(lead.includes("lvHist") && !document.body.classList.contains("dens-glance")) openFold("lvHist");
+  $("phaseLab").textContent = LV_PHASE[phase] || "";
+}
+const cal0 = (() => { try { return JSON.parse(store.get("gex.cal", "null")); } catch(e){ return null; } })();
+orderLevels(cal0 ? sessionPhase(new Date(), cal0).phase : null);        // a first visit: the usual order and no label
 const day0 = s => new Date(s + "T12:00:00Z").toLocaleDateString("en-US", {weekday: "short", month: "short", day: "numeric", timeZone: "UTC"});
 // the one plan zone price is in. The flip decides the side first: when C1 sits below the flip (or P1 above it) the
 // zones would overlap, and price can only be in one ("above C1" also needs price above the flip, "below P1" below it)
