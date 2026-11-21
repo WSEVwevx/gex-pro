@@ -54,6 +54,17 @@ class Charts(unittest.TestCase):
         fn = piece("function renderStockChart(c){")
         self.assertIn('$("scInfo").insertAdjacentHTML("beforeend", `<span class="dim">as of ', fn)
         self.assertLess(fn.index("as of "), fn.index("if(!scChart){"))      # after the empty-bars return, before drawing
+        self.assertIn('tDay + ", " + etTime(tl) + " ET"', fn)                 # with its day: on a Saturday it is Friday's
+        self.assertNotIn('"Today · 5m"', fn)
+
+
+class Sweep2(unittest.TestCase):
+    def test_heatmap_day_marks_name_the_utc_date(self):
+        # 2026-11-21 sweep: the marks are UTC midnights (evening before in ET), so an ET date read one day early
+        self.assertIn('day: new Intl.DateTimeFormat("en-US", {timeZone: "UTC", month: "short", day: "numeric"}),', JS)
+
+    def test_backup_volume_is_unavailable_not_zero(self):
+        self.assertIn('${s.backup ? "volume unavailable (backup estimate)" : `volume calls', JS)
 
 
 if __name__ == "__main__":

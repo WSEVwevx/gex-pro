@@ -1905,7 +1905,7 @@ function renderLiveTable(){
       const x = rows[Number(el.dataset.i)], v = x.v, ls = at.get(Number(el.dataset.i)) || [];
       tip.innerHTML = `<b>${num(x.f, 2)}</b> <span class="c-ink3">(${esc(s.options_source || w.source)} ${num(x.k, 0)})</span>
         <br>Net GEX <b class="${v[0] >= 0 ? "c-pos" : "c-neg"}">${money(v[0])}</b> per 1% · net DEX ${compact(v[1])}
-        <br>OI calls ${num(v[2], 0)} / puts ${num(v[3], 0)} · volume calls ${num(v[4], 0)} / puts ${num(v[5], 0)}${ls.length ? `<br>${ls.map(l => esc(l.code + " " + l.name + (l.share ? ` (${num(100 * l.share, 1)}% of gamma)` : ""))).join("<br>")}` : ""}`;
+        <br>OI calls ${num(v[2], 0)} / puts ${num(v[3], 0)} · ${s.backup ? "volume unavailable (backup estimate)" : `volume calls ${num(v[4], 0)} / puts ${num(v[5], 0)}`}${ls.length ? `<br>${ls.map(l => esc(l.code + " " + l.name + (l.share ? ` (${num(100 * l.share, 1)}% of gamma)` : ""))).join("<br>")}` : ""}`;
       tipAt(tip, 170, (el.offsetTop + el.offsetHeight + 40));
     };
     el.onmouseleave = () => { tip.classList.remove("on"); };
@@ -1988,7 +1988,7 @@ function hmSteady(vals){
 // New York time for the heatmap's axis and crosshair (the chart library would show UTC)
 const hmFmt = {
   hm: new Intl.DateTimeFormat("en-US", {...ET, hour: "2-digit", minute: "2-digit", hourCycle: "h23"}),
-  day: new Intl.DateTimeFormat("en-US", {...ET, month: "short", day: "numeric"}),
+  day: new Intl.DateTimeFormat("en-US", {timeZone: "UTC", month: "short", day: "numeric"}),      // the chart's day marks are UTC midnights
   full: new Intl.DateTimeFormat("en-US", {...ET, weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit"}),
   wd: new Intl.DateTimeFormat("en-US", {...ET, weekday: "short", day: "numeric"}),
 };
@@ -2420,14 +2420,15 @@ function renderStockChart(c){
     + (r["w_" + k] ? `<span>${num(r["w_" + k], 2)}% of the ${market === "ES" ? "S&P 500" : "Nasdaq-100"}</span>` : "")
     + (r["pts_" + k] != null ? `<span class="m ${cls(r["pts_" + k])}">${signed(r["pts_" + k], 1)} ${market} pts</span>` : "")
     + (r.earnings ? `<span>earnings ${esc(earnTxt(r.earnings))}</span>` : "");
-  $("scTf").innerHTML = [["intraday", "Today · 5m"], ["daily", "3 months · daily"]].map(([v, t]) => `<button role="tab" aria-selected="${scRange === v}" data-k="${v}">${t}</button>`).join("");
+  $("scTf").innerHTML = [["intraday", "Last session · 5m"], ["daily", "3 months · daily"]].map(([v, t]) => `<button role="tab" aria-selected="${scRange === v}" data-k="${v}">${t}</button>`).join("");
   [...$("scTf").children].forEach(b => b.onclick = () => { scRange = b.dataset.k; store.set("gex.scrange", scRange); renderStockChart(c); });
   if(!LC){ $("scMsg").textContent = "The chart library could not load (it comes from unpkg.com)."; return; }
   const bars = (scRange === "daily" ? c.daily : c.intraday) || [];
   if(!bars.length){ $("scMsg").hidden = false; $("scMsg").textContent = scRange === "daily" ? "No daily bars yet." : "No bars today yet (they start with the pre-market)."; return; }
   $("scMsg").hidden = true;
   const tl = bars[bars.length - 1][0] * 1000;
-  $("scInfo").insertAdjacentHTML("beforeend", `<span class="dim">as of ${scRange === "daily" ? esc(new Date(tl).toLocaleDateString("en-US", {...ET, month: "short", day: "numeric"})) : esc(etTime(tl)) + " ET"}</span>`);
+  const tDay = new Date(tl).toLocaleDateString("en-US", {...ET, weekday: "short", month: "short", day: "numeric"});
+  $("scInfo").insertAdjacentHTML("beforeend", `<span class="dim">as of ${esc(scRange === "daily" ? tDay : tDay + ", " + etTime(tl) + " ET")}</span>`);
   if(!scChart){
     scChart = LC.createChart($("scBox"), Object.assign({autoSize: true}, hmColors()));
     scSeries = scChart.addCandlestickSeries({borderVisible: false, priceLineVisible: true});
