@@ -19,8 +19,14 @@ class ExpiryNames(unittest.TestCase):
 
     def test_the_tags_from_the_ladder(self):
         # gexsys/ladder.py: tag = ("M" if monthly) + (" AM" if AM-settled)
-        self.assertEqual(self.settle(["M AM", "M", "", None]),
-                         [", AM-settled monthly (settles on the opening prints)", ", PM-settled (settles on the close)", "", ""])
+        # sweep 2026-11-21: the weeklies (tag "") said nothing; every expiry without " AM" settles PM
+        pm = ", PM-settled (settles on the close)"
+        self.assertEqual(self.settle(["M AM", "M", "", None]), [", AM-settled monthly (settles on the opening prints)", pm, pm, ""])
+
+    def test_the_heatmap_legend_does_not_say_today(self):
+        html = (ROOT / "dashboard" / "index.html").read_text(encoding="utf-8")
+        self.assertIn("right edge: the newest saved GEX profile with its C / P / Ab levels", html)
+        self.assertNotIn("today's C / P / Ab", html)
 
     def test_the_tooltip_uses_it(self):
         self.assertIn('e.date + ldSettle(e.tag))}: net GEX', JS)
