@@ -615,7 +615,7 @@ body.stale-data #lvHead .lvh-px .eyebrow::after{content:var(--stale-text);margin
 .ld-tag{font:700 var(--fs-xs) var(--mono);color:var(--prompt)}
 .ld-dot{width:9px;height:9px;border-radius:50%}
 .ld-mini{display:flex;align-items:flex-end;height:36px}.ld-mini i{display:block;width:7px;border-radius:var(--r-1) var(--r-1) 0 0}
-.ld-v{font:600 var(--fs-xs) var(--mono)}
+.ld-v{font:600 var(--fs-xs) var(--mono)}.ld-v.pos{color:color-mix(in oklch,var(--pos) 82%,var(--ink))}.ld-v.neg{color:color-mix(in oklch,var(--neg) 82%,var(--ink))}
 .ld-wrap{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:12px;margin-top:12px;align-items:start}
 .ld-table-card{position:relative;padding-bottom:12px}
 .ld-head,.ld-row{display:grid;grid-template-columns:150px minmax(0,1fr) minmax(0,1.7fr) minmax(0,.9fr) 78px minmax(0,.9fr);gap:8px;align-items:center}

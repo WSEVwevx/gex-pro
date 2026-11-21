@@ -514,7 +514,7 @@ function renderSources(){
   }).join("");
 }
 
-function ago(iso){ const m = (Date.now() - Date.parse(iso))/60000; return m < 1 ? "just now" : m < 60 ? `${Math.round(m)} min ago` : `${Math.floor(m/60)} h ${Math.round(m%60)} min ago`; }
+function ago(iso){ const m = (Date.now() - Date.parse(iso))/60000, r = Math.round(m); return m < 1 ? "just now" : r < 60 ? `${r} min ago` : `${Math.floor(r/60)} h ${r%60} min ago`; }
 
 function render(){
   const ws = data.workers, markets = [...new Set(ws.map(w => w.market))];
@@ -524,7 +524,7 @@ function render(){
   const anyPub = ws.some(w => w.published);
   $("copyAll").disabled = !anyPub;
   $("copyAll").textContent = anyPub ? `Copy for TradingView · ${slotTxt(ws.find(w=>w.published).published.slot_et)}` : "Copy for TradingView";
-  $("bbCopy").disabled = !anyPub; $("bbCopyT").textContent = anyPub ? slotTxt(ws.find(w=>w.published).published.slot_et) : "not available yet";
+  $("bbCopy").disabled = !anyPub; $("bbCopyT").textContent = anyPub ? slotTxt(ws.find(w=>w.published).published.slot_et).replace(/^[A-Z][a-z]{2}, /, "") : "not available yet";
 
   const w = ws.find(x => x.market === market && x.result) || ws.find(x => x.market === market);
   const h = w.health;
@@ -755,7 +755,7 @@ function renderStats(w, s, L, X){
   const p = v => v && typeof v === "object" ? v.price : v, emd = em.daily_points_fut ?? em.daily_points;
   const emc = em.anchor_fut ?? fut;                     // the range's centre: the same anchor the plan, ladder and levels use
   const away = v => v == null ? "" : `${num(Math.abs(v - fut), 0)} pts ${v >= fut ? "above" : "below"}${emd ? ` · ${num(Math.abs(v - fut) / emd, 1)}σ` : ""}`;
-  const key = (k, v, color, why) => tile(k, v == null ? "-" : num(v), v == null ? "unavailable" + (why ? ": " + esc(why) : "") : away(v), color);
+  const key = (k, v, color, why) => tile(k, v == null ? "-" : num(v), v == null ? "unavailable" + (why ? ": " + esc(why) : "") : away(v), v == null ? "" : color);
   const zgWhy = /^NO CROSSING/i.test(L.zero_gamma_status || s.zero_gamma_status || "") ? "no crossing near price" : L.zero_gamma_status || s.zero_gamma_status || "";
   $("keyStrip").innerHTML = key("Zero gamma (est.)", p(L.zero_gamma), "var(--zg)", zgWhy) + key("Call wall", p(L.call_wall), "var(--pos)")
     + key("Put wall", p(L.put_wall), "var(--neg)")
@@ -1336,10 +1336,10 @@ function openExplain(key){
   const lb = $("exMore").querySelector("[data-lesson]");
   if(lb) lb.onclick = () => { closeExplain(); openLesson(lb.dataset.lesson); };
   document.querySelectorAll(".ex").forEach(b => b.classList.toggle("on", b.dataset.help === key));
-  $("explain").classList.add("open"); $("explain").setAttribute("aria-hidden", "false"); document.body.classList.add("ex-open");
+  $("explain").classList.add("open"); $("explain").setAttribute("aria-hidden", "false"); $("explain").inert = false; document.body.classList.add("ex-open");
 }
 function closeExplain(){
-  $("explain").classList.remove("open"); $("explain").setAttribute("aria-hidden", "true"); document.body.classList.remove("ex-open");
+  $("explain").classList.remove("open"); $("explain").setAttribute("aria-hidden", "true"); $("explain").inert = true; document.body.classList.remove("ex-open");
   document.querySelectorAll(".ex.on").forEach(b => b.classList.remove("on")); exKey = null;
 }
 $("explainTab").onclick = () => exKey ? closeExplain() : openExplain(PAGE_HELP[page] || "regime");
@@ -1854,7 +1854,7 @@ function renderLiveTable(){
     return `<button class="ld-exp${on(i) ? " on" : ""}" data-i="${i}" type="button" title="${esc(e.date === "other" ? "Every later expiration in the basket" : e.date)}: net GEX ${esc(money(e.net))}, net DEX ${esc(compact(e.dex))}">
       <span class="ld-d">${ldDate(e.date)}</span><span class="ld-dte">${e.dte == null ? "rest" : num(e.dte, 1) + " DTE"}</span><span class="ld-tag">${esc(e.tag || "")}</span>
       <i class="ld-dot" style="background:${pos ? "var(--pos)" : "var(--neg)"}"></i>
-      <span class="ld-mini"><i style="height:${h}px;background:${pos ? "var(--pos)" : "var(--neg)"}"></i></span><span class="ld-v" style="color:${pos ? "var(--pos)" : "var(--neg)"}">${compact(e.net)}</span></button>`;
+      <span class="ld-mini"><i style="height:${h}px;background:${pos ? "var(--pos)" : "var(--neg)"}"></i></span><span class="ld-v ${pos ? "pos" : "neg"}">${compact(e.net)}</span></button>`;
   }).join("");
   [...$("ldStrip").children].forEach(b => b.onclick = () => { const i = Number(b.dataset.i); ldSel.has(i) ? ldSel.delete(i) : ldSel.add(i); if(ldSel.size === E.length) ldSel.clear(); store.set("gex.ldsel", JSON.stringify([...ldSel])); renderLiveTable(); });
   $("ldAll").onclick = () => { ldSel.clear(); store.set("gex.ldsel", "[]"); renderLiveTable(); };
@@ -2196,6 +2196,7 @@ class HeatPrimitive {
     });
   }
 }
+const hmGexW = () => Math.min(190, Math.round(Math.max(300, $("hmChart").clientWidth - 80) * 0.38));
 function hmColors(){
   return {layout: {background: {type: "solid", color: lcVar("--panel")}, textColor: lcVar("--ink3"), fontFamily: cssVar("--mono"), fontSize: 11},
     grid: {vertLines: {visible: false}, horzLines: {visible: false}},
@@ -2245,12 +2246,12 @@ function renderHeatmap(){
     hmChart.subscribeCrosshairMove(hmHover);
     let roTimer = null;
     hmChart.timeScale().subscribeVisibleLogicalRangeChange(() => { clearTimeout(roTimer); roTimer = setTimeout(() => {
-      const want = Math.max(16, Math.ceil(190 / (hmChart.timeScale().options().barSpacing || 6)));
+      const want = Math.max(16, Math.ceil(hmGexW() / (hmChart.timeScale().options().barSpacing || 6)));
       if(Math.abs(want - hmChart.timeScale().options().rightOffset) > 2) hmChart.timeScale().applyOptions({rightOffset: want}); }, 150); });
     $("hmChart").appendChild($("hmTip")); $("hmChart").appendChild($("hmMsg"));   // keep them above the chart's canvases
   } else { hmChart.applyOptions(hmColors()); hmChart.applyOptions(hmTimeOpts()); }
-  // room right of the last candle for the latest profile: about 190 px, whatever the zoom
-  const ro = Math.max(16, Math.ceil(190 / (hmChart.timeScale().options().barSpacing || 6)));
+  // room right of the last candle for the latest profile: about 190 px (less on a phone), whatever the zoom
+  const ro = Math.max(16, Math.ceil(hmGexW() / (hmChart.timeScale().options().barSpacing || 6)));
   hmChart.timeScale().applyOptions({rightOffset: ro});
   // keep the user's zoom only for a redraw of the same data's market and timeframe (a range picked while
   // another timeframe loads applies when that data arrives)
@@ -2269,15 +2270,18 @@ function renderHeatmap(){
     .filter(([k]) => lastCol[k] != null)
     .map(([k, title, color]) => hmCandles.createPriceLine({price: Math.round((lastCol[k] * hm.factor + hm.offset) * 4) / 4, color, title, lineVisible: false, axisLabelVisible: true}));
   if(keep) hmChart.timeScale().setVisibleLogicalRange(keep);
-  else {
+  else if($("hmChart").clientWidth < 100){                 // not laid out yet (a hidden tab): set the view once it has a size
+    hmReset = true;
+    const ro0 = new ResizeObserver(() => { if($("hmChart").clientWidth >= 100){ ro0.disconnect(); renderHeatmap(); } }); ro0.observe($("hmChart"));
+  } else {
     hmCandles.priceScale().applyOptions({autoScale: true}); hmReset = false;
     const n = hm.candles.length, st = hm._starts || [0];
     // a session under 3 hours old (just after the 18:00 reopen) is too short to count as one of the days shown
     const young = st.length > 1 && n && hm._times[n - 1] - hm._times[st[st.length - 1]] < 3 * 3600 ? 1 : 0;
     const from = Math.max(0, (hmSpan === "all" ? 0 : st[Math.max(0, st.length - (hmSpan === "2d" ? 2 : 1) - young)] || 0) - 2);
-    // pick the right offset so the profile space is ~190 px once the candles fill the rest of the width
-    const plot = Math.max(300, $("hmChart").clientWidth - 80), bars = Math.max(1, n - from);
-    const ro2 = Math.max(16, Math.round(190 * bars / Math.max(100, plot - 190)));
+    // pick the right offset so the profile space is hmGexW() once the candles fill the rest of the width
+    const plot = Math.max(300, $("hmChart").clientWidth - 80), bars = Math.max(1, n - from), gw = hmGexW();
+    const ro2 = Math.max(16, Math.round(gw * bars / Math.max(100, plot - gw)));
     hmChart.timeScale().applyOptions({rightOffset: ro2});
     hmChart.timeScale().setVisibleLogicalRange({from, to: n + ro2});
   }
