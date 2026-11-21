@@ -197,6 +197,7 @@ a{color:var(--ink2)}
 .chartwrap{position:relative}
 svg text{fill:var(--ink3);font:var(--fs-xs) var(--mono)}
 .tip{position:absolute;pointer-events:none;background:var(--tip-bg);border:1px solid var(--line2);border-radius:var(--r-2);padding:7px 10px;font:var(--fs-sm) var(--mono);color:var(--ink);opacity:0;transition:opacity var(--t-fast) var(--ease);white-space:nowrap;box-shadow:0 10px 30px -10px var(--shadow2);z-index:3}
+.tip.on{opacity:1}
 .legend{display:flex;gap:6px 14px;flex-wrap:wrap;font-size:var(--fs-sm);color:var(--ink3);margin-top:10px}
 .legend span{display:inline-flex;align-items:center;gap:6px}
 .legend span[hidden]{display:none}
@@ -478,7 +479,8 @@ body:not(.notes) .stats.keys .stat .s{display:block}
 .lvh-mid{font:600 var(--fs-xl)/1.3 var(--mono);margin-top:var(--sp-1);white-space:nowrap}
 .lvh-sub{font-size:var(--fs-sm);color:var(--ink2);margin-top:2px}
 .lvh-say{flex:0 0 100%;margin:0;padding-right:max(0px,calc(100% - 78ch));font-size:var(--fs-base);line-height:1.5;color:var(--ink2);text-wrap:pretty}
-.c-pos{color:var(--pos)}.c-neg{color:var(--neg)}.c-zg{color:var(--zg)}.c-ink3{color:var(--ink3)}
+/* doubled class: beats a container's "X b{color}" (e.g. .tk b), still loses to the stale-data quieting */
+.c-pos.c-pos{color:var(--pos)}.c-neg.c-neg{color:var(--neg)}.c-zg.c-zg{color:var(--zg)}.c-ink3.c-ink3{color:var(--ink3)}.c-good.c-good{color:var(--good)}.c-bad.c-bad{color:var(--bad)}
 body.stale-data #lvHead .lvh-px .eyebrow::after{content:var(--stale-text);margin-left:8px;font:600 var(--fs-xs) var(--mono);text-transform:none;color:var(--warn)}
 .stats.keys{background:transparent;box-shadow:none;border-radius:0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
 .stats.keys .stat{background:transparent;padding:var(--sp-3) var(--sp-4) var(--sp-3) 0}
@@ -803,3 +805,11 @@ b.good,.drv-chg .good{color:var(--good)}b.bad,.drv-chg .bad{color:var(--bad)}
 body:not(.notes) .hero .expl,body:not(.notes) .stat .s,body:not(.notes) .ladder .desc{display:none}
 .side .notes-btn{margin-top:2px}
 .side .notes-btn[aria-pressed="true"]{color:var(--ink)}
+
+/* utilities for what app.js used to set inline (Phase 6): !important keeps the inline style's priority */
+.c-ink2{color:var(--ink2)!important}.c-warn{color:var(--warn)!important}.c-mp{color:var(--mp)!important}
+.f-ink2{fill:var(--ink2)!important}.f-ink3{fill:var(--ink3)!important}
+.ml-0{margin-left:0!important}.mt-0{margin-top:0!important}.mt-1{margin-top:var(--sp-1)!important}.mt-2{margin-top:var(--sp-2)!important}.mb-0{margin-bottom:0!important}.m-2{margin:var(--sp-2)!important}
+.w-100{width:100%!important}.nowrap{white-space:nowrap!important}.ta-l{text-align:left!important}
+.fs-base{font-size:var(--fs-base)!important}.fw-500{font-weight:500!important}.mono-sm{font:var(--fs-sm) var(--mono)!important}
+.mt-3{margin-top:var(--sp-3)!important}.dot-inl{display:inline-block;margin-right:6px}.banner.fatal{margin-top:var(--sp-8);font-size:var(--fs-lg);line-height:1.7}
