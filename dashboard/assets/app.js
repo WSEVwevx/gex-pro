@@ -41,8 +41,8 @@ const PER_MARKET = ["levelsView", "ladderView", "heatmapView", "screenerView", "
 const cardKey = c => { const v = c.closest("[id$=View]"); return v ? v.id + ":" + [...v.querySelectorAll(".card")].indexOf(c) + (PER_MARKET.includes(v.id) ? ":" + market : "") : null; };
 // a first visit has no heights of its own yet: it reserves the usual ones (measured on the live site at 1366 and
 // 375 px wide, every page re-measured 2026-11-20 after the redesign, NQ, folds closed), by page and card order. They are replaced by this device's real heights after one draw.
-const DEFAULT_H = {wide: {levelsView:[207,398,102,577,571,373,373,124,124,124,1228],ladderView:[184,797,220,328,312],heatmapView:[648],screenerView:[291,370,97,679],biasView:[200,633,220,238],trackView:[259,578,635,297,272,1661,370,365,365,320],backtestView:[221,260,528,536,291,165,301,803],briefingsView:[448,292,0,0],newsView:[651,988],indicatorView:[217,217,217,67,369],libraryView:[155,628,1371],glossaryView:[5493],healthView:[1515]},
-  narrow: {levelsView:[186,431,94,894,618,365,365,81,116,109,1757],ladderView:[184,892,193,320,272],heatmapView:[879],screenerView:[304,389,146,754],biasView:[332,731,393,368],trackView:[446,891,823,334,291,2528,637,384,407,359],backtestView:[464,252,566,718,385,275,312,834],briefingsView:[1029,303,0,0],newsView:[787,718],indicatorView:[252,251,254,95,980],libraryView:[317,1066,1726],glossaryView:[13616],healthView:[2870]}};
+const DEFAULT_H = {wide: {levelsView:[207,418,102,577,571,373,373,124,124,124,1228],ladderView:[184,797,220,328,312],heatmapView:[648],screenerView:[291,370,97,679],biasView:[200,633,220,238],trackView:[259,578,635,297,272,1661,370,365,365,320],backtestView:[221,260,528,536,291,165,301,803],briefingsView:[448,292,0,0],newsView:[651,988],indicatorView:[217,217,217,67,369],libraryView:[155,628,1371],glossaryView:[5493],healthView:[1515]},
+  narrow: {levelsView:[186,482,94,894,618,365,365,81,116,109,1757],ladderView:[184,892,193,320,272],heatmapView:[879],screenerView:[304,389,146,754],biasView:[332,731,393,368],trackView:[446,891,823,334,291,2528,637,384,407,359],backtestView:[464,252,566,718,385,275,312,834],briefingsView:[1029,303,0,0],newsView:[787,718],indicatorView:[252,251,254,95,980],libraryView:[317,1066,1726],glossaryView:[13616],healthView:[2870]}};
 function reserve(){
   const usual = DEFAULT_H[innerWidth < 700 ? "narrow" : "wide"];
   document.querySelectorAll("[id$=View] .card").forEach(c => {
@@ -1262,7 +1262,7 @@ const HELP = {
   plan: {title: "Today's plan", tldr: "The regime, the key levels and what each side of them means, built from the latest data.",
     body: `<p>The plan uses the first expiry's levels (the same C / P / Ab as the TradingView indicator) and the gamma flip. Each line is a zone: <b>above C1</b> (positive-gamma extension), <b>between the flip and C1</b> (positive gamma: two-way trade), <b>between P1 and the flip</b> (negative gamma: moves extend) and <b>below P1</b>. The highlighted line is where price is now.</p><p><b>Day range ±1σ</b> is the range the options market prices in from the previous close. <b>Data today</b> lists the medium- and high-impact US releases still ahead; <b>Earnings ahead</b> lists drivers reporting before the next open, with the move their options price in and what that is worth in index points.</p>`},
   level_map: {title: "Level map", tldr: "Where price sits among today's levels, drawn to scale.",
-    body: `<p>One vertical price scale, centred on the reference price and reaching 3.3 expected moves each way. Each line is a level: the <b>call wall</b> and <b>C1</b> in blue, <b>zero gamma</b> (and the 0DTE <b>flip</b> when there is one) dashed grey, <b>P1</b> and the <b>put wall</b> in orange; each label gives the distance in points and in expected moves (σ). A level beyond the scale is pinned to the edge with an arrow. The area above zero gamma is shaded blue (positive gamma), below it orange (negative gamma). The grey band is the day's ±1σ range, and the faint bars behind are the model's gamma by price.</p><p>It shows the same numbers as the cards and the plan, so you can see the distances at a glance. It is a picture of the model, not a forecast.</p>`,
+    body: `<p>One vertical price scale, centred on the reference price and reaching 3.3 expected moves each way. Each line is a level: the <b>call wall</b> and <b>C1</b> in blue, <b>zero gamma</b> (and the 0DTE <b>flip</b> when there is one) dashed grey, <b>P1</b> and the <b>put wall</b> in orange; each label gives the distance in points and in expected moves (σ). A level beyond the scale is pinned to the edge with an arrow. The area above zero gamma is shaded blue (positive gamma), below it orange (negative gamma). The grey band is the day's ±1σ range.</p><p><b>The field.</b> The vertical axis in the middle is the meridian, and the price is the bead on it. The strip of colour on the meridian is the model's net gamma at each strike (blue positive, orange negative; deeper colour = more gamma, so the walls are where it is deepest). The curve is the model's total gamma if the price were at each level: right of the axis positive, left negative, so it crosses the axis at zero gamma. Point at the field, or tap it, for the exact numbers at any price; the strike value is rounded to 1% of the largest strike.</p><p>It shows the same numbers as the cards and the plan, so you can see the distances at a glance. It is a picture of the model, not a forecast.</p>`,
     watch: ["How far price is from zero gamma compared with the grey band", "Which wall price meets first"]},
   changes: {title: "What changed today", tldr: "Every level that moved since the 6 pm ET session start, and when.",
     body: `<p>Each line is a level that moved and stayed moved for at least two snapshots (one-off flickers are ignored): C1 / C2, P1 / P2, Ab1, the 0DTE flip, zero gamma, the walls, and the regime. <b>At the 9:30 open</b> shows where the main levels stood when the cash session began, so you can see how far the map has drifted. The TradingView indicator draws those open levels as faint ghosts.</p>`},
@@ -2474,6 +2474,13 @@ function renderLevelHistoryChart(ss, fut){
 // A level beyond the scale is pinned to the edge with an arrow, so the scale never lies about distance.
 const MAP_SPAN = 3.3;
 function niceStep(raw){ const e = 10 ** Math.floor(Math.log10(raw)); return [1, 2, 2.5, 5, 10].map(m => m * e).find(x => x >= raw); }
+const PROBE_HINT = "Point at the field, or tap it, for the gamma at any price.";
+// the total curve at a price, straight between its two nearest points; off its range: null (never extrapolated)
+function fieldAt(curve, at){
+  for(let i = 1; i < curve.length; i++){ const [p0, n0] = curve[i - 1], [p1, n1] = curve[i];
+    if(at >= Math.min(p0, p1) && at <= Math.max(p0, p1)) return p1 === p0 ? n0 : n0 + (n1 - n0) * (at - p0) / (p1 - p0); }
+  return null;
+}
 function renderLevelMap(w, L, X, ref){
   const box = $("lvMap"), lv = (w.result.session || {}).levels || {}, em = X.expected_move || {};
   const d = em.daily_points_fut ?? em.daily_points, a = em.anchor_fut ?? em.anchor ?? ref, p = v => v && typeof v === "object" ? v.price : v;
@@ -2489,12 +2496,21 @@ function renderLevelMap(w, L, X, ref){
   const zg = p(L.zero_gamma), yz = zg == null ? null : Math.max(top, Math.min(bot, y(zg)));
   let g = yz == null ? "" : `<rect x="${xr}" y="${top}" width="${xe - xr}" height="${yz - top}" class="m-posz"/><rect x="${xr}" y="${yz}" width="${xe - xr}" height="${bot - yz}" class="m-negz"/>`;
   g += `<rect x="${xr}" y="${y(a + d)}" width="${xe - xr}" height="${y(a - d) - y(a + d)}" class="m-band"/>`;
+  // The field (Meridian). On the meridian, the strike tone: the model's net gamma at each strike bin, deepest where the
+  // walls are. Across it, the total curve: the model's net gamma if the price were at each level (result.profile, index
+  // prices times the frozen basis the other levels use), right of the axis positive and left negative, so it crosses
+  // the axis at zero gamma. The price is the bead on the meridian.
+  const xm = Math.round(xr + (xe - xr) / 2), half = (xe - xr) * 0.42;
   const pr = X.profile, base = pr && (pr.base_fut ?? pr.base), step = pr && (pr.width_fut ?? pr.width);
-  if(pr && pr.values && base != null && step){
-    const mx = Math.max(...pr.values.map(Math.abs)) || 1, bw = (xe - xr) * 0.42;
-    pr.values.forEach((v, i) => { const pv = base + i * step; if(!v || pv < lo || pv > hi) return;
-      const len = Math.abs(v) / mx * bw; g += `<rect x="${xe - len}" y="${y(pv) - 1.4}" width="${len}" height="2.8" class="m-bar ${v < 0 ? "neg" : "pos"}"/>`; });
-  }
+  const bins = pr && pr.values && base != null && step && pr.max_abs ? pr.values.map((v, i) => [base + i * step, v / 99 * pr.max_abs, v]) : [];
+  for(const [pv, , v] of bins){ if(!v || pv - step / 2 > hi || pv + step / 2 < lo) continue;
+    const y0 = Math.max(top, y(pv + step / 2)), y1 = Math.min(bot, y(pv - step / 2));
+    g += `<rect x="${xm - 7}" y="${y0.toFixed(1)}" width="14" height="${Math.max(0.5, y1 - y0).toFixed(1)}" fill-opacity="${(0.15 + 0.85 * Math.abs(v) / 99).toFixed(2)}" class="m-tone ${v < 0 ? "neg" : "pos"}"/>`; }
+  const f = w.result.mapped && w.result.mapped.mapping ? w.result.mapped.mapping.factor : 1;
+  const curve = (w.result.profile || []).map(q => [q.price * f, q.net]).filter(([pp, n]) => pp >= lo && pp <= hi && isFinite(n));
+  const cmax = Math.max(0, ...curve.map(c => Math.abs(c[1])));
+  g += `<line x1="${xm}" x2="${xm}" y1="${top}" y2="${bot}" class="m-axis"/><text x="${xm - 5}" y="${top - 3}" text-anchor="end" class="m-t">− gamma</text><text x="${xm + 5}" y="${top - 3}" class="m-t">+ gamma</text>`;
+  if(curve.length > 1 && cmax > 0) g += `<path d="${curve.map(([pp, n], i) => `${i ? "L" : "M"}${(xm + n / cmax * half).toFixed(1)} ${y(pp).toFixed(1)}`).join("")}" class="m-curve"/>`;
   const tk = niceStep(MAP_SPAN * d / 3), ticks = [];
   for(let t = Math.ceil(lo / tk) * tk; t <= hi; t += tk){ g += `<line x1="${xr}" x2="${xe}" y1="${y(t)}" y2="${y(t)}" class="m-grid"/>`; ticks.push(t); }
   const pins = lines.map(l => ({...l, yy: Math.max(top + 6, Math.min(bot - 6, y(l.v))), off: l.v > hi ? "↑ " : l.v < lo ? "↓ " : ""}));
@@ -2503,7 +2519,7 @@ function renderLevelMap(w, L, X, ref){
   pins.forEach((l, i) => { l.ly = i ? Math.max(l.yy, pins[i - 1].ly + 28) : l.yy; });   // labels never overlap
   const shift = Math.max(0, pins.at(-1).ly - (bot - 4)); pins.forEach(l => { l.ly -= shift; });
   for(const l of pins){
-    if(l.px){ g += `<line x1="${xr}" x2="${xe}" y1="${l.yy}" y2="${l.yy}" class="m-px"/><path d="M${xr - 10} ${l.ly} L${xr} ${l.yy}" class="m-lead px"/>
+    if(l.px){ g += `<line x1="${xr}" x2="${xe}" y1="${l.yy}" y2="${l.yy}" class="m-px"/><circle cx="${xm}" cy="${l.yy}" r="6" class="m-bead"/><path d="M${xr - 10} ${l.ly} L${xr} ${l.yy}" class="m-lead px"/>
       <rect x="0" y="${l.ly - 11}" width="${xr - 10}" height="22" rx="5" class="m-pill"/><text x="8" y="${l.ly + 4}" class="m-pillt">${W < 420 ? "" : esc(market) + (w.result.mapped ? " eq. " : " ")}${num(ref)}</text>`; continue; }
     g += `<line x1="${xr}" x2="${xe}" y1="${l.yy}" y2="${l.yy}" class="m-lv ${l.c}${l.off ? " off" : ""}${l.k.startsWith("ZG") || l.k.startsWith("Flip") ? " dash" : ""}"/>
       <path d="M${xr - 10} ${l.ly} L${xr} ${l.yy}" class="m-lead ${l.c}"/>
@@ -2512,8 +2528,26 @@ function renderLevelMap(w, L, X, ref){
   }
   for(const t of ticks) g += `<text x="${xe - 4}" y="${y(t) - 3}" text-anchor="end" class="m-t">${num(t, 0)}</text>`;
   if(yz != null){ g += `<text x="${xr + 6}" y="${top + 12}" class="m-z pos">POSITIVE GAMMA</text><text x="${xr + 6}" y="${bot - 5}" class="m-z neg">NEGATIVE GAMMA</text>`; }
-  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(market)} price ${num(ref)} among today's levels">${g}</svg>
-    <div class="legend"><span><i class="sw m-sw-band"></i>Day ±1σ ${num(a - d, 0)} – ${num(a + d, 0)}</span><span><i class="sw m-sw-bar"></i>Gamma by price</span><span>↑ ↓ beyond ±${MAP_SPAN}σ</span></div>`;
+  // the same picture in words, for screen readers
+  const here = fieldAt(curve, ref), deep = bins.filter(b => b[0] >= lo && b[0] <= hi).sort((u, v) => Math.abs(v[2]) - Math.abs(u[2]))[0];
+  const words = `${market} ${num(ref)}. ${here == null ? "Total modeled gamma at the price: unavailable." : `Total modeled gamma at the price: ${money(here)} per 1% move.`} `
+    + `${zg == null ? "The model found no zero-gamma crossing in its range." : `It crosses zero at ${num(zg)}.`} `
+    + `${deep ? `Deepest strike tone: ${num(deep[0], 0)}, ${deep[1] < 0 ? "negative" : "positive"}.` : ""} `
+    + lines.map(l => `${l.k} ${num(l.v)}, ${signed(l.v - ref, 0)} pts.`).join(" ");
+  g += `<line x1="${xr}" x2="${xe}" y1="0" y2="0" class="m-probe-ln" visibility="hidden"/>`;
+  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(market)} price ${num(ref)} in the gamma field among today's levels">${g}</svg>
+    <p class="vh">${esc(words)}</p>
+    <div class="m-probe" aria-live="polite">${PROBE_HINT}</div>
+    <div class="legend"><span><i class="sw m-sw-band"></i>Day ±1σ ${num(a - d, 0)} – ${num(a + d, 0)}</span><span><i class="sw m-sw-tone"></i>Strike gamma</span><span><i class="sw m-sw-curve ln"></i>Total if price were there</span><span>↑ ↓ beyond ±${MAP_SPAN}σ</span></div>`;
+  // the probe: point or tap anywhere on the field for the exact numbers at that price
+  const svg = box.querySelector && box.querySelector("svg"), out = svg && box.querySelector(".m-probe"), ln = svg && svg.querySelector(".m-probe-ln");
+  if(svg) svg.onpointermove = svg.onpointerdown = e => {
+    const r = svg.getBoundingClientRect(), yy = (e.clientY - r.top) * H / r.height;
+    if(yy < top || yy > bot){ ln.setAttribute("visibility", "hidden"); out.textContent = PROBE_HINT; return; }
+    const at = hi - (yy - top) / (bot - top) * (hi - lo), b = bins.find(q => Math.abs(q[0] - at) <= step / 2), tot = fieldAt(curve, at);
+    ln.setAttribute("y1", yy); ln.setAttribute("y2", yy); ln.setAttribute("visibility", "visible");
+    out.textContent = `${num(at, 0)} · ${signed(at - ref, 0)} pts · strike gamma ${!b ? "none saved here" : b[2] ? "about " + money(b[1]) : "under 1% of the largest"} · total if price were here ${tot == null ? "unavailable" : money(tot)} (per 1% move)`;
+  };
   $("lvMapSub").textContent = `${w.result.mapped ? market + " equiv. of " + w.source : w.source + " prices"} · ±${MAP_SPAN}σ around the price`;
 }
 // the two folded sections remember whether this viewer left them open; a chart drawn while folded is redrawn at its real width
