@@ -1836,7 +1836,7 @@ function renderBacktest(){
 
 // ---------- GEX live table: net DEX / GEX / OI / volume by strike, for the expirations you pick
 // two expirations can share a date (the AM-settled monthly and the PM-settled weekly root): the tooltip says which
-const ldSettle = tag => /AM/.test(tag || "") ? ", AM-settled monthly (settles on the opening prints)" : /M/.test(tag || "") ? ", PM-settled (settles on the close)" : "";
+const ldSettle = tag => tag == null ? "" : /AM/.test(tag) ? ", AM-settled monthly (settles on the opening prints)" : ", PM-settled (settles on the close)";   // gexsys/ladder.py: no " AM" = PM
 let ldSel = (() => { try { return new Set(JSON.parse(store.get("gex.ldsel", "[]"))); } catch(e){ return new Set(); } })();
 let ldRowsN = Number(store.get("gex.ldrows", "51"));
 const MON = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
