@@ -17,8 +17,8 @@ def piece(start, end="\n}"):
     return start + JS.split(start, 1)[1].split(end, 1)[0] + end
 
 
-SRC = "\n".join([next(l for l in JS.splitlines() if l.startswith(p)) for p in ("const esc =", "const num =", "const signed =")]
-                + ["const MAP_SPAN = 3.3;", piece("function niceStep(", "}"), piece("function renderLevelMap(")])
+SRC = "\n".join([next(l for l in JS.splitlines() if l.startswith(p)) for p in ("const esc =", "const num =", "const money =", "const signed =", "const PROBE_HINT =")]
+                + ["const MAP_SPAN = 3.3;", piece("function niceStep(", "}"), piece("function fieldAt("), piece("function renderLevelMap(")])
 STUB = """
 const els = {lvMap: {innerHTML: "", clientWidth: %d}, lvMapSub: {textContent: ""}}, $ = id => els[id], market = "NQ";
 renderLevelMap(%s, %s, %s, %s);
@@ -32,7 +32,7 @@ X_ = {"expected_move": {"daily_points_fut": EM, "anchor_fut": 26595.0}, "profile
 
 def draw(width=560, w=W_, L=L_, X=X_, ref=REF):
     js = SRC + STUB % (width, json.dumps(w), json.dumps(L), json.dumps(X), json.dumps(ref))
-    return json.loads(subprocess.run(["node", "-e", js], capture_output=True, encoding="utf-8", check=True).stdout)
+    return json.loads(subprocess.run(["node"], input=js, capture_output=True, encoding="utf-8", check=True).stdout)
 
 
 @unittest.skipUnless(shutil.which("node"), "node is not installed")
@@ -85,6 +85,79 @@ class LevelMap(unittest.TestCase):
         self.assertIn("  level_map: {title:", JS)
         self.assertIn("body.stale-data #lvHead .lvh-px .eyebrow::after{content:var(--stale-text)", CSS)
         self.assertIn('<div class="lvh-px"><div class="eyebrow">${esc(market)} ${w.result.mapped ? "equiv. of " + esc(w.source) : esc(w.source)}${refAt(s.ref_time)}</div>', JS)
+
+
+# the field: an index-price profile times the frozen basis; the net crosses zero halfway between 26,900 and 27,100
+F_ = 1.002
+W_F = {"source": "NDX", "result": {"mapped": {"mapping": {"factor": F_}}, "session": {"levels": {}},
+                                    "profile": [{"price": 26500.0, "net": 3e9}, {"price": 26900.0, "net": 1e9},
+                                                {"price": 27100.0, "net": -1e9}, {"price": 27300.0, "net": -2e9}]}}
+X_F = {**X_, "profile": {"base_fut": 26500.0, "width_fut": 25.0, "values": [99, 0, -50], "max_abs": 4e8}}
+
+
+def fieldAt(curve, at):
+    js = piece("function fieldAt(") + f"\nconsole.log(JSON.stringify(fieldAt({json.dumps(curve)}, {json.dumps(at)})))"
+    return json.loads(subprocess.run(["node"], input=js, capture_output=True, encoding="utf-8", check=True).stdout)
+
+
+@unittest.skipUnless(shutil.which("node"), "node is not installed")
+class Field(unittest.TestCase):
+    def geom(self, svg):
+        W, H = map(int, re.search(r'viewBox="0 0 (\d+) (\d+)"', svg).groups())
+        lo, hi, top, bot = REF - 3.3 * EM, REF + 3.3 * EM, 14, H - 14
+        xr = 112 if W < 420 else 168
+        return (lambda v: bot - (v - lo) / (hi - lo) * (bot - top)), round(xr + (W - 2 - xr) / 2), (W - 2 - xr) * 0.42
+
+    def test_the_curve_crosses_the_meridian_at_zero_gamma(self):
+        svg = draw(w=W_F, X=X_F)["svg"]
+        y, xm, half = self.geom(svg)
+        path = re.search(r'<path d="([^"]+)" class="m-curve"', svg).group(1)
+        pts = [tuple(map(float, m)) for m in re.findall(r"[ML]([\d.]+) ([\d.]+)", path)]
+        self.assertEqual(len(pts), 4)
+        for (x, yy), (p, n) in zip(pts, [(26500, 3e9), (26900, 1e9), (27100, -1e9), (27300, -2e9)]):
+            self.assertAlmostEqual(x, xm + n / 3e9 * half, delta=0.06)          # right = positive, scaled to the largest
+            self.assertAlmostEqual(yy, y(p * F_), delta=0.06)                   # index price times the frozen basis
+        (x0, y0), (x1, y1) = pts[1], pts[2]
+        self.assertAlmostEqual(y0 + (y1 - y0) * (xm - x0) / (x1 - x0), y(27000 * F_), delta=0.1)
+
+    def test_the_bead_sits_on_the_meridian_at_the_price(self):
+        svg = draw(w=W_F, X=X_F)["svg"]
+        y, xm, _ = self.geom(svg)
+        cx, cy = map(float, re.search(r'<circle cx="([\d.]+)" cy="([\d.]+)" r="6" class="m-bead"', svg).groups())
+        self.assertEqual(cx, xm)
+        self.assertAlmostEqual(cy, y(REF), places=6)
+
+    def test_the_tone_is_deepest_at_the_largest_strike_and_absent_at_zero(self):
+        svg = draw(w=W_F, X=X_F)["svg"]
+        tones = re.findall(r'fill-opacity="([\d.]+)" class="m-tone (pos|neg)"', svg)
+        self.assertEqual(tones, [("1.00", "pos"), ("0.58", "neg")])              # 0.15 + 0.85 x |v| / 99; v = 0 is not drawn
+
+    def test_the_words_say_what_the_picture_shows(self):
+        svg = draw(w=W_F, X=X_F)["svg"]
+        words = re.search(r'<p class="vh">([^<]+)</p>', svg).group(1)
+        # at 26,594.97: between 26,500 x 1.002 = 26,553 (3e9) and 26,900 x 1.002 = 26,953.8 (1e9)
+        here = 3e9 + (1e9 - 3e9) * (REF - 26500 * F_) / (400 * F_)
+        self.assertIn(f"NQ 26,594.97. Total modeled gamma at the price: +${here / 1e9:.2f}B per 1% move.", words)
+        self.assertIn("It crosses zero at 27,361.75.", words)
+        self.assertIn("Deepest strike tone: 26,500, positive.", words)
+        self.assertIn('aria-live="polite">Point at the field, or tap it, for the gamma at any price.</div>', svg)
+
+    def test_no_profile_draws_no_curve_and_says_unavailable(self):
+        svg = draw()["svg"]
+        self.assertNotIn("m-curve", svg)
+        self.assertIn("Total modeled gamma at the price: unavailable.", svg)
+
+    def test_the_probe_reads_the_same_scale_back(self):
+        fn = piece("function renderLevelMap(")
+        self.assertIn("const at = hi - (yy - top) / (bot - top) * (hi - lo)", fn)       # the inverse of y(v)
+        self.assertIn("y = v => bot - (v - lo) / (hi - lo) * (bot - top)", fn)
+        self.assertIn('total if price were here ${tot == null ? "unavailable" : money(tot)}', fn)
+        self.assertIn('strike gamma ${!b ? "none saved here" : b[2] ? "about " + money(b[1]) : "under 1% of the largest"}', fn)
+
+    def test_the_curve_is_never_extrapolated(self):
+        self.assertEqual(fieldAt([[1, 10], [3, 30]], 2), 20)
+        self.assertIsNone(fieldAt([[1, 10], [3, 30]], 4))
+        self.assertIsNone(fieldAt([], 1))
 
 
 if __name__ == "__main__":
