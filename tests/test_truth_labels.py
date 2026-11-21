@@ -78,7 +78,7 @@ class OneCodeOnePrice(unittest.TestCase):
 class Heatmap(unittest.TestCase):
     def test_the_latest_profile_carries_its_own_time(self):
         self.assertNotIn('"GEX now"', JS)
-        self.assertIn("ctx.fillText(`GEX ${hmFmt.wd.format(pt)} ${hmFmt.hm.format(pt)}`", JS)
+        self.assertIn('ctx.fillText(`GEX ${pt.toLocaleDateString("en-US", {...ET, weekday: "short"})} ${hmFmt.hm.format(pt)}`', JS)
 
     def test_the_live_table_help_names_its_own_codes(self):
         self.assertIn("+G = the strikes near price with the most positive net GEX, −G = the most negative, AG = the most total gamma", JS)

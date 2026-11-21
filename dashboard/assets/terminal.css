@@ -499,7 +499,7 @@ body.stale-data #lvHead .lvh-px .eyebrow::after{content:var(--stale-text);margin
 .plan-sc div{display:grid;grid-template-columns:minmax(150px,auto) 1fr auto;gap:10px;padding:8px 11px;background:var(--panel);font-size:var(--fs-base);color:var(--ink2);align-items:baseline}
 .plan-sc div b{color:var(--ink);font-weight:650}
 .plan-sc div.here{background:color-mix(in srgb,var(--pos) 8%,transparent);box-shadow:inset 3px 0 0 var(--pos)}
-.plan-sc em{font-style:normal;font:700 var(--fs-xs) var(--mono);color:var(--pos);text-transform:uppercase;letter-spacing:.08em}
+.plan-sc em{font-style:normal;font:700 var(--fs-xs) var(--mono);color:var(--ink2);text-transform:uppercase;letter-spacing:.08em}
 .plan-ev{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:baseline;margin-bottom:8px;font-size:var(--fs-sm);color:var(--ink2)}
 .plan-ev .eyebrow{width:100%}.plan-ev .hi{color:var(--bad-fg)}
 .chg{display:grid;gap:0;max-height:360px;overflow:auto}
