@@ -14,7 +14,7 @@ import json
 import math
 import random
 import sys
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -49,13 +49,9 @@ def next_trading_day(d: date) -> date:
     return n
 
 
-def close_time(d: date) -> datetime:
-    return datetime.combine(d, marketcal.rth_close(d), marketcal.NY)
-
-
 def calendar_days(d: date, n: date) -> float:
     # to UTC first: two times in the same zone subtract by the wall clock and would miss the DST hour
-    a, b = (close_time(x).timestamp() for x in (d, n))
+    a, b = (marketcal.rth_close_dt(x).timestamp() for x in (d, n))
     return (b - a) / 86400
 
 

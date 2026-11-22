@@ -74,6 +74,18 @@ class WeekendMove(unittest.TestCase):
         self.assertAlmostEqual(lo, 0.4038, places=4)
         self.assertAlmostEqual(hi, 0.5962, places=4)
 
+    def test_the_published_numbers(self):
+        # the run of 2026-11-22 (definition 9d53ae9b): an engine or calendar change that moves them must be noticed
+        rows = wm.read_inputs(wm.definition()[0])
+        want = {("SPX", "primary"): (230, 0.448546, 213, 186), ("SPX", "ordinary"): (882, 0.050656, 553, 618),
+                ("NDX", "primary"): (230, 0.301898, 205, 169), ("NDX", "ordinary"): (882, 0.170182, 501, 571)}
+        for (ix, g), (n, diff, a, b) in want.items():
+            ps, dropped = wm.pairs(rows, ix)
+            q = wm.group(ps, g)
+            self.assertEqual((len(ps), dropped, len(q)), (1135, 0, n))
+            self.assertAlmostEqual(wm.mean(p["diff"] for p in q), diff, places=6)
+            self.assertEqual([sum(abs(p["r"]) <= p[s] for p in q) for s in "ab"], [a, b])
+
     def test_the_definition_is_frozen(self):
         d, sha = wm.definition()
         self.assertEqual(sha, "9d53ae9b8914480cb465b5222f12ce2622a47b13000c1e6a75ce5229a82ba25c")
