@@ -130,6 +130,7 @@ def main() -> int:
     bad += audit_replay(bad)
     bad += audit_splits(bad)
     bad += audit_rules(bad)
+    bad += audit_weekend_move()
     print(f"sessions {len(sessions)}, pastes {len(pastes)}, minute records {len(minutes)}, days {days[0]} to {days[-1]}")
     print(f"violations: {len(bad)} (tolerance 0)")
     for b in bad:
@@ -177,6 +178,22 @@ def audit_rules(bad: list[str]) -> list[str]:
             if G[rules.choose(earlier)] != o["grid"] or len(earlier) != o["trained_on"]:
                 out.append(f"L9 rules {o['session']}_{m}: parameters not reproduced from earlier sessions only")
     print(f"rules: {len(sessions)} session(s) with 1-minute bars (archive or backfill), {n} out-of-sample choice(s), {len(out)} with a violation")
+    return out
+
+
+def audit_weekend_move() -> list[str]:
+    """L10: both sigmas of every pair come out the same when all vol closes after the close day are removed."""
+    from tools.stress import weekend_move as wm
+    rows, out, n = wm.read_inputs(wm.definition()[0]), [], 0
+    for ix in wm.INDEXES:
+        for p in wm.pairs(rows, ix)[0]:
+            n += 1
+            known = {d: r for d, r in rows.items() if d <= p["d"]}
+            known[p["n"]] = {ix: rows[p["n"]][ix]}                       # the outcome only
+            last = [q for q in wm.pairs(known, ix, p["d"], p["n"])[0] if q["d"] == p["d"]]
+            if not last or (last[0]["a"], last[0]["b"]) != (p["a"], p["b"]):
+                out.append(f"L10 weekend_move {ix} {p['d']}: a sigma used data from after the close day")
+    print(f"weekend_move: {n} pair(s), {len(out)} with a violation")
     return out
 
 
