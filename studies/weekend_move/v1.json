@@ -1,0 +1,70 @@
+{
+ "study": "weekend_move",
+ "version": 1,
+ "written": "2026-11-22, before any return or score was computed; approved by the owner in chat the same day",
+ "question": "With the market closed, which rule better sizes the index's one-sigma move from one close to the next: calendar days on the backup's vol curve (A, what the site does), or one VIX1D session (B)?",
+ "source_basis": "Cboe VIX1D methodology v2.0 (26 Feb 2026): T in business minutes, 405 per session, 252 sessions a year; from 16:00 to 16:15 ET only the next expiration is used",
+ "inputs": {
+  "file": "inputs.csv",
+  "sha256": "fb99c31c263f1618dcadff6ca36f49be5fae2eb90d84e00d08c19104f26a91d2",
+  "columns": "SPX, NDX: Yahoo ^GSPC / ^NDX daily close; VIX1D, VIX9D, VIX, VIX3M, VXN: Cboe daily close, percent",
+  "raw_sha256": {
+   "vol_VIX.csv": "2a3b180ffb268b7805c17567c0ac7787c74898b0d99f62f550be67eafffd1c16",
+   "vol_VIX1D.csv": "de402aad025b2af3d61c556e1070b7e195f36633205366270cc414c90c2b5313",
+   "vol_VIX3M.csv": "034fd5e08f9ce5ef806e600a51b28a76a1d85c6ea3ff978a29ca4abc67451a96",
+   "vol_VIX9D.csv": "1c5bcd49e4744fdfe179b8f14a13cc741125a187210377afe8cc4ae962a459cd",
+   "vol_VXN.csv": "3b17d449b06e5f9e23d529f9a4bfbfc860ae54ac3842439c637894d134cf6984",
+   "yahoo_NDX.json": "981e1739f7632064c1e19dcb9f61449eb3bf3a42124dd9f601c4a6aa82786020",
+   "yahoo_SPX.json": "2848bddd6db1bcce980a8cc7bb640e6f6cd7b4d8e9f6d5c23bb5253a97456eee"
+  }
+ },
+ "pairs": {
+  "close_day": "trading days d (gexsys/marketcal.py) from 2022-05-13",
+  "next_day": "the next trading day n, last n = 2026-11-20",
+  "required": "both closes of the index; all four VIX points on d, and VXN for both indexes; a pair missing any is dropped and counted",
+  "gap": "calendar days n - d"
+ },
+ "rules": {
+  "A": "sigma = iv(T) x sqrt(T / 365); T = calendar days from the close of d to the close of n (rth_close, ET); iv = gexsys.providers.occ.curve_iv on points (1 VIX1D, 9 VIX9D, 30 VIX, 93 VIX3M) / 100",
+  "B": "sigma = VIX1D / 100 x sqrt(1 / 252)",
+  "NDX": "both x VXN / VIX of the same day"
+ },
+ "outcome": "r = ln(close_n / close_d)",
+ "groups": {
+  "primary": "gap >= 3, neither d nor n an early close",
+  "ordinary": "gap = 1, neither an early close",
+  "two_day": "gap = 2, neither an early close, reported without a verdict",
+  "early": "d or n an early close, any gap, reported without a verdict"
+ },
+ "score": "QLIKE = r^2 / sigma^2 + ln(sigma^2), lower is better; difference = A - B (positive: B better)",
+ "test": {
+  "interval": "95% percentile interval of the mean difference, whole ISO weeks (of d) drawn with replacement, 10000 draws, the random.Random(20261121) generator restarted for each index and group; weeks sorted; each draw picks len(weeks) weeks with rng.randrange; mean = sum of differences / number of pairs; interval ends are sorted draws [249] and [9749]",
+  "seed": 20261121,
+  "draws": 10000
+ },
+ "b_better_only_if_all_hold_for_both_indexes": [
+  "primary: interval entirely above 0",
+  "primary, later half: pairs in date order, the last ceil(n / 2): mean difference > 0",
+  "primary: B's share of |r| <= sigma is strictly closer to 0.682689 than A's",
+  "ordinary: the interval is not entirely below 0"
+ ],
+ "otherwise": "no edge found; rule A stays",
+ "reported_without_verdict": [
+  "share inside 1 sigma with a Wilson 95% interval",
+  "mean r^2 / sigma^2",
+  "before / after the VIX1D launch 2023-04-24 (d on or after)",
+  "roll weeks (marketcal.roll_week(n)) and other weeks"
+ ],
+ "known_before": [
+  "the 2026-11-20 figures of both rules (no outcome)",
+  "the description, not the results, of tools/stress/em_calibration.py",
+  "STATUS.md line 20: an older ATM-IV x sqrt(1/252) rule overstated the move 1.2-1.4x (seen while looking for something else; a different vol input)"
+ ],
+ "limits": [
+  "tests the 16:00 close, the live backup starts at the last quote",
+  "SPX and NDX move together: not independent",
+  "implied vol usually exceeds realized",
+  "Yahoo closes stand in for Cboe's",
+  "a pass changes nothing on the site by itself"
+ ]
+}
