@@ -560,7 +560,7 @@ function render(){
   renderPlan(w);
   renderLevelMap(w, L, X, ref);
   loadLevelHistory();
-  renderLadder(L, X, ref, !!w.result.mapped);
+  renderLadder(L, X, ref, !!s.backup);
   renderChart(w, s, L, ref);
   renderMaxPain(X);
   renderStats(w, s, L, X);
@@ -570,7 +570,7 @@ function render(){
   if(page === "ladder") renderLiveTable();
   if(page === "screener") renderScreener();
   if(page === "heatmap" && hmMarket !== market + hmTf){ hmReset = true; loadHeatmap(); }
-  $("foot").innerHTML = `Model estimates from ${esc(s.provider || w.provider)} ${opts} options (${s.ref_quality === "RT" ? "real-time quotes" : "15-minute-delayed quotes"}) and end-of-day open interest, assuming dealers are long calls and short puts.
+  $("foot").innerHTML = `Model estimates from ${esc(s.provider || w.provider)} ${opts} options (${s.backup ? "VIX-family volatility, no option quotes" : s.ref_quality === "RT" ? "real-time quotes" : "15-minute-delayed quotes"}) and end-of-day open interest, assuming dealers are long calls and short puts.
     ${w.result.mapped ? "Futures prices use " + esc(w.result.mapped.mapping.futures_ref_mode) + "; TradingView re-maps with your live chart." : esc(s.mapping_note || "")}
     These are proxy levels from index and ETF options, not NQ/ES futures options, and not trading advice.`;
 }
@@ -664,7 +664,7 @@ function levels(L, X){
   return out.filter(x => x[3] != null && isFinite(x[3]));
 }
 
-function renderLadder(L, X, ref){
+function renderLadder(L, X, ref, backup){
   if(!VIEWS.some(v => v[0] === view)) view = "all";
   $("filters").innerHTML = VIEWS.map(([k, t]) => `<button role="tab" aria-selected="${view === k}" data-v="${k}">${t}</button>`).join("");
   [...$("filters").children].forEach(b => b.onclick = () => { view = b.dataset.v; store.set("gex.view", view); render(); });
@@ -689,7 +689,7 @@ function renderLadder(L, X, ref){
   if(!placed) html += nowRow(ref);
   const missing = view === "all" || view === "key" ? KEY_NAMES.filter(n => !all.some(x => x[2] === n)) : [];
   $("ladder").innerHTML = (rows.length ? html : `<div class="expl">No levels in this group right now.</div>`)
-    + (missing.length ? `<div class="expl">Not available right now: ${missing.map(esc).join(", ")}. ${KEY_WHY}</div>` : "");
+    + (missing.length ? `<div class="expl">Not available right now: ${missing.map(esc).join(", ")}. ${KEY_WHY}${backup && missing.includes("Largest -GEX strike") ? " The backup estimate leaves out the largest -GEX strike: in a test it was too far from Cboe's." : ""}</div>` : "");
 }
 const KEY_NAMES = ["Zero gamma (est.)", "Call wall", "Put wall", "Largest +GEX strike", "Largest -GEX strike", "Absolute gamma strike"];
 const KEY_WHY = "Zero gamma is shown only when the model finds a crossing near price; a wall is missing when no strike on that side has exposure.";
@@ -778,7 +778,7 @@ function renderStats(w, s, L, X){
 }
 
 const BIAS_FLIP = 0.75, GAUGE_MAX = 2;      // the score that makes a call (gexsys/bias.py), and where the gauge ends
-const whole = t => t.replace(/(\d,\d{3})\.\d\d(?!\d)/g, "$1");      // index levels in a sentence, to the point
+const whole = t => t.replace(/\d{1,3}(?:,\d{3})+\.\d\d(?!\d)/g, x => num(Number(x.replace(/,/g, "")), 0));      // index levels in a sentence, to the point
 const BIAS_COLOR = {Bullish: "var(--pos)", Bearish: "var(--neg)", Neutral: "var(--zg)"};
 // CFTC positioning: fetched once per page load, it only changes weekly
 let cot = null, cotAsked = false;

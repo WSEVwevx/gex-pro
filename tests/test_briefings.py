@@ -100,6 +100,9 @@ class TestWeekly(unittest.TestCase):
         self.assertNotIn("ZZZ", t)
         self.assertIn("CPI y/y came in at 3.1% against 2.9% expected on Friday", t)
         self.assertIn("the 10-year yield went from 4.00% to 4.25%", t)
+        two = dict(data, economy=[dict(data["economy"][0], title="CPI"), dict(data["economy"][0], title="CPI", actual="0.6%", consensus="0.5%")])
+        self.assertIn("CPI came in at 3.1% against 2.9% expected and 0.6% against 0.5% expected on Friday.",
+                      recap(two, self.END, et(2026, 10, 30, 17), et(2026, 10, 30, 17, 5))["headline"])      # one name, two figures
         self.assertIn("oil rose 5.0%", t)
         self.assertIn("; leveraged funds' net position was above 12% in ES and 80% in NQ of the past 3 years (CFTC, Oct 27).", t)
         self.assertLess(b["sentences"], 10)

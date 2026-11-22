@@ -19,7 +19,7 @@ from typing import Optional
 
 from .schedule import TITLES
 
-VERSION = 5             # a stored recap from an older version is rewritten while its week is current
+VERSION = 6             # a stored recap from an older version is rewritten while its week is current
 MAIN = "S&P 500"
 TECH = "Nasdaq-100"
 OTHERS = ("Dow", "Russell 2000")
@@ -150,14 +150,16 @@ def _earnings(data: dict, end: date, days: list) -> Optional[str]:
 
 
 def _economy(data: dict) -> Optional[str]:
-    seen, parts = set(), []
+    rows: dict = {}
     for e in sorted(data.get("economy") or [], key=lambda x: x.get("rank", 99)):       # the most important releases first
-        if e["title"] in seen or len(parts) >= MAX_DATA:
+        rows.setdefault((e["title"], e["date"]), []).append(e)          # one name twice: the monthly and the yearly figure
+    seen, parts = set(), []
+    for (title, day), es in rows.items():
+        if title in seen or len(parts) >= MAX_DATA:
             continue
-        seen.add(e["title"])
-        vs = f" against {e['consensus']} expected" if e.get("consensus") else ""
-        fed = "interest rate" in e["title"].lower()
-        parts.append((f"the Fed set rates at {e['actual']}" if fed else f"{e['title']} came in at {e['actual']}") + vs + f" on {_day(e['date'])}")
+        seen.add(title)
+        got = " and ".join(dict.fromkeys(e["actual"] + (f" against {e['consensus']} expected" if e.get("consensus") else "") for e in es))
+        parts.append((f"the Fed set rates at {got}" if "interest rate" in title.lower() else f"{title} came in at {got}") + f" on {_day(day)}")
     return "; ".join(parts) + "." if parts else None
 
 

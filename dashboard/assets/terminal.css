@@ -177,6 +177,7 @@ a{color:var(--ink2)}
 /* the explain button on every module */
 .ex{position:absolute;top:12px;right:12px;width:22px;height:22px;display:grid;place-items:center;border-radius:var(--r-2);border:1px solid var(--line2);background:var(--panel2);color:var(--ink3);font:700 var(--fs-xs) var(--mono);z-index:2}
 .head .ex{position:static;margin-left:2px}
+#planCard .head{padding-right:24px}      /* its ? is placed on the card, over the end of this line */
 .ex:hover,.ex.on{color:var(--prompt);border-color:color-mix(in srgb,var(--prompt) 50%,transparent);background:color-mix(in srgb,var(--prompt) 8%,transparent)}
 
 /* level ladder */
@@ -655,7 +656,7 @@ body.stale-data #lvHead .lvh-px .eyebrow::after{content:var(--stale-text);margin
 .ld-list>div{display:grid;grid-template-columns:36px minmax(0,1fr) auto 50px;gap:6px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);font-size:var(--fs-sm);color:var(--ink2)}
 .ld-list>div:last-child{border-bottom:0}
 .ld-list em{font:600 var(--fs-sm) var(--mono);font-style:normal;color:var(--ink)}.ld-list i{font:var(--fs-xs) var(--mono);font-style:normal;text-align:right}
-.ld-list span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ld-list span{overflow-wrap:anywhere}
 @media(max-width:820px){.ld-table-card{overflow-x:auto}.ld-head,.ld-rows{min-width:720px}.ld-head,.ld-row{grid-template-columns:120px minmax(0,1fr) minmax(0,1.6fr) minmax(0,.9fr) 64px minmax(0,.9fr)}}
 
 /* ---------------------------------------------------------------- market tape */

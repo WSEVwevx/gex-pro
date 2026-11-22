@@ -492,3 +492,19 @@ The entry above and its PR text got these wrong. Rechecked the same evening:
   time; whether methodology v2.0 held for the whole sample; NDX against Cboe (403). Yahoo and FRED differ on one NDX close
   (2024-10-22, 3.3 bp; no effect on the verdict). SPX and NDX are not independent.
 - **After the run** only a helper swap (`marketcal.rth_close_dt`), a docstring line and tests changed; output byte-identical.
+
+## 2026-11-22 sweep fixes (hosted sweep after PR 76: 104 combinations, 8 with a layout defect; market closed)
+- **Weekly recap releases were wrong**: Nasdaq files each US release under the day after it (33 of 33 fixed-weekday rows, 2025-07
+  to 2026-10), so the recap named the next day and never saw Friday's releases (payrolls). It also printed "Retail Sales 6.82%",
+  the first of two unlabelled rows (the other: 0.2% against 0.1%). Now the next day's page is read and dated the day before; a
+  row with a consensus beats one without; two with one are both named; parts (U6, ISM employment, NFIB "optimism"...) are out.
+  Replayed from saved responses: 20 Nov "Retail Sales 0.2% against 0.1% on Tuesday"; 2 Oct "Payrolls 29K against 89K on Friday".
+- Recount (`verifier`, own code, saved pages, exact strings): every release in five weeks matches; 38 of 38 events matched by name
+  and time to ForexFactory (16-20 Nov) are one day late; holidays too; no US data row elsewhere. Clock-change week not saved.
+- If Nasdaq changes its dates, the fixed weekdays of Redbook, mortgage applications and jobless claims show it and the line is
+  left out (logged). Older recaps stay as written, wrong days included; VERSION 6 rewrites only the current week's.
+- Not checked: whether Friday's results are on Saturday's page by the recap's time; whether GitHub's servers still get this
+  calendar (the 20 Nov recap has it); this PC gets HTTP 403 from Nasdaq since about 100 reads today, not retried.
+- Small ones: Bias names "largest +GEX" when that is the magnet, sentence levels are rounded (7,017, was 7,016), the Levels footer
+  and the missing -GEX strike name the backup, the plan's subtitle clears its "?", Live table names wrap.
+- **Left for later** (reported): "today" on a no-session day; Live table "Later / rest"; "Last try failed" with one missing snapshot.
