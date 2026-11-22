@@ -443,3 +443,16 @@ The entry above and its PR text got these wrong. Rechecked the same evening:
   separate call and put vols the gammas would not cancel exactly. Why the ES call wall moves was inferred, not checked.
 - **73** changed the Heatmap legend to "with its C / P / Ab levels". False: those marks are the latest calculation's,
   the profile is the newest saved one. Corrected here. PRs 70-73 were merged without a full `/code-review`.
+
+## 2026-11-21 backup expected move (the owner said "Yes, fix it"; market closed)
+- **Defect**: on the OCC backup the expected move grew on unchanged prices (NQ 1,257 -> 1,324 over Saturday): the vol
+  curve was read at the time left from now, the variance counted from the last quote. Now both use the quote's clock.
+- **Scope**: the snapshot carries the curve (`vol_points`); only `extras.expected_moves` reads it, only when the market is
+  closed. Full engine output before/after on the saved 20 Nov files at five clock times: 48 values changed, all in
+  `extras.expected_move`; none at Mon 11:00 ET.
+- **Numbers** (quote time 22:00 UTC, replay): NQ 1,244 / 1,297 / 1,459 / 1,459 (Fri 19:00, Sat 16:00, Sun 18:00, Mon 09:29
+  ET) -> 1,240.85 at all four; ES 272.5 / 284.1 / 319.4 / 319.4 -> 271.73. The `verifier` recounted 16 numbers with its
+  own code from the raw files, tolerance 0.01 point fixed first: all pass. Hosted values differ slightly (other quote times).
+- **Still wrong, not changed**: the weekend counts as calendar days, so a Friday-to-Monday "daily" is about 2.96 days of
+  variance; it drops at Monday's open (replay: NQ 1,241 at 09:29, 810 at 11:00, same prices). VIX-family vols carry skew
+  (wider than at-the-money), VIX1D may use business time, and NDX uses a 30-day ratio at every tenor. n = 1 weekend.

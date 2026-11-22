@@ -148,6 +148,27 @@ class TestExpectedMove(unittest.TestCase):
         self.assertAlmostEqual(ex.expected_moves(live, basket, TUE_CLOSE + timedelta(hours=9), live.contracts)["daily_points"],
                                100 * math.sqrt(0.2 ** 2 * 15 / 8760))
 
+    def test_the_backup_band_does_not_grow_on_frozen_quotes(self):
+        """The backup's IV is a curve read at the time left from now; with the variance clock at the quote it grew all
+        weekend (NQ 2026-11-21: 1,257 to 1,324 points on unchanged prices)."""
+        from gexsys.providers.occ import curve_iv
+        pts = [(1.0, 0.50), (9.0, 0.40), (30.0, 0.35), (93.0, 0.30)]            # inverted: the short end is the higher
+        quote = TUE_CLOSE + timedelta(minutes=15)
+        snap, basket = self.mk()
+        def at(now, vol_points=pts):
+            cs = [replace(c, iv=curve_iv(pts, (c.expiration - now).total_seconds() / 86400)) for c in snap.contracts]
+            return ex.expected_moves(replace(snap, contracts=cs, spot_time=quote, vol_points=vol_points), basket, now, cs)
+        a, b = at(TUE_CLOSE + timedelta(hours=1)), at(TUE_CLOSE + timedelta(hours=16))     # Tue 17:00, Wed 08:00
+        for k in ("daily_points", "weekly_points", "monthly_points", "daily_iv"):
+            self.assertAlmostEqual(a[k], b[k], msg=k)
+        # by hand, to Fri 2026-10-23 16:00: T = 2.98958 days, w = 0.25 + (0.16 x 9 - 0.25) x (T - 1) / 8
+        t = 71.75 / 24
+        self.assertAlmostEqual(a["weekly_points"], 100 * math.sqrt((0.25 + (0.16 * 9 - 0.25) * (t - 1) / 8) / 365))
+        self.assertAlmostEqual(a["daily_points"], 100 * math.sqrt(0.25 * (23.75 / 24) / 365))   # under a day: the curve is flat
+        self.assertGreater(at(TUE_CLOSE + timedelta(hours=16), None)["weekly_points"], a["weekly_points"])   # what it did before
+        rth = [at(ASOF, p)["daily_points"] for p in (pts, None)]                 # during RTH the two clocks are one
+        self.assertEqual(rth[0], rth[1])
+
     def test_the_band_names_its_centre(self):
         """The page says what the 1 sigma range is centred on: on a gap day a band around the prior close reads
         as one around today's price unless it says so (NQ 2026-11-19, +1.7% gap)."""
