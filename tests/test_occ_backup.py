@@ -179,6 +179,8 @@ class TestOccProvider(unittest.TestCase):
         dec = next(c for c in s.contracts if c.root == "NDX" and c.expiration.month == 12)
         days = (dec.expiration - NOW).total_seconds() / 86400
         self.assertAlmostEqual(dec.iv, scale * curve_iv(pts, days), places=12)
+        self.assertEqual([d for d, _ in s.vol_points], [1.0, 9.0, 30.0, 93.0])       # the expected move reads this curve itself
+        self.assertAlmostEqual(curve_iv(s.vol_points, days), dec.iv, places=12)      # same curve as the contracts' IVs
 
     def test_a_missing_curve_point_is_named(self):
         pages = dict(ndx_pages(), VIX_History=vol_csv(18, day="11/18/2026"))

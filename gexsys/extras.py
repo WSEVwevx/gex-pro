@@ -38,6 +38,7 @@ from . import engine as eng
 from . import marketcal, pricing
 from .levels import RANK0_N, RANK0_WINDOW, LevelConfig, ranked_levels, summarize
 from .models import ChainSnapshot, OptionContract, OptionType
+from .providers.occ import curve_iv
 
 NICE_WIDTHS = (0.5, 1, 2, 2.5, 5, 10, 25, 50, 100, 250)
 
@@ -195,6 +196,11 @@ def expected_moves(snap: ChainSnapshot, basket: list[str], asof: datetime, ivs_f
     w, iv_of = {}, {}
     for e in sorted({c.expiration for c in ivs_from if c.iv and c.expiration > asof and c.expiration.date().isoformat() in b}):
         iv = atm_iv([c for c in ivs_from if c.expiration == e], e.date().isoformat(), snap.spot)
+        # the backup's IVs are not frozen quotes: they are its vol curve read at the time left from now, which rises
+        # toward VIX1D while the clock here stands still (NQ 2026-11-21: 1,257 to 1,324 on unchanged prices). Read the
+        # curve at this clock instead; nothing else uses it, and during RTH t0 = asof, so nothing changes then.
+        if iv and snap.vol_points and t0 < asof:
+            iv = curve_iv(snap.vol_points, (e - t0).total_seconds() / 86400)
         if iv:
             w[e], iv_of[e] = iv * iv * (e - t0).total_seconds() / eng.YEAR_SECONDS, iv
     if not w or not days:

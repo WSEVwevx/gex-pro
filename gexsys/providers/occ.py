@@ -219,7 +219,8 @@ class OccProvider:
         return ChainSnapshot(underlying=src.vendor_symbol, source_kind=src.kind, spot=spot,
                              spot_time=spot_q["time"], spot_quality=Quality.DELAYED,
                              contracts=contracts, source="occ+vix", fetched_at=now, warnings=warnings,
-                             prev_close=spot_q["prev"], rate=risk_free_rate(), div_yield=dividend_yield(source_key))
+                             prev_close=spot_q["prev"], rate=risk_free_rate(), div_yield=dividend_yield(source_key),
+                             vol_points=[(d, scale * v) for d, v in pts])
 
 
 class FallbackProvider:

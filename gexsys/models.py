@@ -96,6 +96,7 @@ class ChainSnapshot:
     div_yield: float = 0.0         # continuous dividend yield assumption (0 for futures options)
     warnings: list[str] = field(default_factory=list)
     prev_close: Optional[float] = None   # underlying's previous session close (anchors expected-move bands)
+    vol_points: Optional[list] = None    # [(days, vol)] when IVs come from a curve read at fetch time (the OCC backup)
 
     def expirations(self) -> list[datetime]:
         return sorted({c.expiration for c in self.contracts})
