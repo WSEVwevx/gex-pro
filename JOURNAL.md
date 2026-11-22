@@ -456,3 +456,39 @@ The entry above and its PR text got these wrong. Rechecked the same evening:
 - **Still wrong, not changed**: the weekend counts as calendar days, so a Friday-to-Monday "daily" is about 2.96 days of
   variance; it drops at Monday's open (replay: NQ 1,241 at 09:29, 810 at 11:00, same prices). VIX-family vols carry skew
   (wider than at-the-money), VIX1D may use business time, and NDX uses a 30-day ratio at every tenor. n = 1 weekend.
+
+## 2026-11-22 study weekend_move v1 (the owner said "Yes, study it", then "Yes, run it"; market closed)
+- **Question**: from one close to the next, is the index's one-sigma move better sized by calendar days on the backup's vol
+  curve (A, what the site does) or by one VIX1D session (B)? Definition SHA-256 9d53ae9b8914..., committed (f15bc72)
+  before the code and the result; seed 20261121, 10,000 week-block draws; 1,135 pairs per index, 0 dropped, 2022-05-13 to
+  2026-11-20. Git shows the order only (the two commits are 1m51s apart); it can't prove that nothing was run earlier.
+- **Verdict by its rule: B is better** (all four conditions, both indexes). A pass changes nothing on the site by itself.
+
+  | group | n | A - B, QLIKE [95%] | A inside 1 sigma; r2/s2 | B inside 1 sigma; r2/s2 |
+  |---|---|---|---|---|
+  | SPX weekend or longer gap | 230 | +0.4485 [+0.3451, +0.5382] | 92.6%; 0.299 | 80.9%; 0.698 |
+  | NDX weekend or longer gap | 230 | +0.3019 [+0.1240, +0.4414] | 89.1%; 0.387 | 73.5%; 0.933 |
+  | SPX ordinary night | 882 | +0.0507 [+0.0040, +0.1054] | 62.7%; 1.360 | 70.1%; 0.939 |
+  | NDX ordinary night | 882 | +0.1702 [+0.1154, +0.2296] | 56.8%; 1.746 | 64.7%; 1.206 |
+
+  Without a verdict: two-day gaps n 5, early closes n 18. Weekends in roll weeks (n 18): SPX +0.4299, NDX +0.1100
+  [-0.2840, +0.4407]. Weekends since VIX1D's launch (n 181; earlier values are back-calculated): SPX +0.4498, NDX +0.2681.
+- **Recount**: the `verifier` rebuilt it from the raw files with its own code and calendar; tolerances first (counts exact,
+  scores 0.0001, shares 0.05 pp): every claimed number matches. Look-ahead audit L10: 2,270 pairs, 0 violations.
+- **What it does and doesn't show** (the verifier's attacks, outside the definition):
+  - It is a day-count effect. On ordinary nights B is A x sqrt(365/252) exactly, one constant. On weekends, with the best
+    constant fitted to each rule, they can't be told apart (SPX -0.0003 [-0.056, +0.055], NDX -0.032 [-0.102, +0.038]).
+    One session at the curve's own vol does as well as B (SPX +0.036 [-0.004, +0.070], NDX -0.013 [-0.100, +0.047]). So
+    "count one session, not calendar days" is supported; "use VIX1D" over the curve's vol is not.
+  - SPX ordinary rests on tails: five pairs give 84% of it (without them +0.0083 [-0.0229, +0.0418]) and A wins 587 of 882.
+    Not a robust ordinary-night edge. NDX: A wins 536 of 882.
+  - NDX weekends, later half: mean +0.1660, interval [-0.149, +0.416] includes 0; the rule asked only for the mean.
+  - Robust: five other seeds, 4-week blocks, and without the five pairs that favour B most.
+  - B is still too wide on SPX weekends (80.9% inside) and too narrow on NDX ordinary nights (r2/s2 1.21).
+  - If the band were read as the move to the 09:30 open, A would win ordinary nights; the docs state close to close.
+- **Wording flaws in v1** (kept, it is frozen): "calendar days" means elapsed days (9 weekends cross a clock change; wall
+  clock moves the numbers by up to 0.0017, every condition still passes); "number of pairs" means the pairs drawn.
+- **Not checked**: VIX1D closes 15 minutes after the index, so later news can be in the vol (both rules); the live quote
+  time; whether methodology v2.0 held for the whole sample; NDX against Cboe (403). Yahoo and FRED differ on one NDX close
+  (2024-10-22, 3.3 bp; no effect on the verdict). SPX and NDX are not independent.
+- **After the run** only a helper swap (`marketcal.rth_close_dt`), a docstring line and tests changed; output byte-identical.
