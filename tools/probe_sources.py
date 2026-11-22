@@ -34,6 +34,13 @@ def _json(b: bytes, need) -> str:
     return need(json.loads(b))
 
 
+def _contracts(d) -> str:
+    n = d["data"]["totalRecord"]
+    if not n:
+        raise ValueError("no contracts")                     # an empty chain is not a working source
+    return f"{n} contracts"
+
+
 def _rows(key):
     return lambda d: f"{len(d[key] if key else d)} rows"
 
@@ -52,11 +59,11 @@ SOURCES = [
     # candidates (2026-11-21): Nasdaq's option-chain JSON (bid/ask/volume/OI per strike) to cross-check Cboe and give the
     # OCC backup skew and volume. Not used by the app yet; the probe decides whether it answers GitHub.
     ("Nasdaq NDX options (candidate)", "https://api.nasdaq.com/api/quote/NDX/option-chain?assetclass=index&limit=60&excode=oprac&callput=callput&money=all&type=all",
-     {**PLAIN, "Accept": "application/json"}, lambda b: _json(b, lambda d: f"{d['data']['totalRecord']} contracts"), None),
+     {**PLAIN, "Accept": "application/json"}, lambda b: _json(b, _contracts), None),
     ("Nasdaq QQQ options (candidate)", "https://api.nasdaq.com/api/quote/QQQ/option-chain?assetclass=etf&limit=60&excode=oprac&callput=callput&money=all&type=all",
-     {**PLAIN, "Accept": "application/json"}, lambda b: _json(b, lambda d: f"{d['data']['totalRecord']} contracts"), None),
+     {**PLAIN, "Accept": "application/json"}, lambda b: _json(b, _contracts), None),
     ("Nasdaq SPY options (candidate)", "https://api.nasdaq.com/api/quote/SPY/option-chain?assetclass=etf&limit=60&excode=oprac&callput=callput&money=all&type=all",
-     {**PLAIN, "Accept": "application/json"}, lambda b: _json(b, lambda d: f"{d['data']['totalRecord']} contracts"), None),
+     {**PLAIN, "Accept": "application/json"}, lambda b: _json(b, _contracts), None),
     ("OCC NDX open interest", "https://marketdata.theocc.com/series-search?symbolType=U&symbol=NDX", PLAIN,
      lambda b: f"{sum(1 for l in b.decode(errors='replace').splitlines() if l.startswith('NDX'))} series", None),
     ("OCC SPX open interest", "https://marketdata.theocc.com/series-search?symbolType=U&symbol=SPX", PLAIN,

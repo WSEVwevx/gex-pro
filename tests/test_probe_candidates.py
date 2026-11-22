@@ -27,6 +27,12 @@ class ProbeCandidates(unittest.TestCase):
             self.assertNotIn("key", url.lower())                         # free, keyless
             self.assertEqual(check(json.dumps(RAW).encode()), "1926 contracts")
 
+    def test_an_empty_chain_is_not_ok(self):
+        for empty in ({"data": {"totalRecord": 0}}, {"data": {"totalRecord": None}}, {"data": None}):
+            for name, url, headers, check, backup in self.rows():
+                with self.assertRaises((ValueError, TypeError)):
+                    check(json.dumps(empty).encode())
+
     def run_main(self, ok_names):
         def probe(name, url, headers, check):
             return (name in ok_names, "ok" if name in ok_names else "HTTP 403", 0.1)

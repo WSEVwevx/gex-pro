@@ -25,7 +25,10 @@ class ExpiryNames(unittest.TestCase):
 
     def test_the_heatmap_legend_does_not_say_today(self):
         html = (ROOT / "dashboard" / "index.html").read_text(encoding="utf-8")
-        self.assertIn("right edge: the newest saved GEX profile with its C / P / Ab levels", html)
+        # two sources: the profile is the newest saved column, the marks are the latest calculation (PR 73 said "its")
+        self.assertIn("right edge: the newest saved GEX profile; the C / P / Ab labels come from the latest calculation", html)
+        self.assertIn("hm._profile = [...hm.columns].reverse()", JS)
+        self.assertIn("const wk = data && data.workers.find(x => x.market === market && x.result), nr = wk &&", JS)
         self.assertNotIn("today's C / P / Ab", html)
 
     def test_the_tooltip_uses_it(self):
