@@ -4,6 +4,7 @@
 
 Definition: studies/weekend_move/v1.json (written and committed before any result; its SHA-256 is printed).
 Inputs: studies/weekend_move/inputs.csv, frozen daily closes, checked against the hash in the definition.
+Raw responses (their hashes are in the definition): data/studies/weekend_move_raw on the owner's PC, not committed.
 Nothing here is used by the site.
 """
 from __future__ import annotations
