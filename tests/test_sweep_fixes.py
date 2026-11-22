@@ -57,5 +57,25 @@ class Access(unittest.TestCase):
         self.assertIn('.published.slot_et).replace(/^[A-Z][a-z]{2}, /, "")', JS)
 
 
+class Sweep20261122(unittest.TestCase):
+    """The sweep of 2026-11-22 (after PR 76)."""
+    @unittest.skipUnless(shutil.which("node"), "node is not installed")
+    def test_levels_in_a_sentence_are_rounded_not_cut(self):
+        fns = [next(l for l in JS.splitlines() if l.startswith(p)) for p in ("const num = ", "const whole = ")]
+        text = "strike 7,016.75 is 89.8 pts; 25,923.25; 999,999.50; $1,518M; 0.75"
+        src = "\n".join(fns) + f"\nconsole.log(whole({json.dumps(text)}))"
+        got = subprocess.run(["node"], input=src, capture_output=True, encoding="utf-8", check=True).stdout.strip()
+        self.assertEqual(got, "strike 7,017 is 89.8 pts; 25,923; 1,000,000; $1,518M; 0.75")
+
+    def test_the_backup_is_not_called_delayed_quotes_and_says_why_a_level_is_gone(self):
+        self.assertIn('s.backup ? "VIX-family volatility, no option quotes" : s.ref_quality === "RT"', JS)
+        self.assertIn('backup && missing.includes("Largest -GEX strike")', JS)
+        self.assertIn("renderLadder(L, X, ref, !!s.backup);", JS)
+
+    def test_nothing_is_cut_or_covered(self):
+        self.assertIn("#planCard .head{padding-right:24px}", CSS)
+        self.assertIn(".ld-list span{overflow-wrap:anywhere}", CSS)
+
+
 if __name__ == "__main__":
     unittest.main()

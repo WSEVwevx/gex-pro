@@ -20,6 +20,12 @@ def levels(ref=20000.0, zg=19800.0, cw=20300.0, pw=19700.0, ag=20100.0, charm=5e
 
 
 class TestBiasScenarios(unittest.TestCase):
+    def test_the_magnet_is_named_for_what_it_is(self):
+        why = lambda L: next(f["why"] for f in compute(L, TUE_1100)["factors"] if f["name"] == "Magnet strike")
+        self.assertTrue(why(levels()).startswith("the biggest gamma strike 20,100.00 is 100.0 pts above"))
+        far = dict(levels(ag=21000.0), max_positive={"price": 20100.0})         # absolute gamma beyond one expected move
+        self.assertTrue(why(far).startswith("the largest +GEX strike 20,100.00 is 100.0 pts above"))
+
     def test_positive_gamma_magnet_above_is_bullish_range_day(self):
         b = compute(levels(), TUE_1100)
         self.assertEqual(b["side"], "positive")                        # (20000 - 19800) / 200 = 1.0 sigma above

@@ -30,7 +30,10 @@ BATCH = 20
 # the releases that move index futures, most important first; a recap names the top ones of the week
 BIG_DATA = ("fed interest rate", "nonfarm payrolls", "cpi", "core pce price index", "gdp", "unemployment rate", "retail sales", "ppi", "ism")
 NOT_DATA = ("gdpnow", "gdp price", "gdp sales", "gdp deflator", "gdp capital", "core retail", "ism prices", "ism employment", "ism new orders",
-            "ism inventories", "cpi index", "cpi n.s.a", "cleveland")
+            "ism inventories", "cpi index", "cpi n.s.a", "cpi, n.s.a", "cleveland", "optimism", "retail sales ex", "private nonfarm", "u6 ", "ppi ex",
+            "manufacturing employment", "manufacturing new orders", "manufacturing prices", "manufacturing business")
+# released on one weekday (holidays aside): they show whether the calendar's dates mean what economy() takes them to mean
+WEEKDAY = {"Redbook": 1, "MBA Mortgage Applications": 2, "Initial Jobless Claims": 3}
 
 
 def _get(url: str, timeout: float = 20) -> Optional[bytes]:
@@ -83,7 +86,9 @@ def parse_earnings(raw: bytes, day: str) -> list:
 
 
 def parse_economy(raw: bytes, day: str) -> list:
-    """The big US releases with a result; Nasdaq's rows carry no market impact, so they are picked by name."""
+    """The big US releases with a result; Nasdaq's rows carry no market impact, so they are picked by name.
+    The monthly and the yearly figure can share one name, in no fixed order and unlabelled: if only one has a consensus
+    it is the headline; if both have one, both are kept (briefings/weekly.py names both)."""
     rows = ((json.loads(raw).get("data") or {}).get("rows")) or []
     out = []
     for r in rows:
@@ -93,7 +98,8 @@ def parse_economy(raw: bytes, day: str) -> list:
         rank = next((i for i, k in enumerate(BIG_DATA) if k in low), None)
         if r.get("country") == "United States" and actual and rank is not None and not any(k in low for k in NOT_DATA):
             out.append({"date": day, "title": name, "rank": rank, "actual": actual, "consensus": str(r.get("consensus") or "").replace("&nbsp;", "").strip()})
-    return out
+    headline = {e["title"] for e in out if e["consensus"]}
+    return [e for e in out if e["consensus"] or e["title"] not in headline]
 
 
 def _days(start: date, end: date) -> list:
@@ -112,13 +118,22 @@ def earnings(start: date, end: date) -> list:
 
 
 def economy(start: date, end: date) -> list:
-    out = []
+    """Nasdaq files a release under the day after it: in 33 of 33 rows read 2026-11-22 (weeks of 2025-07 to 2026-10) Tuesday's
+    Redbook is under Wednesday, Wednesday's mortgage applications under Thursday and Thursday's jobless claims under Friday."""
+    out, fits, off = [], 0, 0
     for d in _days(start, end):
-        raw = _get(ECONOMY.format(d=d))
+        day = date.fromisoformat(d)
+        raw = _get(ECONOMY.format(d=day + timedelta(days=1)))
         try:
             out += parse_economy(raw, d) if raw else []
+            names = {r.get("eventName") for r in ((json.loads(raw).get("data") or {}).get("rows") or []) if r.get("country") == "United States"} if raw else ()
         except ValueError:
             continue
+        for wd in (WEEKDAY[n] for n in names if n in WEEKDAY):
+            fits, off = fits + (wd == day.weekday()), off + (wd != day.weekday())
+    if off > fits:                                              # Nasdaq files them otherwise now: no releases rather than wrong days
+        log.warning("economic calendar: %d of %d fixed-weekday releases on another day, left out", off, fits + off)
+        return []
     return out
 
 

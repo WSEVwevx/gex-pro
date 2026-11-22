@@ -91,7 +91,7 @@ def compute(L: dict, now: datetime, step_min: int = 10) -> Optional[dict]:
     if magnet is not None:
         w = 1.0 if side == "positive" else 0.5
         add("Magnet strike", w * _clip((magnet - ref) / (0.5 * emd)),
-            f"the biggest gamma strike {magnet:,.2f} is {abs(magnet - ref):,.1f} pts {'above' if magnet >= ref else 'below'}; "
+            f"the {'biggest gamma' if magnet == ag else 'largest +GEX'} strike {magnet:,.2f} is {abs(magnet - ref):,.1f} pts {'above' if magnet >= ref else 'below'}; "
             + ("in positive gamma price tends to drift toward it" if side == "positive" else "its pull is weaker outside positive gamma"))
     flow = g.get("charm_flow_usd_per_day")
     if flow:
