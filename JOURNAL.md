@@ -420,3 +420,26 @@ Prices are as of the prior close on a weekend. Items 7-8 need a CLAUDE.md wirefr
   its caveat. One day of data (n = 1 per market); there's nothing to say about prediction.
 - **Not done:** backlog 4 (screen-reader text), 6 (wall hold/break study: the archive starts 2026-11-18 and Cboe
   chains stopped on 19 Nov, too few sessions for any threshold), 7-9.
+
+## 2026-11-21 corrections to "next level: results" (Sat 21 Nov, 22:20 ET, market closed)
+The entry above and its PR text got these wrong. Rechecked the same evening:
+- **Phone cold load**: the 375 runs reused the 1366 run's cache (0 KB transferred), so they were warm. With a new
+  browser profile per run (Slow 4G, CPU x4, hosted, n = 3 each): 1366 largest paint 2,444-2,504 ms, CLS 0-0.039; **375
+  largest paint 2,308-2,664 ms, CLS 0.109 in 2 of 3 runs**. A first visit on a slow phone still jumps; the cause isn't
+  traced (the 1.5 s `booting` fallback is the suspect).
+- **Early data fetch**: the entry left out that first paint improved (about 1.4 -> 0.8 s) and that one old run had CLS
+  0.057. Rerun with a new profile per run, n = 3: largest paint 1366 2,384-2,416 -> 2,772-2,924 ms; 375 2,296-2,352 ->
+  2,680-2,832 ms, so slower, where the first comparison had 1366 faster (2.40 -> 2.25 s). The two disagree and the
+  cause is unknown. No gain shown, so it stays dropped.
+- **`by_strike`**: the Levels page draws it ("Gamma by price", `renderChart`). Whether it is below the first screen was
+  not measured, so "isn't needed for the first screen" was not established.
+- **NQ expected move**: not a new failure (an earlier check had it at 1,256.7), and the site shows +/-1,320 index
+  (+/-1,324 futures), not the 1,066 quoted in chat, which is another field. It grows on frozen prices: the backup's
+  vol curve is read at the time left from now (shrinking, so the vol rises toward VIX1D) while the variance is scaled
+  by the time left from the quote (`extras.expected_moves` t0). Own recount, tolerance 0.5 NQ / 0.2 ES fixed first,
+  matches the hosted values to 0.01: NQ 1,239 at the quote time, 1,320 at 22:08 ET Saturday, 1,456 by Sunday 18:00 ET;
+  ES 272, 290, 320. Backup only. Not fixed: the engine's calculations are out of bounds without the owner's word.
+- **Matched pairs**: "zero gamma can't move" holds here because the backup gives a strike's call and put one vol; with
+  separate call and put vols the gammas would not cancel exactly. Why the ES call wall moves was inferred, not checked.
+- **73** changed the Heatmap legend to "with its C / P / Ab levels". False: those marks are the latest calculation's,
+  the profile is the newest saved one. Corrected here. PRs 70-73 were merged without a full `/code-review`.
