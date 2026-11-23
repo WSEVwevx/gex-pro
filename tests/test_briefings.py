@@ -253,6 +253,15 @@ class TestComponent(unittest.TestCase):
             status, body = c.routes()["/api/briefings"]({})
             self.assertEqual((status, body["latest"]["nyam"]["session"]), (200, "2026-10-20"))
 
+    def test_no_zero_gamma_does_not_hold_a_brief(self):
+        # 22 Nov 2026: the backup found no crossing in NQ or ES, and the Asia brief waited for hours
+        import json
+        with tempfile.TemporaryDirectory() as tmp:
+            now = et(2026, 10, 20, 9, 1)
+            c = BriefingsComponent(context=lambda: ctx(now, zg=None), is_trading_day=is_trading_day, store_dir=tmp, clock=lambda: now)
+            self.assertEqual(c.tick(), ["2026-10-20-nyam"])
+            self.assertIn("with no zero-gamma crossing near price", json.dumps(c.payload()["latest"]["nyam"]))      # said, not left out
+
     def test_mirror_fills_gaps_and_never_overwrites(self):
         import json
         with tempfile.TemporaryDirectory() as tmp:

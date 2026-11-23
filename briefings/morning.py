@@ -80,6 +80,8 @@ def regime_block(m: dict, graded: list) -> dict:
     line = f"{m['market']} {_f(m['price'])} is in {REGIME.get(regime, 'no clear gamma regime')}"
     if sig is not None:
         line += f", {abs(sig):.1f}σ {'above' if sig >= 0 else 'below'} zero gamma {_f(zg)}"
+    elif zg is None:
+        line += ", with no zero-gamma crossing near price"
     same = [r["outcome"] for r in graded if r["plan"].get("regime") == regime and r["outcome"].get("range_em") is not None]
     every = [r["outcome"]["range_em"] for r in graded if r["outcome"].get("range_em") is not None]
     name = REGIME.get(regime, "this regime")

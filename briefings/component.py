@@ -138,7 +138,8 @@ class BriefingsComponent:
                         continue
                 else:
                     ctx = self.context()
-                    if not any(m.get("price") and m.get("zero_gamma") is not None for m in ctx.get("markets", [])):
+                    if not any(m.get("price") and any(m.get(k) is not None for k in ("zero_gamma", "call_wall", "put_wall")) for m in ctx.get("markets", [])):
+                        # no zero gamma is a result (no crossing near price, as on the backup), not a wait
                         log.info("briefing %s waiting for GEX levels", sid)
                         continue
                     try:
