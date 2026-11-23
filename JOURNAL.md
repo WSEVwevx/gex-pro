@@ -508,3 +508,11 @@ The entry above and its PR text got these wrong. Rechecked the same evening:
 - Small ones: Bias names "largest +GEX" when that is the magnet, sentence levels are rounded (7,017, was 7,016), the Levels footer
   and the missing -GEX strike name the backup, the plan's subtitle clears its "?", Live table names wrap.
 - **Left for later** (reported): "today" on a no-session day; Live table "Later / rest"; "Last try failed" with one missing snapshot.
+
+## 2026-11-22 briefs held by a missing zero gamma (sweep after PR 77)
+- The Asia brief for Sun 19:00 ET was not written by 22:50 ET: a brief waited until some market had a zero gamma, and on the
+  backup neither NQ nor ES has a crossing within 5%. Monday's NY AM would have waited too. Now any of zero gamma or a wall
+  is enough, and the regime line says "with no zero-gamma crossing near price". The late Asia brief is written on the next
+  build and marked late (existing rule).
+- The sweep's other items: NQ's Bias sentence was right ("biggest gamma" 24,770 is now NQ's abs gamma); the "?" on Briefings
+  sitting 2 px over the selector at 375 px is left for later.
