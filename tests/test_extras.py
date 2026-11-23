@@ -164,10 +164,39 @@ class TestExpectedMove(unittest.TestCase):
         # by hand, to Fri 2026-10-23 16:00: T = 2.98958 days, w = 0.25 + (0.16 x 9 - 0.25) x (T - 1) / 8
         t = 71.75 / 24
         self.assertAlmostEqual(a["weekly_points"], 100 * math.sqrt((0.25 + (0.16 * 9 - 0.25) * (t - 1) / 8) / 365))
-        self.assertAlmostEqual(a["daily_points"], 100 * math.sqrt(0.25 * (23.75 / 24) / 365))   # under a day: the curve is flat
+        self.assertAlmostEqual(a["daily_points"], 100 * 0.50 / math.sqrt(252))               # one session at VIX1D (study weekend_move)
         self.assertGreater(at(TUE_CLOSE + timedelta(hours=16), None)["weekly_points"], a["weekly_points"])   # what it did before
         rth = [at(ASOF, p)["daily_points"] for p in (pts, None)]                 # during RTH the two clocks are one
         self.assertEqual(rth[0], rth[1])
+
+    def test_the_backup_counts_one_session_while_closed(self):
+        """Study weekend_move v1 (PR 76): with the market closed the backup's daily band is one session at VIX1D,
+        sigma = S x VIX1D / sqrt(252), not calendar days on its curve. RTH and Cboe's own quotes are unchanged."""
+        from gexsys.providers.occ import curve_iv
+        pts = [(1.0, 0.50), (9.0, 0.40), (30.0, 0.35), (93.0, 0.30)]
+        exps = [datetime.fromisoformat(d + "T16:00:00").replace(tzinfo=NY) for d in ("2026-10-22", "2026-10-23", "2026-10-26", "2026-11-20")]
+
+        def at(now, quote, vol_points=pts):
+            cs = [replace(contract(100, t, oi=10, exp=e), iv=curve_iv(pts, (e - now).total_seconds() / 86400)) for e in exps if e > now for t in "CP"]
+            snap = replace(chain(cs, spot=100.0), prev_close=98.0, spot_time=quote, vol_points=vol_points)
+            return ex.expected_moves(snap, [e.date().isoformat() for e in exps], now, cs)
+        fri = datetime(2026, 10, 23, 20, 15, tzinfo=timezone.utc)                              # Friday 16:15 ET, the quote
+        new, old = at(fri + timedelta(hours=5), fri), at(fri + timedelta(hours=5), fri, None)
+        self.assertAlmostEqual(new["daily_points"], 100 * 0.50 / math.sqrt(252))               # 3.1497
+        self.assertEqual((new["daily_method"], new["daily_iv"]), ("one session at VIX1D (backup, market closed)", 0.50))
+        t = 71.75 / 24                                                                          # Fri 16:15 to Mon 16:00
+        self.assertAlmostEqual(old["daily_points"], 100 * curve_iv(pts, (t * 24 - 5) / 24) * math.sqrt(t / 365))   # no curve: as before
+        a = 100 * math.sqrt((0.25 + (0.16 * 9 - 0.25) * (t - 1) / 8) / 365)                    # the weekend by the calendar rule
+        self.assertAlmostEqual(a, 3.8675, places=4)                                             # w = 0.25 + 1.19 x 1.98958 / 8 = 0.54595
+        self.assertAlmostEqual(new["daily_points"] / a, 0.8144, places=4)                       # 3.1497 / 3.8675
+        thu = datetime(2026, 10, 22, 20, 15, tzinfo=timezone.utc)
+        night = at(thu + timedelta(hours=3), thu)                                               # Thursday night: the week ends tomorrow
+        self.assertAlmostEqual(night["daily_points"], 100 * 0.50 / math.sqrt(252))
+        self.assertAlmostEqual(night["weekly_points"], night["daily_points"])                   # never less than the day inside it
+        day = at(datetime(2026, 10, 22, 15, 0, tzinfo=timezone.utc), datetime(2026, 10, 22, 15, 0, tzinfo=timezone.utc))
+        self.assertNotEqual(day["daily_method"], new["daily_method"])                           # RTH: unchanged
+        gone = at(fri + timedelta(hours=5), fri, [p for p in pts if p[0] != 1.0])               # no VIX1D close: the old rule
+        self.assertEqual(gone["daily_method"], "variance to the next session's expiration")
 
     def test_the_band_names_its_centre(self):
         """The page says what the 1 sigma range is centred on: on a gap day a band around the prior close reads
