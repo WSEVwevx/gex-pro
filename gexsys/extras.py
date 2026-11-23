@@ -174,6 +174,9 @@ def _sessions(first: date, last: date) -> int:
     return sum(1 for i in range((last - first).days + 1) if marketcal.is_trading_day(first + timedelta(days=i)))
 
 
+SESSIONS_A_YEAR = 252       # as in Cboe's VIX1D (methodology v2.0)
+
+
 def expected_moves(snap: ChainSnapshot, basket: list[str], asof: datetime, ivs_from: list[OptionContract]) -> Optional[dict]:
     if snap.spot is None or not basket:
         return None
@@ -219,7 +222,14 @@ def expected_moves(snap: ChainSnapshot, basket: list[str], asof: datetime, ivs_f
         used = min(w)
         n = _sessions(sd, used.astimezone(marketcal.NY).date())
         dvar, method = w[used] / max(n, 1), f"average per session over {max(n, 1)} sessions"
-    out.update(daily_points=snap.spot * math.sqrt(dvar), daily_iv=iv_of[used],
+    day_iv = iv_of[used]
+    one = None if rth else next((v for d, v in snap.vol_points or () if d == 1.0 and v), None)
+    if one:
+        # the OCC backup with the market closed: one trading session at VIX1D, whatever the calendar gap. Study
+        # weekend_move v1 (definition 9d53ae9b, PR 76): over 230 weekends calendar days were too wide, and over 882
+        # ordinary nights too narrow; one session scored better on both indexes. Cboe's VIX1D counts 252 sessions a year.
+        dvar, day_iv, method = one * one / SESSIONS_A_YEAR, one, "one session at VIX1D (backup, market closed)"
+    out.update(daily_points=snap.spot * math.sqrt(dvar), daily_iv=day_iv,
                daily_iv_expiry=used.date().isoformat(), daily_method=method, variance_from=t0.isoformat())
     friday = sd + timedelta(days=(4 - sd.weekday()) % 7)
     weekly = [e for e in w if sd <= e.astimezone(marketcal.NY).date() <= friday]
@@ -228,7 +238,7 @@ def expected_moves(snap: ChainSnapshot, basket: list[str], asof: datetime, ivs_f
         if rth and e_today:
             wvar = dvar + max(0.0, w[we] - w[e_today])      # today's full session + the rest of the week
         else:
-            wvar = w[we] if not rth else max(w[we], dvar)
+            wvar = max(w[we], dvar)                         # never less than the day inside it
         out.update(weekly_points=snap.spot * math.sqrt(wvar), weekly_iv=iv_of[we],
                    weekly_expiry=we.date().isoformat(), weekly_days=_sessions(sd, we.astimezone(marketcal.NY).date()))
     # monthly: through the next standard monthly expiration (third Friday, holiday-adjusted), same construction
@@ -239,7 +249,7 @@ def expected_moves(snap: ChainSnapshot, basket: list[str], asof: datetime, ivs_f
     monthly = [e for e in w if e.astimezone(marketcal.NY).date() == nm]
     if monthly:
         me = max(monthly)                                   # the PM-settled one when AM and PM both list
-        mvar = dvar + max(0.0, w[me] - w[e_today]) if rth and e_today else (w[me] if not rth else max(w[me], dvar))
+        mvar = dvar + max(0.0, w[me] - w[e_today]) if rth and e_today else max(w[me], dvar)
         out.update(monthly_points=snap.spot * math.sqrt(mvar), monthly_iv=iv_of[me],
                    monthly_expiry=me.date().isoformat(), monthly_days=_sessions(sd, nm))
     return out

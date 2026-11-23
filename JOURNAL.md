@@ -516,3 +516,12 @@ The entry above and its PR text got these wrong. Rechecked the same evening:
   build and marked late (existing rule).
 - The sweep's other items: NQ's Bias sentence was right ("biggest gamma" 24,770 is now NQ's abs gamma); the "?" on Briefings
   sitting 2 px over the selector at 375 px is left for later.
+
+## 2026-11-23 backup daily move: one session while closed (the owner: "Plan it first", then "Yes, build it")
+- `extras.expected_moves`: on the OCC backup with the market closed, daily V = VIX1D^2 / 252 (VXN-scaled for NDX), the
+  rule study weekend_move v1 passed. RTH, Cboe's own quotes and a missing VIX1D close keep the old rule. Weekly and monthly
+  are never less than the daily (Thursday night: weekly = daily).
+- Expected from the 20 Nov closes (16:00): NQ index +-1,248 -> +-1,021, ES +-273 -> +-223 (x0.818); ordinary nights x1.20.
+- Limits carried over from the study: B is still wide on SPX weekends (80.9% inside), its gain is the session count not
+  VIX1D itself (one session at the curve's vol did as well), holiday gaps and early closes had no verdict. Monday's 09:30 step
+  remains (replay NQ about 1,021 -> 810): RTH was not studied.
