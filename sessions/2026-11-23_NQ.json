@@ -1,0 +1,8 @@
+{
+ "session": "2026-11-23",
+ "market": "NQ",
+ "status": "missed",
+ "plan": null,
+ "outcome": null,
+ "why": "no GEX PRO calculation from before this session's open was saved"
+}
