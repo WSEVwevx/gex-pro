@@ -211,6 +211,23 @@ class TestExpectedMove(unittest.TestCase):
         no_iv = [replace(c, iv=None) for c in snap.contracts]                                       # nothing to measure
         self.assertIsNone(ex.expected_moves(replace(snap, contracts=no_iv), basket, ASOF, no_iv))
 
+    def test_spot_sigma_says_where_price_sits_in_the_band(self):
+        """Decision 001, C1: price in prior-close band widths, only while the band is centred on the prior close."""
+        snap, basket = self.mk(spot=100.0, prev=98.0)
+        rth = ex.expected_moves(snap, basket, ASOF, snap.contracts)                               # Tue 11:00 ET
+        d = 100 * math.sqrt(0.2 ** 2 * (29 / 8760) / 2)                                             # as in the test above
+        self.assertAlmostEqual(rth["spot_sigma"], (100.0 - 98.0) / d)                               # ~ +1.76
+        down = ex.expected_moves(replace(snap, prev_close=102.5), basket, ASOF, snap.contracts)
+        self.assertAlmostEqual(down["spot_sigma"], (100.0 - 102.5) / d)                             # below: negative
+        night = ex.expected_moves(snap, basket, TUE_CLOSE + timedelta(hours=3), snap.contracts)    # centred on price
+        self.assertNotIn("spot_sigma", night)
+        live = ex.expected_moves(replace(snap, prev_close=None), basket, ASOF, snap.contracts)     # no prior close
+        self.assertNotIn("spot_sigma", live)
+        # nothing else in the band moves: the same output with the new key taken out
+        old = {k: v for k, v in rth.items() if k != "spot_sigma"}
+        self.assertEqual(old["anchor"], 98.0)
+        self.assertAlmostEqual(old["daily_points"], d)
+
     def test_index_options_preferred_over_converted_etf(self):
         # a converted ETF option sits closer to the money, but the band uses the index's own ATM IV
         snap, basket = self.mk(spot=100.4)
