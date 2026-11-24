@@ -1972,8 +1972,21 @@ const RGB_PX = document.createElement("canvas").getContext("2d", {willReadFreque
 function rgbOf(c){ RGB_PX.clearRect(0, 0, 1, 1); RGB_PX.fillStyle = "#000"; RGB_PX.fillStyle = c; RGB_PX.fillRect(0, 0, 1, 1); return [...RGB_PX.getImageData(0, 0, 1, 1).data.slice(0, 3)]; }
 // a token for the chart library: always rgb()
 const lcVar = n => `rgb(${rgbOf(cssVar(n)).join(",")})`;
+// the chart library (164 KB) loads only when a chart opens, off the first screen's critical path (decision 001, C2)
+let lcPending = null;
+function needCharts(){
+  if(window.LightweightCharts) return Promise.resolve(true);
+  return lcPending = lcPending || new Promise(done => {
+    const s = document.createElement("script");
+    s.src = "assets/lightweight-charts-4.2.0.js";
+    s.onload = () => done(!!window.LightweightCharts);
+    s.onerror = () => { lcPending = null; s.remove(); done(false); };   // a later try can load it again
+    document.head.appendChild(s);
+  });
+}
+const LC_FAIL = "The chart library could not load. Check your connection and refresh.";
 async function loadHeatmap(){
-  if(!window.LightweightCharts){ $("hmMsg").textContent = "The chart library could not load (it comes from unpkg.com). Check your connection and refresh."; $("hmMsg").hidden = false; return; }
+  if(!(await needCharts())){ $("hmMsg").textContent = LC_FAIL; $("hmMsg").hidden = false; return; }
   const want = market + hmTf;
   let got;
   try { got = await (await fetchFresh(hmUrl())).json(); }
@@ -2421,6 +2434,7 @@ async function openStockChart(sym){
     if(STATIC){ scCharts = scCharts || await (await fetchFresh("data/screener-charts.json")).json(); c = scCharts[sym]; }
     else c = await (await fetchFresh(`/api/screener/chart?symbol=${encodeURIComponent(sym)}`)).json();
   } catch(e){ if(sym === scSym) $("scMsg").textContent = offline(); return; }
+  if(!(await needCharts())){ if(sym === scSym) $("scMsg").textContent = LC_FAIL; return; }
   if(sym !== scSym) return;                              // another stock was clicked while this one loaded
   if(!c || !c.symbol){ $("scMsg").textContent = "No chart data for this stock yet."; return; }
   renderStockChart(c);
@@ -2437,7 +2451,7 @@ function renderStockChart(c){
     + (r.earnings ? `<span>earnings ${esc(earnTxt(r.earnings))}</span>` : "");
   $("scTf").innerHTML = [["intraday", "Last session · 5m"], ["daily", "3 months · daily"]].map(([v, t]) => `<button role="tab" aria-selected="${scRange === v}" data-k="${v}">${t}</button>`).join("");
   [...$("scTf").children].forEach(b => b.onclick = () => { scRange = b.dataset.k; store.set("gex.scrange", scRange); renderStockChart(c); });
-  if(!LC){ $("scMsg").textContent = "The chart library could not load (it comes from unpkg.com)."; return; }
+  if(!LC){ $("scMsg").textContent = LC_FAIL; return; }
   const bars = (scRange === "daily" ? c.daily : c.intraday) || [];
   if(!bars.length){ $("scMsg").hidden = false; $("scMsg").textContent = scRange === "daily" ? "No daily bars yet." : "No bars today yet (they start with the pre-market)."; return; }
   $("scMsg").hidden = true;
