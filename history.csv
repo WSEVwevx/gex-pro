@@ -47,3 +47,5 @@ session,market,status,data_asof,frozen_at,ref,em,regime,zero_gamma,call_wall,put
 2026-11-20,NQ,graded,2026-11-19T22:20:56.146046+00:00,2026-11-20T15:02:15.010786+00:00,26517.05,703.2,NEGATIVE,27682.79,28820.0,26350.0,27000.0,Bullish,27079.61,26184.76,26429.09,24910.48,25028.98,-2.116,no,no,not reached,broke,no,2026-11-20T21:22:16.712928+00:00,
 2026-11-23,ES,missed,,,,,,,,,,,,,,,,,,,,,,,no GEX PRO calculation from before this session's open was saved
 2026-11-23,NQ,missed,,,,,,,,,,,,,,,,,,,,,,,no GEX PRO calculation from before this session's open was saved
+2026-11-24,ES,missed,,,,,,,,,,,,,,,,,,,,,,,no GEX PRO calculation from before this session's open was saved
+2026-11-24,NQ,missed,,,,,,,,,,,,,,,,,,,,,,,no GEX PRO calculation from before this session's open was saved
