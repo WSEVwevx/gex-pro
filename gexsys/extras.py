@@ -231,6 +231,11 @@ def expected_moves(snap: ChainSnapshot, basket: list[str], asof: datetime, ivs_f
         dvar, day_iv, method = one * one / SESSIONS_A_YEAR, one, "one session at VIX1D (backup, market closed)"
     out.update(daily_points=snap.spot * math.sqrt(dvar), daily_iv=day_iv,
                daily_iv_expiry=used.date().isoformat(), daily_method=method, variance_from=t0.isoformat())
+    # where price sits in the prior-close band, in band widths (decision 001, C1). Only while the band is centred on
+    # the prior close (RTH); elsewhere it is centred on price and the figure would always be 0. NQ 2026-11-23 17:39 UTC:
+    # +1.99 after a +7% day, which the page did not say. Unitless, so the futures mapping leaves it unchanged.
+    if rth and snap.prev_close and out["daily_points"] > 0:
+        out["spot_sigma"] = (snap.spot - anchor) / out["daily_points"]
     friday = sd + timedelta(days=(4 - sd.weekday()) % 7)
     weekly = [e for e in w if sd <= e.astimezone(marketcal.NY).date() <= friday]
     if weekly:
