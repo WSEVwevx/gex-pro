@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 from gexsys import config as cfgmod
 from gexsys.basis import carry_fair_value, futures_expiry
 from gexsys.export import combine, parse_combined
-from gexsys.marketcal import NY
+from gexsys.marketcal import NY, rth_close
 from gexsys.pipeline import run_once
 from gexsys.providers.base import ProviderError
 from gexsys.providers.cboe import CboeProvider
@@ -48,7 +48,9 @@ class TestCboe(unittest.TestCase):
         zero_iv = [c for c in s.contracts if c.strike == 29500.0]
         self.assertTrue(all(c.iv is None for c in zero_iv))     # iv 0 -> missing, never used as 0
         self.assertEqual(s.contracts[0].root, "NDXP")
-        self.assertEqual(s.contracts[0].expiration.hour, 16)
+        # PM-settled NDXP expires at the cash close: 16:00 ET, or 13:00 on an early close such as the day after
+        # Thanksgiving (EXP is 3 days ahead, so on 24 Nov it lands on Fri 27 Nov). Ask the calendar, never assume 16.
+        self.assertEqual(s.contracts[0].expiration.astimezone(NY).hour, rth_close(EXP).hour)
         self.assertAlmostEqual((NOW - s.spot_time).total_seconds(), 900, delta=2)
 
     def test_errors(self):
