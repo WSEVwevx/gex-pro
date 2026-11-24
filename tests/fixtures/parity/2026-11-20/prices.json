@@ -1,0 +1,25 @@
+{
+ "futures": {
+  "ES=F": {
+   "price": 6943.75,
+   "time": "2026-11-20T21:00:00+00:00"
+  },
+  "NQ=F": {
+   "price": 25142.0,
+   "time": "2026-11-20T21:00:00+00:00"
+  }
+ },
+ "note": "frozen from the archive's 1-minute bars (last bar of 2026-11-20, previous close = last bar of 2026-11-19); QQQ and SPY were not saved: their ETF merge is not covered",
+ "yahoo": {
+  "^GSPC": {
+   "chartPreviousClose": 7177.56,
+   "regularMarketPrice": 6918.45,
+   "regularMarketTime": 1795208400
+  },
+  "^NDX": {
+   "chartPreviousClose": 26523.44,
+   "regularMarketPrice": 25065.4,
+   "regularMarketTime": 1795208400
+  }
+ }
+}
