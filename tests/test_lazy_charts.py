@@ -48,6 +48,7 @@ class LazyChartLibrary(unittest.TestCase):
     def test_a_failed_load_can_be_retried_and_says_so(self):
         loader = body("needCharts")
         self.assertIn("lcPending = null", loader)
+        self.assertIn("window.LightweightCharts ? done(true) : fail()", loader)  # a 200 without the library is retried too
         self.assertIn("could not load", JS[JS.index("const LC_FAIL"):][:120])
         self.assertNotIn("it comes from unpkg.com", JS)  # the old message named a CDN the library no longer comes from
 

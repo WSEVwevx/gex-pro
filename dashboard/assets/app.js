@@ -1979,8 +1979,9 @@ function needCharts(){
   return lcPending = lcPending || new Promise(done => {
     const s = document.createElement("script");
     s.src = "assets/lightweight-charts-4.2.0.js";
-    s.onload = () => done(!!window.LightweightCharts);
-    s.onerror = () => { lcPending = null; s.remove(); done(false); };   // a later try can load it again
+    const fail = () => { lcPending = null; s.remove(); done(false); };   // a later try can load it again
+    s.onload = () => window.LightweightCharts ? done(true) : fail();     // a 200 that is not the library (a Wi-Fi login page)
+    s.onerror = fail;
     document.head.appendChild(s);
   });
 }
