@@ -525,3 +525,23 @@ The entry above and its PR text got these wrong. Rechecked the same evening:
 - Limits carried over from the study: B is still wide on SPX weekends (80.9% inside), its gain is the session count not
   VIX1D itself (one session at the curve's vol did as well), holiday gaps and early closes had no verdict. Monday's 09:30 step
   remains (replay NQ about 1,021 -> 810): RTH was not studied.
+
+## 2026-11-23 decision 001: rework path M, steps C1-C4 (the owner: "Form (42/45)", "Yes, go with M")
+
+- Session 1 (read-only) gave the evidence; decision record `docs/decisions/001-rework-path.md` (PR 81). Look: racing
+  form / Swiss print, 42/45, pick-out pass (n=1 per direction: anecdote).
+- C2 (PR 83): the chart library loads when a chart opens. Hosted after deploy (24 Nov 00:37 UTC, market closed, Slow 4G
+  + CPU x4, cold, n=3): 375 LCP 2,060 / 2,072 / 2,100 ms, CLS 0 (before, 23 Nov RTH: 2,288 / 2,312 / 2,432, CLS 0.162);
+  1366 LCP 2,116 / 2,272 / 2,452, CLS 0 (before 2,416 / 2,460 / 2,628, 0.029). Different market state from the
+  baseline: compare again in a session. Budget 1.5 s still missed.
+- C3 (CLS reserve) dropped: CLS was 0 in every run after C2 (hosted n=6, local n=16); the shift came from the
+  library's timing. Revisit if a session reading shows CLS >= 0.1.
+- C1 (PR 84): expected_move.spot_sigma and the note "price +X.Xσ, outside the band" past 1 band width, RTH only.
+  Verifier recount from the 23 Nov 17:39 UTC all.json: NQ +1.992, ES +1.786 (tolerance 0.01, PASS). Not yet read live
+  in a session.
+- C4 (PR 85): tools/merge_deploy.py. First runs: PR 84 merge to deploy done 00:41 -> 00:43 UTC (lane 88, built the
+  merge commit), PR 85 00:43 -> 00:45 (lane 89). n=2: anecdote against the 5.2 min median (n=20).
+- Test fix (PR 82): test_free_sources assumed a 16:00 expiry; on 24 Nov its expiry is Fri 27 Nov, a 13:00 early close.
+- Not checked: hosted LCP during a session; the band note live; offline first chart open (library cached only after
+  first use). Next in M: parity runner, v2 scaffolding, v2 Levels in the chosen look. Font download (Archivo) not
+  yet approved.
