@@ -49,3 +49,5 @@ session,market,status,data_asof,frozen_at,ref,em,regime,zero_gamma,call_wall,put
 2026-11-23,NQ,missed,,,,,,,,,,,,,,,,,,,,,,,no GEX PRO calculation from before this session's open was saved
 2026-11-24,ES,missed,,,,,,,,,,,,,,,,,,,,,,,no GEX PRO calculation from before this session's open was saved
 2026-11-24,NQ,missed,,,,,,,,,,,,,,,,,,,,,,,no GEX PRO calculation from before this session's open was saved
+2026-11-25,ES,missed,,,,,,,,,,,,,,,,,,,,,,,no GEX PRO calculation from before this session's open was saved
+2026-11-25,NQ,missed,,,,,,,,,,,,,,,,,,,,,,,no GEX PRO calculation from before this session's open was saved
