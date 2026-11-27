@@ -1,0 +1,194 @@
+{
+ "note": "hosted all.json of 2026-11-23 17:39 UTC (OCC backup, RTH), only the fields v2 Levels reads",
+ "now": "2026-11-23T17:39:35.818248+00:00",
+ "workers": [
+  {
+   "health": {
+    "next_publish_et": "2026-11-23 13:00",
+    "published_slot_et": "2026-11-19 16:30",
+    "session": "RTH"
+   },
+   "market": "NQ",
+   "provider": "CBOE",
+   "published": {
+    "provider": "CBOE",
+    "published_at": "2026-11-19T21:33:01.069512+00:00",
+    "regime": "NEGATIVE",
+    "slot_et": "2026-11-19 16:30",
+    "space": "futures",
+    "status": "OK",
+    "zero_gamma": 27772.5
+   },
+   "result": {
+    "mapped": {
+     "abs_gamma": {
+      "metric": "max total |exposure|",
+      "price": 27072.5,
+      "src_price": 27000.0,
+      "value": 709516498.1442184
+     },
+     "asof": "2026-11-23T17:39:29.714983+00:00",
+     "backup": "OCC open interest + VIX-family vols: an estimate while Cboe refuses",
+     "call_wall": {
+      "metric": "|call exposure|",
+      "oi": 4868.328809084779,
+      "price": 28852.25,
+      "src_price": 28775.0,
+      "value": 374581950.0538764
+     },
+     "expected_move": {
+      "expiration": "2026-11-23",
+      "one_sigma_points": 338.6128312627363,
+      "one_sigma_points_fut": 339.5216977977253
+     },
+     "mapping": {
+      "factor": 1.0026840876986254,
+      "futures_ref": 26855.416335346497,
+      "futures_ref_mode": "measured NQ=F / ^NDX basis (15-minute median to 11-23 12:29 ET)",
+      "futures_time": "2026-11-23T17:39:26+00:00",
+      "market": "NQ",
+      "method": "ratio",
+      "notes": [],
+      "offset": 0.0,
+      "proxy": true,
+      "source": "NDX",
+      "source_kind": "INDEX",
+      "source_ref": 26783.527,
+      "source_time": "2026-11-23T17:39:26+00:00"
+     },
+     "mapping_note": null,
+     "provider": "OCC",
+     "put_wall": {
+      "metric": "|put exposure|",
+      "oi": 2770.323877098039,
+      "price": 26791.75,
+      "src_price": 26720.0,
+      "value": 327266460.2999392
+     },
+     "ref_time": "2026-11-23T17:39:26+00:00",
+     "regime": "INDETERMINATE",
+     "source": "occ+vix",
+     "warnings": [
+      "BACKUP ESTIMATE: Cboe refused; OCC open interest (end of day) with one implied vol per expiry from the Nov 20 VIX-family closes scaled by VXN (no skew)",
+      "includes QQQ options in NDX terms (41.11 QQQ contracts = 1 NDX contract)"
+     ],
+     "zero_gamma": {
+      "kind": "estimate",
+      "metric": "modeled net exposure = 0",
+      "price": 26574.5,
+      "src_price": 26503.328653434633
+     },
+     "zero_gamma_status": "ESTIMATE"
+    },
+    "session": {
+     "levels": {
+      "C1": 27202.75,
+      "CW": 28852.25,
+      "P1": 26571.25,
+      "PW": 26791.75,
+      "ZG": 26574.5,
+      "regime": "INDETERMINATE"
+     }
+    },
+    "summary": {
+     "asof": "2026-11-23T17:39:29.714983+00:00",
+     "provider": "OCC"
+    }
+   }
+  },
+  {
+   "health": {
+    "next_publish_et": "2026-11-23 13:00",
+    "published_slot_et": "2026-11-19 16:30",
+    "session": "RTH"
+   },
+   "market": "ES",
+   "provider": "CBOE",
+   "published": {
+    "provider": "CBOE",
+    "published_at": "2026-11-19T21:33:04.417666+00:00",
+    "regime": "NEGATIVE",
+    "slot_et": "2026-11-19 16:30",
+    "space": "futures",
+    "status": "OK",
+    "zero_gamma": 7522.25
+   },
+   "result": {
+    "mapped": {
+     "abs_gamma": {
+      "metric": "max total |exposure|",
+      "price": 7015.25,
+      "src_price": 7000.0,
+      "value": 28975470408.231228
+     },
+     "asof": "2026-11-23T17:39:32.137385+00:00",
+     "backup": "OCC open interest + VIX-family vols: an estimate while Cboe refuses",
+     "call_wall": {
+      "metric": "|call exposure|",
+      "oi": 459477.2294578713,
+      "price": 8017.5,
+      "src_price": 8000.0,
+      "value": 8411086131.56325
+     },
+     "expected_move": {
+      "expiration": "2026-11-23",
+      "one_sigma_points": 72.67073993251151,
+      "one_sigma_points_fut": 72.83035083458887
+     },
+     "mapping": {
+      "factor": 1.0021963571889538,
+      "futures_ref": 7263.82899923339,
+      "futures_ref_mode": "measured ES=F / ^GSPC basis (15-minute median to 11-23 12:29 ET)",
+      "futures_time": "2026-11-23T17:39:31+00:00",
+      "market": "ES",
+      "method": "ratio",
+      "notes": [],
+      "offset": 0.0,
+      "proxy": true,
+      "source": "SPX",
+      "source_kind": "INDEX",
+      "source_ref": 7247.91,
+      "source_time": "2026-11-23T17:39:31+00:00"
+     },
+     "mapping_note": null,
+     "provider": "OCC",
+     "put_wall": {
+      "metric": "|put exposure|",
+      "oi": 539826.0,
+      "price": 7015.25,
+      "src_price": 7000.0,
+      "value": 15479817218.321274
+     },
+     "ref_time": "2026-11-23T17:39:31+00:00",
+     "regime": "INDETERMINATE",
+     "source": "occ+vix",
+     "warnings": [
+      "BACKUP ESTIMATE: Cboe refused; OCC open interest (end of day) with one implied vol per expiry from the Nov 20 VIX-family closes (no skew)",
+      "includes SPY options in SPX terms (10.02 SPY contracts = 1 SPX contract)"
+     ],
+     "zero_gamma": {
+      "kind": "estimate",
+      "metric": "modeled net exposure = 0",
+      "price": 7308.75,
+      "src_price": 7292.851035086711
+     },
+     "zero_gamma_status": "ESTIMATE"
+    },
+    "session": {
+     "levels": {
+      "C1": 7261.0,
+      "CW": 8017.5,
+      "P1": 7190.75,
+      "PW": 7015.25,
+      "ZG": 7308.75,
+      "regime": "INDETERMINATE"
+     }
+    },
+    "summary": {
+     "asof": "2026-11-23T17:39:32.137385+00:00",
+     "provider": "OCC"
+    }
+   }
+  }
+ ]
+}

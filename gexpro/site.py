@@ -38,6 +38,18 @@ def build(components, out: str | Path, state: str | Path) -> dict:
             tag = hashlib.sha256(f.read_bytes()).hexdigest()[:10]
             html = html.replace(f'"assets/{f.name}"', f'"assets/{f.name}?v={tag}"')
     (out / "index.html").write_text(html.replace("<script", STATIC_FLAG + "\n<script", 1), encoding="utf-8")
+    # v2 beside the main site (decision 001): /v2/ with its own files, versioned the same way; the root service
+    # worker already covers it (its scope is the site's root), so v2 registers none of its own
+    v2 = DASHBOARD / "v2"
+    if v2.is_dir():
+        (out / "v2").mkdir(exist_ok=True)
+        page = (v2 / "index.html").read_text(encoding="utf-8")
+        for f in v2.glob("*"):
+            if f.is_file() and f.name != "index.html":
+                shutil.copy2(f, out / "v2" / f.name)
+                tag = hashlib.sha256(f.read_bytes()).hexdigest()[:10]
+                page = page.replace(f'"{f.name}"', f'"{f.name}?v={tag}"')
+        (out / "v2" / "index.html").write_text(page.replace("<script", STATIC_FLAG + "\n<script", 1), encoding="utf-8")
     for name in ("manifest.webmanifest", "sw.js"):     # the installable-app files, at the site's root
         shutil.copy2(DASHBOARD / name, out / name)
     (out / ".nojekyll").write_text("", encoding="utf-8")
