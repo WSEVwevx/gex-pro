@@ -39,6 +39,9 @@ function levelsModel(all, market, nowMs){
   // 1 price (futures points)
   out.price = !m ? no(r.mapping_note || s.mapping_note || "no futures mapping in this reading")
     : fin(mp.futures_ref) ? {v: mp.futures_ref, at: mp.futures_time || s.ref_time} : no("no futures quote");
+  // a price from an earlier New York day than now is shown with its date and flagged, never as today's
+  if(fin(out.price.v)) out.price.notToday = !out.price.at || !fin(nowMs)
+    || etStamp(Date.parse(out.price.at)).slice(0, 10) !== etStamp(nowMs).slice(0, 10);
   // 3 zero gamma, 4-5 walls, 7-9 C1 P1 Ab1
   const lvl = {
     ZG: m && fin(val(m.zero_gamma)) ? {v: val(m.zero_gamma), modelled: m.zero_gamma_status === "ESTIMATE"} : no("no zero gamma in this reading"),
@@ -98,7 +101,7 @@ function age(min){
   return `${min} min`;
 }
 
-const api = {URLS, LEVELS, worker, levelsModel, age};
+const api = {URLS, LEVELS, worker, levelsModel, age, etStamp};
 if(typeof module !== "undefined" && module.exports) module.exports = api;
 else root.GEX2 = api;
 })(typeof window !== "undefined" ? window : globalThis);
