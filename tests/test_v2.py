@@ -58,6 +58,16 @@ class LevelsModel(unittest.TestCase):
         self.assertIsNone(model(ALL, now="2026-11-23T18:00:00Z")["paste"]["next"])                     # 13:00 ET, due
         self.assertIsNone(model(ALL, now="2026-11-27T22:00:00Z")["paste"]["next"])
 
+    def test_a_price_from_an_earlier_day_is_flagged(self):
+        self.assertFalse(model(ALL)["price"]["notToday"])                                   # same New York day
+        self.assertTrue(model(ALL, now="2026-11-24T05:00:00Z")["price"]["notToday"])      # 00:00 ET the next day
+        self.assertFalse(model(ALL, now="2026-11-24T04:59:00Z")["price"]["notToday"])     # 23:59 ET, same day
+        a = copy.deepcopy(ALL)
+        a["workers"][0]["result"]["mapped"]["mapping"]["futures_time"] = None
+        self.assertTrue(model(a, a["workers"][0]["market"])["price"]["notToday"])          # no time: never called today's
+        self.assertIn("pTime(P)", Invariants.JS)
+        self.assertEqual(Invariants.JS.count("etTime(P.at)"), 2)                             # only inside pTime itself
+
     def test_es_too(self):
         m = model(ALL, "ES")
         self.assertEqual(m["market"], "ES")

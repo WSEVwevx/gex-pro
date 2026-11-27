@@ -8,6 +8,8 @@ const num = (x, d = 2) => Number(x).toLocaleString("en-US", {minimumFractionDigi
 const ET = {timeZone: "America/New_York"};
 const etTime = iso => iso ? new Date(iso).toLocaleTimeString("en-US", {...ET, hour: "2-digit", minute: "2-digit", hour12: false}) + " ET" : "";
 const etDay = iso => iso ? new Date(iso).toLocaleDateString("en-US", {...ET, weekday: "short", day: "numeric", month: "short"}) : "";
+const pTime = (P, short) => !P.notToday ? etTime(P.at)                              // the date whenever it is not today
+  : short ? new Date(P.at).toLocaleDateString("en-US", {...ET, day: "numeric", month: "short"}) : etDay(P.at) + ", " + etTime(P.at);
 const TONE = {pos: "--call", neg: "--put", zg: "--flip", ag: "--abs", em: "--em"};
 const REGIME = {POSITIVE: ["Positive gamma", "moves tend to fade"], NEGATIVE: ["Negative gamma", "moves can extend"],
   INDETERMINATE: ["Indeterminate", "the model cannot call the side"]};
@@ -39,7 +41,7 @@ function render(){
   h.push(row(`${esc(market)} vs zero gamma`, D.missing ? `<div class="v2">${miss(D.missing)}</div>`
     : `<div class="big">${num(D.v)}<span class="u">pts ${D.side}</span></div>
        <div class="cap"><span class="tick" style="background:var(--flip)"></span>Zero gamma <span class="n">${num(Z.v)}</span>${Z.modelled ? ' <span class="dim">(modelled)</span>' : ""}
-       · price <span class="n">${num(P.v)}</span> at ${esc(etTime(P.at))}</div>`, "hero"));
+       · price <span class="n">${num(P.v)}</span> at ${esc(pTime(P))}${P.notToday ? ' <span class="hl nt">not today</span>' : ""}</div>`, "hero"));
   // 2. nearer wall
   const W = M.nearerWall;
   h.push(row("Nearer wall", W.missing ? `<div class="v2">${miss(W.missing)}</div>`
@@ -59,7 +61,7 @@ function render(){
   const t = [`<table class="lad"><caption><span class="sc">Ladder, ${esc(market)} futures prices</span> <span class="dim">· as of ${esc(etTime(M.asof))}</span></caption>
     <thead><tr><th></th><th>Level</th><th class="r">Price</th><th class="r">From price</th></tr></thead><tbody>`];
   let placed = false;
-  const now = () => `<tr class="now"><td class="m"></td><td>Price</td><td class="r">${P.missing ? "–" : num(P.v)}</td><td class="r d">${P.missing ? "" : esc(etTime(P.at))}</td></tr>`;
+  const now = () => `<tr class="now"><td class="m"></td><td>Price</td><td class="r">${P.missing ? "–" : num(P.v)}</td><td class="r d">${P.missing ? "" : esc(pTime(P, true))}</td></tr>`;
   for(const r of M.ladder){
     if(!placed && !P.missing && r.v < P.v){ t.push(now()); placed = true; }
     const near = !W.missing && r.name === W.name;
