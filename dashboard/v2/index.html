@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GEX · Levels (v2 preview)</title>
+<meta name="robots" content="noindex">
+<meta name="color-scheme" content="dark light">
+<script>/* theme and market before first paint: the same saved choices as the main site */
+try { var t = localStorage.getItem("gex.theme") || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"); document.documentElement.dataset.theme = t; } catch(e) { document.documentElement.dataset.theme = "dark"; }
+</script>
+<link rel="icon" type="image/svg+xml" href="../assets/icon.svg">
+<link rel="stylesheet" href="v2.css">
+</head>
+<body>
+<main class="sheet" id="app" aria-live="polite">
+  <!-- the first screen's shape before the data: the same rows, so nothing jumps when it arrives -->
+  <header class="mast"><span class="t">GEX · Levels</span><span class="sc dim">loading the latest reading…</span></header>
+  <section class="state"><div class="sc k">Source</div><div class="s">&nbsp;</div></section>
+  <div class="form"><div>
+    <section class="row hero"><div class="sc k">&nbsp;</div><div><div class="big">&nbsp;</div><div class="cap">&nbsp;</div></div></section>
+    <section class="row"><div class="sc k">Nearer wall</div><div class="v2">&nbsp;</div></section>
+    <section class="row"><div class="sc k">Regime</div><div class="v2">&nbsp;</div></section>
+    <section class="row"><div class="sc k">Levels as of</div><div class="v2">&nbsp;</div></section>
+    <section class="row"><div class="sc k">TradingView paste</div><div class="v2">&nbsp;</div></section>
+  </div><div></div></div>
+</main>
+<script src="core.js"></script>
+<script src="levels.js"></script>
+</body>
+</html>

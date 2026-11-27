@@ -1,0 +1,108 @@
+/* GEX PRO v2, Levels: racing form / Swiss print (owner pick 23 Nov 2026, decision 001). Level marks use the Pine
+   input.color defaults (dark) and their themed() light shades; one yellow highlighter for the state, nothing else. */
+:root{
+  --sans:"Archivo","Helvetica Neue","Arial Nova",Helvetica,Arial,"Liberation Sans","Nimbus Sans",sans-serif;
+  --narrow:"Archivo","Archivo Narrow","Helvetica Neue Condensed","Arial Narrow","Roboto Condensed","Liberation Sans Narrow","Helvetica Neue",Arial,sans-serif;
+}
+:root,[data-theme="dark"]{
+  --paper:#141413; --ink:#ecebe6; --ink2:#a9a8a1; --ink3:#77766f; --rule:#3a3936; --heavy:#ecebe6;
+  --mark:#e9d24a; --markink:#141413;
+  --flip:#b9bec7; --call:#3987e5; --put:#d95926; --abs:#e6e6e6; --em:#8b95a5;
+  --btn:#ecebe6; --btnink:#141413;
+}
+[data-theme="light"]{
+  --paper:#f5f3ec; --ink:#151513; --ink2:#4f4e49; --ink3:#7d7b74; --rule:#cfccc2; --heavy:#151513;
+  --mark:#f3e05a; --markink:#151513;
+  --flip:#6b7280; --call:#2b6fc9; --put:#c44716; --abs:#1f2937; --em:#64748b;
+  --btn:#151513; --btnink:#f5f3ec;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--paper);color:var(--ink)}
+body{font-family:var(--sans);font-size:15px;line-height:1.35;-webkit-text-size-adjust:100%;
+  font-variant-numeric:tabular-nums lining-nums;overflow-x:hidden}
+a{color:inherit}
+.sheet{max-width:1366px;margin:0 auto;padding:18px 40px 40px}
+.sc{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink2);font-weight:600}
+.dim{color:var(--ink3)}
+.s{color:var(--ink2)}
+
+/* masthead: one line of type on a heavy rule */
+.mast{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 22px;padding-bottom:8px;border-bottom:3px solid var(--heavy)}
+.mast .t{font-weight:800;font-size:15px;letter-spacing:-.01em}
+.mast .sw a{text-decoration:none;color:var(--ink3);margin-right:10px}
+.mast .sw a[aria-current]{color:var(--ink);font-weight:700;text-decoration:underline;text-underline-offset:4px;text-decoration-thickness:2px}
+.mast .snap{margin-left:auto;text-align:right}
+
+/* state line */
+.state{display:grid;grid-template-columns:132px 1fr;gap:4px 24px;padding:10px 0 11px;border-bottom:1px solid var(--rule)}
+.state .k{padding-top:2px}
+.state b{font-weight:800}
+.hl{background:var(--mark);color:var(--markink);padding:0 5px;box-decoration-break:clone;-webkit-box-decoration-break:clone}
+.state .w{font-size:12px;color:var(--ink2);margin-top:3px}
+
+/* the form: asymmetric two columns */
+.form{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:0 56px;margin-top:0}
+.row{display:grid;grid-template-columns:132px minmax(0,1fr);gap:0 24px;padding:12px 0;border-bottom:1px solid var(--rule)}
+.row .k{padding-top:4px}
+.hero{padding:14px 0 16px}
+.big{font-family:var(--narrow);font-stretch:75%;font-weight:800;font-size:clamp(76px,10.5vw,148px);
+  line-height:.86;letter-spacing:-.035em;margin:0 0 0 -.04em;white-space:nowrap}
+.big .u{font-family:var(--sans);font-stretch:100%;font-size:17px;font-weight:600;letter-spacing:0;margin-left:10px;color:var(--ink2)}
+.cap{margin-top:10px;font-size:15px;max-width:44em}
+.cap .n{font-weight:700}
+.v2{font-size:24px;font-weight:700;letter-spacing:-.01em;line-height:1.15}
+.v2 .lv{font-weight:800}
+.tick{display:inline-block;width:4px;height:.8em;margin-right:7px;vertical-align:-.02em}
+.q{font:inherit;font-size:11px;font-weight:700;border:1px solid var(--ink3);color:var(--ink2);background:none;
+  border-radius:50%;width:18px;height:18px;line-height:15px;padding:0;margin-left:6px;cursor:pointer;vertical-align:1px}
+.help{font-size:12.5px;color:var(--ink2);margin:6px 0 0;max-width:46em}
+.help[hidden]{display:none}
+
+/* paste */
+.copy{font:inherit;font-weight:800;font-size:15px;background:var(--btn);color:var(--btnink);border:0;
+  padding:10px 18px 11px;cursor:pointer;letter-spacing:.01em}
+.copy:focus-visible{outline:3px solid var(--mark);outline-offset:2px}
+.pline{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px}
+.pnote{font-size:13px;color:var(--ink2);margin-top:8px;max-width:46em}
+.peek{font-size:12px;color:var(--ink3);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.nc{font-style:italic;color:var(--ink3)}
+
+/* the ladder: a racing-form column */
+.lad{border-collapse:collapse;width:100%;margin-top:6px}
+.lad caption{text-align:left;padding:10px 0 6px;border-bottom:3px solid var(--heavy)}
+.lad th{text-align:left;font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink2);font-weight:600;
+  padding:8px 0 5px;border-bottom:1px solid var(--heavy)}
+.lad th.r,.lad td.r{text-align:right}
+.lad td{padding:7px 0 6px;border-bottom:1px solid var(--rule);vertical-align:baseline;font-size:15px}
+.lad td.m{width:14px}
+.lad td.m i{display:inline-block;width:4px;height:14px;vertical-align:-2px}
+.lad td .tag{font-size:11px;color:var(--ink3);margin-left:6px;letter-spacing:.04em}
+.lad td.p{font-weight:700}
+.lad tr.now td{border-top:2px solid var(--heavy);border-bottom:2px solid var(--heavy);font-weight:800;padding:8px 0}
+.lad tr.near td{font-weight:800}
+.lad tr.nc td{color:var(--ink3)}
+.lad td.d{color:var(--ink2);padding-left:14px}
+.lad td.p,.lad td.d{white-space:nowrap}       /* numbers keep one line; the level name column takes any wrap */
+.foot{margin-top:22px;font-size:12px;color:var(--ink3);display:flex;flex-wrap:wrap;gap:4px 18px}
+
+
+@media (max-width:900px){
+  .form{grid-template-columns:1fr}
+  .lad{margin-top:18px}
+}
+@media (max-width:600px){
+  .sheet{padding:10px 16px 28px}
+  .mast{gap:2px 14px}
+  .mast .snap{margin-left:0;text-align:left;width:100%;font-size:10px}
+  .state{grid-template-columns:1fr;gap:2px;padding:8px 0 9px}
+  .state .w{display:none}
+  .row{grid-template-columns:84px minmax(0,1fr);gap:0 12px;padding:9px 0}
+  .row.hero{grid-template-columns:1fr;padding:10px 0 12px}
+  .big{font-size:clamp(64px,22vw,96px)}
+  .big .u{font-size:14px;margin-left:6px}
+  .cap{font-size:13.5px;margin-top:8px}
+  .v2{font-size:19px}
+  .sc{font-size:10px}
+  .row .s{font-size:13px}
+  .lad td{font-size:14px}
+}

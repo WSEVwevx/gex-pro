@@ -50,6 +50,21 @@ def make_handler(components):
                 f = DASHBOARD / "index.html"           # read on every request: edits show up on reload
                 if f.exists():
                     return self._send(200, f.read_bytes(), "text/html; charset=utf-8")
+            if u.path == "/v2":                         # the page's links are relative: they need the folder's slash
+                self.send_response(301)
+                self.send_header("Location", "/v2/")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+            if u.path.startswith("/v2/"):
+                # v2 beside the main site (decision 001): its page and its own files, one plain name each
+                name = "index.html" if u.path in ("/v2/", "/v2/index.html") else u.path[len("/v2/"):]
+                f = DASHBOARD / "v2" / name
+                if name == "index.html" and f.is_file():
+                    return self._send(200, f.read_bytes(), "text/html; charset=utf-8")
+                if ASSET_NAME.match(name) and f.suffix in ASSET_TYPES and f.is_file():
+                    return self._send(200, f.read_bytes(), ASSET_TYPES[f.suffix])
+                return self._send(404, b'{"error": "not found"}', "application/json")
             if u.path in ROOT_FILES:
                 return self._send(200, (DASHBOARD / u.path[1:]).read_bytes(), ROOT_FILES[u.path])
             if u.path.startswith("/assets/"):
