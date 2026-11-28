@@ -585,7 +585,7 @@ function render(){
   if(page === "ladder") renderLiveTable();
   if(page === "screener") renderScreener();
   if(page === "heatmap" && hmMarket !== market + hmTf){ hmReset = true; loadHeatmap(); }
-  $("foot").innerHTML = `Model estimates from ${esc(s.provider || w.provider)} ${opts} options (${s.backup ? "VIX-family volatility, no option quotes" : s.ref_quality === "RT" ? "real-time quotes" : "15-minute-delayed quotes"}) and end-of-day open interest, assuming dealers are long calls and short puts.
+  $("foot").innerHTML = `Model estimates from ${esc(s.provider || w.provider)} ${opts} options (${s.chain === "occ+lse" ? `each strike's implied vol from the previous session's smile${s.smile && s.smile.credit ? ` · ${esc(s.smile.credit)}` : ""}` : s.backup ? "VIX-family volatility, no option quotes" : s.ref_quality === "RT" ? "real-time quotes" : "15-minute-delayed quotes"}) and end-of-day open interest, assuming dealers are long calls and short puts.
     ${w.result.mapped ? "Futures prices use " + esc(w.result.mapped.mapping.futures_ref_mode) + "; TradingView re-maps with your live chart." : esc(s.mapping_note || "")}
     These are proxy levels from index and ETF options, not NQ/ES futures options, and not trading advice.`;
 }
@@ -1960,7 +1960,7 @@ function renderLiveTable(){
     };
     el.onmouseleave = () => { tip.classList.remove("on"); };
   });
-  $("ldSub").textContent = `${num(LD.width * fac, 1)}-pt rows in ${w.market} prices · ${all ? "all expirations" : `${ldSel.size} expiration${ldSel.size === 1 ? "" : "s"}`} · ${s.backup ? "OCC open interest, one vol per expiry" : "15-min delayed"}`;
+  $("ldSub").textContent = `${num(LD.width * fac, 1)}-pt rows in ${w.market} prices · ${all ? "all expirations" : `${ldSel.size} expiration${ldSel.size === 1 ? "" : "s"}`} · ${s.chain === "occ+lse" ? `OCC open interest, previous session's smile${s.smile && s.smile.credit ? ` · ${s.smile.credit}` : ""}` : s.backup ? "OCC open interest, one vol per expiry" : "15-min delayed"}`;
   // side panel
   const T = LD.rows.reduce((t, row) => { sum(row).forEach((x, j) => t[j] += x); return t; }, [0, 0, 0, 0, 0, 0]);
   const gT = E.reduce((a, e, i) => a + (on(i) ? e.net : 0), 0), dT = E.reduce((a, e, i) => a + (on(i) ? e.dex : 0), 0);

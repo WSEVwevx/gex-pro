@@ -21,7 +21,8 @@ system. **Awaiting credentials**: needs your provider account. **Simulated**: te
 | Math | Independent recomputation from raw Cboe data (own BSM, IV solver, OCC parsing, zero-gamma search) | **Matches** (2026-10-23): net GEX within 0.006% / 0.002%, walls and abs-gamma identical, ZG within 0.001 / 1.2 pts; fixed: Cboe's rounded gamma no longer used for options without IV; rate/dividend now applied |
 | Pine | Panel header shows the folded-in ETF (`etf=` payload token, e.g. CBOE SPX+SPY); header text updated | Static tests pass; Pine Editor shows no errors (2026-11-10); not yet tested on a chart: see the checklist in TRADINGVIEW_SETUP.md |
 | Data | Tradier, Schwab, Databento adapters | **Removed** 2026-10-23 (free data only) |
-| Data | Cboe free delayed feed (SPX, NDX, SPY, QQQ) | **Working with live data** (checked 2026-10-21 overnight; RTH behaviour not yet observed) |
+| Data | Cboe free delayed feed (SPX, NDX, SPY, QQQ) | **Removed** 2026-11 (refused GitHub's servers with HTTP 403) |
+| Data | OCC open interest + the previous session's per-strike smile from London Strategic Edge (this PC only, `gexsys/smile.py`) | **Unverified** against a live LSE session; method checked independently on synthetic rows (51 claims). Plan, paste and grades held until the accuracy study |
 | Data | Schwab Trader API | **Removed** 2026-10-23 (API access denied) |
 | Math | Vanna and charm exposure, absolute gamma strike, hedge size in contracts, zero-gamma distance in σ | Working: vanna/charm validated by finite differences; live numbers hand-checked |
 | Testing | `python -m gexsys audit`: live end-to-end checks (data, vendor Greeks vs independent recalculation, levels, accounting, payload) | Working: 36/36 checks passed on live Cboe NQ and ES data (2026-10-21) |

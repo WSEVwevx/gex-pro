@@ -96,6 +96,28 @@ their exposures use OI·multiplier·S, which is also unchanged.
   same expiration (counted in the warnings). With `recompute_greeks = "always"` the vendor's own gamma
   is never used: Cboe rounds it to 4 decimals, which overstated deep in-the-money 0DTE gamma by ~40x.
 
+### 4d. The previous session's smile (`gexsys/smile.py`, rules v1, this PC only)
+
+For each expiry of session P (the last completed session, else the one before):
+
+* Rows: out of the money against the forward F = S·e^((r−q)T), IV in [0.03, 3.0], volume ≥ 1, last trade inside P's
+  cash session, expiry after P's close. S is the row's own underlying price; T = (expiry − last trade) / 365 days.
+* x = ln(K/F)/√T, so expiries of different length share one axis. Rows from P's last hour are used; the whole session
+  only when the last hour cannot make a smile.
+* Bins of width 0.1·σ_ref (σ_ref = the VIX-family vol at that expiry). In a bin, rows further than max(2 vol pts,
+  3 MAD) from the volume-weighted median are cut; the bin is the volume-weighted mean of the rest, x and IV alike.
+* Screen: a bin is compared with a Theil–Sen line through up to 3 bins on each side (itself left out); the worst one
+  goes while it misses by more than max(3 vol pts, 4 × the median miss), at most a quarter of the bins.
+* Fit: at least 5 bins, 2 on each side of x = 0; monotone cubic (PCHIP) through the bins, flat beyond the ends.
+* Today, contract with strike K, expiry e: x from today's price and time left; IV from e's own fit, else total
+  variance interpolated in time at equal x between the nearest fitted expiries, else the nearest fit. If P is the
+  session before the vol date, the result is multiplied by curve_vd(T)/curve_P(T) of the VIX-family curve.
+* 0DTE: no vol (left out). Fit quality per expiry (volume-weighted RMS miss in vol points, outliers) is in the
+  snapshot's `smile` block.
+
+Checked by the verifier with its own code on synthetic rows shaped like LSE's (3 expiries, 51 claims: bins, screen,
+fit, IV and gamma), all within the tolerances fixed beforehand. Not yet checked on a live LSE session.
+
 ### 4c. Independent check (2026-10-23, live Cboe data)
 
 A separate script recomputed everything from the raw Cboe responses with its own OCC parsing, expiry

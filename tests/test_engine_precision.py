@@ -57,7 +57,7 @@ class TestStandardSeries(unittest.TestCase):
             def __exit__(self, *a):
                 return False
         prov = OccProvider(opener=lambda req, timeout=None: R(text.encode()), clock=now.timestamp)
-        got = prov._contracts("SPX", "SPX", 100, lambda exp: 0.2, now, 45, True)
+        got = prov._contracts("SPX", "SPX", 100, lambda exp, k: 0.2, now, 45, True)
         self.assertEqual(sorted({c.root for c in got}), ["SPX", "SPXW"])
 
 

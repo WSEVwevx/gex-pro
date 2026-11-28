@@ -233,12 +233,17 @@ class LseClient:
     # ---------------------------------------------------------------- endpoints
     def chain(self, root: str, *, type: Optional[str] = None, expiry: Optional[str] = None,
               strike_min: Optional[float] = None, strike_max: Optional[float] = None,
-              min_dte: Optional[int] = None, max_dte: Optional[int] = None) -> dict:
-        """Every page of one root's chain: {underlying, greeks_as_of, contracts, rows}."""
-        rows, offset, head = [], 0, {}
+              min_dte: Optional[int] = None, max_dte: Optional[int] = None, resume: Optional[dict] = None) -> dict:
+        """Every page of one root's chain: {underlying, greeks_as_of, contracts, rows}. A limit reached part-way raises
+        RateLimitError with `.partial` ({head, rows, offset}); passing that back as `resume` carries on from there."""
+        rows, offset, head = (list(resume["rows"]), resume["offset"], dict(resume["head"])) if resume else ([], 0, {})
         while True:
-            d = self.get("/v3/options/chain", underlying=root, type=type, expiry=expiry, strike_min=strike_min,
-                         strike_max=strike_max, min_dte=min_dte, max_dte=max_dte, limit=PAGE, offset=offset)
+            try:
+                d = self.get("/v3/options/chain", underlying=root, type=type, expiry=expiry, strike_min=strike_min,
+                             strike_max=strike_max, min_dte=min_dte, max_dte=max_dte, limit=PAGE, offset=offset)
+            except RateLimitError as e:
+                e.partial = {"head": head, "rows": rows, "offset": offset} if head else None
+                raise
             if not head:
                 head = {k: d.get(k) for k in ("underlying", "underlying_price", "underlying_at", "contracts", "greeks_as_of")}
             elif d.get("greeks_as_of") != head["greeks_as_of"]:
@@ -274,9 +279,10 @@ class LseClient:
             return None
 
     def session_chain(self, root: str, session: date, **filters) -> Optional[dict]:
-        """The chain whose Greeks are for `session`: from disk once landed (never fetched again); otherwise fetched
-        (at most every 15 minutes) and returned only if its Greeks are that session's. None while they have not
-        landed: the caller uses the newest landed session and names its date, never waits."""
+        """The chain whose Greeks are for `session`: from disk once landed (never fetched again); otherwise one 1-row
+        probe (at most every 15 minutes) reads which session LSE serves, and the whole chain (many pages) is fetched
+        only when that is `session`. When LSE still serves an earlier session the cache lacks, that one is stored
+        too, so newest_landed() has it. None while `session` has not landed: the caller names what it uses instead."""
         have = self.cached(root, session)
         if have and have.get("landed"):
             return have
@@ -284,20 +290,54 @@ class LseClient:
             return None                     # LSE already serves a later session's Greeks: this one never lands here
         if have and self.clock() - have.get("fetched_at", 0) < REFETCH_S:
             return None
-        got = self.chain(root, **filters)
-        gs = session_of(got.get("greeks_as_of"))
-        landed = gs == session
-        rec = dict(got, root=root, session=session.isoformat(), fetched_at=self.clock(), landed=landed,
-                   filters=filters)
+        gs = session_of(self.get("/v3/options/chain", underlying=root, limit=1, **filters).get("greeks_as_of"))
         if gs and gs > session:
-            landed = False                  # newer Greeks already: that session's chain is gone from this endpoint
-            rec.update(landed=False, gone=True, rows=[], note=f"the Greeks already moved on to {gs}")
+            self._store(root, session, {"root": root, "session": session.isoformat(), "fetched_at": self.clock(),
+                                        "landed": False, "gone": True, "rows": [], "note": f"the Greeks already moved on to {gs}"})
+            return None
+        if gs == session:
+            return self._fetch_landed(root, session, filters)
+        self._store(root, session, {"root": root, "session": session.isoformat(), "fetched_at": self.clock(),
+                                    "landed": False, "filters": filters, "note": f"LSE serves the Greeks of {gs}"})
+        if gs and not (self.cached(root, gs) or {}).get("landed"):
+            self._fetch_landed(root, gs, filters)
+        return None
+
+    def _fetch_landed(self, root: str, session: date, filters: dict) -> Optional[dict]:
+        # a chain longer than the per-minute limit is fetched over several refreshes: the pages so far wait on disk
+        # (not *.json, so never read as a landed session) and the next attempt carries on from them
+        part = self._file(root, session)
+        part = part.with_suffix(".part") if part else None
+        resume = None
+        try:
+            got = json.loads(part.read_text(encoding="utf-8")) if part and part.exists() else None
+            if got and got.get("filters") == filters:
+                resume = got
+        except (OSError, ValueError):
+            pass
+        try:
+            got = self.chain(root, **filters, resume=resume)
+        except RateLimitError as e:
+            if part and getattr(e, "partial", None) and session_of(e.partial["head"].get("greeks_as_of")) == session:
+                _atomic_write(part, dict(e.partial, filters=filters))
+            raise
+        except ProviderError:
+            if part:
+                part.unlink(missing_ok=True)    # e.g. the Greeks changed day while paging: start again
+            raise
+        if part:
+            part.unlink(missing_ok=True)
+        if session_of(got.get("greeks_as_of")) != session:
+            return None                     # moved on between the probe and the pages: asked again later
+        rec = dict(got, root=root, session=session.isoformat(), fetched_at=self.clock(), landed=True, filters=filters)
+        self._store(root, session, rec)
+        self._log_landing(root, session, got.get("greeks_as_of"))
+        return rec
+
+    def _store(self, root: str, session: date, rec: dict) -> None:
         f = self._file(root, session)
         if f:
-            _atomic_write(f, rec if landed else {k: v for k, v in rec.items() if k != "rows"})
-            if landed:
-                self._log_landing(root, session, got.get("greeks_as_of"))
-        return rec if landed else None
+            _atomic_write(f, rec)
 
     def _log_landing(self, root: str, session: date, greeks_as_of: Optional[str]) -> None:
         """The first time a session's Greeks were seen, per root: when the Greeks become usable before 09:30."""
@@ -330,7 +370,7 @@ class LseClient:
         return best[1] if best else None
 
     # ---------------------------------------------------------------- Data health
-    def health_row(self, usage: Optional[dict] = None) -> dict:
+    def health_row(self, usage: Optional[dict] = None, pages: Optional[list] = None) -> dict:
         """One Data health row (gexpro/health.py): plan, calls today, last greeks_as_of, cache age, landing times."""
         landing = {}
         try:
@@ -348,8 +388,8 @@ class LseClient:
         if last:
             bits.append(f"newest Greeks {last.get('greeks_as_of', '')[:16]} UTC, first seen {last.get('first_seen', '')[:16]} UTC")
         why = why_not_here()
-        # no page reads LSE yet: the OCC + LSE chain (rework workstream 4) waits for the owner's approval of its math
-        return {"name": "Option IVs (LSE)", "provider": "London Strategic Edge (local only)", "pages": [],
+        return {"name": "Option IVs (LSE)", "provider": "London Strategic Edge (local only)", "pages": pages or [],
                 "last_ok": datetime.fromtimestamp(self.last_ok, timezone.utc).isoformat() if self.last_ok else None,
                 "error": why or (None if self._key else "unavailable: no LSE key") or self.last_error,
-                "detail": "; ".join(bits), "note": "connected; no page uses it yet"}
+                "detail": "; ".join(bits),
+                "note": None if pages else "connected; no page uses it (START.bat sets GEX_LSE=1 for the OCC chain's smile)"}

@@ -59,7 +59,7 @@ def _futures_ref(cfg: MarketConfig, snap, override: Optional[tuple], provider=No
     return None, None, "none", s, st
 
 
-def backup_trim(summary: dict) -> None:
+def backup_trim(summary: dict, note: str = "OCC open interest + VIX-family vols: an estimate (one vol per expiry, no skew)") -> None:
     """The OCC chain (no per-strike vols): keep only the levels that matched the full chain's in the 2026-11-19 comparison
     (all-expiry zero gamma, walls, absolute-gamma and largest +GEX strikes; the first-expiry C1 and P1, within 0.06
     expected moves) and drop the rest (0DTE flip, the lower ranks, Ab1, largest -GEX: 0.2 to 1.5 expected moves off)."""
@@ -72,7 +72,7 @@ def backup_trim(summary: dict) -> None:
                 n[key] = {"call": n[key].get("call", [])[:1], "put": n[key].get("put", [])[:1], "abs": []}
     if summary.get("ranked"):
         summary["ranked"] = {side: v[:1] for side, v in summary["ranked"].items()}
-    summary["backup"] = "OCC open interest + VIX-family vols: an estimate (one vol per expiry, no skew)"
+    summary["backup"] = note
 
 
 def run_once(cfg: MarketConfig, provider, store: Optional[SnapshotStore] = None,
@@ -93,6 +93,12 @@ def run_once(cfg: MarketConfig, provider, store: Optional[SnapshotStore] = None,
     summary["heat"] = heat_profile(res)                    # net GEX by price band, for the heatmap history
     if snap.source == "occ+vix":
         backup_trim(summary)
+    elif snap.source == "occ+lse":
+        # the same levels and the same hold (no plan, no paste) until the accuracy study (rework workstream 7) says
+        # what the per-strike smile improves; its own note, and the smile's fit report, local only
+        backup_trim(summary, "OCC open interest + the previous session's per-strike smile: an estimate (0DTE left out)")
+        summary["smile"] = getattr(provider, "smile_info", None) or None
+    summary["chain"] = snap.source
     summary["market"] = cfg.market
     summary["options_source"] = cfg.source
     summary["tv_ref_symbol"] = src.tv_symbol

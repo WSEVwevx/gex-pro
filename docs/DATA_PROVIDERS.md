@@ -1,23 +1,38 @@
 # Data providers
 
-Everything runs on **free** data: Cboe's public delayed-quotes feed. No account, key or payment.
+Everything on the hosted site runs on **free** data with no account, key or payment. Option levels are an
+estimate: end-of-day open interest from OCC, with implied vols that are not per-strike quotes.
 
-| Market | Options used | Source |
-|---|---|---|
-| ES / MES | **SPX + SPY** options | Cboe free feed |
-| NQ / MNQ | **NDX + QQQ** options | Cboe free feed |
+| Market | Options used | Hosted site and this PC | This PC only, with a London Strategic Edge key |
+|---|---|---|---|
+| ES / MES | **SPX + SPY** | OCC open interest + one vol per expiry from the VIX-family closes | the same OI + each strike's vol from the previous session's smile |
+| NQ / MNQ | **NDX + QQQ** | the same, scaled by VXN / VIX | the same |
 
-## Cboe details (`gexsys/providers/cboe.py`, verified live 2026-10-21 and 2026-10-23)
+## OCC chain (`gexsys/providers/occ.py`)
 
-| | Cboe delayed-quotes JSON |
+| | |
 |---|---|
-| Endpoint | `cdn.cboe.com/api/global/delayed_quotes/options/{_SPX,_NDX,SPY,QQQ}.json` |
-| Requests | 2 per market per refresh (index chain + ETF chain) |
-| Open interest | yes (end of day) |
-| IV / Greeks | IV plus Greeks; gamma is rounded to 4 decimals, so it is recomputed from IV |
-| Delay | 15 min |
-| Terms | unofficial website feed, personal use |
-| Cost | free, no key, no signup |
+| Open interest | `marketdata.theocc.com/series-search?symbolType=U&symbol={NDX,SPX,QQQ,SPY}`: end of day, all exchanges |
+| Vols | Yahoo daily closes of ^VIX1D, ^VIX9D, ^VIX, ^VIX3M (SPX curve) and ^VXN (NDX scale); no skew |
+| Prices | Yahoo chart meta for ^NDX, ^GSPC, QQQ, SPY |
+| Source label | `occ+vix`, snapshots under `NQ-OCC` / `ES-OCC` |
+| Cost | free, no key, no signup; proven from GitHub's servers by the Source probe |
+
+## Previous session's smile (`gexsys/smile.py`, this PC only)
+
+With `GEX_LSE=1` (START.bat sets it) and a key in `%USERPROFILE%\.lse_key` or `LSE_KEY`, each contract instead gets
+an implied vol read off the previous session's per-strike smile, fitted from London Strategic Edge's option rows
+(roots NDX + NDXP, SPX + SPXW, QQQ, SPY; strikes within 25% of the price; 1 to 46 days). The method is in
+METHODOLOGY section 4d. Source label `occ+lse`, snapshots under `NQ-OCCLSE` / `ES-OCCLSE`; the chain's Data health row
+and the site's footnote name the credit ("Data: London Strategic Edge").
+
+* Never on GitHub, the hosted build, the archive branch or the repo: `gexsys/config.py` gives the provider no LSE
+  client when `GITHUB_ACTIONS` or `GEX_NO_LSE` is set, and tests use synthetic rows only.
+* One session's chain is fetched once, after a 1-row probe shows its Greeks have landed, and kept in
+  `%LOCALAPPDATA%\gexsys\lse\chains`. When nothing usable has landed for two sessions, or LSE refuses, the VIX-family
+  curve is used and the snapshot's warnings say why.
+* 0DTE contracts get no vol from it (the engine leaves them out): yesterday's smile is not today's one-day smile.
+* Plan, paste and track record stay off this source until the accuracy study (rework workstream 7) passes.
 
 ## Why SPY and QQQ are included
 
@@ -28,7 +43,7 @@ ES from -$56B to -$69B.
 
 How an ETF option joins the index chain (`provider.include_etf`, on in both free configs):
 
-* ratio r = index price / ETF price, from the same Cboe snapshot (about 10 for SPY, 41 for QQQ);
+* ratio r = index price / ETF price, from the same price snapshot (about 10 for SPY, 41 for QQQ);
 * strike × r, kept exact for the math and grouped with the nearest listed index strike (within 0.75 of
   the usual strike spacing) for levels, walls and max pain;
 * open interest and volume ÷ r, so 10 SPY contracts count as 1 SPX contract;
@@ -47,6 +62,7 @@ units. If the ETF chain fails to load, the levels come from the index alone, wit
 | Yahoo Finance | removed: SPX open interest missing near the money, all OI blanked overnight |
 | tastytrade API (free brokerage account) | needs an account; real-time status and futures-options OI for API users not confirmed |
 | Paid feeds (Databento, ThetaData, Massive, IBKR data) | not free. Tradier, Schwab and Databento adapters were built earlier and removed |
+| Cboe delayed quotes | refused GitHub's servers (HTTP 403); removed from the project in November 2026 |
 
 ## CSV adapter (any other source)
 
@@ -57,8 +73,8 @@ Multipliers: 50 for ES options, 20 for NQ, 5 and 2 for the micros. Timestamps ne
 
 ## Licensing
 
-* Cboe's feed is for personal use. `storage.store_raw` defaults to `false`, so only derived numbers
-  are written to disk.
+* `storage.store_raw` defaults to `false`, so only derived numbers are written to disk.
+* London Strategic Edge values stay on this PC (see above) and are shown with their credit.
 
 ## Other free feeds (not used for option levels)
 
