@@ -9,10 +9,13 @@
   site       the hosted website's data files: present, filled in, and recent
 
 --quick skips the live checks (math, audit, track, site). Exits 1 if anything failed.
+--local keeps every part off the hosts this computer never asks (LOCAL_OFF, added to GEX_OFF_HOSTS: feeds/hostswitch.py),
+as START.bat does; the hosted site and GitHub still ask them.
 """
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import time
@@ -22,6 +25,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))      # the project's packages, for the market calendar
 from gexsys import marketcal  # noqa: E402
+
+LOCAL_OFF = ("api.nasdaq.com",)                     # as START.bat; Cboe is no longer asked by any code
+
+
+def local_env(env: dict) -> dict:
+    """env with LOCAL_OFF added to GEX_OFF_HOSTS (the parts run as child processes and inherit it)."""
+    have = [h for h in env.get("GEX_OFF_HOSTS", "").split(",") if h.strip()]
+    return dict(env, GEX_OFF_HOSTS=",".join(have + [h for h in LOCAL_OFF if h not in have]))
 
 ROOT = Path(__file__).resolve().parent.parent
 PACKAGES = ["gexsys", "feeds", "briefings", "trackrecord", "gexpro"]
@@ -93,6 +104,8 @@ def site() -> tuple[bool, str]:
 def main() -> int:
     sys.stdout.reconfigure(errors="replace")          # a failure message with an unusual character must still print
     quick = "--quick" in sys.argv
+    if "--local" in sys.argv:
+        os.environ.update(local_env(dict(os.environ)))
     steps = [("tests", lambda: run(["-m", "unittest", "discover", "-s", "tests", "-q"])),
              ("pyflakes", lambda: run(["-m", "pyflakes", *PACKAGES, "tests", "tools"])),
              ("vulture", lambda: run(["-m", "vulture", *PACKAGES, "--min-confidence", "80"])),
