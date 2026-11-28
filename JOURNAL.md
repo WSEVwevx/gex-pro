@@ -569,3 +569,16 @@ The entry above and its PR text got these wrong. Rechecked the same evening:
   cached LSE chains. D: not run (Cboe removed). Pass bar proposed, waiting for the owner; the paste stays held either way.
 - 2026-11-28: the owner approved the pass bar ("Approve pass bar"), recorded in studies/occ_lse_accuracy/approval.json
   against the v1 hash; v1.json itself is unchanged. Still nothing computed.
+
+## 2026-11-28 study occ_lse_accuracy v2 part A: "better" (n = 10), verifier PASS
+
+- v2 (sha256 a75e602d...9cffc0) written before any call or result: the first after-close Cboe snapshot (not the last:
+  Cboe reprices its frozen 1-day quotes overnight), the engine's index-only daily_iv as truth, LSE flow prints (the
+  chain serves only the newest session) collapsed per contract. Pass bar identical to the approved v1 bar.
+- 10 LSE calls of the owner's 20. NQ and ES x sessions 9, 10, 16, 17, 18 Nov; none dropped. ES flow truncated at 5000
+  prints (the last ~6 minutes), as v2 allows. Secondary (one session late) not run.
+- Verdict "better": the smile closer to Cboe than the VIX curve in every pair, the bar's interval below 0. Numbers stay
+  local (LSE licence): %LOCALAPPDATA%/gexsys/studies/occ_lse_accuracy/result_v2.json.
+- Verifier: own code, every claim PASS (smile IVs within 2e-15). It used its own calendar (zoneinfo), equivalent here.
+- Limits: 10 pairs, 2 weeks, one-day expiries at the money only; agreement with Cboe's closing quotes, not a forecast of
+  the next session; B and D impossible, so levels were never checked against a full chain.

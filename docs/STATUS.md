@@ -22,7 +22,7 @@ system. **Awaiting credentials**: needs your provider account. **Simulated**: te
 | Pine | Panel header shows the folded-in ETF (`etf=` payload token, e.g. CBOE SPX+SPY); header text updated | Static tests pass; Pine Editor shows no errors (2026-11-10); not yet tested on a chart: see the checklist in TRADINGVIEW_SETUP.md |
 | Data | Tradier, Schwab, Databento adapters | **Removed** 2026-10-23 (free data only) |
 | Data | Cboe free delayed feed (SPX, NDX, SPY, QQQ) | **Removed** 2026-11 (refused GitHub's servers with HTTP 403) |
-| Data | OCC open interest + the previous session's per-strike smile from London Strategic Edge (this PC only, `gexsys/smile.py`) | **Unverified** against a live LSE session; method checked independently on synthetic rows (51 claims). Plan, paste and grades held until the accuracy study |
+| Data | OCC open interest + the previous session's per-strike smile from London Strategic Edge (this PC only, `gexsys/smile.py`) | **Partial**: study occ_lse_accuracy v2 part A (2026-11-28) found it **better** than the VIX curve at the money on one-day expiries (n = 10, verifier PASS); levels never checked against a full chain (no historical OI). Not yet run live. Plan, paste and grades held pending the owner's word |
 | Data | Schwab Trader API | **Removed** 2026-10-23 (API access denied) |
 | Math | Vanna and charm exposure, absolute gamma strike, hedge size in contracts, zero-gamma distance in σ | Working: vanna/charm validated by finite differences; live numbers hand-checked |
 | Testing | `python -m gexsys audit`: live end-to-end checks (data, vendor Greeks vs independent recalculation, levels, accounting, payload) | Working: 36/36 checks passed on live Cboe NQ and ES data (2026-10-21) |
