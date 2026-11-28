@@ -561,3 +561,9 @@ The entry above and its PR text got these wrong. Rechecked the same evening:
 - Parity (tools/parity.py, origin/main vs branch): identical except the new `summary.chain` field.
 - Not checked: a live LSE session (the 10-call exploration budget is spent); whether the smile beats the VIX curve
   (workstream 7 study, pre-registered first). Plan, paste and grades stay off occ+lse until then.
+
+## 2026-11-28 study occ_lse_accuracy v1 written (rework workstream 7), sha256 607b25a6...641737
+
+- Written before any comparison. A (IV level vs Cboe's own close quotes, 10-19 Nov, n at most 12 pairs) needs LSE
+  Greeks history for 9-19 Nov: not yet budgeted. B: not possible (no historical OI from OCC). C: runs once START.bat has
+  cached LSE chains. D: not run (Cboe removed). Pass bar proposed, waiting for the owner; the paste stays held either way.
