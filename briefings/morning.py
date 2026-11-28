@@ -216,7 +216,9 @@ def market_brief(m: dict, record: list, session: str, now: datetime, kind: str =
         t = _t(m["asof"])
         if t > now:                                        # no hindsight: a brief never holds data newer than itself
             raise ValueError(f"{m['market']} levels are stamped {t.isoformat()}, after the brief ({now.isoformat()})")
-        feed = ("estimate (OCC open interest with one VIX-family vol per expiry, no skew; not graded)"
+        feed = ("estimate (OCC open interest with each strike's vol from the previous session's smile, Data: London "
+                "Strategic Edge; not graded)" if m.get("backup") and m.get("chain") == "occ+lse" else
+                "estimate (OCC open interest with one VIX-family vol per expiry, no skew; not graded)"
                 if m.get("backup") else "real time" if m.get("quality") == "RT" else "15-min delayed")
         data = f"{m.get('options', '')} options, {feed}, calculated {_clock(t)} ET; open interest from the last close."
         if (now - t).total_seconds() > STALE_S:

@@ -23,6 +23,7 @@ from feeds.component import FeedsComponent
 from gexsys import marketcal, publish
 from gexsys.component import GexComponent
 from trackrecord.component import TrackRecordComponent
+from trackrecord.smile_series import SmileTrackRecord
 
 from .archive import ArchiveComponent
 from .context import pre_open, snapshot, week_data
@@ -51,4 +52,14 @@ def default_components(gex_configs) -> list:
                                  session_close=lambda d: datetime.combine(d, marketcal.rth_close(d), marketcal.NY))
     arc = ArchiveComponent()
     st = StudiesComponent()
-    return [gex, feeds, track, briefings, arc, st, HealthComponent([gex, feeds, briefings, track, arc, st])]
+    smile = [SmileTrackRecord(pre_open=lambda d: pre_open(gex, d, chain="occ+lse"), is_trading_day=marketcal.is_trading_day,
+                              session_close=track.session_close)] if smile_series_on() else []
+    return [gex, feeds, track, briefings, arc, st, *smile, HealthComponent([gex, feeds, briefings, track, arc, st])]
+
+
+def smile_series_on() -> bool:
+    """The smile estimate's own track record runs where the smile does: GEX_LSE=1 (START.bat) and never on GitHub or in
+    the hosted build (gexsys/providers/lse.py why_not_here). Never part of the hosted site."""
+    import os
+    from gexsys.providers import lse
+    return os.environ.get("GEX_LSE") == "1" and lse.why_not_here() is None

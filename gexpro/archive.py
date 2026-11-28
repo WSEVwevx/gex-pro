@@ -85,7 +85,9 @@ def candidates(folder: Path, d: date) -> list[dict]:
                 em = ((s.get("extras") or {}).get("expected_move") or {}).get("daily_points")
                 out.append({"file": f"{f.parent.name}/{f.name}", "asof": t.isoformat(), "status": s.get("status"),
                             "usable": bool(s.get("status") != "UNAVAILABLE" and not s.get("backup") and em),
-                            "estimate": bool(s.get("status") != "UNAVAILABLE" and s.get("backup") and em)})
+                            # never the smile estimate: its vols are local only and stay off the archive (licence)
+                            "estimate": bool(s.get("status") != "UNAVAILABLE" and s.get("backup") and em
+                                             and s.get("chain") != "occ+lse")})
         day += timedelta(days=1)
     return sorted(out, key=lambda c: c["asof"])
 
