@@ -4,6 +4,7 @@
   python -m gexpro serve --config a.json --config b.json [--port 8765]
   python -m gexpro build-site [--out _site] [--state .state]   hosted copy (GitHub workflow)
   python -m gexpro archive [--state .state]                    add due days to the archive branch (GitHub workflow)
+  python -m gexpro rawsave                                     save the raw morning inputs to the raw branch (GitHub workflow)
 
 GEX-only tools (demo, snapshot, audit, replay, sensitivity) stay in `python -m gexsys`.
 """
@@ -38,6 +39,7 @@ def main(argv=None) -> int:
     bs.add_argument("--state", default=".state", help="folder kept between runs (last good results, history, caches)")
     ar = sub.add_parser("archive", help="add the due trading days to the history archive branch (gexpro/archive.py)")
     ar.add_argument("--state", default=".state")
+    sub.add_parser("rawsave", help="save the OCC estimate's raw inputs before the open to the raw branch (gexpro/rawsave.py)")
     a = ap.parse_args(argv)
     logging.basicConfig(level=getattr(logging, a.log_level.upper(), logging.INFO),
                         format='{"t":"%(asctime)s","lvl":"%(levelname)s","log":"%(name)s","msg":"%(message)s"}')
@@ -63,6 +65,11 @@ def main(argv=None) -> int:
         idx = archive.run(Path(a.state))
         print(json.dumps({k: idx[k] for k in ("wrote", "missing", "error", "markets")}))
         return 1 if idx["error"] else 0
+    if a.cmd == "rawsave":
+        from . import rawsave
+        res = rawsave.run()
+        print(json.dumps(res))
+        return 1 if res["session"] and not res["saved"] else 0
     return 2
 
 

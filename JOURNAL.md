@@ -592,3 +592,14 @@ The entry above and its PR text got these wrong. Rechecked the same evening:
 - Unchanged: the main record still takes no estimate; briefs from an estimate stay ungraded (their data line now names
   the smile); the TradingView paste stays on hold (B and D could not check levels against a full chain).
 - Not checked yet: a live session through START.bat with GEX_LSE=1 (the first plan can freeze on Mon 30 Nov).
+
+## 2026-11-28 decision 004: the public morning save (private app W1; the owner: "keep the public morning save")
+
+- OCC's website Terms and Conditions (updated 2025-02-05, theocc.com/specialpages/legal/terms-and-conditions) forbid
+  mirroring its Services (k), copying or distributing access to them (o) and automated access (p). The owner stated
+  that OCC's management approved both GEX PRO's automated reading of Series Search and keeping its raw files in the
+  public `raw` branch. That approval was given to the owner and is not verified here; no written copy is in the repo.
+  Suggested: keep OCC's written OK privately.
+- So: gexpro/rawsave.py and .github/workflows/morning.yml (the workflow approved by the owner as an exact file) save the
+  13 free OCC/Yahoo inputs before each open. No LSE data on GitHub (the LSE licence is unchanged).
+- Not checked: Yahoo's terms for automated access (GEX PRO already uses Yahoo for prices and vols).
