@@ -54,6 +54,7 @@ WRITE_AFTER = time(17, 15)                     # the futures day ends 17:00 ET; 
 GIVE_UP_DAYS = 3                               # after this, a day is written with its gaps named
 LOOKBACK_DAYS = 7                              # the build's state keeps 7 days of snapshots
 LATE_AFTER = time(18, 0)                       # Data health: a trading day still missing at 18:00 ET is an error
+KEPT = "; the OCC estimate is kept as "             # a gap an estimate fills: it never holds a day back
 MARKETS = {"NQ": {"futures": "NQ=F", "index": "^NDX"}, "ES": {"futures": "ES=F", "index": "^GSPC"}}
 YAHOO = "https://query1.finance.yahoo.com/v8/finance/chart/{sym}?interval=1m&period1={p1}&period2={p2}&includePrePost=true"
 UA = {"User-Agent": "Mozilla/5.0 (GEX PRO archive)"}
@@ -208,7 +209,7 @@ def build_day(d: date, folders: dict[str, Path], now: datetime, get: Callable[[s
                 e = est[k]
                 chosen[m][f"{k}_estimate"] = {"file": e["file"], "asof": e["asof"]}
                 files[f"{m}-{k}-estimate.json"] = (folder / e["file"]).read_bytes()
-                gaps.append(f"{m} {k} snapshot: {WHY[k]}; the OCC estimate is kept as {m}-{k}-estimate.json")
+                gaps.append(f"{m} {k} snapshot: {WHY[k]}{KEPT}{m}-{k}-estimate.json")
             else:
                 gaps.append(f"{m} {k} snapshot: {WHY[k]}")
                 wait = True
@@ -289,14 +290,17 @@ def health_row(idx: Optional[dict]) -> dict:
         return dict(row, note="not checked yet in this build's saved state")
     row["last_ok"] = idx.get("last_ok")
     pend = idx.get("pending") or {}
-    why = lambda d: f" ({pend[d][0]})" if pend.get(d) else ""
+    # name what the day waits for, not a slot an estimate already fills (hosted, 28 Nov 2026: the row quoted "ES open
+    # snapshot: ... the OCC estimate is kept" while the day waited for its midday snapshots)
+    first = lambda gaps: next((g for g in gaps if KEPT not in g), gaps[0])
+    why = lambda d: f" ({first(pend[d])})" if pend.get(d) else ""
     errs = ([idx["error"]] if idx.get("error") else []) + \
            ([f"{len(idx['missing'])} trading day(s) missing after 18:00 ET: {', '.join(d + why(d) for d in idx['missing'][-3:])}"]
             if idx.get("missing") else [])
     row["error"] = "; ".join(errs) or None
     if pend and not row["error"]:
         d = sorted(pend)[-1]
-        row["note"] = f"{d} waits for missing parts: {pend[d][0]}"
+        row["note"] = f"{d} waits for missing parts: {first(pend[d])}"
     elif idx.get("gaps") and not row["error"]:
         last = sorted(idx["gaps"])[-1]
         row["note"] = f"{len(idx['gaps'])} day(s) saved with gaps, newest {last}: {idx['gaps'][last][0]}"
