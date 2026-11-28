@@ -117,6 +117,13 @@ class Fitting(unittest.TestCase):
         end = [(b[0][0], 0.90, 1)] + b[1:]                       # at an end too
         self.assertEqual(S.screen(end), (b[1:], 1))
 
+    def test_two_stale_bins_close_together_are_both_screened(self):
+        # 2026-11-28: with a two-neighbour line, two spikes inflated every nearby miss and the median, and none went
+        b = [(-0.3 + 0.02 * i, truth(-0.3 + 0.02 * i), 1) for i in range(30)]
+        for spikes in ((10, 12), (0, 2), (28, 29), (10, 11, 12)):
+            bad = [(x, 0.9 if i in spikes else v, w) for i, (x, v, w) in enumerate(b)]
+            self.assertEqual(S.screen(bad), ([t for i, t in enumerate(b) if i not in spikes], len(spikes)), spikes)
+
     def test_the_screen_keeps_a_smooth_steep_wing(self):
         b = [(x / 50, truth(x / 50), 1) for x in range(-30, 31)]     # curvature of a steep real smile
         self.assertEqual(S.screen(b), (b, 0))

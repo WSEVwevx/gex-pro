@@ -20,10 +20,13 @@ The math (rules v1, fixed 2026-11-28 before any result was looked at):
          In each bin, rows further than max(2 vol points, 3 x MAD) from the bin's volume-weighted median IV are
          dropped (a stale print); the bin is then the volume-weighted mean of x AND of IV over the rest (both from the
          same rows: a median IV beside a mean x is biased on a sloped smile), weight = their total volume.
-  Bad bins: a bin that is a lone stale print cannot be trimmed inside itself, so each bin is compared with the line
-         through its two neighbours (the two inward ones at an end); the worst is dropped while it misses by more than
-         max(3 vol points, 4 x the median miss), at most a quarter of the bins (a smile is smooth on a tenth of a
-         standard deviation: its curvature there is a fraction of a vol point).
+  Bad bins: a bin that is a lone stale print cannot be trimmed inside itself, so each bin is compared with a robust
+         local line: the Theil-Sen line (median pairwise slope, median intercept) through the up to 3 bins on each side
+         of it, itself left out, so a stale bin does not bend the reference of the good bins beside it. The worst bin
+         is dropped while it misses by more than max(3 vol points, 4 x the median miss), at most a quarter of the bins
+         (a smile is smooth over a few tenths of a standard deviation: its curvature there is a fraction of a vol point).
+         Tested: up to 3 stale bins together among 30 are all removed, at either end too; on a handful of bins, two
+         stale ones can hide each other (past what any median can resist) and stay, to show in the fit's miss.
   A fit needs >= 5 bins, >= 2 of them on each side of x = 0; otherwise the expiry has no fit of its own.
   Fit:   a monotone piecewise-cubic Hermite spline (PCHIP, Fritsch-Carlson slopes, scipy's end rule) of IV over x
          through the bins; flat IV beyond the first and last bin.
@@ -42,6 +45,23 @@ The math (rules v1, fixed 2026-11-28 before any result was looked at):
     VIX-family curve between the two closes: a(T) = curve_new(T) / curve_P(T). Older than that: no smile.
   0DTE: today's expiring contracts get no IV (the engine drops them, as it dropped contracts without data in the
     Cboe era): one-day vol is not yesterday's two-day vol, and no study has validated it yet.
+
+Exact readings (pinned after the independent re-computation of 2026-11-28, which matched every claim to 1e-13):
+  - window: open <= last trade <= close; "last hour" is last trade >= close - 60 min (to the microsecond; LSE's
+    nanoseconds are cut); the session window is used when the last-hour bins fail the full test (>= 5 bins, >= 2 on
+    each side) after the screen; a bin at exactly x = 0 counts on neither side.
+  - bins: index floor(x / width), the grid anchored at x = 0. Weighted median = the lowest value whose cumulative
+    weight reaches half; MAD = the weighted median of |IV - median|; a row is kept when |IV - median| <= the limit.
+  - screen: the signed miss against the Theil-Sen line of bins i-3..i+3 without i (fewer at an end); slope = the
+    median of (v_b - v_a) / (x_b - x_a) over every pair a < b of them, intercept = the median of v - slope x; medians
+    of an even count average the middle two. All misses and their median (sorted |miss|[n // 2], the candidate
+    included) are recomputed after each drop; a bin is dropped when |miss| > the limit; ties take the lower x; it runs
+    while >= 5 bins remain and fewer than int(0.25 x the bins it started with) are dropped.
+  - quality: over every row in the window used (rows trimmed inside a bin included); a row counts as an outlier when
+    |row IV - fit| > 9 vol points; RMS weights are volumes.
+  - T: seconds / (365 x 86400). a(T0) is evaluated at today's T0. sigma_ref is the vol-date curve at the expiry's time
+    left from now. Beyond the last (before the first) fitted expiry, that expiry's fit IV at x0 is used as is.
+  - IV bounds are inclusive: 0.03 <= IV <= 3.0.
 
 Gamma is the engine's own (pricing.model_gamma at the current price), never LSE's: LSE's gamma is at another price.
 Pure functions: no network, no files. gexsys/providers/occ.py feeds it; tests/test_smile.py and the verifier check it.
@@ -218,17 +238,28 @@ SCREEN_MADS = 4.0
 SCREEN_MAX = 0.25                       # share of bins the screen may drop
 
 
+SCREEN_REACH = 3                        # bins on each side in the local line
+
+
+def _median(v: list) -> float:
+    v = sorted(v)
+    n = len(v)
+    return v[n // 2] if n % 2 else (v[n // 2 - 1] + v[n // 2]) / 2.0
+
+
 def _neighbour_miss(b: list, i: int) -> float:
-    """Bin i's IV minus the line through its neighbours (the two inward ones at an end)."""
-    j, k = (i - 1, i + 1) if 0 < i < len(b) - 1 else ((1, 2) if i == 0 else (i - 2, i - 1))
-    (xj, vj, _), (xk, vk, _) = b[j], b[k]
-    return b[i][1] - (vj + (vk - vj) * (b[i][0] - xj) / (xk - xj))
+    """Bin i's IV minus the Theil-Sen line through bins i-3..i+3, bin i left out (module docstring)."""
+    nb = [b[j] for j in range(max(0, i - SCREEN_REACH), min(len(b), i + SCREEN_REACH + 1)) if j != i]
+    slopes = [(nb[k][1] - nb[j][1]) / (nb[k][0] - nb[j][0]) for j in range(len(nb)) for k in range(j + 1, len(nb))]
+    m = _median(slopes)
+    c = _median([v - m * x for x, v, _ in nb])
+    return b[i][1] - (c + m * b[i][0])
 
 
 def screen(b: list) -> tuple[list, int]:
     """(bins without the stale ones, how many were dropped): module docstring, "Bad bins"."""
     b, dropped, most = list(b), 0, int(len(b) * SCREEN_MAX)
-    while len(b) >= 4 and dropped < most:
+    while len(b) >= 5 and dropped < most:
         miss = [_neighbour_miss(b, i) for i in range(len(b))]
         mad = sorted(abs(m) for m in miss)[len(miss) // 2]
         worst = max(range(len(b)), key=lambda i: abs(miss[i]))

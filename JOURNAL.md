@@ -545,3 +545,19 @@ The entry above and its PR text got these wrong. Rechecked the same evening:
 - Not checked: hosted LCP during a session; the band note live; offline first chart open (library cached only after
   first use). Next in M: parity runner, v2 scaffolding, v2 Levels in the chosen look. Font download (Archivo) not
   yet approved.
+
+## 2026-11-28 decision 002: OCC open interest + the previous session's LSE smile, local only (rework workstream 4)
+
+- The owner: Cboe "completely expelled" (PR 91); estimates "as accurate as possible", no extra estimate
+  label needed. So on this PC, with a London Strategic Edge key, each strike gets its own vol from the previous
+  session's smile instead of one VIX-family vol per expiry (no skew). Hosted site, GitHub and the archive: unchanged.
+- Method `gexsys/smile.py` rules v1 (METHODOLOGY 4d). Two changes made during review: bins average x and IV over the
+  same rows (a median IV with a mean x biased the fit by 0.83 vol pts; now 0.007 on synthetic truth); the stale-bin
+  screen uses a Theil–Sen line over 3 bins each side (a line through the two neighbours let two nearby stale bins
+  hide each other). On ~8 bins, two spikes can still shield each other: documented, not fixed.
+- Verifier (own code from the written rules, synthetic LSE-shaped rows, tolerances fixed first): 70 claims PASS on
+  the first rules, 51 PASS on the Theil–Sen rules. It noted its E3 case does not separate the two screens;
+  tests/test_smile.py does (two adjacent stale bins, 30 bins).
+- Parity (tools/parity.py, origin/main vs branch): identical except the new `summary.chain` field.
+- Not checked: a live LSE session (the 10-call exploration budget is spent); whether the smile beats the VIX curve
+  (workstream 7 study, pre-registered first). Plan, paste and grades stay off occ+lse until then.
