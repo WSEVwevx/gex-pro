@@ -206,6 +206,17 @@ class SessionCache(unittest.TestCase):
             self.assertIsNone(c.newest_landed("SPXW", before=wed))
             self.assertIn("newest Greeks 2026-11-25 21:00", c.health_row()["detail"])
 
+    def test_a_session_already_passed_is_not_asked_again(self):
+        thu_greeks = {"contracts": 1, "greeks_as_of": "2026-11-27 18:30:00", "rows": [row(100)]}
+        with tempfile.TemporaryDirectory() as tmp:
+            t = [0.0]
+            op = Script(thu_greeks)
+            c = lse.LseClient(key=KEY, opener=op, clock=lambda: t[0], cache_dir=tmp)
+            self.assertIsNone(c.session_chain("SPXW", date(2026, 11, 25)))
+            t[0] += 10 * lse.REFETCH_S
+            self.assertIsNone(c.session_chain("SPXW", date(2026, 11, 25)))
+            self.assertEqual(len(op.reqs), 1)
+
     def test_a_greeks_time_is_dated_in_new_york(self):
         self.assertEqual(lse.session_of("2026-11-25 20:58:19.448381162"), date(2026, 11, 25))
         self.assertEqual(lse.session_of("2026-11-26 01:30:00"), date(2026, 11, 25))   # 20:30 ET

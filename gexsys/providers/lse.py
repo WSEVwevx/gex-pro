@@ -280,6 +280,8 @@ class LseClient:
         have = self.cached(root, session)
         if have and have.get("landed"):
             return have
+        if have and have.get("gone"):
+            return None                     # LSE already serves a later session's Greeks: this one never lands here
         if have and self.clock() - have.get("fetched_at", 0) < REFETCH_S:
             return None
         got = self.chain(root, **filters)
@@ -289,7 +291,7 @@ class LseClient:
                    filters=filters)
         if gs and gs > session:
             landed = False                  # newer Greeks already: that session's chain is gone from this endpoint
-            rec.update(landed=False, rows=[], note=f"the Greeks already moved on to {gs}")
+            rec.update(landed=False, gone=True, rows=[], note=f"the Greeks already moved on to {gs}")
         f = self._file(root, session)
         if f:
             _atomic_write(f, rec if landed else {k: v for k, v in rec.items() if k != "rows"})
