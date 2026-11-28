@@ -24,7 +24,7 @@ class TestRankedLevels(unittest.TestCase):
         s = {"asof": "2026-10-20T15:00:00+00:00", "ref_price": 100.0, "net": 1.0, "regime": "POSITIVE", "status": "OK",
              "extras": {"nearest": {"label": "0DTE", "expiration": "2026-10-20",
                                     "ranked": {"call": [{"price": 101.0, "share": 0.2}], "put": [{"price": 99.0, "share": 0.1}], "abs": []}}}}
-        d = parse_payload(pine_payload(s, "ES", "SPX", "ratio", provider="CBOE"))
+        d = parse_payload(pine_payload(s, "ES", "SPX", "ratio", provider="OCC"))
         self.assertEqual((d["R0"], d["x0d"]), ("C101.00:20.0,P99.00:10.0", "2026-10-20"))
 
 

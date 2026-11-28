@@ -22,7 +22,7 @@ def _fill(root: Path, days: int, per_day: int) -> None:
     for d in range(days):
         for i in range(per_day):
             t = t0 - timedelta(days=d) + timedelta(minutes=i)
-            st.save("NQ-CBOE", {"asof": t.isoformat(), "status": "OK", "zero_gamma": {"price": 100.0 + i}})
+            st.save("NQ-OCC", {"asof": t.isoformat(), "status": "OK", "zero_gamma": {"price": 100.0 + i}})
 
 
 class TestHistoryCosts(unittest.TestCase):
@@ -32,14 +32,14 @@ class TestHistoryCosts(unittest.TestCase):
             globbed = []
             real = Path.glob
             with mock.patch.object(Path, "glob", lambda self, pat: globbed.append(self.name) or real(self, pat)):
-                s = SnapshotStore(tmp).latest("NQ-CBOE", usable=True)
+                s = SnapshotStore(tmp).latest("NQ-OCC", usable=True)
             self.assertEqual(s["zero_gamma"]["price"], 119.0)
             self.assertEqual(globbed, ["20261113"])                     # one folder, however long the history
 
     def test_session_reader_parses_each_file_once(self):
         with tempfile.TemporaryDirectory() as tmp:
             _fill(Path(tmp), days=2, per_day=30)
-            folder = Path(tmp) / "NQ-CBOE"
+            folder = Path(tmp) / "NQ-OCC"
             since = datetime(2026, 11, 12, 0, 0, tzinfo=timezone.utc)
             session._LIGHT.clear()
             with mock.patch.object(session.json, "loads", wraps=json.loads) as loads:

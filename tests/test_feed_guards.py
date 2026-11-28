@@ -7,43 +7,7 @@ from datetime import datetime, timedelta, timezone
 from feeds import drivers, quotes
 from gexsys import engine as eng
 from gexsys.normalize import normalize
-from gexsys.providers.cboe import CboeProvider, ProviderError
 from tests.util import chain, contract
-
-# an expiry a month after the run date: a fixed date turns into an expired chain the evening it passes
-EXP = (datetime.now(timezone.utc) + timedelta(days=30)).strftime("%y%m%d")
-
-
-def _raw(price, ts=None, n=3):
-    ts = ts or datetime.now(timezone.utc) - timedelta(minutes=20)
-    opts = [{"option": f"SPXW{EXP}C0{7600 + 25 * i}000", "iv": 0.2, "gamma": 0.001, "open_interest": 100,
-             "bid": 1.0, "ask": 1.2, "volume": 1} for i in range(n)]
-    return {"timestamp": ts.strftime("%Y-%m-%d %H:%M:%S"), "data": {"current_price": price, "options": opts}}
-
-
-def _etf(price):
-    r = _raw(price)
-    for o in r["data"]["options"]:
-        o["option"] = f"SPY{EXP}C00760000"
-    return r
-
-
-class TestProviderGuards(unittest.TestCase):
-    def test_timestamp_in_the_future_is_refused(self):
-        raw = _raw(7600.0, ts=datetime.now(timezone.utc) + timedelta(hours=5))
-        with self.assertRaises(ProviderError):
-            CboeProvider(http=lambda *a, **k: raw, include_etf=False).fetch_snapshot("SPX", 45, True)
-
-    def test_etf_without_a_price_or_with_a_wrong_one_is_not_used_and_says_so(self):
-        for etf_price, why in ((0, "no price"), (76.0, "price ratio 100.00 outside 9.5-10.5")):
-            raws = {"_SPX": _raw(7600.0), "SPY": _etf(etf_price)}
-            prov = CboeProvider(http=lambda url, headers, limiter=None: raws[url.rsplit("/", 1)[1][:-5]], include_etf=True)
-            snap = prov.fetch_snapshot("SPX", 45, True)
-            self.assertFalse(any(c.root == "SPY" for c in snap.contracts))
-            self.assertTrue(any("SPY options not used (" + why in w for w in snap.warnings), snap.warnings)
-            res = eng.compute(normalize(snap), asof=snap.fetched_at)
-            self.assertEqual(res.status, "DEGRADED")
-
 
 class TestCorruptChain(unittest.TestCase):
     def test_many_invalid_values_degrade_the_result(self):
@@ -89,10 +53,10 @@ class TestDamagedCache(unittest.TestCase):
         from pathlib import Path
         from gexsys import config as cfgmod, service
         with tempfile.TemporaryDirectory() as tmp:
-            cfg = cfgmod.load("configs/free_nq_cboe.json")
+            cfg = cfgmod.load("configs/free_nq.json")
             cfg.storage["root"] = tmp
             for junk in (b"null", b'{"unexpected": 1}', b'{"summary": 3}', b"\x00\xff garbage", b'{"slot_et": 5}'):
-                for name in ("last_good_NQ-CBOE.json", "published_NQ-CBOE.json"):
+                for name in ("last_good_NQ-OCC.json", "published_NQ-OCC.json"):
                     (Path(tmp) / name).write_bytes(junk)
                 w = service.MarketWorker(cfg)
                 self.assertIsNone(w.result)

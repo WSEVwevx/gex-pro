@@ -234,7 +234,7 @@ class TestPineStatic(unittest.TestCase):
                                                 "monthly_points": 1.0, "monthly_expiry": "2026-11-20", "daily_iv": 0.2, "weekly_iv": 0.2, "monthly_iv": 0.2},
                               "greeks": {"vanna_usd_per_vol_pt": 1.0, "charm_usd_per_day": 1.0},
                               "profile": {"base": 1.0, "width": 1.0, "values": [1]}}}
-        emitted = {kv.split("=", 1)[0] for kv in pine_payload(summary, "NQ", "NDX", "ratio", provider="CBOE",
+        emitted = {kv.split("=", 1)[0] for kv in pine_payload(summary, "NQ", "NDX", "ratio", provider="OCC",
                                                                delta={"zero_gamma": 1.0, "prev_regime": "POSITIVE"}).split(";")[1:] if "=" in kv}
         # fields the service adds on every refresh (gexsys/service.py, add_tokens): open levels, reaction stats,
         # past sessions' levels (the call may span several lines)

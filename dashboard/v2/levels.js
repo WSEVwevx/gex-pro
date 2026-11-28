@@ -32,7 +32,7 @@ function render(){
   }
   const S = M.source;
   h.push(`<section class="state"><div class="sc k">Source</div><div>${S.backup
-    ? `<b class="hl">Backup estimate, not Cboe data.</b> ${esc(S.note || "")}`
+    ? `<b>${esc(S.provider || "")} levels</b> ${esc(S.note || "")}`
     : `<b>${esc(S.provider || "")} data</b> (${esc(S.kind || "")})`}
     ${S.warnings.length ? `<div class="w">${S.warnings.map(esc).join(" · ")}</div>` : ""}</div></section>`);
   h.push('<div class="form"><div>');
@@ -55,7 +55,7 @@ function render(){
   const T = M.paste;
   h.push(row("TradingView paste", T.missing ? miss(T.missing)
     : `<div class="pline"><button class="copy" id="copy" type="button">Copy paste</button><span><b>${esc(etDay(T.at))}, ${esc(etTime(T.at))}</b> <span class="dim">(${esc(T.slot)} slot)</span></span></div>
-       ${T.onHold ? `<div class="pnote"><span class="hl">On hold, ${esc(G.age(T.ageMin))} old.</span> Backup estimates are not pasted, so it still carries the levels of that slot${T.zg != null ? ` (zero gamma ${num(T.zg)})` : ""}.${T.next ? ` Next attempt ${esc(T.next)} ET.` : ""}</div>` : ""}`));
+       ${T.onHold ? `<div class="pnote"><span class="hl">On hold, ${esc(G.age(T.ageMin))} old.</span> Estimates are not pasted, so it still carries the levels of that slot${T.zg != null ? ` (zero gamma ${num(T.zg)})` : ""}.${T.next ? ` Next attempt ${esc(T.next)} ET.` : ""}</div>` : ""}`));
   h.push("</div>");
   // the ladder
   const t = [`<table class="lad"><caption><span class="sc">Ladder, ${esc(market)} futures prices</span> <span class="dim">· as of ${esc(etTime(M.asof))}</span></caption>

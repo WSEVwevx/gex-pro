@@ -18,6 +18,8 @@ from datetime import date, datetime, timedelta
 from typing import Optional
 from zoneinfo import ZoneInfo
 
+from . import hostswitch
+
 log = logging.getLogger("feeds.weekinfo")
 NY = ZoneInfo("America/New_York")
 UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36",
@@ -37,6 +39,8 @@ WEEKDAY = {"Redbook": 1, "MBA Mortgage Applications": 2, "Initial Jobless Claims
 
 
 def _get(url: str, timeout: float = 20) -> Optional[bytes]:
+    if hostswitch.why_off(url):
+        return None                                             # switched off here: the calendar reads empty
     try:
         with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=timeout) as r:
             return r.read()

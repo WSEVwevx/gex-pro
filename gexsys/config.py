@@ -19,8 +19,7 @@ from .publish import PublishConfig
 
 TOP_KEYS = {"market", "source", "provider", "engine", "levels", "mapping", "futures_ref", "refresh",
             "alerts", "storage", "description", "publish"}
-PROVIDERS = {"csv", "synthetic", "cboe"}
-FREE_INDEX_SOURCES = {"SPX", "NDX", "SPY", "QQQ"}
+PROVIDERS = {"csv", "synthetic", "occ"}
 
 
 def _build(cls, data: dict, section: str):
@@ -68,8 +67,8 @@ class MarketConfig:
             raise ConfigError(f"provider.name must be one of {sorted(PROVIDERS)}")
         if name == "csv" and not self.provider.get("path"):
             raise ConfigError("csv provider requires provider.path")
-        if name == "cboe" and self.source not in FREE_INDEX_SOURCES:
-            raise ConfigError(f"{name} provider supports sources {sorted(FREE_INDEX_SOURCES)}")
+        if name == "occ" and self.source not in ("NDX", "SPX"):
+            raise ConfigError("occ provider supports sources ['NDX', 'SPX'] (with QQQ / SPY folded in)")
         if self.provider.get("include_etf") and self.source not in ("SPX", "NDX"):
             raise ConfigError("provider.include_etf adds SPY to SPX or QQQ to NDX: source must be SPX or NDX")
         mode = self.futures_ref.get("mode", "none")
@@ -116,17 +115,12 @@ def make_provider(cfg: MarketConfig):
     if name == "csv":
         from .providers.csvfile import CsvProvider
         return CsvProvider(**p)
-    if name == "cboe":
-        from .providers.cboe import CboeProvider
-        cboe = CboeProvider(**p)
-        if cfg.source not in ("NDX", "SPX"):
-            return cboe
-        # only when Cboe refuses (it began blocking automated requests on 2026-11-19): OCC open interest + VIX-family
-        # vols, labelled as a backup estimate (gexsys/providers/occ.py). Its downloads are cached beside the snapshots.
+    if name == "occ":
+        # OCC open interest + VIX-family vols (gexsys/providers/occ.py); its downloads are cached beside the snapshots
         import os
-        from .providers.occ import FallbackProvider, OccProvider
+        from .providers.occ import OccProvider
         root = Path(os.path.expandvars(str(cfg.storage.get("root", "data/snapshots"))))
-        return FallbackProvider(cboe, OccProvider(cache_dir=str(root.parent / "occ_cache")))
+        return OccProvider(cache_dir=str(root.parent / "occ_cache"))
     from .providers.synthetic import SyntheticProvider
     return SyntheticProvider(**p)
 

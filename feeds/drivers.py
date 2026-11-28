@@ -26,6 +26,8 @@ from pathlib import Path
 from typing import Callable, Optional
 from zoneinfo import ZoneInfo
 
+from . import hostswitch
+
 log = logging.getLogger("feeds.drivers")
 NY = ZoneInfo("America/New_York")
 UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36",
@@ -34,8 +36,6 @@ WEIGHTS_URL = {"NQ": "https://www.slickcharts.com/nasdaq100", "ES": "https://www
 INTRADAY = "https://query1.finance.yahoo.com/v8/finance/chart/{sym}?range=1d&interval=5m&includePrePost=true"
 DAILY = "https://query1.finance.yahoo.com/v8/finance/chart/{sym}?range=3mo&interval=1d"
 EARNINGS = "https://api.nasdaq.com/api/calendar/earnings?date={d}"
-CHAIN = "https://cdn.cboe.com/api/global/delayed_quotes/options/{sym}.json"     # one stock's options, 15-min delayed
-OCC = re.compile(r"^([A-Z.]+)(\d{6})([CP])(\d{8})$")
 FUTURES = {"NQ": "NQ=F", "ES": "ES=F"}
 FALLBACK = Path(__file__).with_name("index_weights.json")
 ROW = re.compile(r'<tr><td>\d+</td><td[^>]*><a href="/symbol/([^"]+)">([^<]*)</a></td><td><a[^>]*>[^<]*</a></td><td>([\d.]+)%</td>')
@@ -103,32 +103,6 @@ def parse_daily(raw: bytes) -> Optional[dict]:
             "bars": _bars(r)}
 
 
-def implied_move(raw: bytes, first_expiry: str) -> Optional[dict]:
-    """The options market's expected move through an earnings report: the at-the-money straddle (call + put
-    mid) of the first expiration on or after `first_expiry`, as a % of the stock price."""
-    try:
-        d = json.loads(raw)["data"]
-        spot = float(d["current_price"])
-    except (KeyError, TypeError, ValueError):
-        return None
-    legs: dict = {}
-    for o in d.get("options") or []:
-        m = OCC.match(o.get("option") or "")
-        if not m:
-            continue
-        exp = f"20{m.group(2)[:2]}-{m.group(2)[2:4]}-{m.group(2)[4:]}"
-        bid, ask = o.get("bid") or 0, o.get("ask") or 0
-        if exp >= first_expiry and bid > 0 and ask >= bid:
-            legs.setdefault(exp, {}).setdefault(int(m.group(4)) / 1000, {})[m.group(3)] = (bid + ask) / 2
-    for exp in sorted(legs):
-        both = {k: v for k, v in legs[exp].items() if "C" in v and "P" in v}
-        if both and spot > 0:
-            k = min(both, key=lambda x: abs(x - spot))
-            straddle = both[k]["C"] + both[k]["P"]
-            return {"expiry": exp, "strike": k, "straddle": round(straddle, 2), "pct": round(100 * straddle / spot, 2)}
-    return None
-
-
 def parse_earnings(raw: bytes, day: str) -> dict:
     """{symbol: {"date", "when"}} from one day of Nasdaq.com's earnings calendar."""
     try:
@@ -155,6 +129,7 @@ class Drivers:
                 pass
 
     def _get(self, url: str, timeout: float = 15) -> bytes:
+        hostswitch.check(url)
         with self.opener(urllib.request.Request(url, headers=UA), timeout=timeout) as r:
             return r.read()
 
@@ -264,18 +239,16 @@ class Drivers:
                     continue
                 d = self._slow["daily"].get(sym) or {}
                 e = self._slow["earnings"].get(sym.replace("-", ".")) or self._slow["earnings"].get(sym)
-                em = self._earn_move(sym, e, now)
                 row = {"symbol": sym, "name": name, "price": p["price"], "pct": p["pct"], "change": p["price"] - p["prev"],
                        "ext": p["ext"], "volume": p["volume"], "avg_volume": d.get("avg_volume"),
                        "rel_volume": p["volume"] / d["avg_volume"] if p["volume"] and d.get("avg_volume") else None,
                        "w_nq": w_nq, "w_es": w_es, "spark": (d.get("spark") or []) + [round(p["price"], 2)],
-                       "earnings": e, "earn_move": em, "stale": p["stale"]}
+                       "earnings": e, "earn_move": None, "stale": p["stale"]}
                 for m, w in (("nq", w_nq), ("es", w_es)):
                     f = fut[m.upper()]
                     row["pts_" + m] = w / 100 * p["pct"] / 100 * f["price"] if f and w else None
                     row["ext_pts_" + m] = w / 100 * p["ext"]["pct"] / 100 * f["price"] if f and w and p["ext"] else None
-                    # what the options market prices in for the report, in futures points (±)
-                    row["earn_pts_" + m] = w / 100 * em["pct"] / 100 * f["price"] if f and w and em else None
+                    row["earn_pts_" + m] = None        # the earnings implied move needs a stock option chain: none free
                 stocks.append(row)
             totals = {}
             for m in ("NQ", "ES"):
@@ -293,32 +266,10 @@ class Drivers:
             W = self._slow["weights"] or {}
             self._out = {"fetched": datetime.fromtimestamp(now, timezone.utc).isoformat(),
                          "weights_asof": W.get("asof"), "weights_source": W.get("source"),
-                         "source": "Weights: slickcharts.com. Prices: Yahoo Finance, delayed. Earnings: Nasdaq.com.",
+                         "source": "Weights: slickcharts.com. Prices: Yahoo Finance, delayed. Earnings: Nasdaq.com"
+                                   + (" (switched off on this computer)." if hostswitch.why_off(EARNINGS) else "."),
                          "totals": totals, "stocks": stocks}
             return self._out
-
-    def _earn_move(self, sym: str, e: Optional[dict], now: float) -> Optional[dict]:
-        """Implied earnings move for a stock reporting within 7 days (its option chain, at most hourly)."""
-        if not e or not e.get("date"):
-            return None
-        t = datetime.fromtimestamp(now, NY)
-        day = datetime.fromisoformat(e["date"]).date()
-        nxt = day + timedelta(days=1)
-        while nxt.weekday() >= 5:
-            nxt += timedelta(days=1)
-        # the report is still ahead until the session it moves opens: 09:30 the same day for a pre-open report,
-        # 09:30 the next trading day otherwise (after close, or time not given)
-        bmo = e.get("when") == "before open"
-        if t >= datetime.combine(day if bmo else nxt, datetime.min.time(), NY).replace(hour=9, minute=30) or (day - t.date()).days > 7:
-            return None
-        first = day if bmo else nxt                     # the first expiry that spans the report
-        c = self._slow.setdefault("moves", {}).get(sym)
-        if c and now - c.get("at", 0) < 3600 and c.get("first") == first.isoformat():
-            return c.get("move")
-        raw = self._try(CHAIN.format(sym=urllib.parse.quote(sym.replace("-", "."))))
-        mv = implied_move(raw, first.isoformat()) if raw else (c or {}).get("move")
-        self._slow["moves"][sym] = {"at": now, "first": first.isoformat(), "move": mv}
-        return mv
 
     def charts(self, symbol: Optional[str] = None) -> dict:
         """Chart bars for one stock ({} if unknown), or {symbol: chart} for every stock on the page."""

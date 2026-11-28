@@ -57,7 +57,7 @@ def main() -> int:
     from gexsys import heatmap
     real, seen = heatmap.fetch_candles, {}
     heatmap.fetch_candles = lambda market, tf: seen.setdefault((market, tf), real(market, tf))
-    comps = default_components([cfgmod.load(f"configs/free_{m}_cboe.json") for m in ("nq", "es")])
+    comps = default_components([cfgmod.load(f"configs/free_{m}.json") for m in ("nq", "es")])
     print("build:", build(comps, out, state))
     routes = {}
     for c in comps:

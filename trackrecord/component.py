@@ -13,7 +13,7 @@ Inputs from the app shell:
   is_trading_day(date), session_close(date) -> datetime (ET, early closes included)
 
 Each session is one file, sessions/YYYY-MM-DD_MARKET.json. A plan is written once, 30 minutes after
-the open (Cboe data is 15 minutes delayed, so every pre-open snapshot exists by then), and never changed.
+the open (every pre-open snapshot exists by then, even from 15-minute delayed data), and never changed.
 It is graded when that session's final bar is available. Sessions the app could not see are kept as
 "missed" from the first recorded day on, so gaps are visible rather than quietly skipped.
 
@@ -53,6 +53,7 @@ LOOKBACK_DAYS = 10
 MINUTES_KEPT_BY_SOURCE = timedelta(days=28)    # Yahoo serves 1-minute bars for about 30 days
 BACKTEST_MAX_AGE = timedelta(hours=20)
 MIRROR_URL = "https://wsevwevx.github.io/gex-pro/data/trackrecord.json"      # the public record ($GEXPRO_TRACK_MIRROR)
+SAME_EVENING_SETTLE = timedelta(minutes=60)
 PRE_FIX_SOURCE = "Cboe 1-minute"     # graded on the 15:59 minute bar (until 2026-11-17): its close missed the closing print
 HISTORY_COLUMNS = ["session", "market", "status", "data_asof", "frozen_at", "ref", "em", "regime", "zero_gamma", "call_wall",
                    "put_wall", "abs_gamma", "bias", "target", "open", "high", "low", "close", "move_em", "close_in_band",
@@ -257,13 +258,12 @@ class TrackRecordComponent:
     def session_bar(self, underlying: str, d: date, now: datetime) -> Optional[dict]:
         """The final open/high/low/close of session d, or None while it is not final yet."""
         close = self.session_close(d)
-        if now < close + timedelta(minutes=20):                 # 15-minute delayed data needs time to settle
+        # the daily bar is final once the closing print is in it: give the same evening an hour (the 15:59 minute bar
+        # missed the closing print by up to 55 NQ points on 2026-11-17), a later day the usual 20 minutes
+        settle = SAME_EVENING_SETTLE if now.astimezone(NY).date() == d else timedelta(minutes=20)
+        if now < close + settle:
             return None
-        if now.astimezone(NY).date() == d:                       # same evening: Cboe's 1-minute bars
-            b = self.src.intraday(underlying)
-            if b and b["date"] == d.isoformat() and b.get("last", "") >= (close - timedelta(minutes=1)).astimezone(NY).strftime("%H:%M"):
-                return b
-        return self._daily_bars(underlying, now, fresh_after=close + timedelta(minutes=20)).get(d.isoformat())
+        return self._daily_bars(underlying, now, fresh_after=close + settle).get(d.isoformat())
 
     # ---------------------------------------------------------------- freezing and grading
     def tick(self) -> list[str]:
@@ -420,7 +420,7 @@ class TrackRecordComponent:
         graded = [s["graded_at"] for s in ss if s.get("graded_at")]
         why = ([f"{len(waiting)} session(s) past the close still waiting for a final price"] if waiting else []) + \
               ([f"{len(lost)} session(s) could not be graded: no final price was found"] if lost else [])
-        return [{"name": "Closing prices for grading", "provider": "Cboe (same evening), Yahoo Finance (daily)",
+        return [{"name": "Closing prices for grading", "provider": "Yahoo Finance (daily)",
                  "pages": ["Track record"], "last_ok": max(graded, default=None), "error": "; ".join(why) or None}]
 
     # ---------------------------------------------------------------- component contract

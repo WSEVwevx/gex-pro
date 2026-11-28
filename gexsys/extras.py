@@ -174,7 +174,7 @@ def _sessions(first: date, last: date) -> int:
     return sum(1 for i in range((last - first).days + 1) if marketcal.is_trading_day(first + timedelta(days=i)))
 
 
-SESSIONS_A_YEAR = 252       # as in Cboe's VIX1D (methodology v2.0)
+SESSIONS_A_YEAR = 252       # as in the VIX1D methodology (v2.0)
 
 
 def expected_moves(snap: ChainSnapshot, basket: list[str], asof: datetime, ivs_from: list[OptionContract]) -> Optional[dict]:
@@ -227,7 +227,7 @@ def expected_moves(snap: ChainSnapshot, basket: list[str], asof: datetime, ivs_f
     if one:
         # the OCC backup with the market closed: one trading session at VIX1D, whatever the calendar gap. Study
         # weekend_move v1 (definition 9d53ae9b, PR 76): over 230 weekends calendar days were too wide, and over 882
-        # ordinary nights too narrow; one session scored better on both indexes. Cboe's VIX1D counts 252 sessions a year.
+        # ordinary nights too narrow; one session scored better on both indexes. The VIX1D methodology counts 252 sessions a year.
         dvar, day_iv, method = one * one / SESSIONS_A_YEAR, one, "one session at VIX1D (backup, market closed)"
     out.update(daily_points=snap.spot * math.sqrt(dvar), daily_iv=day_iv,
                daily_iv_expiry=used.date().isoformat(), daily_method=method, variance_from=t0.isoformat())

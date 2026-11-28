@@ -91,7 +91,7 @@ class TestFiltering(unittest.TestCase):
         self.assertTrue(any("nearest strike's IV" in w for w in r.warnings))
 
     def test_rounded_vendor_gamma_not_used_when_recomputing(self):
-        # Cboe rounds gamma to 4 decimals (0.0002 on a deep-ITM 0DTE put whose true gamma is ~0.000005);
+        # vendors round gamma to 4 decimals (0.0002 on a deep-ITM 0DTE put whose true gamma is ~0.000005);
         # with recompute_greeks="always" that vendor number must never reach the totals
         lone = contract(130, "P", gamma=0.0002, iv=None, days=1)
         r = eng.compute(chain([lone, contract(100, "C", gamma=0.01, iv=0.2)]), eng.EngineConfig(recompute_greeks="always"))

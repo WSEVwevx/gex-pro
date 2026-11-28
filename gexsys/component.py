@@ -10,8 +10,8 @@ Same shape as every GEX PRO component (see gexpro/components.py):
                               bias-history-{NQ,ES}.json for the hosted site
 
 Endpoints, by example:
-  /api/levels?key=NQ-CBOE                    one worker's latest result (market=NQ picks the first NQ worker)
-  /api/pine?key=NQ-CBOE[&which=published]    one worker's Pine payload (text)
+  /api/levels?key=NQ-OCC                     one worker's latest result (market=NQ picks the first NQ worker)
+  /api/pine?key=NQ-OCC[&which=published]     one worker's Pine payload (text)
   /api/pine/all[?which=published&market=NQ]  payloads joined with "|": one paste for every chart
 """
 from __future__ import annotations
@@ -82,7 +82,7 @@ def _all(workers: Iterable[MarketWorker], **extra) -> dict:
 
 def _last_saved(w) -> Optional[str]:
     """When the worker's own source last gave a usable chain, from its saved history (a fresh process, such as each
-    hosted build, has no memory of it; the history holds Cboe's own results only: a backup result is saved apart)."""
+    hosted build, has no memory of it)."""
     try:
         s = w.store.latest(w.key, usable=True)
     except (AttributeError, OSError):
@@ -156,32 +156,25 @@ class GexComponent:
             h = w.health()
             ok = datetime.fromtimestamp(w.last_success, timezone.utc).isoformat() if w.last_success else None
             calc = h.get("calc_status")
-            fb = getattr(w, "provider", None)
-            fb = fb if hasattr(fb, "backup") else None
-            refused = fb.refusal if fb else None
-            rows.append({"name": f"{w.cfg.market} options chain", "provider": f"{w.label} ({w.cfg.source}, 15-min delayed)",
+            est = bool(((getattr(w, "result", None) or {}).get("summary") or {}).get("backup"))
+            vxn = " + VXN" if w.cfg.source == "NDX" else ""
+            rows.append({"name": f"{w.cfg.market} options chain",
+                         "provider": f"OCC open interest + VIX-family closes{vxn} (Yahoo) + Yahoo prices ({w.cfg.source})",
                          "pages": ["Levels", "Live table", "Heatmap", "Bias", "TradingView paste"],
-                         "last_ok": (datetime.fromtimestamp(fb.primary_ok, timezone.utc).isoformat() if fb.primary_ok
-                                     else _last_saved(w)) if refused else ok,
-                         "error": f"REFUSED: {refused}" if refused else w.last_error if w.failures else None, "fresh_h": 2,
-                         "note": "the OCC backup is in use" if refused and fb.last_label else "first refresh in progress" if not ok and not w.failures
-                         else f"the last calculation was {calc}" if calc and calc != "OK" else None})
-            if fb:      # the backup only runs while Cboe refuses
-                bok = datetime.fromtimestamp(fb.backup_ok, timezone.utc).isoformat() if fb.backup_ok else None
-                rows.append({"name": f"{w.cfg.market} backup chain (estimate)",
-                             "provider": f"OCC open interest + Cboe VIX-family closes{' + VXN' if w.cfg.source == 'NDX' else ''} + Yahoo prices",
-                             "pages": ["Levels", "Live table", "Bias"], "last_ok": bok, "error": fb.backup_error,      # not saved, so not on the Heatmap
-                             "fresh_h": 2 if refused else None,
-                             "note": "in use on the website only (not pasted to TradingView): Cboe refuses; walls, zero gamma, C1 and P1 only, no 0DTE flip" if refused and fb.last_label
-                             else "standby: used only when Cboe refuses"})
+                         "last_ok": ok or _last_saved(w),
+                         "error": w.last_error if w.failures else None, "fresh_h": 2,
+                         "note": "first refresh in progress" if not ok and not w.failures
+                         else f"the last calculation was {calc}" if calc and calc != "OK" else None,
+                         "detail": "one implied vol per expiry (no skew): walls, zero gamma, C1 and P1 only, no 0DTE flip" if est else None})
             # the paste (every 30 min, plus 09:45): late when it is more than an hour old (two missed slots) while the futures trade
             pub = w.published or {}
             trading = marketcal.session_state(datetime.now(timezone.utc)) in ("RTH", "ETH")
             rows.append({"name": f"{w.cfg.market} TradingView paste", "provider": "GEX PRO (every 30 min and 09:45 ET, from the options chain)",
                          "pages": ["Copy for TradingView", "Indicator"], "last_ok": pub.get("published_at"),
-                         "error": None, "fresh_h": 1 if trading else None,
-                         # on hold while Cboe refuses (the backup is never pasted): "partly", not "Working"
-                         "note": f"on hold while Cboe refuses: the paste on the site is still the {pub['slot_et']} ET one" if refused and pub.get("slot_et") else None,
+                         "error": None, "fresh_h": 1 if trading and not est else None,
+                         # on hold while the levels are an estimate (not pasted): "partly", not "Working"
+                         "note": (f"on hold: estimates are not pasted; the paste on the site is still the {pub['slot_et']} ET one"
+                                  if pub.get("slot_et") else "on hold: estimates are not pasted") if est else None,
                          "detail": f"the paste on the site is the {pub['slot_et']} ET one" if pub.get("slot_et") else None})
             # the website's index -> futures conversion: the measured NQ=F / ^NDX basis, or the carry model when
             # Yahoo's minute bars fail (that model sat ~20 NQ / 6 ES points below the market, stress test C1)

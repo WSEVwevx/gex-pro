@@ -110,10 +110,10 @@ class LevelsModel(unittest.TestCase):
         self.assertEqual(m["levels"]["C1"]["missing"], "not in this reading")
         self.assertEqual(model({"workers": []})["missing"], "no reading for NQ in this update")
 
-    def test_cboe_data_is_not_called_a_backup(self):
+    def test_a_result_without_the_estimate_flag_is_not_called_a_backup(self):
         a = copy.deepcopy(ALL)
         for w in a["workers"]:
-            w["result"]["mapped"].update(provider="CBOE", backup=None)
+            w["result"]["mapped"].update(provider="OCC", backup=None)
         m = model(a)
         self.assertFalse(m["source"]["backup"])
         self.assertFalse(m["paste"]["onHold"])

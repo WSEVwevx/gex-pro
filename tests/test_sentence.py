@@ -57,10 +57,11 @@ class Templates(unittest.TestCase):
         self.assertIn("is 330 pts below", c)                     # no expected move: no σ, nothing invented
         self.assertNotIn("σ", c)
 
-    def test_a_backup_estimate_says_so_first(self):
+    def test_an_estimate_reads_like_any_reading(self):
+        # the owner's call (27 Nov 2026): the levels are known to be an estimate; the source line names it, not the sentence
         a, b = say([{**BASE, "backup": True}, BASE])
-        self.assertTrue(a.startswith("Backup estimate: NQ has no zero-gamma crossing"), a)
-        self.assertNotIn("Backup", b)
+        self.assertEqual(a, b)
+        self.assertTrue(a.startswith("NQ has no zero-gamma crossing"), a)
 
     def test_no_banned_word_in_any_template(self):
         cases = [{**BASE, "m": m, "regime": r, "zg": zg, "zgStatus": st, "cw": cw, "pw": pw, "emd": em}

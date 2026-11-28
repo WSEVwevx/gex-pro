@@ -1,4 +1,4 @@
-"""Market calendar: NYSE/Cboe holidays and early closes, CME Globex sessions,
+"""Market calendar: NYSE holidays and early closes, CME Globex sessions,
 futures roll schedule, option expiry times, and session-aware refresh cadence.
 
 All wall-clock rules are expressed in America/New_York and converted with

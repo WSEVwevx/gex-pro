@@ -1,9 +1,9 @@
 """GEX command line (engine only). The app - website, START.bat, hosted site - is `python -m gexpro`.
 
   python -m gexsys demo [--market NQ|ES]          synthetic end-to-end run (no credentials)
-  python -m gexsys snapshot --config configs/free_nq_cboe.json [--futures-price 20345.25]
+  python -m gexsys snapshot --config configs/free_nq.json [--futures-price 20345.25]
   python -m gexsys replay --market NQ [--root data/snapshots]
-  python -m gexsys sensitivity --config configs/free_es_cboe.json
+  python -m gexsys sensitivity --config configs/free_es.json
 """
 from __future__ import annotations
 
@@ -33,9 +33,9 @@ def _print_result(r: dict) -> None:
 
 
 def auto_configs() -> list[str]:
-    """The free Cboe configs: ES from SPX + SPY options, NQ from NDX + QQQ options."""
-    print("Data: Cboe free feed (SPX+SPY options for ES, NDX+QQQ for NQ; 15-min delayed).")
-    return ["configs/free_nq_cboe.json", "configs/free_es_cboe.json"]
+    """The free configs: ES from SPX + SPY options, NQ from NDX + QQQ options."""
+    print("Data: OCC open interest + VIX-family vols, an estimate (SPX+SPY options for ES, NDX+QQQ for NQ).")
+    return ["configs/free_nq.json", "configs/free_es.json"]
 
 
 def main(argv=None) -> int:

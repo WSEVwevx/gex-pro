@@ -90,11 +90,10 @@
   "futures_ref": {
     "mode": "observed"
   },
-  "description": "ES levels from SPX + SPY options (Cboe free feed, 15-min delayed), SPY converted to SPX terms, mapped to ES futures",
+  "description": "ES levels from SPX + SPY options (OCC open interest + VIX-family vols, an estimate; Yahoo prices), SPY converted to SPX terms, mapped to ES futures",
   "market": "ES",
   "source": "SPX",
   "provider": {
-    "name": "cboe",
-    "include_etf": true
+    "name": "occ"
   }
 }

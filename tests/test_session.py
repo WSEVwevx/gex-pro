@@ -26,10 +26,10 @@ class TestSession(unittest.TestCase):
             st = SnapshotStore(tmp)
             mon, tue = datetime(2026, 10, 26, tzinfo=NY), datetime(2026, 10, 27, tzinfo=NY)
             for day, zg in ((mon, 95.0), (tue, 97.0)):
-                st.save("NQ-CBOE", dict(snap(day.replace(hour=11), zg=zg - 1), status="OK"))
-                st.save("NQ-CBOE", dict(snap(day.replace(hour=16, minute=10), zg=zg), status="OK"))      # the session's last
-                st.save("NQ-CBOE", dict(snap(day.replace(hour=19), zg=zg + 5), status="OK"))             # evening: not the close
-            folder = Path(tmp) / "NQ-CBOE"
+                st.save("NQ-OCC", dict(snap(day.replace(hour=11), zg=zg - 1), status="OK"))
+                st.save("NQ-OCC", dict(snap(day.replace(hour=16, minute=10), zg=zg), status="OK"))      # the session's last
+                st.save("NQ-OCC", dict(snap(day.replace(hour=19), zg=zg + 5), status="OK"))             # evening: not the close
+            folder = Path(tmp) / "NQ-OCC"
             # Tuesday 12:00: only Monday has closed
             pr = session.prior_levels(folder, tue.replace(hour=12))
             self.assertEqual([(d.isoformat(), lv["ZG"]) for d, lv in pr], [("2026-10-26", 95.0)])
@@ -73,8 +73,8 @@ class TestSession(unittest.TestCase):
             st = SnapshotStore(tmp)
             for t, c1, fm in ((at(9, 33), 100.0, {"factor": 1.01, "offset": 0.0}), (at(10, 0), 110.0, {"factor": 1.02, "offset": 2.0}),
                               (at(10, 5), 110.0, {"factor": 1.03, "offset": 0.0}), (at(10, 30), 120.0, None), (at(10, 35), 120.0, None)):
-                st.save("NQ-CBOE", dict(snap(t, c1=c1), status="OK", **({"futures_map": fm} if fm else {})))
-            w = SimpleNamespace(store=st, key="NQ-CBOE", _stats=lambda *a: {})
+                st.save("NQ-OCC", dict(snap(t, c1=c1), status="OK", **({"futures_map": fm} if fm else {})))
+            w = SimpleNamespace(store=st, key="NQ-OCC", _stats=lambda *a: {})
             r = {"summary": dict(snap(at(11, 0), c1=120.0), status="OK"), "mapped": {"mapping": {"factor": 1.05, "offset": 0.0}}}
             MarketWorker._add_session(w, r, at(11, 0))
             S = r["session"]
@@ -90,7 +90,7 @@ class TestSession(unittest.TestCase):
 
     def test_a_failed_retry_after_the_close_is_not_news(self):
         """In the daily break the delayed quotes are frozen at the close: if the shown result has them, a failed
-        retry (Cboe refusing this PC on 2026-11-19 at 17:30) is not worth a banner. Before it has them, it is."""
+        retry (a source refusing this PC, as on 2026-11-19 at 17:30) is not worth a banner. Before it has them, it is."""
         from gexsys.service import holds_latest
         at = lambda d, h, m: datetime(2026, 11, d, h, m, tzinfo=NY)
         close = {"ref_time": at(19, 16, 14).isoformat()}                     # Thu: the 16:15 quotes, after the close

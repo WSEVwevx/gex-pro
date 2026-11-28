@@ -142,7 +142,7 @@ def pastes() -> list[tuple[str, str, dict | None]]:
     unrounded counterpart where a local summary exists, else they are checked for self-consistency only."""
     out = []
     root = Path(os.path.expandvars("%LOCALAPPDATA%/gexsys/snapshots"))
-    for f in sorted(root.glob("*-CBOE/*/*.json")):
+    for f in sorted(p for k in ("*-OCC", "*-CBOE") for p in root.glob(f"{k}/*/*.json")):     # today's key and the retired one
         try:
             s = json.loads(f.read_text(encoding="utf-8"))
         except (OSError, ValueError):
@@ -151,7 +151,7 @@ def pastes() -> list[tuple[str, str, dict | None]]:
         if not s.get("zero_gamma") or not s.get("market"):
             continue
         src = "NDX" if s["market"] == "NQ" else "SPX"
-        out.append((f"{f.parent.parent.name}/{f.parent.name}/{f.stem}", pine_payload(s, s["market"], src, "ratio", provider="CBOE"), s))
+        out.append((f"{f.parent.parent.name}/{f.parent.name}/{f.stem}", pine_payload(s, s["market"], src, "ratio", provider=s.get("provider") or "OCC"), s))
     names = subprocess.run(["git", "ls-tree", "-r", "--name-only", "origin/track-record", "pastes/"], cwd=ROOT,
                            capture_output=True, text=True).stdout.split()
     for nm in names:

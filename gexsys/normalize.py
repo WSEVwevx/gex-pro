@@ -100,6 +100,6 @@ def normalize(snap: ChainSnapshot, check_occ: bool = False, max_quote_age_s: Opt
             log.info("normalize %s=%d underlying=%s", k, v, snap.underlying)
     bad = sum(counts[k] for k in ("invalid", "bad_oi", "bad_iv", "bad_gamma", "occ_mismatch"))
     if snap.contracts and bad > CORRUPT_SHARE * len(snap.contracts):
-        # a few placeholders are normal (Cboe: ~0.3% IVs above 500%); many mean the feed is damaged
+        # a few placeholders are normal (delayed chains: ~0.3% IVs above 500%); many mean the feed is damaged
         warnings.append(f"invalid values in {bad} of {len(snap.contracts)} contracts: the feed may be corrupt")
     return replace(snap, contracts=list(seen.values()), warnings=warnings)

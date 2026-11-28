@@ -70,7 +70,7 @@ def http_get_json(url: str, headers: dict, *, timeout: float = 15.0, retries: in
     for attempt in range(retries + 1):
         if limiter:
             limiter.wait()
-        # compressed transfer: Cboe's SPX chain is 13.7 MB as JSON, 1.8 MB gzipped (same bytes once unpacked)
+        # compressed transfer: a full SPX chain is 13.7 MB as JSON, 1.8 MB gzipped (same bytes once unpacked)
         req = urllib.request.Request(url, headers={"Accept-Encoding": "gzip", **headers}, method="GET")
         try:
             with opener(req, timeout=timeout) as resp:

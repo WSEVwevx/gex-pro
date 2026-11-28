@@ -1,15 +1,13 @@
-"""Free price history for grading: daily and intraday index bars, and implied-vol index closes.
+"""Free price history for grading: daily index bars and implied-vol index closes, all from Yahoo Finance.
 
-  SPX   daily: Cboe (cdn.cboe.com, since 1975), fallback Yahoo ^GSPC     intraday: Cboe 1-minute, today only
-  NDX   daily: Yahoo ^NDX (Cboe does not publish NDX history)            intraday: Cboe 1-minute, today only
-  VIX / VXN   daily closes: Cboe CSV (VIX since 1990, VXN since 2009), fallback Yahoo ^VIX / ^VXN
+  SPX   daily: Yahoo ^GSPC        NDX   daily: Yahoo ^NDX
+  VIX / VXN   daily closes: Yahoo ^VIX / ^VXN (VIX since 1990)
 
-All of it is end-of-day or delayed, which is all grading needs. Bars are index points, matching the plans.
+All of it is end-of-day or delayed, which is all grading needs. Bars are index points, matching the plans. A session is
+graded on its daily bar once that bar is final (trackrecord/component.py session_bar).
 """
 from __future__ import annotations
 
-import csv
-import io
 import json
 import logging
 import urllib.parse
@@ -19,15 +17,14 @@ from typing import Optional
 
 log = logging.getLogger("trackrecord.prices")
 UA = {"User-Agent": "Mozilla/5.0 (GEX PRO track record)", "Accept": "*/*"}
-CBOE = "https://cdn.cboe.com/api/global"
 YAHOO = "https://query1.finance.yahoo.com/v8/finance/chart/{sym}?interval=1d&period1={p1}&period2={p2}"
-DAILY = {"SPX": [("cboe", "_SPX"), ("yahoo", "^GSPC")], "NDX": [("yahoo", "^NDX")]}
+DAILY = {"SPX": "^GSPC", "NDX": "^NDX"}
 VOL_INDEX = {"SPX": "VIX", "NDX": "VXN"}
 
 
 def _get(url: str, timeout: float = 25) -> bytes:
     req = urllib.request.Request(url, headers=UA)
-    with urllib.request.urlopen(req, timeout=timeout) as r:      # follows Cboe's redirect to cdn-api
+    with urllib.request.urlopen(req, timeout=timeout) as r:
         return r.read()
 
 
@@ -36,18 +33,9 @@ def _bar(d, o, h, l, c, src) -> Optional[dict]:
         o, h, l, c = float(o), float(h), float(l), float(c)
     except (TypeError, ValueError):
         return None
-    if min(o, h, l, c) <= 0 or h < l:                          # Cboe's oldest rows have no open
+    if min(o, h, l, c) <= 0 or h < l:                          # some old rows have no open
         return None
     return {"date": d, "open": o, "high": h, "low": l, "close": c, "source": src}
-
-
-def parse_cboe_daily(raw: bytes) -> dict[str, dict]:
-    out = {}
-    for r in json.loads(raw).get("data", []):
-        b = _bar(r.get("date"), r.get("open"), r.get("high"), r.get("low"), r.get("close"), "Cboe daily")
-        if b:
-            out[b["date"]] = b
-    return out
 
 
 def parse_yahoo_daily(raw: bytes, label: str) -> dict[str, dict]:
@@ -66,19 +54,16 @@ def parse_yahoo_daily(raw: bytes, label: str) -> dict[str, dict]:
 
 def daily(underlying: str, since: date = date(1990, 1, 1)) -> dict[str, dict]:
     """date (YYYY-MM-DD) -> bar. The current day may be a partial bar; callers decide when a day is final."""
-    for kind, sym in DAILY.get(underlying, []):
-        try:
-            if kind == "cboe":
-                bars = parse_cboe_daily(_get(f"{CBOE}/delayed_quotes/charts/historical/{sym}.json"))
-            else:
-                p1 = int(datetime(since.year, since.month, since.day, tzinfo=timezone.utc).timestamp())
-                p2 = int(datetime.now(timezone.utc).timestamp()) + 86400
-                bars = parse_yahoo_daily(_get(YAHOO.format(sym=urllib.parse.quote(sym), p1=p1, p2=p2)), f"Yahoo {sym} daily")
-            if bars:
-                return bars
-        except Exception as e:                                   # try the next source
-            log.warning("daily %s from %s failed: %s", underlying, kind, e)
-    return {}
+    sym = DAILY.get(underlying)
+    if not sym:
+        return {}
+    try:
+        p1 = int(datetime(since.year, since.month, since.day, tzinfo=timezone.utc).timestamp())
+        p2 = int(datetime.now(timezone.utc).timestamp()) + 86400
+        return parse_yahoo_daily(_get(YAHOO.format(sym=urllib.parse.quote(sym), p1=p1, p2=p2)), f"Yahoo {sym} daily")
+    except Exception as e:
+        log.warning("daily %s from Yahoo failed: %s", underlying, e)
+        return {}
 
 
 def yahoo_daily(sym: str, days: int = 45) -> dict[str, dict]:
@@ -89,36 +74,6 @@ def yahoo_daily(sym: str, days: int = 45) -> dict[str, dict]:
     except Exception as e:
         log.warning("daily %s failed: %s", sym, e)
         return {}
-
-
-def parse_cboe_intraday(raw: bytes, quote: Optional[bytes]) -> Optional[dict]:
-    """Today's session: open, high and low from the 1-minute bars, the close from the quote's official close,
-    {"date", OHLC, "last": "HH:MM"} (ET), or None. The last bar (15:59) misses the closing print: on 2026-11-17
-    NDX closed at 27,001.79 and its 15:59 bar at 26,946.73. So without a quote stamped after the last bar's
-    minute on the same day there is no close yet, and the daily bar is used instead."""
-    rows = json.loads(raw).get("data", [])
-    rows = [r for r in rows if r.get("price") and r.get("datetime")]
-    if not rows or not quote:
-        return None
-    q = json.loads(quote).get("data") or {}
-    day, last = rows[0]["datetime"][:10], rows[-1]["datetime"][11:16]
-    stamp = str(q.get("last_trade_time") or "")
-    if stamp[:10] != day or stamp[11:16] <= last:
-        return None
-    p = [r["price"] for r in rows]
-    b = _bar(day, p[0]["open"], max(x["high"] for x in p), min(x["low"] for x in p), q.get("close"), "Cboe 1-minute, official close")
-    if b:
-        b["last"] = last
-    return b
-
-
-def intraday(underlying: str) -> Optional[dict]:
-    try:
-        return parse_cboe_intraday(_get(f"{CBOE}/delayed_quotes/charts/intraday/_{underlying}.json"),
-                                   _get(f"{CBOE}/delayed_quotes/quotes/_{underlying}.json"))
-    except Exception as e:
-        log.warning("intraday %s failed: %s", underlying, e)
-        return None
 
 
 PUBLIC_MINUTES = "https://raw.githubusercontent.com/WSEVwevx/gex-pro/track-record/minutes/{name}"
@@ -138,30 +93,11 @@ def minutes(session: dict, recent: bool = True, end: int = 390) -> Optional[dict
     return reactions.minutes_record(session, reactions.fetch_minutes(session["market"], d, end), end) if recent else None
 
 
-def parse_cboe_vol_csv(raw: bytes) -> dict[str, float]:
-    out = {}
-    for r in csv.DictReader(io.StringIO(raw.decode("utf-8", "replace"))):
-        try:
-            m, d, y = r["DATE"].split("/")
-            v = float(r["CLOSE"])
-        except (KeyError, ValueError):
-            continue
-        if v > 0:
-            out[f"{y}-{int(m):02d}-{int(d):02d}"] = v
-    return out
-
-
 def vol_index(underlying: str) -> dict[str, float]:
     """date -> closing implied-vol index level (percent, e.g. 18.4)."""
     name = VOL_INDEX.get(underlying)
     if not name:
         return {}
-    try:
-        v = parse_cboe_vol_csv(_get(f"{CBOE}/us_indices/daily_prices/{name}_History.csv"))
-        if v:
-            return v
-    except Exception as e:
-        log.warning("%s history from Cboe failed: %s", name, e)
     try:
         bars = parse_yahoo_daily(_get(YAHOO.format(sym=urllib.parse.quote("^" + name), p1=631152000,
                                                    p2=int(datetime.now(timezone.utc).timestamp()) + 86400)), "Yahoo")

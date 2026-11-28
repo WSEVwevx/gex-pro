@@ -124,50 +124,24 @@ class TestBacktest(unittest.TestCase):
         self.assertIsNone(backtest.wall_baseline([], mk))
 
     def test_parsers(self):
-        csv = b"DATE,OPEN,HIGH,LOW,CLOSE\n10/21/2026,17.25,17.58,16.51,16.68\nbad,row\n"
-        self.assertEqual(prices.parse_cboe_vol_csv(csv), {"2026-10-21": 16.68})
-        daily = json.dumps({"data": [{"date": "1975-01-02", "open": "0", "high": "70.9", "low": "68.6", "close": "70.2"},
-                                     {"date": "2026-10-22", "open": "7694.6", "high": "7702.9", "low": "7637.4", "close": "7663.4"}]}).encode()
-        self.assertEqual(list(prices.parse_cboe_daily(daily)), ["2026-10-22"])     # no-open rows dropped
-        intra = json.dumps({"data": [{"datetime": "2026-10-23T09:31:00", "price": {"open": 10, "high": 12, "low": 9, "close": 11}},
-                                     {"datetime": "2026-10-23T15:59:00", "price": {"open": 11, "high": 14, "low": 10, "close": 13}}]}).encode()
-        quote = json.dumps({"data": {"close": 13.5, "last_trade_time": "2026-10-23T16:15:00"}}).encode()
-        b = prices.parse_cboe_intraday(intra, quote)
-        self.assertEqual((b["open"], b["high"], b["low"], b["close"], b["last"]), (10, 14, 9, 13.5, "15:59"))
-
-
-class TestCboeSessionBar(unittest.TestCase):
-    """2026-11-17 audit: the same-evening bar took its close from the last 1-minute bar (15:59), which misses the
-    closing print: NDX's official close was 27,001.79, the 15:59 bar 26,946.73 (55 points), and that flipped the
-    session's put-wall grade. The close must be the official one."""
-    BARS = json.dumps({"data": [
-        {"datetime": "2026-11-17T09:31:00", "price": {"open": 27229.95, "high": 27258.84, "low": 27200.0, "close": 27210.0}},
-        {"datetime": "2026-11-17T15:59:00", "price": {"open": 26944.10, "high": 26954.22, "low": 26580.86, "close": 26946.73}}]}).encode()
-
-    def quote(self, close=27001.79, t="2026-11-17T16:14:59"):
-        return json.dumps({"data": {"close": close, "current_price": close, "last_trade_time": t}}).encode()
-
-    def test_the_close_is_the_official_close(self):
-        b = prices.parse_cboe_intraday(self.BARS, self.quote())
-        self.assertEqual((b["open"], b["high"], b["low"], b["close"], b["last"]), (27229.95, 27258.84, 26580.86, 27001.79, "15:59"))
-
-    def test_no_official_close_yet_means_no_bar(self):
-        self.assertIsNone(prices.parse_cboe_intraday(self.BARS, None))                                   # quote missing
-        self.assertIsNone(prices.parse_cboe_intraday(self.BARS, self.quote(t="2026-11-17T15:58:00")))    # before the close
-        self.assertIsNone(prices.parse_cboe_intraday(self.BARS, self.quote(t="2026-11-16T16:14:59")))    # yesterday's
+        raw = json.dumps({"chart": {"result": [{"meta": {"exchangeTimezoneName": "America/New_York"},
+                                                "timestamp": [1792589400, 1792675800],          # 21 and 22 Oct 2026, 09:30 ET
+                                                "indicators": {"quote": [{"open": [17.25, 0], "high": [17.58, 70.9],
+                                                                          "low": [16.51, 68.6], "close": [16.68, 70.2]}]}}]}}).encode()
+        self.assertEqual(list(prices.parse_yahoo_daily(raw, "Yahoo")), ["2026-10-21"])     # no-open rows dropped
+        self.assertEqual(prices.parse_yahoo_daily(raw, "Yahoo")["2026-10-21"]["close"], 16.68)
+        self.assertEqual(prices.DAILY, {"SPX": "^GSPC", "NDX": "^NDX"})
+        self.assertFalse(hasattr(prices, "intraday"))                                     # no same-evening intraday bars
 
 
 class FakeSource:
     VOL_INDEX = prices.VOL_INDEX
 
     def __init__(self):
-        self.daily_bars, self.intra = {}, None
+        self.daily_bars = {}
 
     def daily(self, underlying, since=None):
         return self.daily_bars
-
-    def intraday(self, underlying):
-        return self.intra
 
     def vol_index(self, underlying):
         return {}
@@ -190,10 +164,10 @@ class TestSchedule(unittest.TestCase):
             self.assertEqual(c.tick(), ["2026-10-22_NQ frozen"])
             inp["ref"] = 999.0                                         # later data never changes a frozen plan
             self.assertEqual(c.tick(), [])
-            self.now = datetime(2026, 10, 22, 16, 25, tzinfo=NY)
-            self.src.intra = {"date": "2026-10-22", "open": 100, "high": 104, "low": 98, "close": 103, "last": "15:50", "source": "i"}
-            self.assertEqual(c.tick(), [])                             # 1-minute bars stop early: not final
-            self.src.intra["last"] = "15:59"
+            self.now = datetime(2026, 10, 22, 16, 59, tzinfo=NY)
+            self.src.daily_bars = {"2026-10-22": {"date": "2026-10-22", "open": 100, "high": 104, "low": 98, "close": 103, "source": "d"}}
+            self.assertEqual(c.tick(), [])                             # the same evening: the bar settles for an hour
+            self.now = datetime(2026, 10, 22, 17, 0, tzinfo=NY)
             self.assertEqual(c.tick(), ["2026-10-22_NQ graded"])
             s = c.sessions()[0]
             self.assertEqual((s["plan"]["ref"], s["outcome"]["close"], s["outcome"]["em_close"]), (100.0, 103.0, True))
@@ -275,7 +249,7 @@ class TestSchedule(unittest.TestCase):
             c.tick()
             self.src.daily_bars = {"2026-10-22": {"open": 100, "high": 101, "low": 99, "close": 100.5, "source": "partial"}}
             c._daily_bars("SPX", self.now)                             # cached before the close
-            self.now = datetime(2026, 10, 22, 16, 25, tzinfo=NY)
+            self.now = datetime(2026, 10, 22, 17, 0, tzinfo=NY)               # the same evening: an hour after the close
             self.src.daily_bars = {"2026-10-22": {"open": 100, "high": 103, "low": 95, "close": 96, "source": "final"}}
             c.tick()
             s = [x for x in c.sessions() if x["session"] == "2026-10-22"][0]
@@ -316,8 +290,8 @@ class TestSchedule(unittest.TestCase):
         import csv
         inp = {"market": "NQ", "underlying": "NDX", "ref": 100.0, "em": 10.0, "regime": "POSITIVE", "cw": 108.0}
         with tempfile.TemporaryDirectory() as tmp:
-            c = self.make(tmp, datetime(2026, 10, 22, 16, 25, tzinfo=NY), lambda d: {"NQ": dict(inp)} if d == date(2026, 10, 22) else {"NQ": None})
-            self.src.intra = {"date": "2026-10-22", "open": 100, "high": 104, "low": 98, "close": 103, "last": "15:59", "source": "i"}
+            c = self.make(tmp, datetime(2026, 10, 22, 17, 5, tzinfo=NY), lambda d: {"NQ": dict(inp)} if d == date(2026, 10, 22) else {"NQ": None})
+            self.src.daily_bars = {"2026-10-22": {"date": "2026-10-22", "open": 100, "high": 104, "low": 98, "close": 103, "source": "d"}}
             c.tick()
             rows = list(csv.DictReader((Path(tmp) / "history.csv").read_text(encoding="utf-8").splitlines()))
             self.assertEqual(len(rows), 1)

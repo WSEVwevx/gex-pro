@@ -541,18 +541,18 @@ function render(){
   const used = (s && s.provider) || w.provider, rt = s && s.ref_quality === "RT", bk = s && s.backup;
   const opts = s ? esc(s.options_source || w.source) + (s.etf ? "+" + esc(s.etf) : "") : esc(w.source);
   $("status").innerHTML = `<span class="chip"><i class="dot ${svc}"></i>Data <b>${esc(used)}</b> · ${opts}</span>
-    <span class="chip">Options <b>${bk ? "backup estimate" : rt ? "real time" : "15-min delayed"}</b></span>
+    <span class="chip">Options <b>${bk ? "last close OI" : rt ? "real time" : "15-min delayed"}</b></span>
     ${s ? `<span class="chip">Updated <b>${ago(s.asof)}</b></span>` : ""}
-    <span class="chip"${bk ? ' title="No new TradingView paste while the levels are a backup estimate"' : ""}>Next paste <b>${bk ? "on hold" : h.next_publish_et ? esc(h.next_publish_et.slice(11)) + " ET" : "-"}</b></span>
+    <span class="chip"${bk ? ' title="No new TradingView paste while the levels are an estimate"' : ""}>Next paste <b>${bk ? "on hold" : h.next_publish_et ? esc(h.next_publish_et.slice(11)) + " ET" : "-"}</b></span>
     ${(() => { const e = nextHighUSD(); return e ? `<span class="chip" title="Next ${e.impact.toLowerCase()}-impact USD event (ForexFactory)"><i class="dot ${e.impact === "High" ? "bad" : "warn"}"></i>${esc(e.title)} <b>in ${dur(Date.parse(e.time) - Date.now())}</b></span>` : ""; })()}`;
   $("banner").innerHTML = !w.result ? `<div class="banner">${h.last_error ? "The options data source failed on its last try. Nothing to show yet; retrying by itself. Details are on the Data health page." : "First calculation in progress: levels appear within a minute."}</div>`
-    : s && s.backup ? `<div class="banner backup"><b>Backup estimate.</b> Cboe is refusing requests, so these levels are an estimate from OCC open interest and VIX-family volatility (no skew). The TradingView paste keeps the last Cboe levels.<span class="bn-more"> It gives the walls, C1, P1 and zero gamma when price is near a crossing; it has no 0DTE flip and no first-expiry Ab1 or lower ranks. Details are on the Data health page.</span></div>`
+    : s && s.backup ? `<div class="banner backup"><b>OCC open interest + VIX-family vols.</b> One implied vol per expiry (no skew); the TradingView paste keeps its last published levels.<span class="bn-more"> It gives the walls, C1, P1 and zero gamma when price is near a crossing; it has no 0DTE flip and no first-expiry Ab1 or lower ranks. Details are on the Data health page.</span></div>`
     // closed market and the close's numbers already shown: a failed retry changes nothing (Data health still says so)
     : h.last_error && !h.holds_latest ? `<div class="banner" title="${esc(h.last_error)}">The options data source failed on its last try. Showing the last good numbers; retrying by itself. Details are on the Data health page.</div>`
     : lag ? `<div class="banner">The hosted data was built ${ago(data.now)}. GitHub runs the refresh on a schedule that sometimes runs late; this page picks up the next build by itself.</div>` : "";
   // old data says so on each market card, not only in the banner
   document.body.classList.toggle("stale-data", !!lag);
-  document.body.classList.toggle("backup-data", !!(s && s.backup));
+  document.body.classList.remove("backup-data");
   document.body.style.setProperty("--stale-text", lag ? `"data from ${lastGood()} ET"` : '""');
   if(!w.result) return;
   const L = w.result.mapped || s, X = L.extras || {};
@@ -601,7 +601,7 @@ function stateSentence(o){
     : `Zero gamma for ${o.m} is unavailable; ${g}${why}.`;
   const wall = (name, v) => v == null ? `the ${name} is unavailable` : `the ${name}, ${num(v)}, is ${gap(v) || "at the price"}`;
   const second = wall("put wall", o.pw) + "; " + wall("call wall", o.cw) + ".";
-  return (o.backup ? "Backup estimate: " : "") + first + " " + second[0].toUpperCase() + second.slice(1);
+  return first + " " + second[0].toUpperCase() + second.slice(1);
 }
 function renderHero(w, s, L, X, ref){
   const R = {POSITIVE:["Positive gamma","+","var(--pos)","Modeled dealers are long gamma, so their hedging leans against moves. That tends to mean tighter ranges and more mean reversion."],
@@ -691,7 +691,7 @@ function renderLadder(L, X, ref, backup){
   if(!placed) html += nowRow(ref);
   const missing = view === "all" || view === "key" ? KEY_NAMES.filter(n => !all.some(x => x[2] === n)) : [];
   $("ladder").innerHTML = (rows.length ? html : `<div class="expl">No levels in this group right now.</div>`)
-    + (missing.length ? `<div class="expl">Not available right now: ${missing.map(esc).join(", ")}. ${KEY_WHY}${backup && missing.includes("Largest -GEX strike") ? " The backup estimate leaves out the largest -GEX strike: in a test it was too far from Cboe's." : ""}</div>` : "");
+    + (missing.length ? `<div class="expl">Not available right now: ${missing.map(esc).join(", ")}. ${KEY_WHY}${backup && missing.includes("Largest -GEX strike") ? " One vol per expiry leaves out the largest -GEX strike: in a test against a full per-strike chain it was too far off." : ""}</div>` : "");
 }
 const KEY_NAMES = ["Zero gamma (est.)", "Call wall", "Put wall", "Largest +GEX strike", "Largest -GEX strike", "Absolute gamma strike"];
 const KEY_WHY = "Zero gamma is shown only when the model finds a crossing near price; a wall is missing when no strike on that side has exposure.";
@@ -1207,7 +1207,7 @@ const HELP = {
     watch: ["Negative gamma + a level break = moves can accelerate", "Positive gamma = fade extremes toward the walls"],
     live: (w, s, L) => `Regime: ${s.regime}\nZero gamma: ${num(pickP(L.zero_gamma))}\nPrice: ${num(L.futures_equiv_of_ref ?? s.ref_price)}`},
   reference: {title: "Reference price", tldr: "The price every level here is measured against.",
-    body: `<p>Levels are computed from <b>index and ETF options</b> (SPX + SPY for ES, NDX + QQQ for NQ). The big number is the <b>futures-equivalent</b> price, converted with the measured futures / index basis, so the levels sit in futures prices.</p><p>The data is <b>15 minutes delayed</b> (Cboe's free feed). TradingView re-maps every level to your live chart, so the indicator lines stay aligned in real time.</p><p>The <b>expected move</b> is the 1-standard-deviation range implied by option prices for the session: options price about a 68% chance the close ends inside it. The Track record page shows how often it actually has.</p><p>On the <b>backup estimate</b> with the market closed it is one trading session at VIX1D (scaled by VXN for NQ), whatever the calendar gap: over 230 weekends that fitted better than counting calendar days (Backtest study weekend_move v1).</p>`},
+    body: `<p>Levels are computed from <b>index and ETF options</b> (SPX + SPY for ES, NDX + QQQ for NQ). The big number is the <b>futures-equivalent</b> price, converted with the measured futures / index basis, so the levels sit in futures prices.</p><p>Open interest is <b>from the last close</b> (OCC), with one implied vol per expiry from the VIX-family closes. TradingView re-maps every level to your live chart, so the indicator lines stay aligned in real time.</p><p>The <b>expected move</b> is the 1-standard-deviation range implied by option prices for the session: options price about a 68% chance the close ends inside it. The Track record page shows how often it actually has.</p><p>With the market closed it is one trading session at VIX1D (scaled by VXN for NQ), whatever the calendar gap: over 230 weekends that fitted better than counting calendar days (Backtest study weekend_move v1).</p>`},
   net_gex: {title: "Net gamma exposure", tldr: "How much dealers would have to trade for a 1% move, in dollars.",
     body: `<p>Adds up every option's gamma times its open interest, using the usual assumption that dealers are <b>long calls and short puts</b>. The result is the dollar amount of stock or futures dealers would buy or sell if price moved 1%.</p><p><b>Positive</b> = they trade against the move (calming). <b>Negative</b> = they trade with it (amplifying). Bigger magnitude = stronger effect.</p><p>It's a model of positioning, not observed trades: treat it as a map of where hedging pressure likely sits.</p>`},
   stats: {title: "Flow dashboard", tldr: "Translates the gamma model into contracts and flows you can feel on the tape.",
@@ -1279,7 +1279,7 @@ const HELP = {
   library: {title: "The Library", tldr: "A short course that explains everything on this site from zero.",
     body: `<p>Six chapters: options basics, dealers and the Greeks, gamma exposure, volatility, the GEX PRO levels (C / P / Ab, first expiry, gamma zones) and using GEX PRO day to day. Start with <b>What an option is</b> and follow them in order, or search for a topic. Each lesson ends with a quick check; answer it correctly and the lesson is marked as read. Your progress is saved in this browser.</p><p>Every Explain panel links to the matching lesson, so you can jump from a number on the screen straight to the idea behind it.</p>`},
   health: {title: "Data health", tldr: "Every outside source, when it last worked and whether its last try failed.",
-    body: `<p>GEX PRO uses only free sources: Cboe for the options chains, Yahoo Finance for prices and candles, ForexFactory for the calendar, Truth Social for posts, slickcharts for index weights and the CFTC for positioning. When one fails, its page keeps the <b>last good copy</b> instead of going blank, so a failure is easy to miss. This page shows each one.</p><p><b>Green</b> = working. <b>Amber</b> = late (no new data for longer than usual) or working only partly, e.g. on a backup source. <b>Red</b> = the last try failed. A red dot on <b>Data health</b> in the menu means something failed.</p>`,
+    body: `<p>GEX PRO uses only free sources: OCC open interest for the options chains, Yahoo Finance for prices, candles and the VIX family, ForexFactory for the calendar, Truth Social for posts, slickcharts for index weights and the CFTC for positioning. When one fails, its page keeps the <b>last good copy</b> instead of going blank, so a failure is easy to miss. This page shows each one.</p><p><b>Green</b> = working. <b>Amber</b> = late (no new data for longer than usual) or working only partly, e.g. on a backup source. <b>Red</b> = the last try failed. A red dot on <b>Data health</b> in the menu means something failed.</p>`,
     watch: ["Red options chain = levels and the TradingView paste are not updating", "The weekly CFTC report is normally up to 10 days old: that is still green"]},
   track: {title: "Live track record", tldr: "What GEX PRO said before each open, graded against what the market did.",
     body: `<p>At every session, the levels from the <b>last calculation timestamped before 09:30 ET</b> are frozen as that day's plan: expected move, regime, walls, zero gamma, bias. Nothing can be changed afterwards. After the close, the plan is graded against the index's open, high, low and close.</p><p>Everything is in index points (NDX for NQ, SPX for ES), so the futures basis can't flatter or hurt the result. Missed sessions are listed, not hidden.</p><p>Small samples lie. Until about 20 sessions are graded, read the numbers as a diary, not as proof. The 95% range shows how uncertain each rate still is.</p>`,
@@ -1317,7 +1317,7 @@ const HELP = {
   ladder_activity: {title: "Chain activity", tldr: "Who is positioned, and what is trading today.",
     body: `<p>Put/call ratios over the selected expirations and the rows shown: above 1 means more puts. Open interest is from yesterday's close; volume is today's.</p>`},
   heatmap: {title: "GEX heatmap", tldr: "Futures candles with dealer gamma painted behind them, snapshot by snapshot.",
-    body: `<p>Behind the candles is the net dealer gamma from every GEX PRO snapshot, each one shown from the moment it was taken until the next, with neighbouring price bands blended into soft zones (hover for the exact value at any price and time). <b>Today</b>, <b>2 days</b> (the default) and <b>All</b> (about a week) pick how much price action is shown. <b>Blue</b> = positive gamma (hedging leans against moves, so price tends to stall or pin there); <b>orange</b> = negative gamma (hedging adds to moves). Brighter = more gamma.</p><p>The lines are the call wall (blue) and put wall (orange) wherever they held for an hour or more; the ZG, CW and PW labels on the price axis are where zero gamma and the walls were in the latest saved snapshot. Times are New York time; a dashed line marks each 9:30 cash open.</p><p>The space right of the last candle shows <b>GEX</b> with the latest saved snapshot's time: that snapshot as bars (right = more gamma, blue or orange by sign), with today's key levels from the first expiry: C1 / C2, P1 / P2, Ab1 and the 0DTE flip, the same levels the TradingView indicator draws. <b>Today / 2 days / All</b> sets how much history is in view; the colour scale under the chart says how much gamma the brightest colour means. Watch how price reacts when it reaches a bright band, and how the bands move during the day. Hover anywhere for the numbers.</p><p><b>Hatched ground</b> means no GEX was saved for that time: the newest snapshot is more than 90 minutes older than the candle (for example while Cboe refuses requests, since the backup estimate is not saved). The page leaves it uncoloured rather than stretch an old snapshot over it.</p><p>Candles: Yahoo Finance, delayed. Gamma: Cboe options, 15-min delayed, mapped to futures with today's basis. History builds up as snapshots are saved (about 12 days in the app, 5 on the hosted site).</p>`,
+    body: `<p>Behind the candles is the net dealer gamma from every GEX PRO snapshot, each one shown from the moment it was taken until the next, with neighbouring price bands blended into soft zones (hover for the exact value at any price and time). <b>Today</b>, <b>2 days</b> (the default) and <b>All</b> (about a week) pick how much price action is shown. <b>Blue</b> = positive gamma (hedging leans against moves, so price tends to stall or pin there); <b>orange</b> = negative gamma (hedging adds to moves). Brighter = more gamma.</p><p>The lines are the call wall (blue) and put wall (orange) wherever they held for an hour or more; the ZG, CW and PW labels on the price axis are where zero gamma and the walls were in the latest saved snapshot. Times are New York time; a dashed line marks each 9:30 cash open.</p><p>The space right of the last candle shows <b>GEX</b> with the latest saved snapshot's time: that snapshot as bars (right = more gamma, blue or orange by sign), with today's key levels from the first expiry: C1 / C2, P1 / P2, Ab1 and the 0DTE flip, the same levels the TradingView indicator draws. <b>Today / 2 days / All</b> sets how much history is in view; the colour scale under the chart says how much gamma the brightest colour means. Watch how price reacts when it reaches a bright band, and how the bands move during the day. Hover anywhere for the numbers.</p><p><b>Hatched ground</b> means no GEX was saved for that time: the newest snapshot is more than 90 minutes older than the candle (for example while a source is down). The page leaves it uncoloured rather than stretch an old snapshot over it.</p><p>Candles: Yahoo Finance, delayed. Gamma: OCC open interest with VIX-family vols, mapped to futures with today's basis. History builds up as snapshots are saved (about 12 days in the app, 5 on the hosted site).</p>`,
     watch: ["Price stalling at a bright blue band = positive-gamma support or resistance", "Price slicing through orange = negative gamma, moves can extend"]},
   paste: {title: "The scheduled paste", tldr: "One text block that carries all levels to TradingView.",
     body: `<p>Published every 30 minutes (:00 and :30 ET), plus 09:45 ET. One paste holds NQ and ES; each chart draws only its own market. The indicator marks levels stale after 90 minutes.</p>`},
@@ -1912,12 +1912,12 @@ function renderLiveTable(){
       const x = rows[Number(el.dataset.i)], v = x.v, ls = at.get(Number(el.dataset.i)) || [];
       tip.innerHTML = `<b>${num(x.f, 2)}</b> <span class="c-ink3">(${esc(s.options_source || w.source)} ${num(x.k, 0)})</span>
         <br>Net GEX <b class="${v[0] >= 0 ? "c-pos" : "c-neg"}">${money(v[0])}</b> per 1% · net DEX ${compact(v[1])}
-        <br>OI calls ${num(v[2], 0)} / puts ${num(v[3], 0)} · ${s.backup ? "volume unavailable (backup estimate)" : `volume calls ${num(v[4], 0)} / puts ${num(v[5], 0)}`}${ls.length ? `<br>${ls.map(l => esc(l.code + " " + l.name + (l.share ? ` (${num(100 * l.share, 1)}% of gamma)` : ""))).join("<br>")}` : ""}`;
+        <br>OI calls ${num(v[2], 0)} / puts ${num(v[3], 0)} · ${s.backup ? "no volume (OCC open interest only)" : `volume calls ${num(v[4], 0)} / puts ${num(v[5], 0)}`}${ls.length ? `<br>${ls.map(l => esc(l.code + " " + l.name + (l.share ? ` (${num(100 * l.share, 1)}% of gamma)` : ""))).join("<br>")}` : ""}`;
       tipAt(tip, 170, (el.offsetTop + el.offsetHeight + 40));
     };
     el.onmouseleave = () => { tip.classList.remove("on"); };
   });
-  $("ldSub").textContent = `${num(LD.width * fac, 1)}-pt rows in ${w.market} prices · ${all ? "all expirations" : `${ldSel.size} expiration${ldSel.size === 1 ? "" : "s"}`} · ${s.backup ? "OCC backup estimate (open interest only)" : "Cboe 15-min delayed"}`;
+  $("ldSub").textContent = `${num(LD.width * fac, 1)}-pt rows in ${w.market} prices · ${all ? "all expirations" : `${ldSel.size} expiration${ldSel.size === 1 ? "" : "s"}`} · ${s.backup ? "OCC open interest, one vol per expiry" : "15-min delayed"}`;
   // side panel
   const T = LD.rows.reduce((t, row) => { sum(row).forEach((x, j) => t[j] += x); return t; }, [0, 0, 0, 0, 0, 0]);
   const gT = E.reduce((a, e, i) => a + (on(i) ? e.net : 0), 0), dT = E.reduce((a, e, i) => a + (on(i) ? e.dex : 0), 0);
@@ -1936,7 +1936,7 @@ function renderLiveTable(){
     <div class="metric"><div class="eyebrow">Put/call volume</div><div class="v">${s.backup || pcV == null ? "-" : num(pcV, 2)}</div><div class="s">${s.backup ? "unavailable" : pcV == null ? "" : pcV > 1 ? "puts trading more today" : "calls trading more today"}</div></div>
     <div class="metric"><div class="eyebrow">Most traded strike</div><div class="v">${s.backup ? "-" : num(act.f, 0)}</div><div class="s">${s.backup ? "unavailable" : num(act.v[4] + act.v[5], 0) + " contracts today"}</div></div>
     <div class="metric"><div class="eyebrow">Biggest GEX strike</div><div class="v">${num(rows.reduce((b, x) => Math.abs(x.v[0]) > Math.abs(b.v[0]) ? x : b, rows[0]).f, 0)}</div><div class="s">in the rows shown</div></div></div>
-    <div class="expl">${s.backup ? "Backup estimate: open interest from OCC as of the last close; no volume while Cboe refuses." : "Open interest is as of yesterday's close; volume is today's, 15-min delayed."}</div>`;
+    <div class="expl">${s.backup ? "Open interest from OCC as of the last close; no volume (OCC has none)." : "Open interest is as of yesterday's close; volume is today's, 15-min delayed."}</div>`;
 }
 
 // ---------- market tape: real quotes (Yahoo, exchange data delayed), scrolling across the top
@@ -2187,7 +2187,7 @@ class HeatPrimitive {
         });
         ctx.globalAlpha = 1;
         ctx.fillStyle = `rgba(${cssVar("--fg-rgb")},.45)`;
-        const pt = new Date(P.t * 1000);       // the profile's own time: after a Cboe outage it is not "now"
+        const pt = new Date(P.t * 1000);       // the profile's own time: after a source outage it is not "now"
         ctx.fillText(`GEX ${pt.toLocaleDateString("en-US", {...ET, weekday: "short"})} ${hmFmt.hm.format(pt)}`, Math.round(px0 * hr), fs + 2 * vr);
         if(hmShowLv) for(const m of hm._marks || []){
           const y = this.series.priceToCoordinate(m.p); if(y == null) continue;
@@ -2321,8 +2321,7 @@ function renderHeatmap(){
   }
   if(hm._key === market + hmTf) hmMarket = hm._key;
   const rel = hm.columns.filter(c => c.rel).length;
-  const hw = data && data.workers.find(x => x.market === market && x.result), hbk = hw && hw.result.summary.backup;
-  $("hmSub").textContent = `${market} futures · ${hmAsOf(hm, hmTf)}${hbk ? " · Cboe snapshots only: the backup estimate is not saved, so no GEX after the last one" : ""}`;
+  $("hmSub").textContent = `${market} futures · ${hmAsOf(hm, hmTf)}`;
   $("hmNote").textContent = rel ? `${rel} older snapshot${rel === 1 ? "" : "s"} shown at relative strength` : "";
   $("hmScale").innerHTML = `<i class="hm-ramp"></i>brightest ≈ ±${money(hm._scale * 1e6).replace(/^[+-]/, "")} of gamma per 1% move`;
   hmPrim.requestUpdate && hmPrim.requestUpdate();

@@ -114,10 +114,10 @@ class TestEmptyCases(unittest.TestCase):
         self.assertIsNone(compose("nyam", ctx(), SLOT, SESSION)["markets"][0]["stale"])
 
     def test_backup_levels_are_labelled_and_never_graded(self):
-        # while Cboe refuses, the levels come from the OCC backup (an estimate): the brief says so and is not scored
+        # the levels come from OCC open interest with one VIX-family vol per expiry (an estimate): named, not scored
         m = compose("nyam", ctx(market(backup=True)), SLOT, SESSION)["markets"][0]
         self.assertTrue(m["backup"])
-        self.assertIn("NDX+QQQ options, backup estimate (Cboe refused", m["data"])
+        self.assertIn("NDX+QQQ options, estimate (OCC open interest with one VIX-family vol per expiry", m["data"])
         self.assertNotIn("15-min delayed", m["data"])
         self.assertEqual(morning.grade(m, {"high": 28190.0, "low": 27880.0, "close": 27920.0}), [])
         live = compose("nyam", ctx(), SLOT, SESSION)["markets"][0]

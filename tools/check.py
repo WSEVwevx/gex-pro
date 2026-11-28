@@ -3,7 +3,7 @@
   tests      the unit and integration tests
   lint       pyflakes (unused names, undefined names) and vulture (dead code)
   pricing    every pricing formula against finite differences and identities
-  math       live levels re-derived from the raw Cboe data with independent code
+  math       live levels re-derived from the raw OCC + Yahoo data with independent code
   audit      live data, levels and the TradingView paste end to end, NQ and ES
   track      every track-record plan and grade re-derived by hand; the backtest recounted from raw files
   site       the hosted website's data files: present, filled in, and recent

@@ -31,7 +31,7 @@ from .engine import ConfigError
 log = logging.getLogger("gexsys.publish")
 
 
-# every 30 minutes on :00 and :30 ET, plus 09:45: Cboe is 15 min delayed, so the 09:30 paste still carries ~09:15
+# every 30 minutes on :00 and :30 ET, plus 09:45: with 15-min delayed quotes the 09:30 paste still carries ~09:15
 # (pre-open) quotes and the 09:45 one is the first with the opening prints
 DEFAULT_TIMES_ET = tuple(sorted([f"{h:02d}:{m:02d}" for h in range(24) for m in (0, 30)] + ["09:45"]))
 

@@ -1,16 +1,19 @@
-"""Independent re-derivation of the GEX numbers from the raw Cboe responses.
+"""Independent re-derivation of the GEX numbers from the raw OCC and Yahoo responses.
 
-Shares NOTHING with gexsys's math: own OCC parsing, own expiry times, own BSM gamma, own ETF handling
-(ETF options are valued in the ETF's OWN price/strike/dividend, never converted), own strike buckets,
-own walls and own zero-gamma search.  The raw JSON is fetched once and fed to both sides.
+Shares NOTHING with gexsys's math: own OCC parsing, own session dates (the days ^GSPC traded, from Yahoo's own daily
+bars, never gexsys.marketcal), own vol date and VIX-family curve, own expiry times, own BSM gamma, own ETF handling
+(ETF options are valued in the ETF's OWN price/strike/dividend, never converted), own strike buckets, own walls and own
+zero-gamma search. Every raw answer is fetched once and fed to both sides; the engine reads it through a stub opener
+at the same frozen clock.
 
 Run from the project folder: python tools/verify_math.py (or all checks: python tools/check.py).
 EARLY lists the half-day closes; add next year's when the calendar rolls over.
 """
+import io
 import json
 import math
-import re
 import sys
+import urllib.parse
 import urllib.request
 from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
@@ -23,27 +26,51 @@ Q = {"SPX": 0.013, "SPY": 0.013, "NDX": 0.007, "QQQ": 0.006}
 EARLY = {date(2026, 11, 27): time(13, 0), date(2026, 12, 24): time(13, 0)}
 MAX_DTE = 45
 STANDARD = {"SPX": {"SPX", "SPXW"}, "NDX": {"NDX", "NDXP"}, "SPY": {"SPY"}, "QQQ": {"QQQ"}}
+CURVE = {"VIX1D": 1, "VIX9D": 9, "VIX": 30, "VIX3M": 93}
+YSYM = {"NDX": "^NDX", "SPX": "^GSPC", "QQQ": "QQQ", "SPY": "SPY"}
+UA = {"User-Agent": "Mozilla/5.0 (GEX PRO verify)"}
 
 
-def fetch(sym):
-    req = urllib.request.Request(f"https://cdn.cboe.com/api/global/delayed_quotes/options/{sym}.json",
-                                 headers={"User-Agent": "Mozilla/5.0 (verify)", "Accept": "application/json"})
-    with urllib.request.urlopen(req, timeout=30) as r:
-        return json.loads(r.read())
+def get(url):
+    with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=30) as r:
+        return r.read()
 
 
-def occ(s):
-    m = re.fullmatch(r"([A-Z]{1,6})(\d{6})([CP])(\d{8})", s or "")
-    if not m:
-        return None
-    d = datetime.strptime(m.group(2), "%y%m%d").date()
-    return m.group(1), d, m.group(3), int(m.group(4)) / 1000
+def occ_url(sym):
+    return f"https://marketdata.theocc.com/series-search?symbolType=U&symbol={sym}"
+
+
+def chart_url(sym, rng):
+    return f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(sym)}?range={rng}&interval=1d"
+
+
+def occ_rows(text):
+    """(product, expiry date, strike, call OI, put OI): tab-separated, strike = integer part + thousandths."""
+    out = []
+    for line in text.decode("utf-8", "replace").split("\n"):
+        f = [x.strip() for x in line.split("\t")]
+        try:
+            out.append((f[0], date(int(f[2]), int(f[3]), int(f[4])), int(f[5]) + int(f[6]) / 1000, float(f[8] or 0), float(f[9] or 0)))
+        except (IndexError, ValueError):
+            continue
+    return out
+
+
+def bars(raw):
+    """{date in the exchange's zone: close} from a Yahoo daily chart, closes rounded to 2 decimals (as published)."""
+    r = json.loads(raw)["chart"]["result"][0]
+    z = ZoneInfo(r["meta"]["exchangeTimezoneName"])
+    return {datetime.fromtimestamp(t, z).date(): round(c, 2) for t, c in zip(r["timestamp"], r["indicators"]["quote"][0]["close"]) if c}
+
+
+def close_at(d):
+    return datetime.combine(d, EARLY.get(d, time(16, 0)), NY)
 
 
 def expiry(root, d):
     if root in ("SPX", "NDX"):                       # AM-settled monthlies: opening print
         return datetime.combine(d, time(9, 30), NY)
-    return datetime.combine(d, EARLY.get(d, time(16, 0)), NY)
+    return close_at(d)
 
 
 def gamma(s, k, t, q, v):
@@ -52,62 +79,38 @@ def gamma(s, k, t, q, v):
     return math.exp(-q * t) * math.exp(-d1 * d1 / 2) / math.sqrt(2 * math.pi) / (s * v * math.sqrt(t))
 
 
-def price(s, k, t, q, v, call):
-    t = max(t, 1 / (365 * 24 * 60))
-    d1 = (math.log(s / k) + (R - q + v * v / 2) * t) / (v * math.sqrt(t))
-    d2 = d1 - v * math.sqrt(t)
-    N = lambda x: 0.5 * (1 + math.erf(x / math.sqrt(2)))
-    if call:
-        return s * math.exp(-q * t) * N(d1) - k * math.exp(-R * t) * N(d2)
-    return k * math.exp(-R * t) * N(-d2) - s * math.exp(-q * t) * N(-d1)
+def vols(raw, idx, sessions, now):
+    """The curve [(days, vol)] and the NDX scale, from the closes of the last session finished 30 min before now (or,
+    per series, the session before it)."""
+    done = [d for d in sessions if close_at(d) + timedelta(minutes=30) <= now]
+    vd = done[-1]
+    prev = done[-2]
+    pick, when, hist = {}, {}, {}
+    for n in list(CURVE) + (["VXN"] if idx == "NDX" else []):
+        b = hist[n] = bars(raw[n])
+        for d in (vd, prev):
+            if d in b:
+                pick[n], when[n] = b[d] / 100, d
+                break
+    pts = sorted((CURVE[n], v) for n, v in pick.items() if n in CURVE)
 
-
-def solve_iv(target, s, k, t, q, call):
-    lo, hi = 1e-4, 5.0
-    if not (price(s, k, t, q, lo, call) <= target <= price(s, k, t, q, hi, call)):
-        return None
-    for _ in range(200):
-        mid = (lo + hi) / 2
-        lo, hi = (mid, hi) if price(s, k, t, q, mid, call) < target else (lo, mid)
-    return (lo + hi) / 2
-
-
-def rows_of(raw, key, asof, q_solve=None):
-    today = datetime.strptime(raw["timestamp"], "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc).astimezone(NY).date()
-    out, strikes, smile = [], set(), []
-    for o in raw["data"]["options"]:
-        p = occ(o.get("option"))
-        if not p:
-            continue
-        root, d, cp, k = p
-        if root not in STANDARD.get(key, {root}):        # adjusted / special-settlement series are not the standard contract
-            continue
-        if not (0 <= (d - today).days <= MAX_DTE):
-            continue
-        strikes.add(k)
-        e = expiry(root, d)
-        t = (e - asof).total_seconds() / YEAR
-        oi, iv = o.get("open_interest") or 0, o.get("iv") or 0
-        if t <= 0 or t * 365 > MAX_DTE + 1e-9:
-            continue
-        quoted = 0 < iv <= 5
-        if quoted:
-            smile.append((e, k, float(iv)))
-        if oi <= 0 and not (key in ("SPY", "QQQ") and not quoted):
-            continue                                   # (an ETF IV is solved even at zero OI: it can be a neighbour)
-        if not quoted:                                 # Cboe IV missing/bad: solve it from the bid/ask mid
-            b, a = o.get("bid"), o.get("ask")
-            iv = None
-            if b is not None and a is not None and a > 0 and b >= 0 and a >= b:
-                # the quote is 15 minutes old: solve at its own time
-                quoted_at = datetime.strptime(raw["timestamp"], "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc) - timedelta(minutes=15)
-                tq = (e - quoted_at).total_seconds() / YEAR
-                iv = solve_iv((a + b) / 2, float(raw["data"]["current_price"]), k, tq, q_solve, cp == "C") if tq > 0 else None
-                if iv and key in ("SPY", "QQQ"):         # a solved ETF IV is a usable neighbour too (the provider solves these)
-                    smile.append((e, k, float(iv)))
-        if oi > 0:
-            out.append({"root": root, "cp": cp, "k": k, "t": t, "e": e, "oi": float(oi), "iv": iv})
-    return out, sorted(strikes), smile
+    def iv(days):
+        if days <= pts[0][0]:
+            return pts[0][1]
+        for (d0, v0), (d1, v1) in zip(pts, pts[1:]):
+            if days <= d1:
+                return math.sqrt((v0 * v0 * d0 + (v1 * v1 * d1 - v0 * v0 * d0) * (days - d0) / (d1 - d0)) / days)
+        return pts[-1][1]
+    scale = 1.0
+    if idx == "NDX":                                 # NDX vol / S&P vol, both from one session
+        both = [d for d in (vd, prev) if d in hist["VXN"] and d in hist["VIX"]]
+        if both:
+            scale = hist["VXN"][both[0]] / hist["VIX"][both[0]]
+        elif "VIX" not in pick and len(set(when.values())) == 1:
+            scale = pick["VXN"] / iv(30)
+        else:
+            raise SystemExit("no VXN and VIX close from one session")
+    return (lambda days: scale * iv(days)), vd
 
 
 def snap_to(k, strikes, tol):
@@ -117,31 +120,39 @@ def snap_to(k, strikes, tol):
     return near if abs(near - k) <= tol else round(k, 2)
 
 
-def independent(raw_i, raw_e, idx, etf, asof):
-    S, Se = float(raw_i["data"]["current_price"]), float(raw_e["data"]["current_price"])
-    ri, istrikes, ismile = rows_of(raw_i, idx, asof, Q[idx])
-    re_, _, esmile = rows_of(raw_e, etf, asof, Q[etf])   # ETF IV solved in its own terms
+def legs_of(text, key, now, ivf):
+    today = now.astimezone(NY).date()
+    out, strikes = [], set()
+    for root, d, k, coi, poi in occ_rows(text):
+        if root not in STANDARD[key] or not 0 <= (d - today).days <= MAX_DTE:
+            continue
+        e = expiry(root, d)
+        if e <= now:
+            continue
+        strikes.add(k)
+        v = ivf((e - now).total_seconds() / 86400)
+        t = (e - now).total_seconds() / YEAR
+        for cp, oi in (("C", coi), ("P", poi)):
+            if oi > 0:
+                out.append({"cp": cp, "k": k, "t": t, "oi": oi, "iv": v})
+    return out, sorted(strikes)
+
+
+def independent(raw, idx, etf, now):
+    sessions = sorted(bars(raw["^GSPC_1mo"]))
+    ivf, vd = vols(raw, idx, sessions, now)
+    S = json.loads(raw[YSYM[idx]])["chart"]["result"][0]["meta"]["regularMarketPrice"]
+    Se = json.loads(raw[YSYM[etf]])["chart"]["result"][0]["meta"]["regularMarketPrice"]
+    ri, istrikes = legs_of(raw["occ_" + idx], idx, now, ivf)
+    re_, _ = legs_of(raw["occ_" + etf], etf, now, ivf)
     gaps = sorted(b - a for a, b in zip(istrikes, istrikes[1:]))
     tol = 0.75 * gaps[len(gaps) // 2]
     ratio = S / Se
-    # no usable IV at all: borrow the nearest strike's (index terms) in the same expiration
-    smile = {}
-    for e, k, v in ismile:
-        smile.setdefault(e, []).append((k, v))
-    for e, k, v in esmile:
-        smile.setdefault(e, []).append((k * ratio, v))           # the exact converted strike: borrowing picks the truly nearest
-    def fill(r, k_idx):
-        if r["iv"] is None and smile.get(r["e"]):
-            r["iv"] = min(smile[r["e"]], key=lambda kv: abs(kv[0] - k_idx))[1]
-        return r["iv"]
-    legs = []                      # (index-terms strike, cp, oi in its own contracts, own S, own K, own q, t, iv)
-    for r in ri:
-        if fill(r, r["k"]):
-            legs.append((r["k"], r["cp"], r["oi"], S, r["k"], Q[idx], r["t"], r["iv"]))
-    for r in re_:
-        k_idx = snap_to(r["k"] * ratio, istrikes, tol)
-        if fill(r, r["k"] * ratio):
-            legs.append((k_idx, r["cp"], r["oi"], Se, r["k"], Q[etf], r["t"], r["iv"]))
+    legs = [(r["k"], r["cp"], r["oi"], S, r["k"], Q[idx], r["t"], r["iv"]) for r in ri]
+    legs += [(snap_to(r["k"] * ratio, istrikes, tol), r["cp"], r["oi"], Se, r["k"], Q[etf], r["t"], r["iv"]) for r in re_]
+    lo, hi = {"SPX": (9.5, 10.5), "NDX": (38.0, 45.0)}[idx]
+    if not lo <= ratio <= hi:                       # one of the two prices is wrong: the ETF is left out
+        legs = legs[:len(ri)]
 
     def dollar(leg, move=1.0):     # $ gamma per 1% for the leg, with the underlying scaled by `move`
         _, cp, oi, s, k, q, t, iv = leg
@@ -164,25 +175,53 @@ def independent(raw_i, raw_e, idx, etf, asof):
     prof = [(S * m, sum(dollar(leg, m) for leg in legs)) for m in grid]
     xs = [p0 + (p1 - p0) * (-v0) / (v1 - v0) for (p0, v0), (p1, v1) in zip(prof, prof[1:]) if v0 * v1 < 0]
     zg = min(xs, key=lambda x: abs(x - S)) if xs else None
-    return {"spot": S, "ratio": ratio, "legs": len(legs), "net": net, "gross": gross, "cw": cw, "pw": pw, "ag": ag, "zg": zg}
+    return {"spot": S, "ratio": ratio, "legs": len(legs), "net": net, "gross": gross, "cw": cw, "pw": pw, "ag": ag, "zg": zg,
+            "vd": vd}
+
+
+class _Resp(io.BytesIO):
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        self.close()
+
+
+def fetch_all():
+    raw = {f"occ_{s}": get(occ_url(s)) for s in ("NDX", "QQQ", "SPX", "SPY")}
+    raw.update({n: get(chart_url("^" + n, "1mo")) for n in list(CURVE) + ["VXN"]})
+    raw["^GSPC_1mo"] = get(chart_url("^GSPC", "1mo"))
+    raw.update({y: get(chart_url(y, "1d")) for y in YSYM.values()})
+    return raw
+
+
+def opener_for(raw):
+    """The engine's opener: the same bytes the independent side read, nothing else."""
+    def op(req, timeout=None):
+        q = urllib.parse.urlparse(req.full_url)
+        args = urllib.parse.parse_qs(q.query)
+        if q.netloc == "marketdata.theocc.com":
+            return _Resp(raw["occ_" + args["symbol"][0]])
+        sym = urllib.parse.unquote(q.path.rsplit("/", 1)[-1])
+        return _Resp(raw[sym.lstrip("^")] if args.get("range") == ["1mo"] else raw[sym])
+    return op
 
 
 def main():
     from gexsys import config as cfgmod
     from gexsys.pipeline import run_once
-    from gexsys.providers.cboe import CboeProvider
+    from gexsys.providers.occ import OccProvider
+    raw = fetch_all()
+    now = datetime.now(timezone.utc).replace(microsecond=0)
     bad = 0
-    for cfg, idx, etf, sym_i, sym_e in (("configs/free_es_cboe.json", "SPX", "SPY", "_SPX", "SPY"),
-                                        ("configs/free_nq_cboe.json", "NDX", "QQQ", "_NDX", "QQQ")):
-        raw = {sym_i: fetch(sym_i), sym_e: fetch(sym_e)}
-        prov = CboeProvider(http=lambda url, headers, limiter=None: raw[url.rsplit("/", 1)[1][:-5]], include_etf=True)
-        c = cfgmod.load(cfg)
-        res = run_once(c, prov)
+    for cfg, idx, etf in (("configs/free_es.json", "SPX", "SPY"), ("configs/free_nq.json", "NDX", "QQQ")):
+        prov = OccProvider(cache_dir=None, opener=opener_for(raw), clock=lambda: now.timestamp())
+        res = run_once(cfgmod.load(cfg), prov)
         s = res["summary"]
-        asof = datetime.fromisoformat(s["asof"])
-        ind = independent(raw[sym_i], raw[sym_e], idx, etf, asof)
+        ind = independent(raw, idx, etf, now)
         p = lambda x: (x or {}).get("price") if isinstance(x, dict) else x
         checks = [
+            ("vol date", str(prov.vol_date), str(ind["vd"]), 0),
             ("reference price", s["ref_price"], ind["spot"], 1e-9),
             # net is a sum of large opposite-signed terms: judge its error against total gamma, not against net
             # itself (a balanced market with net near zero made tiny model differences look like big misses)
@@ -192,9 +231,9 @@ def main():
             ("abs gamma strike", p(s["abs_gamma"]), ind["ag"], 0),
             ("zero gamma", p(s["zero_gamma"]), ind["zg"], 1e-3),
         ]
-        print(f"\n{idx}+{etf}  ratio {ind['ratio']:.4f}  legs {ind['legs']}  asof {asof:%H:%M:%S}Z")
+        print(f"\n{idx}+{etf}  ratio {ind['ratio']:.4f}  legs {ind['legs']}  vols of {ind['vd']}  asof {now:%H:%M:%S}Z")
         for name, a, b, tol in checks:
-            if a is None or b is None:
+            if a is None or b is None or isinstance(a, str):
                 ok = a == b
             else:
                 ok = abs(a - b) <= tol * max(abs(b), 1) if tol else a == b

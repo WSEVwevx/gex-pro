@@ -177,7 +177,7 @@ def compute() -> dict:
     cals, shares = S.read_archive()
     closes = {m: prices.vol_index(u) for m, u in S.VOL.items()}
     if not all(closes.values()):                     # never cache a split result built on a failed download
-        raise RuntimeError("the VIX / VXN history did not download (Cboe and Yahoo)")
+        raise RuntimeError("the VIX / VXN history did not download (Yahoo)")
     sp = S.run(sessions, S.counts(real, rand), closes, cals, {m: S.dte_labels(v) for m, v in shares.items()})
     bars = R.read_bars()
     ru = R.run(sessions, bars)
@@ -233,7 +233,7 @@ class StudiesComponent:
             x = json.loads((self.state / "studies.json").read_text(encoding="utf-8"))
         except (OSError, ValueError):
             x = None
-        row = {"name": "Backtesting studies", "provider": "GEX PRO (track record, archive, Cboe VIX / VXN)",
+        row = {"name": "Backtesting studies", "provider": "GEX PRO (track record, archive, Yahoo VIX / VXN)",
                "pages": ["Backtesting"], "fresh_h": 72,
                "detail": "recomputed when the track record, the archive or a study definition changes"}
         if not x:

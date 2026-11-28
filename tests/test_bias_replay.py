@@ -12,7 +12,7 @@ from gexsys.mapping import round_to_tick
 from gexsys.storage import SnapshotStore
 
 OPEN = datetime(2026, 11, 13, 9, 30, tzinfo=marketcal.NY)          # a Friday
-KEY = "NQ-CBOE"
+KEY = "NQ-OCC"
 
 
 def snap(t, zg, cw=29000.0, pw=27000.0, factor=1.0032, ref_time=None, status="OK", mapped=True):

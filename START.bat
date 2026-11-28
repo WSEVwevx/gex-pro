@@ -1,10 +1,12 @@
 @echo off
 rem Starts GEX PRO for NQ + ES and opens the website.
-rem Data: Cboe's free feed - SPX+SPY options for ES, NDX+QQQ for NQ (15 minutes delayed).
+rem Data: OCC open interest + VIX-family vols (Yahoo) - SPX+SPY options for ES, NDX+QQQ for NQ.
 cd /d "%~dp0"
 title GEX PRO - keep this window open
 set "PY=%LOCALAPPDATA%\Programs\Python\Python312\python.exe"
 if not exist "%PY%" set "PY=py"
+rem Hosts this computer never asks (the hosted site still does): feeds/hostswitch.py
+set "GEX_OFF_HOSTS=api.nasdaq.com"
 rem The one dependency (time zone data) is installed once; after that GEX PRO starts without the internet.
 "%PY%" -c "import tzdata" >nul 2>&1
 if errorlevel 1 (
