@@ -25,7 +25,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from gexsys import marketcal, publish  # noqa: E402
-from gexsys.providers import cboe  # noqa: E402
 from trackrecord import component, reactions  # noqa: E402
 
 NY = marketcal.NY
@@ -128,9 +127,6 @@ def main() -> int:
         loc = utc.astimezone(NY)
         if (loc.hour, loc.minute) != want:
             bad.append(f"{utc:%Y-%m-%d %H:%M} UTC -> {loc:%H:%M} ET, should be {want[0]:02d}:{want[1]:02d}")
-    # the 15-minute delay
-    if cboe.DELAY != timedelta(minutes=15):
-        bad.append(f"Cboe delay {cboe.DELAY}, should be 15 minutes")
     # publish slots: every 30 minutes on :00 and :30, plus 09:45, while the futures trade (written out here, not read from publish.py)
     clocks = sorted([(h, m) for h in range(24) for m in (0, 30)] + [(9, 45)])
     cfg = publish.PublishConfig()

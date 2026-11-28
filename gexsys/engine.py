@@ -174,7 +174,7 @@ def _is_futures(snap: ChainSnapshot) -> bool:
 
 # warnings that make a result DEGRADED (the levels stand, but the inputs were not whole or not fresh)
 DEGRADING = ("stale", "may be corrupt", "options not used")
-MAX_IV = 5.0      # Cboe quotes 600-700% "IVs" for deep in-the-money SPX calls that are pure intrinsic value; gamma
+MAX_IV = 5.0      # delayed chains quoted 600-700% "IVs" for deep in-the-money SPX calls that are pure intrinsic value; gamma
                   # at such a vol is invented, so they count as missing (stress test B1, 2026-11-10)
 
 

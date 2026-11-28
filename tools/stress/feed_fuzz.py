@@ -3,9 +3,9 @@
   python tools/stress/feed_fuzz.py
 
 Each source's real response is fetched once, then replayed with one corruption at a time:
-  levels (Cboe chains -> the whole pipeline, run_once): truncated JSON, NaN / Infinity in numbers, negative OI,
-      duplicate contracts, the timestamp 2 days old / 5 hours ahead / in ET instead of UTC, the other market's chain
-      (wrong symbol), price 0, strikes x10, empty options. Verdict per case: REFUSED (error or UNAVAILABLE),
+  levels (OCC open interest + Yahoo VIX-family charts and prices -> the whole pipeline, run_once): truncated OCC file,
+      NaN / negative open interest, every series twice, the other market's file, empty file, a vol chart truncated /
+      a week old / with NaN closes, price 0 / NaN, strikes x10, the ETF price wrong. Verdict per case: REFUSED (error or UNAVAILABLE),
       WARNED (DEGRADED or a new warning, levels may differ), UNAFFECTED (zero gamma and walls within 0.1 daily
       expected move of the clean run, no warning needed), or SILENTLY WRONG (they moved, nothing said so).
   basis (Yahoo NQ=F / ^NDX 1-minute bars, futures prices on the website): truncated, NaN closes, wrong symbol,
@@ -17,7 +17,6 @@ Tolerance (fixed before running): zero SILENTLY WRONG cases, zero crashes, zero 
 """
 from __future__ import annotations
 
-import copy
 import io
 import json
 import re
@@ -33,52 +32,60 @@ sys.path.insert(0, str(ROOT / "tools"))
 import verify_math as vm  # noqa: E402
 from gexsys import basis, config as cfgmod  # noqa: E402
 from gexsys.pipeline import run_once  # noqa: E402
-from gexsys.providers.cboe import CboeProvider  # noqa: E402
+from gexsys.providers.occ import OccProvider  # noqa: E402
 
 TS_FMT = "%Y-%m-%d %H:%M:%S"
 
 
 # ------------------------------------------------------------------ levels
-def chain_cases(raw_i: dict, raw_e: dict, other: dict) -> list[tuple[str, object, object]]:
-    def ts_shift(r, h):
-        r = copy.deepcopy(r)
-        r["timestamp"] = (datetime.strptime(r["timestamp"], TS_FMT) + timedelta(hours=h)).strftime(TS_FMT)
-        return r
+def _occ_edit(text: bytes, f, every=7) -> bytes:
+    lines = text.decode("utf-8", "replace").split("\n")
+    for i, line in enumerate(lines):
+        c = line.split("\t")
+        if len(c) >= 10 and c[2].strip().isdigit() and i % every == 0:
+            lines[i] = "\t".join(f(c))
+    return "\n".join(lines).encode()
 
-    def each(r, f, every=7):
-        r = copy.deepcopy(r)
-        for i, o in enumerate(r["data"]["options"]):
-            if i % every == 0:
-                f(o)
-        return r
 
-    text = json.dumps(raw_i)
+def _price(raw: bytes, v) -> bytes:
+    d = json.loads(raw)
+    d["chart"]["result"][0]["meta"]["regularMarketPrice"] = v
+    return json.dumps(d).encode()
+
+
+def _chart(raw: bytes, f) -> bytes:
+    d = json.loads(raw)
+    f(d["chart"]["result"][0])
+    return json.dumps(d).encode()
+
+
+def chain_cases(raw: dict, idx: str, etf: str, other: str, ysym: str, yetf: str) -> list[tuple[str, dict]]:
+    def week_old(r):
+        r["timestamp"] = [t - 7 * 86400 for t in r["timestamp"]]
+
+    def nan_closes(r):
+        r["indicators"]["quote"][0]["close"] = [float("nan")] * len(r["indicators"]["quote"][0]["close"])
+    occ = raw["occ_" + idx]
     return [
-        ("truncated JSON", text[: len(text) // 2], raw_e),
-        ("NaN open interest (1 in 7)", each(raw_i, lambda o: o.__setitem__("open_interest", float("nan"))), raw_e),
-        ("'NaN' strings in IV and gamma", each(raw_i, lambda o: (o.__setitem__("iv", "NaN"), o.__setitem__("gamma", "NaN"))), raw_e),
-        ("Infinity IV (1 in 7)", each(raw_i, lambda o: o.__setitem__("iv", float("inf"))), raw_e),
-        ("negative open interest (1 in 7)", each(raw_i, lambda o: o.__setitem__("open_interest", -abs(o.get("open_interest") or 1) * 50)), raw_e),
-        ("every contract twice", {**raw_i, "data": {**raw_i["data"], "options": raw_i["data"]["options"] * 2}}, raw_e),
-        ("timestamp 2 days old", ts_shift(raw_i, -48), ts_shift(raw_e, -48)),
-        ("timestamp 5 hours ahead", ts_shift(raw_i, 5), ts_shift(raw_e, 5)),
-        ("timestamp in ET, not UTC", ts_shift(raw_i, -5), ts_shift(raw_e, -5)),
-        ("the other market's chain (wrong symbol)", other, raw_e),
-        ("current price 0", {**raw_i, "data": {**raw_i["data"], "current_price": 0}}, raw_e),
-        ("current price NaN", {**raw_i, "data": {**raw_i["data"], "current_price": "NaN"}}, raw_e),
-        ("strikes x10 (current price unchanged)", {**raw_i, "data": {**raw_i["data"], "current_price": raw_i["data"]["current_price"] / 10}}, raw_e),
-        ("empty options list", {**raw_i, "data": {**raw_i["data"], "options": []}}, raw_e),
-        ("ETF chain truncated", raw_i, json.dumps(raw_e)[:500]),
-        ("ETF price 0", raw_i, {**raw_e, "data": {**raw_e["data"], "current_price": 0}}),
+        ("truncated OCC file", {"occ_" + idx: occ[: len(occ) // 2]}),
+        ("NaN open interest (1 in 7)", {"occ_" + idx: _occ_edit(occ, lambda c: c[:8] + ["NaN", "NaN"] + c[10:])}),
+        ("negative open interest (1 in 7)", {"occ_" + idx: _occ_edit(occ, lambda c: c[:8] + ["-5000", "-5000"] + c[10:])}),
+        ("every series twice", {"occ_" + idx: occ + b"\n" + occ}),
+        ("the other market's OCC file (wrong symbol)", {"occ_" + idx: raw["occ_" + other]}),
+        ("empty OCC file", {"occ_" + idx: b""}),
+        ("VIX chart truncated", {"VIX": raw["VIX"][:200]}),
+        ("every vol chart a week old", {n: _chart(raw[n], week_old) for n in ("VIX1D", "VIX9D", "VIX", "VIX3M", "VXN")}),
+        ("NaN closes in VIX9D", {"VIX9D": _chart(raw["VIX9D"], nan_closes)}),
+        ("index price 0", {ysym: _price(raw[ysym], 0)}),
+        ("index price NaN", {ysym: _price(raw[ysym], "NaN")}),
+        ("strikes x10 (index price / 10)", {ysym: _price(raw[ysym], json.loads(raw[ysym])["chart"]["result"][0]["meta"]["regularMarketPrice"] / 10)}),
+        ("ETF price 0", {yetf: _price(raw[yetf], 0)}),
+        ("ETF OCC file truncated", {"occ_" + etf: raw["occ_" + etf][:500]}),
     ]
 
 
-def run_levels(cfg, si, se, ri, re_):
-    def http(url, headers, limiter=None):
-        body = ri if url.rsplit("/", 1)[1][:-5] == si else re_
-        return json.loads(body) if isinstance(body, str) else body
-    r = run_once(cfg, CboeProvider(http=http, include_etf=True))
-    return r
+def run_levels(cfg, raw):
+    return run_once(cfg, OccProvider(cache_dir=None, opener=vm.opener_for(raw)))
 
 
 def levels_of(r):
@@ -91,14 +98,14 @@ def levels_of(r):
 
 def fuzz_levels() -> list[tuple[str, str, str]]:
     out = []
-    raw = {k: vm.fetch(k) for k in ("_NDX", "QQQ", "_SPX", "SPY")}
-    for cfgp, si, se, oi in (("configs/free_nq_cboe.json", "_NDX", "QQQ", "_SPX"), ("configs/free_es_cboe.json", "_SPX", "SPY", "_NDX")):
+    raw = vm.fetch_all()
+    for cfgp, idx, etf, other in (("configs/free_nq.json", "NDX", "QQQ", "SPX"), ("configs/free_es.json", "SPX", "SPY", "NDX")):
         cfg = cfgmod.load(cfgp)
-        clean = run_levels(cfg, si, se, raw[si], raw[se])
+        clean = run_levels(cfg, raw)
         lv0, em, st0, w0 = levels_of(clean)
-        for name, ri, re_ in chain_cases(raw[si], raw[se], raw[oi]):
+        for name, bad in chain_cases(raw, idx, etf, other, vm.YSYM[idx], vm.YSYM[etf]):
             try:
-                r = run_levels(cfg, si, se, ri, re_)
+                r = run_levels(cfg, {**raw, **bad})
             except Exception as e:
                 out.append((f"{cfg.market} levels", name, f"REFUSED ({type(e).__name__}: {str(e)[:60]})"))
                 continue

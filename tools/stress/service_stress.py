@@ -4,7 +4,7 @@
 
 The real MarketWorker (NQ and ES) steps through simulated time, one refresh per step, on chains recorded live once
 and replayed (so the right levels are known: the clean run's). Faults:
-  network     5-minute outages at random (every request fails: Cboe, Yahoo)
+  network     5-minute outages at random (every request fails: OCC, Yahoo)
   sleep       the PC sleeps 8 hours and wakes (the clock jumps)
   bad feed    a refresh returns an unusable chain (UNAVAILABLE)
   full disk   every file write fails for an hour
@@ -46,7 +46,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "tools"))
 import verify_math as vm  # noqa: E402
 from gexsys import basis, config as cfgmod, service  # noqa: E402
-from gexsys.providers.cboe import CboeProvider  # noqa: E402
+from gexsys.providers.occ import OccProvider  # noqa: E402
 
 TS_FMT = "%Y-%m-%d %H:%M:%S"
 
@@ -82,18 +82,16 @@ def make_worker(cfg, raw, faults, store_root):
     cfg = copy.deepcopy(cfg)
     cfg.storage["root"] = str(store_root)
 
-    def http(url, headers, limiter=None):
+    good = vm.opener_for(raw)
+
+    def opener(req, timeout=None):
         if faults.offline:
             raise urllib.error.URLError("simulated outage")
-        sym = url.rsplit("/", 1)[1][:-5]
-        r = copy.deepcopy(raw[sym])
-        r["timestamp"] = (datetime.now(timezone.utc) - timedelta(minutes=15)).strftime(TS_FMT)   # fresh every refresh
-        if faults.bad_feed:
-            for o in r["data"]["options"]:
-                o["open_interest"] = 0
-        return r
+        if faults.bad_feed and "theocc.com" in req.full_url:
+            return vm._Resp(b"no series")          # a damaged open-interest file: no rows at all
+        return good(req, timeout)
     w = service.MarketWorker(cfg)
-    w.provider = CboeProvider(http=http, include_etf=True)
+    w.provider = OccProvider(cache_dir=None, opener=opener)
     w.notify_desktop = lambda *a, **k: None
     w.send_webhook = lambda *a, **k: None
     w.candles_fn = lambda market: (_ for _ in ()).throw(OSError("offline")) if faults.offline else []
@@ -115,7 +113,7 @@ def main() -> int:
     ap.add_argument("--step-min", type=float, default=5)
     a = ap.parse_args()
     rng = random.Random(11)
-    raw = {k: vm.fetch(k) for k in ("_NDX", "QQQ", "_SPX", "SPY")}
+    raw = vm.fetch_all()
     yb = {s: basis._yahoo_1m(s, datetime.now(timezone.utc)) for s in ("NQ=F", "^NDX", "ES=F", "^GSPC")}
     faults = Faults()
 
@@ -139,7 +137,7 @@ def main() -> int:
     builtins.open, os.replace = guarded_open, guarded_replace
 
     store = Path(tempfile.mkdtemp(prefix="gexpro-stress-"))
-    cfgs = [cfgmod.load("configs/free_nq_cboe.json"), cfgmod.load("configs/free_es_cboe.json")]
+    cfgs = [cfgmod.load("configs/free_nq.json"), cfgmod.load("configs/free_es.json")]
     workers = [make_worker(c, raw, faults, store) for c in cfgs]
     for w in workers:
         w.step(datetime.now(timezone.utc))

@@ -1,6 +1,6 @@
 """Performance profile of one refresh and of the hosted build, on frozen inputs, with the outputs fingerprinted.
 
-  python tools/stress/perf_profile.py record                 save live Cboe chains, Yahoo bars and candles
+  python tools/stress/perf_profile.py record                 save live OCC open interest and Yahoo vols / prices
   python tools/stress/perf_profile.py fill                   build a 12-day store (RTH, one file a minute)
   python tools/stress/perf_profile.py run [--label NAME]     per-stage timings (cold x5, warm x5, hourly stats x5),
                                                              cProfile top 25, peak memory, output fingerprint
@@ -9,8 +9,9 @@
   python tools/stress/perf_profile.py compare A B            outputs of two labelled runs: byte-identical paste,
                                                              every number within 1e-12
 
-Replay: the clock is frozen at FROZEN (Friday 15:45 ET, RTH: the 0DTE path is live) and every chain is stamped
-fresh at that moment; network calls return the recordings. The store holds 12 trading days of RTH history at one
+Replay: the clock is frozen at FROZEN (Friday 15:45 ET, RTH) and the OCC chain is read at that moment from the
+recordings (OCC open interest, the Yahoo VIX-family charts and prices; record them within a month of FROZEN, so the
+charts still hold its session); network calls return the recordings. The store holds 12 trading days of RTH history at one
 file a minute plus today's session so far (~5,000 files per market), so costs that grow with history show up.
 Nothing in the product is changed to measure it: timing and freezing hook in through module attributes.
 """
@@ -37,8 +38,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 BASE = Path(os.path.expandvars(r"%TEMP%/claude/bc7626df52a346c5/61f0ae57-b303-48cd-8d08-5b790089e8ed/scratchpad/perf"))
 REC, STORE, OUT = BASE / "rec", BASE / "store", BASE / "out"
 FROZEN = datetime(2026, 11, 13, 20, 45, tzinfo=timezone.utc)          # Fri 15:45 ET
-TS = FROZEN.strftime("%Y-%m-%d %H:%M:%S")
-CONFIGS = ("configs/free_nq_cboe.json", "configs/free_es_cboe.json")
+CONFIGS = ("configs/free_nq.json", "configs/free_es.json")
 _real_dt = datetime
 
 
@@ -54,7 +54,7 @@ class FrozenDT(datetime):
 
 def freeze():
     import importlib
-    for m in ("gexsys.service", "gexsys.pipeline", "gexsys.providers.cboe", "gexsys.normalize", "gexsys.basis",
+    for m in ("gexsys.service", "gexsys.pipeline", "gexsys.providers.occ", "gexsys.normalize", "gexsys.basis",
               "gexsys.extras", "gexsys.engine", "gexsys.session", "gexsys.storage", "gexsys.component", "gexsys.heatmap",
               "gexsys.ladder", "gexsys.bias", "gexsys.alerts", "gexsys.publish", "gexsys.export", "gexsys.mapping",
               "gexpro.site", "gexpro.components", "gexpro.context"):
@@ -68,16 +68,11 @@ def freeze():
 def replay():
     """Network -> recordings. Returns the raw chain texts (JSON is parsed on every call, as the real feed is)."""
     from gexsys import basis, heatmap, service
-    from gexsys.providers.cboe import CboeProvider
-    texts = {}
-    for k in ("_NDX", "QQQ", "_SPX", "SPY"):
-        d = json.loads((REC / f"cboe{k}.json").read_text())
-        d["timestamp"] = TS
-        texts[k] = json.dumps(d)
-
-    def http(url, headers, limiter=None):
-        return json.loads(texts[url.rsplit("/", 1)[1][:-5]])
-    service.make_provider = lambda cfg: CboeProvider(http=http, include_etf=cfg.provider.get("include_etf", False))
+    from gexsys.providers.occ import OccProvider
+    sys.path.insert(0, str(ROOT / "tools"))
+    import verify_math as vm
+    raw = {k: v.encode("utf-8") for k, v in json.loads((REC / "occ_raw.json").read_text(encoding="utf-8")).items()}
+    service.make_provider = lambda cfg: OccProvider(cache_dir=None, opener=vm.opener_for(raw), clock=FROZEN.timestamp)
     y = json.loads((REC / "yahoo1m.json").read_text())
     y = {s: {int(k): v for k, v in d.items()} for s, d in y.items()}
     basis._yahoo_1m = lambda sym, asof: y[sym]
@@ -105,10 +100,10 @@ def timed(owner, attr, label):
 
 def instrument():
     from gexsys import alerts, engine, pipeline, service, session, storage
-    from gexsys.providers import cboe
-    timed(cboe.CboeProvider, "fetch_snapshot", "fetch+parse (all)")
-    timed(cboe.CboeProvider, "_chain", "  parse chain -> contracts")
-    timed(cboe, "merge_etf", "  ETF merge")
+    from gexsys.providers import occ
+    timed(occ.OccProvider, "fetch_snapshot", "fetch+parse (all)")
+    timed(occ.OccProvider, "_contracts", "  parse OCC -> contracts")
+    timed(occ, "merge_etf", "  ETF merge")
     timed(pipeline, "normalize", "normalize")
     timed(engine, "compute", "GEX compute (all calls)")
     timed(engine, "_solve_iv", "  IV solve")
@@ -255,7 +250,7 @@ def run(label: str) -> None:
             results[kind].append(json.loads(line[-1]))
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / f"timing-{label}.json").write_text(json.dumps(results), encoding="utf-8")
-    for key in ("NQ-CBOE", "ES-CBOE"):
+    for key in ("NQ-OCC", "ES-OCC"):
         print(f"\n{key}  (median of 5, seconds)")
         stages = sorted({s for k in results for r in results[k] for s in r[key]["stages"]},
                         key=lambda s: -statistics.median(r[key]["stages"].get(s, 0) for r in results["warm"]))
@@ -394,7 +389,11 @@ def build(label: str) -> None:
 if __name__ == "__main__":
     cmd = sys.argv[1]
     if cmd == "record":
-        raise SystemExit("recorded already by hand; see REC")
+        sys.path.insert(0, str(ROOT / "tools"))
+        import verify_math as vm
+        REC.mkdir(parents=True, exist_ok=True)
+        (REC / "occ_raw.json").write_text(json.dumps({k: v.decode("utf-8") for k, v in vm.fetch_all().items()}), encoding="utf-8")
+        print("recorded", REC / "occ_raw.json", "(Yahoo 1-minute bars and candles: recorded by hand, see REC)")
     if cmd == "fill":
         fill()
     elif cmd == "_child":

@@ -110,6 +110,12 @@ class TestWeekly(unittest.TestCase):
         self.assertEqual([x["title"] for x in b["sections"]], ["Price action", "What was behind it", "Backdrop"])
         self.assertEqual(" ".join(x["text"] for x in b["sections"]), t)                                          # nothing lost in the split
 
+    def test_calendars_switched_off_here_read_unavailable(self):
+        data = dict(week_input(), calendars_off="api.nasdaq.com is switched off on this computer (GEX_OFF_HOSTS)")
+        t = recap(data, self.END, et(2026, 10, 30, 17), et(2026, 10, 30, 17, 5))["headline"]
+        self.assertIn("Earnings and economic data are unavailable: api.nasdaq.com is switched off on this computer (GEX_OFF_HOSTS).", t)
+        self.assertNotIn("unavailable", recap(week_input(), self.END, et(2026, 10, 30, 17), et(2026, 10, 30, 17, 5))["headline"])
+
     def test_two_tickers_of_one_company_count_once(self):
         data = week_input()
         flat = {d: b["close"] for d, b in week_bars([100, 100, 100, 100, 100, 100]).items()}

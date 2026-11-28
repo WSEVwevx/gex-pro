@@ -74,7 +74,7 @@ class TestSchedule(unittest.TestCase):
         self.assertEqual(pub.due(slot, et(2026, 10, 20, 13, 46), C), et(2026, 10, 20, 13, 30))    # a missed slot: the latest
 
     def test_the_extra_slot_after_the_open(self):
-        # Cboe is 15 min delayed: the 09:30 paste carries ~09:15 quotes, the 09:45 one the first opening prints
+        # delayed quotes run 15 min behind: the 09:30 paste carries ~09:15 quotes, the 09:45 one the first opening prints
         day = [s.strftime("%H:%M") for s in pub._day_slots(et(2026, 11, 19, 0, 0).date(), C)]
         self.assertEqual(day[day.index("09:00"):day.index("10:00") + 1], ["09:00", "09:30", "09:45", "10:00"])
         self.assertEqual(pub.latest_slot(et(2026, 11, 19, 9, 44), C), et(2026, 11, 19, 9, 30))

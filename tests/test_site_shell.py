@@ -36,7 +36,7 @@ class Shell(unittest.TestCase):
     def test_the_short_backup_label_keeps_what_matters(self):
         line = next(l for l in JS.splitlines() if "s && s.backup ?" in l)
         short = re.sub(r'<span class="bn-more">.*?</span>', "", line)
-        for words in ("Backup estimate.", "Cboe is refusing requests", "levels are an estimate", "(no skew)", "The TradingView paste keeps the last Cboe levels."):
+        for words in ("OCC open interest + VIX-family vols.", "One implied vol per expiry (no skew)", "the TradingView paste keeps its last published levels."):
             self.assertIn(words, short)
         self.assertIn(".banner .bn-more{display:none}", PHONE)
 

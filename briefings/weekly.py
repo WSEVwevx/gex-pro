@@ -235,6 +235,8 @@ def recap(data: Optional[dict], end: date, slot: datetime, now: datetime) -> Opt
     for extra in (_earnings(data, end, days), _economy(data)):
         if extra:
             lines.append(extra[0].upper() + extra[1:])
+    if data.get("calendars_off"):                               # not "nothing happened": the calendars were not read
+        lines.append(f"Earnings and economic data are unavailable: {data['calendars_off']}.")
     behind_end = len(lines)
     back = _backdrop(data, end, vix)
     if back:

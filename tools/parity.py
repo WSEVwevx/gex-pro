@@ -10,14 +10,16 @@ blocked, and compare two runs byte for byte.
 key, canonical JSON (sorted keys, repr floats). `compare` reads two such folders and reports the first difference,
 with keys named by --exclude dropped at every depth first. Exit 0 = identical.
 
-Inputs (one folder, as `fixture` writes it): OCC series files `occ_<SYM>.txt`, Cboe VIX-family CSVs `vol_<NAME>.csv`,
+Inputs (one folder, as `fixture` writes it): OCC series files `occ_<SYM>.txt`, Yahoo VIX-family daily charts
+`vol_<NAME>.json`,
 and `prices.json` with Yahoo's three fields per symbol plus the futures reference per market. Yahoo prices were never
 saved, so `fixture` freezes them from the archive branch's 1-minute bars (last bar of the session); QQQ and SPY have
 no saved bars, so the ETF merge is not covered (the provider's own "options not used" path runs instead).
 
-Clocks (rework method 7.3): the backup's states, each one's marketcal state checked before it runs.
-Not covered: Cboe chains (the live RTH path, refused since 19 Nov; the 13 Nov chains are 507 MB and outside the
-repo). The 27 Nov 12:00 RTH clock runs the 20 Nov inputs, so it exercises the stale-price path, not a live session.
+Clocks (rework method 7.3): the chain's states, each one's marketcal state checked before it runs. The vol charts run
+to 27 Nov, so the Thanksgiving clocks read the 25 Nov closes (the last completed session) and never a later one.
+The 27 Nov 12:00 RTH clock runs the 20 Nov open interest and prices, so it exercises the stale-price path, not a live
+session.
 Network guard: socket.create_connection and urllib.request.urlopen raise; any attempt fails the run (exit 3).
 """
 from __future__ import annotations
@@ -44,7 +46,7 @@ CLOCKS = (
     ("thu-2026-11-26-1200", "2026-11-26T12:00", "ETH"),             # Thanksgiving: cash closed, Globex open
     ("fri-2026-11-27-1200", "2026-11-27T12:00", "RTH"),             # early close (13:00)
 )
-MARKETS = (("NQ", "configs/free_nq_cboe.json", "NQ=F"), ("ES", "configs/free_es_cboe.json", "ES=F"))
+MARKETS = (("NQ", "configs/free_nq.json", "NQ=F"), ("ES", "configs/free_es.json", "ES=F"))
 EXCLUDE_DEFAULT = ("built",)
 
 
@@ -83,8 +85,8 @@ def stub_opener(inputs: Path, prices: dict):
         q = urllib.parse.urlparse(url)
         if q.netloc == "marketdata.theocc.com":
             f = inputs / f"occ_{urllib.parse.parse_qs(q.query)['symbol'][0]}.txt"
-        elif q.netloc == "cdn.cboe.com":
-            f = inputs / f"vol_{q.path.rsplit('/', 1)[-1].replace('_History.csv', '')}.csv"
+        elif q.netloc == "query1.finance.yahoo.com" and urllib.parse.parse_qs(q.query).get("range") == ["1mo"]:
+            f = inputs / f"vol_{urllib.parse.unquote(q.path.rsplit('/', 1)[-1]).lstrip('^')}.json"     # a VIX-family chart
         elif q.netloc == "query1.finance.yahoo.com":
             sym = urllib.parse.unquote(q.path.rsplit("/", 1)[-1])
             if sym not in prices["yahoo"]:
@@ -217,7 +219,7 @@ def _bars(day: str, sym: str) -> list:
 
 
 def fixture(occ: Path, out: Path, day: str = "2026-11-20", prev: str = "2026-11-19") -> None:
-    """Trimmed inputs for tests/: OCC rows within 46 days and +-10% of the close, the last 40 vol rows, frozen prices."""
+    """Trimmed inputs for tests/: OCC rows within 46 days and +-10% of the close, the vol charts as saved, frozen prices."""
     out.mkdir(parents=True, exist_ok=True)
     close = {s: _bars(day, s)[-1] for s in ("NDX", "GSPC")}
     # the futures at the same minute as the index's last bar: a later bar would read as a clock skew to the mapping
@@ -236,9 +238,9 @@ def fixture(occ: Path, out: Path, day: str = "2026-11-20", prev: str = "2026-11-
                     continue
             keep.append(line)
         (out / f.name).write_text("\n".join(keep) + "\n", encoding="utf-8", newline="\n")
-    for f in sorted(occ.glob("vol_*.csv")):
-        lines = f.read_text(encoding="utf-8").splitlines()
-        (out / f.name).write_text("\n".join(lines[:1] + lines[-40:]) + "\n", encoding="utf-8", newline="\n")
+    for f in sorted(occ.glob("vol_*.json")):
+        (out / f.name).write_text(json.dumps(json.loads(f.read_text(encoding="utf-8")), separators=(",", ":")) + "\n",
+                                  encoding="utf-8", newline="\n")
 
     def meta(bar, prev_close):
         return {"regularMarketPrice": bar[4], "chartPreviousClose": prev_close, "regularMarketTime": bar[0] + 60}

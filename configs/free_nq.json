@@ -90,11 +90,10 @@
   "futures_ref": {
     "mode": "observed"
   },
-  "description": "NQ levels from NDX + QQQ options (Cboe free feed, 15-min delayed), QQQ converted to NDX terms, mapped to NQ futures",
+  "description": "NQ levels from NDX + QQQ options (OCC open interest + VIX-family vols, an estimate; Yahoo prices), QQQ converted to NDX terms, mapped to NQ futures",
   "market": "NQ",
   "source": "NDX",
   "provider": {
-    "name": "cboe",
-    "include_etf": true
+    "name": "occ"
   }
 }

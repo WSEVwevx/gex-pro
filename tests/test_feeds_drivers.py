@@ -142,23 +142,31 @@ if __name__ == "__main__":
     unittest.main()
 
 
-class TestEarningsMove(unittest.TestCase):
-    CHAIN = json.dumps({"data": {"current_price": 100.0, "options": [
-        {"option": "ABC261030C00100000", "bid": 4.0, "ask": 4.2}, {"option": "ABC261030P00100000", "bid": 3.8, "ask": 4.0},
-        {"option": "ABC261106C00100000", "bid": 5.0, "ask": 5.2}, {"option": "ABC261106P00100000", "bid": 4.8, "ask": 5.0}]}}).encode()
+class TestHostSwitch(unittest.TestCase):
+    """GEX_OFF_HOSTS keeps this computer off a host (START.bat: api.nasdaq.com); the hosted build leaves it empty."""
 
-    def test_straddle_of_the_first_expiry_spanning_the_report(self):
-        self.assertEqual(D.implied_move(self.CHAIN, "2026-10-30")["pct"], 8.0)         # (4.1 + 3.9) / 100
-        self.assertEqual(D.implied_move(self.CHAIN, "2026-10-31")["expiry"], "2026-11-06")
-        self.assertIsNone(D.implied_move(b"not json", "2026-10-30"))
+    def test_a_switched_off_host_is_never_asked_and_says_so(self):
+        import os
+        from unittest import mock
+        from feeds import hostswitch, weekinfo
+        asked = []
+        net = Net(world())
 
-    def test_only_while_the_report_is_ahead(self):
-        from datetime import datetime
-        at = lambda s: datetime.fromisoformat(s).replace(tzinfo=D.NY).timestamp()
-        d = D.Drivers(opener=Net({"options/ABC": self.CHAIN}))
-        amc = {"date": "2026-10-29", "when": "after close"}                              # spans Fri 10-30
-        self.assertEqual(d._earn_move("ABC", amc, at("2026-10-29T15:00"))["expiry"], "2026-10-30")
-        self.assertIsNotNone(d._earn_move("ABC", amc, at("2026-10-30T08:00")))           # out, but not traded yet
-        self.assertIsNone(d._earn_move("ABC", amc, at("2026-10-30T10:00")))              # the move has happened
-        self.assertIsNone(d._earn_move("ABC", {"date": "2026-10-29", "when": "before open"}, at("2026-10-29T11:00")))
-        self.assertIsNone(d._earn_move("ABC", {"date": "2026-11-20", "when": ""}, at("2026-10-29T11:00")))   # > 7 days out
+        def op(req, timeout=None):
+            asked.append(req.full_url)
+            return net(req, timeout)
+        with mock.patch.dict(os.environ, {"GEX_OFF_HOSTS": "api.nasdaq.com, other.example"}):
+            self.assertEqual(hostswitch.off_hosts(), {"api.nasdaq.com", "other.example"})
+            self.assertIn("switched off on this computer", hostswitch.why_off("https://api.nasdaq.com/api/x"))
+            self.assertIsNone(hostswitch.why_off("https://query1.finance.yahoo.com/v8"))
+            out = D.Drivers(opener=op).get()
+            self.assertIn("Earnings: Nasdaq.com (switched off on this computer).", out["source"])
+            with mock.patch("urllib.request.urlopen", side_effect=AssertionError("asked")):
+                self.assertIsNone(weekinfo._get("https://api.nasdaq.com/api/calendar/earnings?date=2026-11-30"))
+        self.assertFalse([u for u in asked if "nasdaq.com" in u.split("/")[2]])
+        with mock.patch.dict(os.environ, {"GEX_OFF_HOSTS": ""}):
+            self.assertIsNone(hostswitch.why_off("https://api.nasdaq.com/api/x"))
+
+    def test_no_stock_option_chain_is_read(self):
+        self.assertFalse(hasattr(D, "CHAIN"))
+        self.assertFalse(hasattr(D, "implied_move"))

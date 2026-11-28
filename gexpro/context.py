@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 from datetime import date, datetime, time, timedelta, timezone
 
-from feeds import weekinfo
+from feeds import hostswitch, weekinfo
 from gexsys import bias, export, marketcal, session
 from gexsys.mapping import FUTURES, round_to_tick
 from trackrecord import prices
@@ -105,7 +105,7 @@ def week_data(feeds, end: date) -> dict:
     return {"positioning": held, "indexes": bars(WEEK_INDEXES), "markets": bars(WEEK_MARKETS), "sectors": bars(WEEK_SECTORS), "weights": weights,
             "closes": weekinfo.closes(sorted({s for t in weights.values() for s in t})),
             "earnings": weekinfo.earnings(monday - timedelta(days=3), end), "economy": weekinfo.economy(monday, end),
-            "headlines": weekinfo.headlines}
+            "calendars_off": hostswitch.why_off(weekinfo.EARNINGS), "headlines": weekinfo.headlines}
 
 
 # ---------------------------------------------------------------- track record: the levels known before an open

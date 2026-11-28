@@ -140,7 +140,7 @@ class TestExpectedMove(unittest.TestCase):
 
     def test_overnight_band_does_not_shrink_on_frozen_quotes(self):
         snap, basket = self.mk()
-        snap = replace(snap, spot_time=TUE_CLOSE + timedelta(minutes=15))              # Cboe's last quote, 16:15
+        snap = replace(snap, spot_time=TUE_CLOSE + timedelta(minutes=15))              # the last delayed quote, 16:15
         ems = [ex.expected_moves(snap, basket, TUE_CLOSE + timedelta(hours=h), snap.contracts)["daily_points"] for h in (1, 4, 9)]
         self.assertAlmostEqual(ems[0], ems[2])                                          # same quotes, same band all night
         self.assertAlmostEqual(ems[0], 100 * math.sqrt(0.2 ** 2 * 23.75 / 8760))
@@ -171,7 +171,7 @@ class TestExpectedMove(unittest.TestCase):
 
     def test_the_backup_counts_one_session_while_closed(self):
         """Study weekend_move v1 (PR 76): with the market closed the backup's daily band is one session at VIX1D,
-        sigma = S x VIX1D / sqrt(252), not calendar days on its curve. RTH and Cboe's own quotes are unchanged."""
+        sigma = S x VIX1D / sqrt(252), not calendar days on its curve. RTH is unchanged."""
         from gexsys.providers.occ import curve_iv
         pts = [(1.0, 0.50), (9.0, 0.40), (30.0, 0.35), (93.0, 0.30)]
         exps = [datetime.fromisoformat(d + "T16:00:00").replace(tzinfo=NY) for d in ("2026-10-22", "2026-10-23", "2026-10-26", "2026-11-20")]
@@ -286,7 +286,7 @@ class TestPayloadAndMapping(unittest.TestCase):
                            "profile": {"base": 5650.0, "width": 10.0, "values": [0, -5, 99]}}}
 
     def test_tokens_and_end_marker(self):
-        p = pine_payload(self.summary(), "ES", "SPX", "ratio", provider="CBOE")
+        p = pine_payload(self.summary(), "ES", "SPX", "ratio", provider="OCC")
         d = parse_payload(p)
         self.assertTrue(d["complete"])
         self.assertEqual((d["x0"], d["z0"], d["vc"], d["emd"], d["emx"]), ("0DTE", "5790.00", "5825.00", "45.50", "2026-10-23"))

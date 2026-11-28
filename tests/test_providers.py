@@ -47,7 +47,7 @@ class TestHttp(unittest.TestCase):
         return op, (lambda: http_get_json("http://x", {}, retries=retries, sleep=self.sleeps.append, opener=op))
 
     def test_gzip_is_requested_and_unpacked(self):
-        # perf (2026-11-13): Cboe sends 1.8 MB gzipped instead of 13.7 MB of JSON when asked; same JSON
+        # perf (2026-11-13): a chain feed sent 1.8 MB gzipped instead of 13.7 MB of JSON when asked; same JSON
         import gzip
         seen = {}
 

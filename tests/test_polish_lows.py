@@ -71,7 +71,7 @@ class Sweep2(unittest.TestCase):
         self.assertIn("requestAnimationFrame(() => requestAnimationFrame(() => hmChart.timeScale().setVisibleLogicalRange({from, to: n + ro2})));", JS)
 
     def test_backup_volume_is_unavailable_not_zero(self):
-        self.assertIn('${s.backup ? "volume unavailable (backup estimate)" : `volume calls', JS)
+        self.assertIn('${s.backup ? "no volume (OCC open interest only)" : `volume calls', JS)
 
 
 if __name__ == "__main__":

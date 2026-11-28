@@ -43,8 +43,8 @@ class TestConfig(unittest.TestCase):
         base = {"market": "NQ", "source": "NDX", "provider": {"name": "synthetic"}}
         for bad in ({**base, "engin": {}}, {**base, "engine": {"max_dt": 3}}, {**base, "source": "SPX"},
                     {**base, "source": "QQQ", "mapping": {"method": "offset"}},
-                    {**base, "source": "NQ_FOP", "provider": {"name": "cboe"}},
-                    {**base, "provider": {"name": "cboe"}, "futures_ref": {"mode": "synthetic_basis"}},
+                    {**base, "source": "NQ_FOP", "provider": {"name": "occ"}},
+                    {**base, "provider": {"name": "occ"}, "futures_ref": {"mode": "synthetic_basis"}},
                     {**base, "provider": {"name": "tradier"}}):
             with self.assertRaises(eng.ConfigError):
                 cfgmod.from_dict(bad)
@@ -239,7 +239,7 @@ class TestService(unittest.TestCase):
 
 
     def test_a_refusal_says_so_and_retries_in_15_minutes(self):
-        """Cboe began answering HTTP 403 on 2026-11-19 (a Cloudflare block on a free source, no key involved):
+        """A free source can answer HTTP 403 (a Cloudflare block, no key involved, as on 2026-11-19):
         the message must not blame credentials, and the next try comes in 15 minutes, not an hour."""
         from gexsys.providers.base import AuthError
         from gexsys.service import AUTH_RETRY_S
@@ -347,7 +347,7 @@ class TestStaticSite(unittest.TestCase):
         from gexsys.component import _prune
         with tempfile.TemporaryDirectory() as tmp:
             now = datetime.now(timezone.utc)
-            days = {k: Path(tmp) / "NQ-CBOE" / (now - timedelta(days=k)).strftime("%Y%m%d") for k in (0, 4, 6, 30)}
+            days = {k: Path(tmp) / "NQ-OCC" / (now - timedelta(days=k)).strftime("%Y%m%d") for k in (0, 4, 6, 30)}
             for d in days.values():
                 d.mkdir(parents=True)
             _prune(Path(tmp), 5)
@@ -403,9 +403,9 @@ class TestSnapshotPrune(unittest.TestCase):
             st = SnapshotStore(tmp)
             now = datetime.now(timezone.utc)
             for back in (0, 5, 11, 13, 40):
-                (Path(tmp) / "NQ-CBOE" / (now - timedelta(days=back)).strftime("%Y%m%d")).mkdir(parents=True)
-            (Path(tmp) / "NQ-CBOE" / "notes").mkdir()
-            self.assertEqual(st.prune("NQ-CBOE", keep_days=12), 2)
-            left = sorted(p.name for p in (Path(tmp) / "NQ-CBOE").iterdir())
+                (Path(tmp) / "NQ-OCC" / (now - timedelta(days=back)).strftime("%Y%m%d")).mkdir(parents=True)
+            (Path(tmp) / "NQ-OCC" / "notes").mkdir()
+            self.assertEqual(st.prune("NQ-OCC", keep_days=12), 2)
+            left = sorted(p.name for p in (Path(tmp) / "NQ-OCC").iterdir())
             self.assertEqual(len(left), 4)
             self.assertIn("notes", left)

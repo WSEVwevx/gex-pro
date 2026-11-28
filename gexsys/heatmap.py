@@ -121,7 +121,7 @@ def build(worker, tf: str = "5m", candles: Optional[list] = None) -> dict:
         candles = [c for c in candles if c[0] >= cut]
     return {"market": market, "tf": tf, "factor": m.get("factor") or 1.0, "offset": m.get("offset") or 0.0,
             "built": datetime.now(timezone.utc).isoformat(), "candles": candles, "columns": cols,
-            "unit": "$M of dealer gamma per 1% move", "source": "candles: Yahoo Finance (delayed); GEX: saved Cboe snapshots (15-min delayed); backup estimates are not saved"}
+            "unit": "$M of dealer gamma per 1% move", "source": "candles: Yahoo Finance (delayed); GEX: saved snapshots (OCC open interest + VIX-family vols, an estimate)"}
 
 
 class HeatmapCache:

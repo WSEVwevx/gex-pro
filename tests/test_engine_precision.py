@@ -1,11 +1,13 @@
 """Regression tests for the six engine defects found by stress test B1 (independent recomputation, 2026-11-10)."""
 import dataclasses
+import io
 import unittest
 from datetime import datetime, timedelta, timezone
 
 from gexsys import engine as eng, pricing
 from gexsys.extras import compute_extras
-from gexsys.providers.cboe import CboeProvider, merge_etf
+from gexsys.providers.common import merge_etf
+from gexsys.providers.occ import OccProvider
 from tests.util import ASOF, chain, contract
 
 
@@ -24,7 +26,7 @@ class TestOwnYield(unittest.TestCase):
 
 class TestPlaceholderIV(unittest.TestCase):
     def test_vendor_iv_above_500pct_is_not_a_vol(self):
-        # Cboe quotes 600-700% for deep in-the-money SPX calls: treated as missing, the neighbour's IV is borrowed
+        # delayed chains quoted 600-700% for deep in-the-money SPX calls: treated as missing, the neighbour's IV is borrowed
         deep = contract(40, iv=7.04, days=10, oi=1)
         near = [contract(k, iv=0.3, days=10) for k in (60, 98, 100, 102)]       # near-the-money OI, as real chains have
         res = eng.compute(chain([deep, *near]), asof=ASOF)
@@ -43,16 +45,20 @@ class TestPlaceholderIV(unittest.TestCase):
 
 class TestStandardSeries(unittest.TestCase):
     def test_adjusted_and_special_series_are_left_out(self):
-        ts = datetime(2026, 11, 10, 15, 0, tzinfo=timezone.utc)
-        def opt(sym, oi=100):
-            return {"option": sym, "iv": 0.2, "gamma": 0.001, "open_interest": oi, "bid": 1.0, "ask": 1.2, "volume": 1}
-        raw = {"timestamp": ts.strftime("%Y-%m-%d %H:%M:%S"),
-               "data": {"current_price": 7600.0, "options": [opt("SPXW261113C07600000"), opt("SPX261120C07600000"),
-                                                             opt("SPXO261118C07600000")]}}
-        prov = CboeProvider(http=lambda url, headers, limiter=None: raw, include_etf=False)
-        snap = prov.fetch_snapshot("SPX", 45, True)
-        self.assertEqual(sorted(c.root for c in snap.contracts), ["SPX", "SPXW"])
-        self.assertTrue(any("non-standard" in w for w in snap.warnings))
+        now = datetime(2026, 11, 10, 15, 0, tzinfo=timezone.utc)
+        line = lambda p, d: "\t".join([p, "", "2026", "11", d, "7600", "000", "C P", "100", "100", "25000"])
+        text = "\n".join(["Series Search Results for SPX", line("SPXW", "13"), line("SPX", "20"), line("SPXO", "18"),
+                          line("B1SPY", "20")]) + "\n"
+
+        class R(io.BytesIO):
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+        prov = OccProvider(opener=lambda req, timeout=None: R(text.encode()), clock=now.timestamp)
+        got = prov._contracts("SPX", "SPX", 100, lambda exp: 0.2, now, 45, True)
+        self.assertEqual(sorted({c.root for c in got}), ["SPX", "SPXW"])
 
 
 class TestSettledSeries(unittest.TestCase):

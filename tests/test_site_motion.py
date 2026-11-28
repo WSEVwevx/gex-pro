@@ -127,7 +127,7 @@ class TestBiasPage(unittest.TestCase):
                                        capture_output=True, encoding="utf-8", check=True).stdout.strip()
         self.assertEqual(run(h), "2 GEX snapshots, latest Thu, Nov 19, 12:42 AM ET · candles 5m, delayed, last 12:35 AM ET")
         self.assertEqual(run({"columns": [], "candles": []}), "0 GEX snapshots · candles 5m, delayed")
-        self.assertIn('$("hmSub").textContent = `${market} futures · ${hmAsOf(hm, hmTf)}${hbk ? " · Cboe snapshots only: the backup estimate is not saved, so no GEX after the last one" : ""}`;', JS)
+        self.assertIn('$("hmSub").textContent = `${market} futures · ${hmAsOf(hm, hmTf)}`;', JS)      # every snapshot is saved now
 
     def test_the_plan_marks_one_zone(self):
         """Today's plan marks exactly the zone price is in, even when C1 sits below the flip (ES on 2026-11-18:

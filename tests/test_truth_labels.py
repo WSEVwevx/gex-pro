@@ -83,9 +83,9 @@ class Heatmap(unittest.TestCase):
     def test_the_live_table_help_names_its_own_codes(self):
         self.assertIn("+G = the strikes near price with the most positive net GEX, −G = the most negative, AG = the most total gamma", JS)
 
-    def test_the_heatmap_source_says_the_backup_is_not_saved(self):
+    def test_the_heatmap_source_names_the_chain(self):
         py = (ROOT / "gexsys" / "heatmap.py").read_text(encoding="utf-8")
-        self.assertIn("GEX: saved Cboe snapshots (15-min delayed); backup estimates are not saved", py)
+        self.assertIn("GEX: saved snapshots (OCC open interest + VIX-family vols, an estimate)", py)
 
 
 if __name__ == "__main__":

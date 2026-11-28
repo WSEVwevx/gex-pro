@@ -60,7 +60,7 @@ def _futures_ref(cfg: MarketConfig, snap, override: Optional[tuple], provider=No
 
 
 def backup_trim(summary: dict) -> None:
-    """The OCC backup (no per-strike vols): keep only the levels that matched Cboe's in the 2026-11-19 comparison
+    """The OCC chain (no per-strike vols): keep only the levels that matched the full chain's in the 2026-11-19 comparison
     (all-expiry zero gamma, walls, absolute-gamma and largest +GEX strikes; the first-expiry C1 and P1, within 0.06
     expected moves) and drop the rest (0DTE flip, the lower ranks, Ab1, largest -GEX: 0.2 to 1.5 expected moves off)."""
     summary["max_negative"] = None
@@ -72,14 +72,14 @@ def backup_trim(summary: dict) -> None:
                 n[key] = {"call": n[key].get("call", [])[:1], "put": n[key].get("put", [])[:1], "abs": []}
     if summary.get("ranked"):
         summary["ranked"] = {side: v[:1] for side, v in summary["ranked"].items()}
-    summary["backup"] = "OCC open interest + VIX-family vols: an estimate while Cboe refuses"
+    summary["backup"] = "OCC open interest + VIX-family vols: an estimate (one vol per expiry, no skew)"
 
 
 def run_once(cfg: MarketConfig, provider, store: Optional[SnapshotStore] = None,
              alerts: Optional[AlertEngine] = None, futures_ref: Optional[tuple] = None) -> dict:
     src = SOURCES[cfg.source]
     snap = provider.fetch_snapshot(cfg.source, cfg.engine.max_dte, cfg.engine.include_0dte)
-    snap = normalize(snap, check_occ=getattr(provider, "name", "") == "cboe")
+    snap = normalize(snap)
     ecfg = cfg.engine
     if src.kind.value != "FUT" and session_state(snap.fetched_at) != "RTH":
         # cash index / ETF is not trading: its last close is the correct reference, not "stale" - but anything

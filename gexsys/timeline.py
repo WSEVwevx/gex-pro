@@ -3,8 +3,8 @@
   build(folder, market, method, candles, now)   the session timeline (dict, sent as JSON)
 
 Which session: the one in progress, or after its close (and before the next open) the last one.
-Levels: a saved snapshot counts from the minute it was FETCHED (its `asof`), never from Cboe's data time: the data
-is 15 minutes delayed, so placing it at its data time would show levels before the site had them. Each snapshot is
+Levels: a saved snapshot counts from the minute it was FETCHED (its `asof`), never from the data's own time: delayed
+data is up to 15 minutes old, so placing it at its data time would show levels before the site had them. Each snapshot is
 mapped to futures with its own factor, saved beside it since 2026-11-14 (`futures_map`). Older snapshots were saved
 without it: their factor is estimated from the futures bar at the index price's own time (flagged, and the page
 says so). A snapshot with neither is left out, and the levels before it are held: gaps stay visible.

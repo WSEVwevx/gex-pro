@@ -58,13 +58,14 @@ class Wiring(unittest.TestCase):
         self.assertIn('$("phaseLab").textContent = [phaseBase, ...calNotes(new Date(), data.calendar)].filter(Boolean).join(" · ");', JS)
         self.assertIn('$("phaseLab").textContent = phaseBase = LV_PHASE[phase] || "";', JS)
 
-    def test_a_backup_estimate_is_its_own_material_and_says_so(self):
-        self.assertIn('<div class="banner backup"><b>Backup estimate.</b>', JS)
-        self.assertIn('document.body.classList.toggle("backup-data", !!(s && s.backup));', JS)
+    def test_the_estimate_names_its_source_quietly(self):
+        # the owner's call (27 Nov 2026): the levels are known to be an estimate; name the source, no loud label
+        self.assertIn('<div class="banner backup"><b>OCC open interest + VIX-family vols.</b>', JS)
+        self.assertIn('document.body.classList.remove("backup-data");', JS)
         rule = re.search(r"\.banner\.backup,body\.backup-data \.lvh-say\{([^}]*)\}", CSS).group(1)
         for tok in ("var(--backup-hatch)", "var(--backup-bg)", "color:var(--backup-ink)"):
             self.assertIn(tok, rule)
-        self.assertIn('(o.backup ? "Backup estimate: " : "")', JS)                   # the sentence says it in words too
+        self.assertNotIn('"Backup estimate: "', JS)
 
     def test_ageing_data_quiets_but_keeps_its_time(self):
         self.assertIn("body.stale-data :is(.lvh-big,.lvh-say,.lvh-mid,#keyStrip .v){color:var(--ink3)}", CSS)

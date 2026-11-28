@@ -289,7 +289,7 @@ def health_row(idx: Optional[dict]) -> dict:
 
 # ---------------------------------------------------------------- the hosted build's step (git plumbing, no checkout)
 BRANCH = "archive"
-SNAPSHOT_KEYS = {"NQ": "NQ-CBOE", "ES": "ES-CBOE"}     # the hosted build's workers (gexsys/service.py MarketWorker.key)
+SNAPSHOT_KEYS = {"NQ": "NQ-OCC", "ES": "ES-OCC"}       # the hosted build's workers (gexsys/service.py MarketWorker.key)
 
 
 def _git(*a: str, inp: Optional[bytes] = None, env: Optional[dict] = None, check: bool = True) -> str:

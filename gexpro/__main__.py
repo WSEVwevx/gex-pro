@@ -19,7 +19,7 @@ from gexsys.__main__ import auto_configs
 
 from .components import default_components
 
-FREE_CONFIGS = ["configs/free_nq_cboe.json", "configs/free_es_cboe.json"]
+FREE_CONFIGS = ["configs/free_nq.json", "configs/free_es.json"]
 
 
 def main(argv=None) -> int:
@@ -28,12 +28,12 @@ def main(argv=None) -> int:
     ap.add_argument("--env-file", default=".env")
     sub = ap.add_subparsers(dest="cmd", required=True)
     sv = sub.add_parser("serve", help="run the local website and its background work")
-    sv.add_argument("--config", action="append", help="GEX market configs (default with --auto: the free Cboe ones)")
-    sv.add_argument("--auto", action="store_true", help="the free Cboe configs for NQ and ES")
+    sv.add_argument("--config", action="append", help="GEX market configs (default with --auto: the free ones)")
+    sv.add_argument("--auto", action="store_true", help="the free configs for NQ and ES")
     sv.add_argument("--host", default="127.0.0.1")
     sv.add_argument("--port", type=int, default=8765)
     bs = sub.add_parser("build-site", help="write the website + fresh data as static files (for free hosting)")
-    bs.add_argument("--config", action="append", help="default: the free Cboe configs")
+    bs.add_argument("--config", action="append", help="default: the free configs")
     bs.add_argument("--out", default="_site")
     bs.add_argument("--state", default=".state", help="folder kept between runs (last good results, history, caches)")
     ar = sub.add_parser("archive", help="add the due trading days to the history archive branch (gexpro/archive.py)")

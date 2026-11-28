@@ -72,16 +72,16 @@ function levelsModel(all, market, nowMs){
   const em = (m && m.expected_move) || {};
   out.sigma = fin(P) && fin(em.one_sigma_points_fut) ? {v: em.one_sigma_points_fut, exp: em.expiration || null,
     hi: P + em.one_sigma_points_fut, lo: P - em.one_sigma_points_fut} : no("1σ move unavailable");
-  // 14-15 the source and whether it is the backup estimate
+  // 14-15 the source and whether it is an estimate (one vol per expiry)
   out.source = {provider: (m || s).provider || w.provider || null, kind: (m || s).source || null,
-    backup: !!((m || s).backup) || ((m || s).provider && (m || s).provider !== "CBOE"),
+    backup: !!((m || s).backup),
     note: (m || s).backup || null, warnings: (m || s).warnings || []};
   // 16-19 the paste
   const pub = w.published || null, h = w.health || {};
   out.paste = !pub ? no("No paste published yet") : {
     at: pub.published_at, slot: pub.slot_et, zg: fin(pub.zero_gamma) ? pub.zero_gamma : null, provider: pub.provider,
     ageMin: fin(nowMs) && pub.published_at ? Math.max(0, Math.round((nowMs - Date.parse(pub.published_at)) / 60000)) : null,
-    onHold: out.source.backup,                     // backup estimates are not pasted: the last Cboe slot stays
+    onHold: out.source.backup,                     // estimates are not pasted: the last published slot stays
     // a next-attempt time already past is old news, never shown as upcoming
     next: h.next_publish_et && (!fin(nowMs) || h.next_publish_et > etStamp(nowMs)) ? h.next_publish_et : null};
   // the ladder: every level and the 1-sigma rows, high to low, with the price row placed by value

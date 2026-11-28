@@ -1,6 +1,6 @@
 """GEX market workers: background refresh, keep-last-good, and the TradingView paste every 30 minutes.
 
-One worker per config, keyed "<MARKET>-<PROVIDER>" (e.g. NQ-CBOE, ES-CBOE). The website endpoints that
+One worker per config, keyed "<MARKET>-<PROVIDER>" (e.g. NQ-OCC, ES-OCC). The website endpoints that
 read them are in gexsys/component.py; the web server itself is the app shell's (gexpro/server.py).
 """
 from __future__ import annotations
@@ -54,7 +54,7 @@ def _fv(payload: str) -> str:
 def holds_latest(summary: dict, now: datetime) -> bool:
     """True when the shown result already has the newest data the free feed can give: the cash market is shut
     (the delayed quotes stay frozen at the close until the next open) and its quotes are from after the last
-    close. A failed retry then changes nothing for the trader, e.g. Cboe refusing a request in the daily break."""
+    close. A failed retry then changes nothing for the trader, e.g. a source refusing a request in the daily break."""
     try:
         ref = datetime.fromisoformat(summary["ref_time"])
     except (KeyError, TypeError, ValueError):
@@ -63,6 +63,9 @@ def holds_latest(summary: dict, now: datetime) -> bool:
 
 
 AUTH_RETRY_S = 900
+# the provider keys used before the OCC chain became the only one (2026-11-28): their last result and paste carry
+# over once, so a restart (or a hosted run with an older state cache) keeps them
+RETIRED_LABELS = ("CBOE",)
 
 
 class MarketWorker(threading.Thread):
@@ -90,8 +93,25 @@ class MarketWorker(threading.Thread):
         root = Path(os.path.expandvars(cfg.storage.get("root", "data/snapshots")))
         self._good_path = root / f"last_good_{self.key}.json"
         self._pub_path = root / f"published_{self.key}.json"
+        self._adopt_retired(root)
         self._restore_last_good()
         self._restore_published()
+
+    def _adopt_retired(self, root: Path) -> None:
+        """Copy the last result and paste saved under a retired key (NQ-CBOE) to this key, once; the old files stay."""
+        for new in (self._good_path, self._pub_path):
+            if new.exists():
+                continue
+            for label in RETIRED_LABELS:
+                old = root / new.name.replace(self.key, f"{self.cfg.market}-{label}")
+                if old != new and old.exists():
+                    try:
+                        tmp = new.with_suffix(".tmp")
+                        tmp.write_bytes(old.read_bytes())
+                        os.replace(tmp, new)
+                    except OSError as e:
+                        log.warning("could not carry over %s: %s", old.name, e)
+                    break
 
     def _restore_published(self) -> None:
         """Keep the last scheduled payload across restarts (and across hosted-site runs, which start fresh)."""
@@ -210,7 +230,7 @@ class MarketWorker(threading.Thread):
         if slot is None or not self.result or not self.result.get("pine"):
             return
         if self.result["summary"].get("backup"):
-            return          # a backup estimate is never pasted: the indicator would show it as Cboe's delayed data
+            return          # an estimate is not pasted until the accuracy study passes (rework workstreams 7-8)
         s = self.result["mapped"] or self.result["summary"]
         zg = (s.get("zero_gamma") or {}).get("price")
         info = {"slot_et": slot.strftime("%Y-%m-%d %H:%M"), "published_at": now.isoformat(),

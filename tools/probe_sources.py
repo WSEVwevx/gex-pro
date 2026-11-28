@@ -9,8 +9,6 @@ with no working backup fails.
 """
 from __future__ import annotations
 
-import csv
-import io
 import json
 import os
 import sys
@@ -21,11 +19,11 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from feeds import drivers, positioning, truthsocial, weekinfo  # noqa: E402
+from feeds import drivers, hostswitch, positioning, truthsocial, weekinfo  # noqa: E402
 from trackrecord import prices  # noqa: E402
 
 YAHOO = "https://query1.finance.yahoo.com/v8/finance/chart/{s}?interval=1m&range=1d"
-CBOE = "https://cdn.cboe.com/api/global/delayed_quotes"
+VOLS = "https://query1.finance.yahoo.com/v8/finance/chart/%5E{n}?range=1mo&interval=1d"     # the OCC chain's vol curve
 PLAIN = {"User-Agent": "Mozilla/5.0 (GEX PRO)"}
 DAY = date.today().isoformat()
 
@@ -47,17 +45,8 @@ def _rows(key):
 
 # (name, url, headers, check(bytes) -> short description, backup name or None)
 SOURCES = [
-    ("Cboe NDX options", f"{CBOE}/options/_NDX.json", PLAIN, lambda b: _json(b, lambda d: f"{len(d['data']['options'])} contracts"), "OCC NDX open interest"),
-    ("Cboe QQQ options", f"{CBOE}/options/QQQ.json", PLAIN, lambda b: _json(b, lambda d: f"{len(d['data']['options'])} contracts"), "OCC QQQ open interest"),
-    ("Cboe SPX options", f"{CBOE}/options/_SPX.json", PLAIN, lambda b: _json(b, lambda d: f"{len(d['data']['options'])} contracts"), "OCC SPX open interest"),
-    ("Cboe SPY options", f"{CBOE}/options/SPY.json", PLAIN, lambda b: _json(b, lambda d: f"{len(d['data']['options'])} contracts"), "OCC SPY open interest"),
-    ("Cboe NDX quote", f"{CBOE}/quotes/_NDX.json", prices.UA, lambda b: _json(b, lambda d: f"close {d['data']['close']}"), None),
-    ("Cboe NDX 1-minute", f"{CBOE}/charts/intraday/_NDX.json", prices.UA, lambda b: _json(b, _rows("data")), None),
-    ("Cboe SPX daily history", f"{CBOE}/charts/historical/_SPX.json", prices.UA, lambda b: _json(b, _rows("data")), "Yahoo ^GSPC daily"),
-    ("Cboe VIX history", "https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv", prices.UA,
-     lambda b: f"{len(list(csv.reader(io.StringIO(b.decode()))))} rows", None),
-    # candidates (2026-11-21): Nasdaq's option-chain JSON (bid/ask/volume/OI per strike) to cross-check Cboe and give the
-    # OCC backup skew and volume. Not used by the app yet; the probe decides whether it answers GitHub.
+    # candidates (2026-11-21): Nasdaq's option-chain JSON (bid/ask/volume/OI per strike) to give the OCC chain skew and
+    # volume. Not used by the app yet; the probe decides whether it answers GitHub.
     ("Nasdaq NDX options (candidate)", "https://api.nasdaq.com/api/quote/NDX/option-chain?assetclass=index&limit=60&excode=oprac&callput=callput&money=all&type=all",
      {**PLAIN, "Accept": "application/json"}, lambda b: _json(b, _contracts), None),
     ("Nasdaq QQQ options (candidate)", "https://api.nasdaq.com/api/quote/QQQ/option-chain?assetclass=etf&limit=60&excode=oprac&callput=callput&money=all&type=all",
@@ -72,8 +61,16 @@ SOURCES = [
      lambda b: f"{sum(1 for l in b.decode(errors='replace').splitlines() if l.startswith('QQQ'))} series", None),
     ("OCC SPY open interest", "https://marketdata.theocc.com/series-search?symbolType=U&symbol=SPY", PLAIN,
      lambda b: f"{sum(1 for l in b.decode(errors='replace').splitlines() if l.startswith('SPY'))} series", None),
-    ("Cboe VIX1D history", "https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX1D_History.csv", prices.UA,
-     lambda b: f"{len(list(csv.reader(io.StringIO(b.decode()))))} rows", None),
+    ("Yahoo ^VIX1D daily", VOLS.format(n="VIX1D"), PLAIN,
+     lambda b: _json(b, lambda d: f"{len(d['chart']['result'][0]['timestamp'])} days"), None),
+    ("Yahoo ^VIX9D daily", VOLS.format(n="VIX9D"), PLAIN,
+     lambda b: _json(b, lambda d: f"{len(d['chart']['result'][0]['timestamp'])} days"), None),
+    ("Yahoo ^VIX daily", VOLS.format(n="VIX"), PLAIN,
+     lambda b: _json(b, lambda d: f"{len(d['chart']['result'][0]['timestamp'])} days"), None),
+    ("Yahoo ^VIX3M daily", VOLS.format(n="VIX3M"), PLAIN,
+     lambda b: _json(b, lambda d: f"{len(d['chart']['result'][0]['timestamp'])} days"), None),
+    ("Yahoo ^VXN daily", VOLS.format(n="VXN"), PLAIN,
+     lambda b: _json(b, lambda d: f"{len(d['chart']['result'][0]['timestamp'])} days"), None),
     ("Yahoo NQ=F 1-minute", YAHOO.format(s="NQ%3DF"), PLAIN, lambda b: _json(b, lambda d: f"{len(d['chart']['result'][0]['timestamp'])} bars"), "carry model"),
     ("Yahoo ^NDX 1-minute", YAHOO.format(s="%5ENDX"), PLAIN, lambda b: _json(b, lambda d: f"{len(d['chart']['result'][0]['timestamp'])} bars"), "carry model"),
     ("Yahoo ES=F 1-minute", YAHOO.format(s="ES%3DF"), PLAIN, lambda b: _json(b, lambda d: f"{len(d['chart']['result'][0]['timestamp'])} bars"), "carry model"),
@@ -107,6 +104,9 @@ def main() -> int:
     ok_by = {}
     rows = []
     for name, url, headers, check, backup in SOURCES:
+        if hostswitch.why_off(url):                          # GEX_OFF_HOSTS: this computer never asks that host
+            print(f"SKIP {name:32s} {hostswitch.why_off(url)}")
+            continue
         ok, msg, dt = probe(name, url, headers, check)
         ok_by[name] = ok
         rows.append((name, ok, msg, dt, backup))

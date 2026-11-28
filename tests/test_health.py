@@ -109,10 +109,10 @@ class TestGexRow(unittest.TestCase):
         import time
         from types import SimpleNamespace
         from gexsys.component import GexComponent
-        w = SimpleNamespace(cfg=SimpleNamespace(market="NQ", source="NDX"), label="CBOE", last_success=time.time() - 3600,
+        w = SimpleNamespace(cfg=SimpleNamespace(market="NQ", source="NDX"), label="OCC", last_success=time.time() - 3600,
                             failures=4, last_error="URLError: timed out", health=lambda: {"status": "stale", "calc_status": "OK"}, published=None)
         g = GexComponent([])
-        g.workers = {"NQ-CBOE": w}
+        g.workers = {"NQ-OCC": w}
         row = g.sources()[0]
         self.assertEqual(row["error"], "URLError: timed out")
         self.assertEqual(status(row, datetime.now(timezone.utc)), "failing")
@@ -127,10 +127,10 @@ class TestBasisRow(unittest.TestCase):
         g = GexComponent([])
         for mode, want in (("measured NQ=F / ^NDX basis (15-minute median to 11-17 16:00 ET)", "ok"),
                            ("carry-model fair value for NQZ6 (r 4.00%, dividend 0.70%) - measured basis unavailable", "partial")):
-            w = SimpleNamespace(cfg=SimpleNamespace(market="NQ", source="NDX"), label="CBOE", last_success=time.time(), failures=0,
+            w = SimpleNamespace(cfg=SimpleNamespace(market="NQ", source="NDX"), label="OCC", last_success=time.time(), failures=0,
                                 last_error=None, health=lambda: {"status": "ok", "calc_status": "OK"}, published=None,
                                 result={"mapped": {"mapping": {"futures_ref_mode": mode}}})
-            g.workers = {"NQ-CBOE": w}
+            g.workers = {"NQ-OCC": w}
             row = next(r for r in g.sources() if r["name"] == "NQ futures basis")
             self.assertEqual(status(row, datetime.now(timezone.utc)), want)
             self.assertEqual(row["detail"], mode)
@@ -143,36 +143,37 @@ class TestPasteRow(unittest.TestCase):
         from unittest import mock
         from gexsys.component import GexComponent
         old = (datetime.now(timezone.utc) - timedelta(hours=44)).isoformat()      # 2026-11-08: Friday's paste on Sunday night
-        w = SimpleNamespace(cfg=SimpleNamespace(market="NQ", source="NDX"), label="CBOE", last_success=time.time(), failures=0,
+        w = SimpleNamespace(cfg=SimpleNamespace(market="NQ", source="NDX"), label="OCC", last_success=time.time(), failures=0,
                             last_error=None, health=lambda: {"status": "ok", "calc_status": "OK"},
                             published={"slot_et": "2026-11-06 23:00", "published_at": old})
         g = GexComponent([])
-        g.workers = {"NQ-CBOE": w}
+        g.workers = {"NQ-OCC": w}
         for state, want in (("ETH", "late"), ("CLOSED", "ok")):
             with mock.patch("gexsys.marketcal.session_state", return_value=state):
                 row = next(r for r in g.sources() if r["name"] == "NQ TradingView paste")
             self.assertEqual(status(row, datetime.now(timezone.utc)), want, state)
 
 
-    def test_the_paste_on_hold_while_cboe_refuses_is_not_working(self):
-        """20 Nov 2026: Cboe refused all day, the site still offered Thursday's 16:30 paste, and the row said "Working"."""
+    def test_the_paste_on_hold_while_the_levels_are_an_estimate_is_not_working(self):
+        """20 Nov 2026: the site still offered Thursday's 16:30 paste while estimates were not pasted, and the row said
+        "Working"."""
         import time
         from types import SimpleNamespace
         from unittest import mock
         from gexsys.component import GexComponent
-        fb = SimpleNamespace(backup=object(), refusal="HTTP 403", primary_ok=time.time() - 30 * 3600, last_label="OCC",
-                             backup_ok=time.time(), backup_error=None)
-        w = SimpleNamespace(cfg=SimpleNamespace(market="NQ", source="NDX"), label="CBOE", last_success=time.time(), failures=0,
-                            last_error=None, health=lambda: {"status": "ok", "calc_status": "OK"}, provider=fb,
+        w = SimpleNamespace(cfg=SimpleNamespace(market="NQ", source="NDX"), label="OCC", last_success=time.time(), failures=0,
+                            last_error=None, health=lambda: {"status": "ok", "calc_status": "OK"},
+                            result={"summary": {"backup": "OCC open interest + VIX-family vols: an estimate"}},
                             published={"slot_et": "2026-11-19 16:30", "published_at": (datetime.now(timezone.utc) - timedelta(hours=29)).isoformat()})
         g = GexComponent([])
-        g.workers = {"NQ-CBOE": w}
-        with mock.patch("gexsys.marketcal.session_state", return_value="CLOSED"):
-            rows = {r["name"]: r for r in g.sources()}
-        paste = rows["NQ TradingView paste"]
-        self.assertEqual(status(paste, datetime.now(timezone.utc)), "partial")
-        self.assertEqual(paste["note"], "on hold while Cboe refuses: the paste on the site is still the 2026-11-19 16:30 ET one")
-        self.assertNotIn("Heatmap", rows["NQ backup chain (estimate)"]["pages"])      # the backup is not saved, so never drawn there
+        g.workers = {"NQ-OCC": w}
+        for state in ("CLOSED", "ETH"):                  # never "late" for a paste that is on hold by design
+            with mock.patch("gexsys.marketcal.session_state", return_value=state):
+                rows = {r["name"]: r for r in g.sources()}
+            paste = rows["NQ TradingView paste"]
+            self.assertEqual(status(paste, datetime.now(timezone.utc)), "partial", state)
+        self.assertEqual(paste["note"], "on hold: estimates are not pasted; the paste on the site is still the 2026-11-19 16:30 ET one")
+        self.assertIn("Heatmap", rows["NQ options chain"]["pages"])                   # every snapshot is saved, so drawn there
         self.assertIn("Heatmap", rows["NQ options chain"]["pages"])
 
 

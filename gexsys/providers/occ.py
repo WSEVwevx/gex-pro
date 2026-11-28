@@ -1,28 +1,30 @@
-"""Backup chain for when Cboe refuses us: OCC open interest + one implied vol per expiry from Cboe's VIX-family
-daily closes + Yahoo prices. Used only by FallbackProvider, only after Cboe answers 401/403 (Cboe began refusing
-automated requests on 2026-11-19; nothing here works around that).
+"""The options chain: OCC open interest + one implied vol per expiry from the VIX-family daily closes + Yahoo prices.
 
 Sources (all free, no key; proven from GitHub's servers by tools/probe_sources.py):
   OCC   GET https://marketdata.theocc.com/series-search?symbolType=U&symbol={NDX|SPX|QQQ|SPY}
         tab-separated: product, -, year, month, day, strike integer, strike decimals (thousandths), "C P",
         call OI, put OI, position limit. End-of-day open interest across all exchanges; the file carries no date.
-  Vols  GET https://cdn.cboe.com/api/global/us_indices/daily_prices/{VIX1D|VIX9D|VIX|VIX3M|VXN}_History.csv
-        DATE,OPEN,HIGH,LOW,CLOSE (percent); the index's daily close.
+  Vols  GET https://query1.finance.yahoo.com/v8/finance/chart/{^VIX1D|^VIX9D|^VIX|^VIX3M|^VXN}?range=1mo&interval=1d
+        daily bars; each bar is dated in the exchange's own time zone (meta.exchangeTimezoneName: ^VIX is dated in
+        Chicago, the others in New York). Close in percent; a bar with no close (not final yet) is skipped.
   Price GET https://query1.finance.yahoo.com/v8/finance/chart/{^NDX|^GSPC|QQQ|SPY}?range=1d&interval=1d (chart meta)
 
+The vol date is the last completed cash session by gexsys/marketcal.py (a close counts 30 minutes after the bell,
+once the VIX family has printed its final value), never the newest row of a file: a holiday row (^VIX carries one
+for Thanksgiving) or a partial bar for today is ignored. A series with no close that day uses its close of the
+trading day before, named in a warning; older closes are not used.
+
 Implied vol (no per-strike quotes, so no skew):
-  SPX: total variance w(d) = (VIX_d / 100)^2 x d at d = 1, 9, 30, 93 days (VIX1D, VIX9D, VIX, VIX3M; only points
-       dated like the newest one), linear in w between points; flat beyond the ends. iv(T) = sqrt(w(T) / T).
+  SPX: total variance w(d) = (VIX_d / 100)^2 x d at d = 1, 9, 30, 93 days (VIX1D, VIX9D, VIX, VIX3M), linear in w
+       between points; flat beyond the ends. iv(T) = sqrt(w(T) / T).
   NDX: the SPX curve x VXN / iv_SPX(30 days) (VXN is the 30-day NDX index; there is no shorter one).
   ETF options (QQQ, SPY) take their index's vol.
 Each contract gets that vol; the engine computes gamma from it. Gamma per strike is therefore an estimate: the
-2026-11-19 comparison (all-expiry walls and zero gamma within 0.06 expected moves of Cboe's; ranks 2-3, Ab1 and the
-0DTE flip far off) is why the pipeline keeps only the first-ranked near-dated levels from this source.
+2026-11-19 comparison with a full per-strike chain (all-expiry walls and zero gamma within 0.06 expected moves; ranks
+2-3, Ab1 and the 0DTE flip far off) is why the pipeline keeps only the first-ranked near-dated levels from this source.
 """
 from __future__ import annotations
 
-import csv
-import io
 import json
 import math
 import os
@@ -30,24 +32,26 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Callable, Optional
+from zoneinfo import ZoneInfo
 
 from .. import marketcal
 from ..mapping import SOURCES
 from ..models import ChainSnapshot, OptionContract, OptionType, Quality
 from .base import AuthError, ProviderError, ProviderUnavailable
-from .cboe import ETF_FOR, ETF_RATIO, STANDARD_ROOTS, dividend_yield, merge_etf, risk_free_rate
+from .common import ETF_FOR, ETF_RATIO, STANDARD_ROOTS, dividend_yield, merge_etf, risk_free_rate
 
 OCC_URL = "https://marketdata.theocc.com/series-search?symbolType=U&symbol={sym}"
-VOL_URL = "https://cdn.cboe.com/api/global/us_indices/daily_prices/{name}_History.csv"
+VOL_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{sym}?range=1mo&interval=1d"
+VOL_SYM = {"VIX1D": "^VIX1D", "VIX9D": "^VIX9D", "VIX": "^VIX", "VIX3M": "^VIX3M", "VXN": "^VXN"}
 PRICE_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{sym}?range=1d&interval=1d"
 YAHOO_SYM = {"NDX": "^NDX", "SPX": "^GSPC", "QQQ": "QQQ", "SPY": "SPY"}
 UA = {"User-Agent": "Mozilla/5.0 (GEX PRO)"}
 CURVE = (("VIX1D", 1), ("VIX9D", 9), ("VIX", 30), ("VIX3M", 93))
 CACHE_S = 3600          # open interest and the vol closes change once a day: fetch each at most hourly
-RETRY_PRIMARY_S = 900   # while Cboe refuses, ask it again every 15 min (the worker's own refusal back-off), not every refresh
+VOL_SETTLE = timedelta(minutes=30)   # the VIX family prints its final value 15 min after the cash close
 
 
 def parse_series(text: str) -> list[tuple[str, date, float, float, float]]:
@@ -65,30 +69,42 @@ def parse_series(text: str) -> list[tuple[str, date, float, float, float]]:
     return out
 
 
-def last_close(text: str) -> Optional[tuple[date, float]]:
-    """The newest (date, close as a decimal) in a Cboe daily_prices CSV."""
-    best = None
-    for r in csv.reader(io.StringIO(text)):
-        if len(r) < 5:
-            continue
-        try:
-            d = datetime.strptime(r[0].strip(), "%m/%d/%Y").date()
-            v = float(r[4])
-        except ValueError:
-            continue
-        if v > 0 and (best is None or d > best[0]):
-            best = (d, v / 100.0)
-    return best
+def daily_closes(text: str) -> dict[date, float]:
+    """{bar date: close as a decimal} from Yahoo's daily chart JSON, dated in the exchange's time zone. Bars with no
+    usable close are left out; an unreadable answer gives {} (the series then counts as missing)."""
+    try:
+        r = json.loads(text)["chart"]["result"][0]
+        tz = ZoneInfo(r["meta"].get("exchangeTimezoneName") or "America/New_York")
+        stamps, closes = r.get("timestamp") or [], r["indicators"]["quote"][0].get("close") or []
+    except (ValueError, KeyError, IndexError, TypeError, LookupError):
+        return {}
+    out = {}
+    for t, c in zip(stamps, closes):
+        if isinstance(t, (int, float)) and isinstance(c, (int, float)) and math.isfinite(c) and c > 0:
+            # published to two decimals; Yahoo carries them as float32 (28.290000915527344): 4 places undo that
+            out[datetime.fromtimestamp(t, tz).date()] = round(c, 4) / 100.0
+    return out
 
 
-def vol_curve(closes: dict[str, tuple[date, float]]) -> tuple[list[tuple[float, float]], date]:
-    """[(days, vol)] from the curve indices dated like the newest one, and that date."""
-    have = {n: closes[n] for n, _ in CURVE if n in closes}
-    if not have:
+def vol_date(now: datetime) -> date:
+    """The session whose VIX-family closes the curve uses: the last completed cash session (marketcal)."""
+    return marketcal.last_close(now - VOL_SETTLE).astimezone(marketcal.NY).date()
+
+
+def pick_close(history: dict[date, float], vd: date) -> Optional[tuple[date, float]]:
+    """The close on vd, else on the trading day before it; nothing older (a week-old vol is not today's)."""
+    for d in (vd, marketcal.previous_trading_day(vd)):
+        if d in history:
+            return d, history[d]
+    return None
+
+
+def vol_curve(closes: dict[str, tuple[date, float]]) -> list[tuple[float, float]]:
+    """[(days, vol)] from the curve indices that have a close."""
+    pts = [(float(days), closes[n][1]) for n, days in CURVE if n in closes]
+    if not pts:
         raise ProviderUnavailable("no VIX-family close available")
-    newest = max(d for d, _ in have.values())
-    pts = [(float(days), have[n][1]) for n, days in CURVE if n in have and have[n][0] == newest]
-    return pts, newest
+    return pts
 
 
 def curve_iv(pts: list[tuple[float, float]], days: float) -> float:
@@ -101,6 +117,22 @@ def curve_iv(pts: list[tuple[float, float]], days: float) -> float:
             w0, w1 = v0 * v0 * d0, v1 * v1 * d1
             return math.sqrt((w0 + (w1 - w0) * (days - d0) / (d1 - d0)) / days)
     return pts[-1][1]
+
+
+def vxn_scale(closes: dict[str, tuple[date, float]], hist: dict[str, dict[date, float]],
+              pts: list[tuple[float, float]], vd: date) -> tuple[float, date]:
+    """NDX vol / S&P vol, both from one session: VXN / VIX on vd, else on the session before; with no VIX on either,
+    VXN over the curve at 30 days when every curve close is from VXN's session. A VXN from one session over a VIX from
+    another would scale every NDX vol by the two days' difference (verifier, 2026-11-28: +19% on the early close of
+    Nov 27), so that is refused. Returns (scale, the session it is from)."""
+    vxn, vix = hist.get("VXN", {}), hist.get("VIX", {})
+    for d in (vd, marketcal.previous_trading_day(vd)):
+        if d in vxn and d in vix:
+            return vxn[d] / vix[d], d
+    d = closes["VXN"][0]
+    if "VIX" not in closes and all(c[0] == d for n, c in closes.items()):
+        return closes["VXN"][1] / curve_iv(pts, 30), d
+    raise ProviderUnavailable(f"no VXN and VIX close from one session ({vd:%b %d} or the one before) to scale the vol curve to NDX")
 
 
 class OccProvider:
@@ -155,7 +187,12 @@ class OccProvider:
         roots = STANDARD_ROOTS.get(sym)
         today = now.astimezone(marketcal.NY).date()
         out = []
-        for prod, ed, k, c_oi, p_oi in parse_series(self._get(OCC_URL.format(sym=sym), f"occ_{sym}")):
+        text = self._get(OCC_URL.format(sym=sym), f"occ_{sym}")
+        # a whole answer starts with OCC's title and ends with a line break: a cut-off download (feed fuzz E1, 2026-11-28)
+        # moved zero gamma and the walls without a word, so it is refused instead
+        if not text.lstrip().startswith(f"Series Search Results for {sym}") or not text.endswith("\n"):
+            raise ProviderUnavailable(f"the OCC {sym} file is incomplete or not a series list")
+        for prod, ed, k, c_oi, p_oi in parse_series(text):
             if roots and prod not in roots:
                 continue
             dte = (ed - today).days
@@ -166,8 +203,8 @@ class OccProvider:
                 continue
             iv = ivs(exp)
             for typ, oi in ((OptionType.CALL, c_oi), (OptionType.PUT, p_oi)):
-                if oi <= 0:
-                    continue
+                if oi == 0:
+                    continue            # negative or NaN open interest goes on to normalize, which counts and flags it
                 out.append(OptionContract(
                     symbol=f"{prod}{ed:%y%m%d}{typ.value}{int(round(k * 1000)):08d}", root=prod, underlying=key,
                     option_type=typ, strike=k, expiration=exp, multiplier=mult, open_interest=oi, iv=iv,
@@ -177,19 +214,25 @@ class OccProvider:
 
     def fetch_snapshot(self, source_key: str, max_dte: float = 45, include_0dte: bool = True) -> ChainSnapshot:
         if source_key not in ("NDX", "SPX"):
-            raise ProviderError(f"the OCC backup covers NDX and SPX, not {source_key}")
+            raise ProviderError(f"the OCC chain covers NDX and SPX, not {source_key}")
         now = datetime.fromtimestamp(self.clock(), timezone.utc)
-        closes = {}
+        vd = vol_date(now)
+        closes, hist = {}, {}
         for n in [c for c, _ in CURVE] + (["VXN"] if source_key == "NDX" else []):
-            got = last_close(self._get(VOL_URL.format(name=n), f"vol_{n}"))
+            hist[n] = daily_closes(self._get(VOL_URL.format(sym=urllib.parse.quote(VOL_SYM[n])), f"yvol_{n}"))
+            got = pick_close(hist[n], vd)
             if got:
                 closes[n] = got
-        pts, vd = vol_curve(closes)
-        scale = 1.0
+        if not any(n in closes for n, _ in CURVE):
+            raise ProviderUnavailable(f"no VIX-family close for {vd:%b %d} or the session before")
+        pts = vol_curve(closes)
+        scale, late_scale = 1.0, None
         if source_key == "NDX":
-            if "VXN" not in closes or closes["VXN"][0] != vd:
-                raise ProviderUnavailable(f"no VXN close for {vd} to scale the vol curve to NDX")
-            scale = closes["VXN"][1] / curve_iv(pts, 30)
+            if "VXN" not in closes:
+                raise ProviderUnavailable(f"no VXN close for {vd:%b %d} or the session before to scale the vol curve to NDX")
+            scale, sd = vxn_scale(closes, hist, pts, vd)
+            if sd != vd:
+                late_scale = f"occ: the NDX scale is VXN / VIX of {sd:%b %d}, the last session with both"
         self.vol_date = vd
         ivs = lambda exp: scale * curve_iv(pts, (exp - now).total_seconds() / 86400)
         src = SOURCES[source_key]
@@ -198,9 +241,14 @@ class OccProvider:
         contracts = self._contracts(source_key, source_key, src.multiplier, ivs, now, max_dte, include_0dte)
         if not contracts:
             raise ProviderUnavailable(f"OCC returned no usable {source_key} series within {max_dte} days")
-        warnings = [f"BACKUP ESTIMATE: Cboe refused; OCC open interest (end of day) with one implied vol per expiry "
+        warnings = [f"estimate: OCC open interest (end of day) with one implied vol per expiry "
                     f"from the {vd:%b %d} VIX-family closes{' scaled by VXN' if source_key == 'NDX' else ''} (no skew)"]
-        missing = [n for n, _ in CURVE if n not in closes or closes[n][0] != vd]
+        late = [f"{n} ({d:%b %d})" for n, (d, _) in closes.items() if d != vd]
+        if late:
+            warnings.append(f"occ: no {vd:%b %d} close yet for {', '.join(late)}: the session before is used")
+        if late_scale:
+            warnings.append(late_scale)
+        missing = [n for n, _ in CURVE if n not in closes]
         if missing:
             warnings.append(f"occ: no {vd:%b %d} close for {', '.join(missing)}; the vol curve interpolates across it")
         etf = ETF_FOR[source_key]
@@ -221,41 +269,3 @@ class OccProvider:
                              contracts=contracts, source="occ+vix", fetched_at=now, warnings=warnings,
                              prev_close=spot_q["prev"], rate=risk_free_rate(), div_yield=dividend_yield(source_key),
                              vol_points=[(d, scale * v) for d, v in pts])
-
-
-class FallbackProvider:
-    """Cboe first; OCC only when Cboe refuses (401/403). Keeps Cboe's name and label (the worker's key and history
-    folder stay the same); `last_label` names what the last result came from, so a backup result is saved and
-    labelled as OCC, never as Cboe."""
-
-    def __init__(self, primary, backup):
-        self.primary, self.backup = primary, backup
-        self.name, self.label = primary.name, primary.label
-        self.include_etf = getattr(primary, "include_etf", False)
-        self.last_label: Optional[str] = None
-        self.refusal: Optional[str] = None          # Cboe's refusal while the backup is in use
-        self.backup_ok: Optional[float] = None      # when the backup last gave a usable chain
-        self.backup_error: Optional[str] = None
-        self.primary_ok: Optional[float] = None     # when Cboe itself last answered
-        self.refused_at = 0.0                       # when Cboe last answered with a refusal
-
-    def fetch_snapshot(self, *a, **k) -> ChainSnapshot:
-        now = time.time()
-        ask = not (self.refusal and now - self.refused_at < RETRY_PRIMARY_S)   # refused recently: don't ask on every refresh
-        try:
-            if not ask:
-                raise AuthError(self.refusal)
-            snap = self.primary.fetch_snapshot(*a, **k)
-        except AuthError as e:
-            if ask:
-                self.refused_at = now
-            self.refusal = str(e)
-            try:
-                snap = self.backup.fetch_snapshot(*a, **k)
-            except ProviderError as e2:
-                self.backup_error, self.last_label = str(e2), None
-                raise ProviderUnavailable(f"Cboe refused ({e}); the OCC backup failed too ({e2})") from e2
-            self.last_label, self.backup_ok, self.backup_error = self.backup.label, time.time(), None
-            return snap
-        self.last_label, self.refusal, self.primary_ok = None, None, now
-        return snap

@@ -9,9 +9,9 @@
     "session": "RTH"
    },
    "market": "NQ",
-   "provider": "CBOE",
+   "provider": "OCC",
    "published": {
-    "provider": "CBOE",
+    "provider": "OCC",
     "published_at": "2026-11-19T21:33:01.069512+00:00",
     "regime": "NEGATIVE",
     "slot_et": "2026-11-19 16:30",
@@ -28,7 +28,7 @@
       "value": 709516498.1442184
      },
      "asof": "2026-11-23T17:39:29.714983+00:00",
-     "backup": "OCC open interest + VIX-family vols: an estimate while Cboe refuses",
+     "backup": "OCC open interest + VIX-family vols: an estimate (one vol per expiry, no skew)",
      "call_wall": {
       "metric": "|call exposure|",
       "oi": 4868.328809084779,
@@ -69,7 +69,7 @@
      "regime": "INDETERMINATE",
      "source": "occ+vix",
      "warnings": [
-      "BACKUP ESTIMATE: Cboe refused; OCC open interest (end of day) with one implied vol per expiry from the Nov 20 VIX-family closes scaled by VXN (no skew)",
+      "estimate: OCC open interest (end of day) with one implied vol per expiry from the Nov 20 VIX-family closes scaled by VXN (no skew)",
       "includes QQQ options in NDX terms (41.11 QQQ contracts = 1 NDX contract)"
      ],
      "zero_gamma": {
@@ -103,9 +103,9 @@
     "session": "RTH"
    },
    "market": "ES",
-   "provider": "CBOE",
+   "provider": "OCC",
    "published": {
-    "provider": "CBOE",
+    "provider": "OCC",
     "published_at": "2026-11-19T21:33:04.417666+00:00",
     "regime": "NEGATIVE",
     "slot_et": "2026-11-19 16:30",
@@ -122,7 +122,7 @@
       "value": 28975470408.231228
      },
      "asof": "2026-11-23T17:39:32.137385+00:00",
-     "backup": "OCC open interest + VIX-family vols: an estimate while Cboe refuses",
+     "backup": "OCC open interest + VIX-family vols: an estimate (one vol per expiry, no skew)",
      "call_wall": {
       "metric": "|call exposure|",
       "oi": 459477.2294578713,
@@ -163,7 +163,7 @@
      "regime": "INDETERMINATE",
      "source": "occ+vix",
      "warnings": [
-      "BACKUP ESTIMATE: Cboe refused; OCC open interest (end of day) with one implied vol per expiry from the Nov 20 VIX-family closes (no skew)",
+      "estimate: OCC open interest (end of day) with one implied vol per expiry from the Nov 20 VIX-family closes (no skew)",
       "includes SPY options in SPX terms (10.02 SPY contracts = 1 SPX contract)"
      ],
      "zero_gamma": {
