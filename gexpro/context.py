@@ -65,6 +65,7 @@ def market_snapshot(w) -> dict | None:
         "bias": {k: b.get(k) for k in ("bias", "confidence", "day_type", "target", "range", "summary")} if b else None,
         "delta": r.get("delta"),
         "backup": bool(s.get("backup")),              # an estimate from the OCC backup (gexsys/providers/occ.py)
+        "chain": s.get("chain"),                       # occ+vix or occ+lse: which estimate (the brief's data line)
     }
 
 
@@ -134,11 +135,13 @@ def open_paste(w, s: dict, d: date, open_: datetime) -> str | None:
     return export.add_tokens(p, {"bt": f"{d:%Y%m%d}", "H": session.history_token(prior)})
 
 
-def pre_open(gex, d: date) -> dict:
+def pre_open(gex, d: date, chain: str | None = None) -> dict:
     """{market: plan input or None} from the last saved calculation timestamped before d's 09:30 ET open.
 
     Reads the snapshot files every worker saves, so it works the same in the local app and in the hosted
-    build, and for a session that has already started. The bias is recomputed for that open."""
+    build, and for a session that has already started. The bias is recomputed for that open.
+    chain="occ+lse": only the smile estimate's snapshots (this PC's separate series, trackrecord/smile_series.py),
+    labelled with their chain and without a paste (the paste stays on hold). Otherwise estimates are never used."""
     open_ = datetime.combine(d, time(9, 30), marketcal.NY)
     lo = open_ - PRE_OPEN_WINDOW
     out: dict = {}
@@ -157,12 +160,13 @@ def pre_open(gex, d: date) -> dict:
                     t = datetime.fromisoformat(s["asof"])
                 except (OSError, ValueError, KeyError):
                     continue
-                usable = s.get("status") != "UNAVAILABLE" and not s.get("backup") and ((s.get("extras") or {}).get("expected_move") or {}).get("daily_points")
+                usable = s.get("status") != "UNAVAILABLE" and ((s.get("extras") or {}).get("expected_move") or {}).get("daily_points")                     and (s.get("chain") == chain if chain else not s.get("backup"))
                 if lo <= t < open_ and usable and (best is None or t > best[0]):
                     best = (t, s)
         if best:
             s = best[1]
-            out[m] = dict(plan_input(m, s, bias.compute(s, open_ - timedelta(minutes=1))), paste=open_paste(w, s, d, open_))
+            inp = plan_input(m, s, bias.compute(s, open_ - timedelta(minutes=1)))
+            out[m] = dict(inp, chain=chain, paste=None) if chain else dict(inp, paste=open_paste(w, s, d, open_))
         else:
             out.setdefault(m, None)
     return out

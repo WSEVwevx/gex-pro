@@ -43,8 +43,8 @@ const PER_MARKET = ["levelsView", "ladderView", "heatmapView", "screenerView", "
 const cardKey = c => { if(c.hasAttribute("data-reserve")) return c.id; const v = c.closest("[id$=View]"); return v ? v.id + ":" + (c.dataset.ci ?? [...v.querySelectorAll(".card")].indexOf(c)) + (PER_MARKET.includes(v.id) ? ":" + market : "") : null; };
 // a first visit has no heights of its own yet: it reserves the usual ones (measured on the live site at 1366 and
 // 375 px wide, every page re-measured 2026-11-20 after the redesign, NQ, folds closed), by page and card order. They are replaced by this device's real heights after one draw.
-const DEFAULT_H = {wide: {levelsView:[207,434,102,577,571,373,373,124,124,124,1228],ladderView:[184,797,220,328,312],heatmapView:[648],screenerView:[291,370,97,679],biasView:[200,633,220,238],trackView:[259,578,635,297,272,1661,370,365,365,320],backtestView:[221,260,528,536,291,165,301,803],briefingsView:[448,292,0,0],newsView:[651,988],indicatorView:[217,217,217,67,369],libraryView:[155,628,1371],glossaryView:[5493],healthView:[1515]},
-  narrow: {levelsView:[186,514,94,894,618,365,365,81,116,109,1757],ladderView:[184,892,193,320,272],heatmapView:[879],screenerView:[304,389,146,754],biasView:[332,731,393,368],trackView:[446,891,823,334,291,2528,637,384,407,359],backtestView:[464,252,566,718,385,275,312,834],briefingsView:[1029,303,0,0],newsView:[787,718],indicatorView:[252,251,254,95,980],libraryView:[317,1066,1726],glossaryView:[13616],healthView:[2870]}};
+const DEFAULT_H = {wide: {levelsView:[207,434,102,577,571,373,373,124,124,124,1228],ladderView:[184,797,220,328,312],heatmapView:[648],screenerView:[291,370,97,679],biasView:[200,633,220,238],trackView:[259,578,635,297,272,1661,300,370,365,365,320],backtestView:[221,260,528,536,291,165,301,803],briefingsView:[448,292,0,0],newsView:[651,988],indicatorView:[217,217,217,67,369],libraryView:[155,628,1371],glossaryView:[5493],healthView:[1515]},
+  narrow: {levelsView:[186,514,94,894,618,365,365,81,116,109,1757],ladderView:[184,892,193,320,272],heatmapView:[879],screenerView:[304,389,146,754],biasView:[332,731,393,368],trackView:[446,891,823,334,291,2528,420,637,384,407,359],backtestView:[464,252,566,718,385,275,312,834],briefingsView:[1029,303,0,0],newsView:[787,718],indicatorView:[252,251,254,95,980],libraryView:[317,1066,1726],glossaryView:[13616],healthView:[2870]}};
 // each card's place in the page as written: the key for its height even after the Levels order moves it
 document.querySelectorAll("[id$=View]").forEach(v => v.querySelectorAll(".card").forEach((c, i) => { c.dataset.ci = i; }));
 function reserve(){
@@ -1339,6 +1339,8 @@ const HELP = {
     watch: ["Bounced well above random = a level worth fading", "Broke well above random = a level that tends to give way, not hold", "No edge = trade it like any other strike"]},
   track_split: {title: "Where it worked", tldr: "The same results split by gamma regime and plan confidence.",
     body: `<p>Shows whether the band and the bias did better on some kinds of day. Groups here are small, so a big gap between them can easily be chance until there are many more sessions.</p>`},
+  track_smile: {title: "Smile estimate: its own record", tldr: "Plans from the smile estimate, graded on their own.",
+    body: `<p>On this PC, with its local data key, the options chain gives each strike its own implied vol from the previous session's smile. Study occ_lse_accuracy found those vols closer to a full option chain's closing quotes than one vol per expiry (10 of 10 sessions, at the money). Plans made from it are frozen before the open and graded like the main record, but kept in their own series, so they never mix with the record built on full option chains. The TradingView paste stays on hold: no study could check the levels against a full chain.</p>`},
   track_log: {title: "Every session", tldr: "The plan and its grade, one row per market per day.",
     body: `<p><b>Close</b> shows the close and how far it moved from the plan's price in expected moves (σ). <b>In band</b> means the close landed inside ± one expected move. Hover a wall result to see its price.</p><p>A plan marked <b>rebuilt</b> was frozen after the open from snapshots saved before it. Its data is still timestamped before the open, so no later information is used.</p>`},
   backtest: {title: "Historical backtest", tldr: "Decades of data on how well implied volatility predicts the next day's range.",
@@ -1574,6 +1576,30 @@ async function loadTrack(){
   try { trk = await (await fetchFresh(API.track)).json(); }
   catch(e){ trk = trk || {error: offline()}; }
   renderTrack();
+  loadTrackSmile();
+}
+// the smile estimate's separate record (trackrecord/smile_series.py): this PC only, so the hosted copy never asks
+let trkSmile = null;
+async function loadTrackSmile(){
+  if(STATIC) return;
+  try { const r = await fetchFresh("/api/trackrecord-smile"); trkSmile = r.ok ? await r.json() : null; } catch(e){ trkSmile = null; }
+  renderTrackSmile();
+}
+function renderTrackSmile(){
+  $("trkSmile").hidden = !trkSmile;
+  if(!trkSmile || !trkSmile.stats) return;
+  const S = trkSmile.stats[trkM] || trkSmile.stats.ALL || {sessions: 0}, n = S.sessions || 0;
+  const emc = S.em_close || {}, wh = S.walls_held || {}, bi = S.bias || {};
+  $("trkSmileSub").textContent = `this PC only · since ${trkSmile.started}${trkSmile.credit ? ` · ${trkSmile.credit}` : ""}`;   // the credit comes from the local data
+  $("trkSmileKpis").innerHTML =
+    kpi("Sessions graded", num(n, 0), n < 20 ? `<span class="trk-tag warn">early: ${n} of 20</span>` : `<span class="trk-tag good">sample ok</span>`)
+    + kpi("Close inside expected move", pct(emc.rate), emc.n ? `${emc.k} of ${emc.n} · a fair band holds 68%` : "no graded sessions yet")
+    + kpi("Walls held when touched", pct(wh.rate), wh.n ? `${wh.k} of ${wh.n} touches` : "no wall touched yet")
+    + kpi("Bias direction right", pct(bi.rate), bi.n ? `${bi.k} of ${bi.n} calls · baseline ${pct(bi.baseline)}` : "no directional calls graded yet");
+  const pend = (trkSmile.sessions || []).filter(s => s.status === "pending" && (trkM === "ALL" || s.market === trkM)).length;
+  $("trkSmileNote").textContent = "Plans frozen before 09:30 ET from the OCC chain with each strike's vol from the previous session's smile (an estimate), "
+    + "graded the same way as the record above, never mixed with it, and not on the public site."
+    + (pend ? ` ${pend} plan${pend === 1 ? "" : "s"} waiting for the close.` : "");
 }
 async function loadArchive(){
   let A;
@@ -1731,7 +1757,7 @@ function renderTrack(){
   </table>` : `<div class="expl">Nothing graded yet. The first plan is graded after its session closes.</div>`;
   // every session
   const ss = (trk.sessions || []).filter(s => trkM === "ALL" || s.market === trkM);
-  renderTrackMoves(ss); renderTrackSplit(ss); renderReactions();
+  renderTrackMoves(ss); renderTrackSplit(ss); renderReactions(); renderTrackSmile();
   $("trkCsv").onclick = () => trackCsv(ss);
   $("trkLogSub").textContent = `${ss.length} session${ss.length === 1 ? "" : "s"} · newest first`;
   const wall = w => !w ? `<span class="dim">-</span>` : !w.touched ? `<span class="dim" title="${num(w.level, 2)}">not reached</span>`

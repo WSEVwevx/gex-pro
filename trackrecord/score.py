@@ -45,6 +45,7 @@ def make_plan(inp: dict, session: str, frozen_at: str) -> Optional[dict]:
         "zg": _r(inp.get("zg")), "cw": _r(inp.get("cw")), "pw": _r(inp.get("pw")), "ag": _r(inp.get("ag")),
         "bias": b.get("bias"), "confidence": b.get("confidence"), "day_type": b.get("day_type"),
         "side": b.get("side"), "target": _r(b.get("target")),
+        **({"chain": inp["chain"]} if inp.get("chain") else {}),     # the smile series' plans say which estimate
     }
 
 

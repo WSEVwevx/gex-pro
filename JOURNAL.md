@@ -582,3 +582,13 @@ The entry above and its PR text got these wrong. Rechecked the same evening:
 - Verifier: own code, every claim PASS (smile IVs within 2e-15). It used its own calendar (zoneinfo), equivalent here.
 - Limits: 10 pairs, 2 weeks, one-day expiries at the money only; agreement with Cboe's closing quotes, not a forecast of
   the next session; B and D impossible, so levels were never checked against a full chain.
+
+## 2026-11-28 decision 003: the smile estimate unlocked locally (rework workstream 8; the owner: "Yes, unlock both")
+
+- After study occ_lse_accuracy v2 part A ("better", n = 10): on this PC only, plans and Bias may come from occ+lse
+  snapshots, labelled as the estimate, graded in their own series (trackrecord/smile_series.py,
+  %LOCALAPPDATA%/gexsys/trackrecord-smile, /api/trackrecord-smile, a card on the Track record page). Never mirrored,
+  never built into the hosted site, never in the archive (archive.py excludes occ+lse explicitly).
+- Unchanged: the main record still takes no estimate; briefs from an estimate stay ungraded (their data line now names
+  the smile); the TradingView paste stays on hold (B and D could not check levels against a full chain).
+- Not checked yet: a live session through START.bat with GEX_LSE=1 (the first plan can freeze on Mon 30 Nov).
