@@ -434,6 +434,10 @@ function renderIndicator(){
     || `<div>${stateHtml("empty", "No change history here", "The list of recent script changes comes from the project's git history, which this copy was built without. The script itself is current.")}</div>`;
   const pub = data && data.workers.find(w => w.published);
   $("indPasteTime").textContent = pub ? `${slotTxt(pub.published.slot_et)} paste` : "Waiting for the first paste";
+  // the OCC estimate holds the paste (pipeline.backup_trim): say so here too, not the usual cadence (sweep, 28 Nov 2026)
+  const held = data && data.workers.some(w => w.result && w.result.summary && w.result.summary.backup);
+  $("indCadence").textContent = held ? "On hold while the levels are an OCC estimate: this is the last paste, with its time."
+    : "A new paste every 30 minutes (:00 and :30 ET), plus 09:45 ET.";
 }
 async function copyCode(){
   if(!ind) return;
