@@ -8,6 +8,23 @@ from pathlib import Path
 from feeds import drivers as D
 
 
+# these tests model the hosted build, where no host is switched off; a GEX_OFF_HOSTS set on this PC (START.bat sets
+# api.nasdaq.com) must not change them. TestHostSwitch sets it itself where it tests the switch.
+_ENV = None
+
+
+def setUpModule():
+    global _ENV
+    import os
+    from unittest import mock
+    _ENV = mock.patch.dict(os.environ, {"GEX_OFF_HOSTS": ""})
+    _ENV.start()
+
+
+def tearDownModule():
+    _ENV.stop()
+
+
 def weights_html(rows):
     return "".join(f'<tr><td>{i}</td><td style="x"><a href="/symbol/{s}">{n}</a></td><td><a href="/symbol/{s}">{s}</a></td>'
                    f'<td>{w}%</td></tr>' for i, (s, n, w) in enumerate(rows, 1))

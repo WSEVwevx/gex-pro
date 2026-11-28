@@ -9,6 +9,23 @@ from unittest import mock
 
 from tools import probe_sources as ps
 
+
+# these tests model the hosted build, where no host is switched off; a GEX_OFF_HOSTS set on this PC (START.bat sets
+# api.nasdaq.com) must not change them. TestHostSwitch sets it itself where it tests the switch.
+_ENV = None
+
+
+def setUpModule():
+    global _ENV
+    import os
+    from unittest import mock
+    _ENV = mock.patch.dict(os.environ, {"GEX_OFF_HOSTS": ""})
+    _ENV.start()
+
+
+def tearDownModule():
+    _ENV.stop()
+
 # trimmed raw response, api.nasdaq.com/api/quote/NDX/option-chain, 21 Nov 2026 (as of the 20 Nov close)
 RAW = {"data": {"totalRecord": 1926, "lastTrade": "LATEST INDEX VALUE: 25,028.98 (AS OF NOV 20, 2026)", "table": {"rows": [
     {"expiryDate": "Nov 23", "c_Last": "6.00", "c_Bid": "0.85", "c_Ask": "15.20", "c_Volume": "28", "c_Openinterest": "--",
