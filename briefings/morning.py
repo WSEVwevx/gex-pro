@@ -164,7 +164,7 @@ def yesterday_block(market: str, record: list, session: str) -> Optional[dict]:
     gap = ""
     if between:
         why = next((x["why"] for x in between if x.get("why")), None)
-        gap = f"No plan for the sessions after {day}" + (f" ({why})" if why else "") + "; the last graded one, "
+        gap = f"No plan for the sessions after {day}" + (f" ({why})" if why else "") + "; the last planned one, "
     if not o:
         return {"session": r["session"], "gap": bool(gap), "text": f"{gap}{day}: not graded yet."}
     parts = [f"{day}: closed {'inside' if o['em_close'] else 'outside'} the expected range (move {o['move_em']:+.2f}σ), "
