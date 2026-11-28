@@ -315,6 +315,7 @@ def run(state: Path, now: Optional[datetime] = None, push: bool = True, get: Cal
     (state/archive-index.json). Never changes a file the branch already has: a day is only ever added whole."""
     import os
     import tempfile
+    os.environ["GEX_NO_LSE"] = "1"          # the archive is public: LSE data is local only (gexsys/providers/lse.py refuses)
     now = now or datetime.now(timezone.utc)
     cache_f, index_f = state / "archive-manifests.json", state / "archive-index.json"
     try:

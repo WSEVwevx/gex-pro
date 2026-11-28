@@ -19,6 +19,8 @@ STATIC_FLAG = "<script>window.GEX_STATIC = true;</script>"
 
 
 def build(components, out: str | Path, state: str | Path) -> dict:
+    import os
+    os.environ["GEX_NO_LSE"] = "1"          # the public site: LSE data is local only (gexsys/providers/lse.py refuses)
     out, state = Path(out), Path(state)
     data = out / "data"
     data.mkdir(parents=True, exist_ok=True)
