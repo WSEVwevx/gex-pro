@@ -1,0 +1,43 @@
+{
+ "study": "occ_lse_accuracy",
+ "version": 1,
+ "written": "2026-11-28, before any comparison was computed; pass bar proposed, waiting for the owner's approval (rework gate 4)",
+ "question": "Does each strike's vol from LSE's smile (gexsys/smile.py rules v1) bring the OCC estimate closer to Cboe's own quotes than one VIX-family vol per expiry (occ+vix)?",
+ "privacy": "LSE values are local only: inputs and per-pair results stay in %LOCALAPPDATA%/gexsys/studies/occ_lse_accuracy/; the repo, GitHub and the hosted site get this definition and, at most, the verdict words",
+ "seed": 20261128,
+ "A_iv_level": {
+  "truth": "Cboe-era snapshots in %LOCALAPPDATA%/gexsys/snapshots/{NQ-CBOE,ES-CBOE}/ (10-19 Nov 2026): for each market and session d, the last snapshot taken after d's close (marketcal.rth_close_dt(d) + 15 min) and before the next session's open; expected_move gives expiry E (the next session), strike K = atm_strike, price S = ref_price, time = asof, IV_cboe = atm_iv. No such snapshot: the pair is dropped and counted",
+  "arms": {
+   "vix_same": "gexsys/providers/occ.py curve (vol date d) at E, at the truth's time; x VXN/VIX for NDX",
+   "smile_same": "smile.Surface from LSE Greeks of session d at (E, K, S, time)",
+   "vix_late": "the curve of vol date d-1, read the same way",
+   "smile_late": "smile of session d-1 re-levelled by curve_d(T)/curve_{d-1}(T), as the provider does when LSE is a session late"
+  },
+  "metric": "error = arm IV - IV_cboe, in vol points; per pair, per day and in total: n, median |error|, mean error (bias), worst",
+  "primary": "paired by (market, d): D = |err smile_same| - |err vix_same|; median D with a 95% bootstrap interval (10,000 resamples, the seed above), and the count of pairs where the smile is closer",
+  "secondary": "the same for smile_late vs vix_late",
+  "lse_needed": "LSE Greeks of the sessions 9-19 Nov 2026 (the export endpoint; calls not yet budgeted: owner decision)"
+ },
+ "B_levels_on_cboe_days": {
+  "result_before_running": "not possible: no historical OI. OCC's series-search takes no date (it serves the latest end-of-day file only), and OCC's report pages refused an automated read with HTTP 403 on 2026-11-28; no documented free by-date options open-interest endpoint was found"
+ },
+ "C_sensitivity": {
+  "sample": "every session from the first one START.bat caches LSE chains for (GEX_LSE=1), NQ and ES",
+  "method": "the same OCC open interest, prices and time (09:00 ET of the next session), built twice: occ+vix and occ+lse",
+  "metrics": "zero gamma difference in points and in expected moves (expected_move.one_sigma_points); call and put wall: same strike, within 1 listed strike, or further; C1 and P1 the same; Pearson correlation of abs_by_strike over the union of strikes",
+  "flags": "|zero gamma difference| > 0.25 expected moves, or a wall further than 1 strike: flagged and listed for review, never hidden",
+  "verdict": "none: it measures how much the choice of vol moves the levels, not which is right"
+ },
+ "D_live_shadow": {
+  "result_before_running": "not run: needs Cboe beside OCC + LSE, and Cboe was refused (gate 1) and removed from the project at the owner's word"
+ },
+ "pass_bar_proposed": {
+  "minimum_n": "8 pairs (market, d) in A's primary comparison; fewer: \"can't tell (n too small)\"",
+  "better": "median D <= -0.5 vol points, its 95% interval below 0, and the smile closer in at least 70% of pairs",
+  "no_worse": "median D <= +0.25 vol points",
+  "no_better": "any other result with n >= 8",
+  "unlocks": "gate 3 (a) plan and Bias and (c) a separate local track record: only on \"better\" in A and the owner's approval; (b) the local paste also needs B or D, which cannot run, so the paste stays held"
+ },
+ "roll_weeks": "sessions inside a futures roll week (8 days before the quarterly expiry) are flagged in every table; none fall in 10-19 Nov 2026",
+ "not_tested": "0DTE (the smile gives it no vol); levels against ground truth (B and D impossible); any session after 19 Nov against Cboe"
+}
