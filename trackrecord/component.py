@@ -420,8 +420,15 @@ class TrackRecordComponent:
         graded = [s["graded_at"] for s in ss if s.get("graded_at")]
         why = ([f"{len(waiting)} session(s) past the close still waiting for a final price"] if waiting else []) + \
               ([f"{len(lost)} session(s) could not be graded: no final price was found"] if lost else [])
+        # nothing graded lately because no plan was saved, not because prices failed: said, so "worked 7 days ago"
+        # never reads as a working source with nothing to explain (hosted sweep, 27 Nov 2026)
+        last = max((s["session"] for s in ss if s.get("graded_at")), default="")
+        missed = sorted({s["session"] for s in ss if s.get("status") == "missed" and s["session"] > last})
+        detail = (f"nothing to grade since {last}: {len(missed)} session(s) after it have no plan "
+                  f"({missed[0]} to {missed[-1]})") if missed and last else None
         return [{"name": "Closing prices for grading", "provider": "Yahoo Finance (daily)",
-                 "pages": ["Track record"], "last_ok": max(graded, default=None), "error": "; ".join(why) or None}]
+                 "pages": ["Track record"], "last_ok": max(graded, default=None), "error": "; ".join(why) or None,
+                 "detail": detail}]
 
     # ---------------------------------------------------------------- component contract
     def routes(self) -> dict:

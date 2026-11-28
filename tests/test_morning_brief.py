@@ -9,6 +9,8 @@ from briefings.component import BriefingsComponent
 from briefings.compose import compose
 from gexsys.marketcal import is_trading_day
 
+JS = (__import__("pathlib").Path(__file__).resolve().parents[1] / "dashboard" / "assets" / "app.js").read_text(encoding="utf-8")
+
 NY = sch.NY
 SESSION = date(2026, 11, 16)                       # a Monday
 SLOT = datetime(2026, 11, 16, 9, 0, tzinfo=NY)
@@ -71,6 +73,17 @@ class TestText(unittest.TestCase):
         self.assertEqual([e["title"] for e in b["calendar"][0]["items"]], ["CPI m/m"])
         self.assertEqual(b["calendar"][0]["history"], "High-impact days graded so far: 0 of the 20 needed to say how they range.")
         self.assertFalse({"plan", "bias", "odte", "posts"} & (set(m) | set(b)))          # the old ungraded sections are gone
+
+    def test_a_week_old_grade_is_not_yesterdays(self):
+        # sessions after Fri Nov 13 missed (no plan): the brief of Thu Nov 19 names the gap and why
+        miss = [{"session": d, "market": "NQ", "status": "missed", "plan": None, "outcome": None,
+                 "why": "no GEX PRO calculation from before this session's open was saved"} for d in ("2026-11-16", "2026-11-17", "2026-11-18")]
+        y = morning.yesterday_block("NQ", history(3) + miss, "2026-11-19")
+        self.assertTrue(y["gap"])
+        self.assertTrue(y["text"].startswith("No plan for the sessions after Fri Nov 13 (no GEX PRO calculation from before this "
+                                             "session's open was saved); the last planned one, Fri Nov 13: closed inside"), y["text"])
+        self.assertFalse(morning.yesterday_block("NQ", history(3), "2026-11-16")["gap"])            # Monday after Friday: no gap
+        self.assertIn('(m.yesterday && m.yesterday.gap) ? "Last session, graded"', JS)
 
     def test_same_price_levels_merge_and_the_nearest_three_are_kept(self):
         lv = morning.key_levels(market(nearest={}))
