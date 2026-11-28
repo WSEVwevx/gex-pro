@@ -205,7 +205,18 @@ class GexComponent:
             rows.append({"name": f"{m} futures candles", "provider": "Yahoo Finance", "pages": ["Heatmap"],
                          "last_ok": s.get("ok"), "error": s.get("error"), "fresh_h": 2,
                          "note": None if s else "checked the first time the Heatmap opens"})
+        rows += self._lse_rows()
         return rows
+
+    def _lse_rows(self) -> list:
+        """The LSE client's row, on this computer only: never in the hosted build or on GitHub's servers (local-only
+        licence), and only when a key is set. It makes no request: calls today and the Greeks' landing come from disk."""
+        from .providers import lse
+        if lse.why_not_here() or not lse.read_key():
+            return []
+        if getattr(self, "_lse", None) is None:
+            self._lse = lse.LseClient()
+        return [self._lse.health_row()]
 
     def _worker(self, q) -> Optional[MarketWorker]:
         if q.get("key"):
