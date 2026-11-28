@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import shutil
 import time
 from dataclasses import replace
@@ -168,16 +169,29 @@ class GexComponent:
             h = w.health()
             ok = datetime.fromtimestamp(w.last_success, timezone.utc).isoformat() if w.last_success else None
             calc = h.get("calc_status")
-            est = bool(((getattr(w, "result", None) or {}).get("summary") or {}).get("backup"))
+            summ = ((getattr(w, "result", None) or {}).get("summary") or {})
+            est = bool(summ.get("backup"))
             vxn = " + VXN" if w.cfg.source == "NDX" else ""
+            sm = summ.get("smile") or {}
+            lse_on = summ.get("chain") == "occ+lse"
+            # the OCCLSE worker on the VIX-family curve for now: say why the smile was not used (its own warning)
+            why_not = next((x.split(": ", 1)[1] for x in summ.get("warnings") or [] if x.startswith("smile unavailable")), None)
+            detail = (f"each strike's vol from the {sm.get('session', '')} session's smile "
+                      f"({sum(len(v) for v in (sm.get('fits') or {}).values())} expiries fitted): walls, zero gamma, C1 and "
+                      f"P1 only, 0DTE left out" if lse_on else
+                      "one implied vol per expiry (no skew): walls, zero gamma, C1 and P1 only, no 0DTE flip" if est else None)
+            if why_not and not lse_on:
+                detail = f"{detail}; the smile was not used: {why_not}" if detail else f"the smile was not used: {why_not}"
             rows.append({"name": f"{w.cfg.market} options chain",
-                         "provider": f"OCC open interest + VIX-family closes{vxn} (Yahoo) + Yahoo prices ({w.cfg.source})",
+                         "provider": (f"OCC open interest + the previous session's smile ({sm.get('credit', '')}) + Yahoo prices "
+                                      f"({w.cfg.source})" if lse_on else
+                                      f"OCC open interest + VIX-family closes{vxn} (Yahoo) + Yahoo prices ({w.cfg.source})"),
                          "pages": ["Levels", "Live table", "Heatmap", "Bias", "TradingView paste"],
                          "last_ok": ok or _last_saved(w),
                          "error": w.last_error if w.failures else None, "fresh_h": 2,
                          "note": "first refresh in progress" if not ok and not w.failures
                          else f"the last calculation was {calc}" if calc and calc != "OK" else None,
-                         "detail": "one implied vol per expiry (no skew): walls, zero gamma, C1 and P1 only, no 0DTE flip" if est else None})
+                         "detail": detail})
             # the paste (every 30 min, plus 09:45): late when it is more than an hour old (two missed slots) while the futures trade
             pub = w.published or {}
             trading = marketcal.session_state(datetime.now(timezone.utc)) in ("RTH", "ETH")
@@ -216,7 +230,8 @@ class GexComponent:
             return []
         if getattr(self, "_lse", None) is None:
             self._lse = lse.LseClient()
-        return [self._lse.health_row()]
+        used = os.environ.get("GEX_LSE") == "1"           # START.bat: the OCC chain takes its smile from it
+        return [self._lse.health_row(pages=["Levels", "Live table", "Heatmap"] if used else [])]
 
     def _worker(self, q) -> Optional[MarketWorker]:
         if q.get("key"):

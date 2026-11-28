@@ -373,7 +373,7 @@ class TestNeverPastedNorGraded(unittest.TestCase):
         js = (ROOT / "dashboard/assets/app.js").read_text(encoding="utf-8")
         self.assertTrue(re.search(r"s\.backup \?.*OCC open interest \+ VIX-family vols.*TradingView paste keeps its last published levels", js))
         self.assertIn('Options <b>${bk ? "last close OI" : rt ? "real time" : "15-min delayed"}</b>', js)
-        self.assertIn('${s.backup ? "OCC open interest, one vol per expiry" : "15-min delayed"}', js)
+        self.assertIn(': s.backup ? "OCC open interest, one vol per expiry" : "15-min delayed"}', js)     # after the occ+lse case
         self.assertIn('Next paste <b>${bk ? "on hold"', js)                       # no paste is published from an estimate
         self.assertIn('Math.abs(x) < 0.5 * 10 ** -d ? ""', js)                 # no "-0.00 pts"
         for f in ("dashboard/assets/app.js", "dashboard/assets/library.js", "dashboard/v2/core.js", "dashboard/v2/levels.js"):

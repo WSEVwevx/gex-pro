@@ -189,22 +189,35 @@ class SessionCache(unittest.TestCase):
         old = {"contracts": 1, "greeks_as_of": "2026-11-24 21:00:00", "rows": [row(100)]}
         new = {"contracts": 1, "greeks_as_of": "2026-11-25 21:00:00", "rows": [row(100, 0.25)]}
         with tempfile.TemporaryDirectory() as tmp:
-            op = Script(old, new)
+            op = Script(old, old, new, new)              # probe, the earlier session's chain; probe, the landed chain
             c = lse.LseClient(key=KEY, opener=op, clock=lambda: t[0], cache_dir=tmp)
             self.assertIsNone(c.session_chain("SPXW", wed))               # not landed yet: no wait, no guess
+            self.assertRegex(op.reqs[0].full_url, r"[?&]limit=1(&|$)")                # a 1-row probe first, not every page
+            self.assertEqual(c.newest_landed("SPXW")["session"], "2026-11-24")     # the earlier session is kept
             self.assertIsNone(c.session_chain("SPXW", wed))               # asked again within 15 min: no request
-            self.assertEqual(len(op.reqs), 1)
+            self.assertEqual(len(op.reqs), 2)
             t[0] += lse.REFETCH_S
             got = c.session_chain("SPXW", wed)
             self.assertEqual(got["rows"][0]["iv"], 0.25)
-            self.assertEqual(len(op.reqs), 2)
+            self.assertEqual(len(op.reqs), 4)
             self.assertEqual(c.session_chain("SPXW", wed)["rows"][0]["iv"], 0.25)       # from disk
-            self.assertEqual(len(op.reqs), 2)
+            self.assertEqual(len(op.reqs), 4)
             land = json.loads((Path(tmp) / "landing.json").read_text(encoding="utf-8"))
             self.assertEqual(land["SPXW 2026-11-25"]["greeks_as_of"], "2026-11-25 21:00:00")
             self.assertEqual(c.newest_landed("SPXW")["session"], "2026-11-25")
-            self.assertIsNone(c.newest_landed("SPXW", before=wed))
+            self.assertEqual(c.newest_landed("SPXW", before=wed)["session"], "2026-11-24")
             self.assertIn("newest Greeks 2026-11-25 21:00", c.health_row()["detail"])
+
+    def test_a_probe_that_finds_nothing_new_costs_one_call(self):
+        t = [0.0]
+        old = {"contracts": 1, "greeks_as_of": "2026-11-24 21:00:00", "rows": [row(100)]}
+        with tempfile.TemporaryDirectory() as tmp:
+            op = Script(old, old, old)
+            c = lse.LseClient(key=KEY, opener=op, clock=lambda: t[0], cache_dir=tmp)
+            c.session_chain("SPXW", date(2026, 11, 25))                   # probe + the 24th's chain (2 calls)
+            t[0] += lse.REFETCH_S
+            c.session_chain("SPXW", date(2026, 11, 25))                   # the 24th is on disk: the probe only
+            self.assertEqual(len(op.reqs), 3)
 
     def test_a_session_already_passed_is_not_asked_again(self):
         thu_greeks = {"contracts": 1, "greeks_as_of": "2026-11-27 18:30:00", "rows": [row(100)]}
@@ -247,7 +260,9 @@ class LocalOnly(unittest.TestCase):
             self.assertNotIn("London Strategic Edge", text, p)
         users = [p.relative_to(ROOT).as_posix() for p in (ROOT / "gexsys").rglob("*.py")
                  if "providers import lse" in p.read_text(encoding="utf-8") or "from .lse" in p.read_text(encoding="utf-8")]
-        self.assertEqual(users, ["gexsys/component.py"])                 # its Data health row, guarded below
+        # its Data health row; the factory, which builds a client only with GEX_LSE=1 and never on GitHub or in the
+        # hosted build (tests/test_occ_lse.py Switch); the OCC chain, which uses only a client it is handed
+        self.assertEqual(sorted(users), ["gexsys/component.py", "gexsys/config.py", "gexsys/providers/occ.py"])
 
     def test_the_data_health_row_is_local_and_keyed(self):
         from types import SimpleNamespace

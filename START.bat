@@ -7,6 +7,8 @@ set "PY=%LOCALAPPDATA%\Programs\Python\Python312\python.exe"
 if not exist "%PY%" set "PY=py"
 rem Hosts this computer never asks (the hosted site still does): feeds/hostswitch.py
 set "GEX_OFF_HOSTS=api.nasdaq.com"
+rem The OCC chain's per-strike smile from London Strategic Edge (your key in %USERPROFILE%\.lse_key): this PC only
+set "GEX_LSE=1"
 rem The one dependency (time zone data) is installed once; after that GEX PRO starts without the internet.
 "%PY%" -c "import tzdata" >nul 2>&1
 if errorlevel 1 (

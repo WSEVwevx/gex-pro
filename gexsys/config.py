@@ -120,9 +120,20 @@ def make_provider(cfg: MarketConfig):
         import os
         from .providers.occ import OccProvider
         root = Path(os.path.expandvars(str(cfg.storage.get("root", "data/snapshots"))))
-        return OccProvider(cache_dir=str(root.parent / "occ_cache"))
+        return OccProvider(cache_dir=str(root.parent / "occ_cache"), lse=_local_lse())
     from .providers.synthetic import SyntheticProvider
     return SyntheticProvider(**p)
+
+
+def _local_lse():
+    """The London Strategic Edge client when this PC asks for it: GEX_LSE=1 (START.bat sets it), a key, and not GitHub,
+    the hosted build or the archive (GEX_NO_LSE). Otherwise None, and the OCC chain uses the VIX-family curve as on the
+    hosted site. An explicit switch, so tests, tools and the hosted build never reach LSE by accident."""
+    import os
+    from .providers import lse
+    if os.environ.get("GEX_LSE") != "1" or lse.why_not_here() or not lse.read_key():
+        return None
+    return lse.LseClient()
 
 
 def load_dotenv(path: Optional[str] = ".env") -> None:
