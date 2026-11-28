@@ -178,6 +178,10 @@ class TestSchedule(unittest.TestCase):
             self.assertEqual(p["started"], "2026-10-22")
             self.assertEqual(p["stats"]["NQ"]["sessions"], 1)
             self.assertEqual([x["status"] for x in p["sessions"]], ["missed", "graded"])
+            # Data health says why nothing is graded after the 22nd (no plan), rather than "working" with no word
+            row = c.sources()[0]
+            self.assertEqual(row["detail"], "nothing to grade since 2026-10-22: 1 session(s) after it have no plan (2026-10-23 to 2026-10-23)")
+            self.assertIsNone(row["error"])
 
     def test_open_paste_saved_once(self):
         inp = {"market": "NQ", "underlying": "NDX", "ref": 100.0, "em": 10.0, "paste": "GEX1;mkt=NQ;bt=20261022;END"}

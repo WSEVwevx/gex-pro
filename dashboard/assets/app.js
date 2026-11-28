@@ -302,7 +302,7 @@ function briefMarket2(m, grades, kind){
     ${bar}
     <div class="eyebrow b2-eb">${m.changes.since ? `Since ${esc(m.changes.since)}'s close` : "Since the previous close"}</div>
     <ul class="b2-ul">${m.changes.items.map(x => `<li>${esc(x)}</li>`).join("")}</ul>
-    <div class="eyebrow b2-eb">${kind === "asia" ? "Last session, graded" : "Yesterday, graded"}</div>
+    <div class="eyebrow b2-eb">${kind === "asia" || (m.yesterday && m.yesterday.gap) ? "Last session, graded" : "Yesterday, graded"}</div>
     <p class="b2-p">${m.yesterday ? esc(m.yesterday.text) : "No earlier session in the track record yet."}</p>
     ${g.length ? `<div class="eyebrow b2-eb">This brief, graded after the close</div><div class="b2-gr">${g.map(x => `<span class="trk-tag ${x.hit ? "good" : "bad"}">${x.hit ? "✓" : "✗"} ${B2_TAG[x.type] || esc(x.type)}</span>`).join("")}</div>` : ""}
     ${m.stale ? `<div class="expl c-warn">${esc(m.stale)}</div>` : ""}</section>`;

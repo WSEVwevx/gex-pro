@@ -158,8 +158,15 @@ def yesterday_block(market: str, record: list, session: str) -> Optional[dict]:
         return None
     r = rows[-1]
     day, o = _day(r["session"]), r.get("outcome")
+    # the track record lists every session, planned or missed: a missed one between the last planned session and this one
+    # means a week-old grade must not read as yesterday's (hosted sweep, 27 Nov 2026: "Yesterday, graded" showed Fri Nov 20)
+    between = [x for x in record if x.get("market") == market and r["session"] < x.get("session", "") < session]
+    gap = ""
+    if between:
+        why = next((x["why"] for x in between if x.get("why")), None)
+        gap = f"No plan for the sessions after {day}" + (f" ({why})" if why else "") + "; the last graded one, "
     if not o:
-        return {"session": r["session"], "text": f"{day}: not graded yet."}
+        return {"session": r["session"], "gap": bool(gap), "text": f"{gap}{day}: not graded yet."}
     parts = [f"{day}: closed {'inside' if o['em_close'] else 'outside'} the expected range (move {o['move_em']:+.2f}σ), "
              f"range {o['range_em']:.2f}× the expected move"]
     for name, k in (("call wall", "cw"), ("put wall", "pw")):
@@ -170,7 +177,7 @@ def yesterday_block(market: str, record: list, session: str) -> Optional[dict]:
         parts.append(f"zero gamma {'crossed' if o['zg']['crossed'] else 'not crossed'}")
     if o.get("bias_hit") is not None:
         parts.append(f"{r['plan'].get('bias', 'bias').lower()} call {'right' if o['bias_hit'] else 'wrong'}")
-    return {"session": r["session"], "text": "; ".join(parts) + "."}
+    return {"session": r["session"], "gap": bool(gap), "text": gap + "; ".join(parts) + "."}
 
 
 # ---------------------------------------------------------------- block 4: events
