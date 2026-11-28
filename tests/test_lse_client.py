@@ -230,6 +230,26 @@ class SessionCache(unittest.TestCase):
             self.assertIsNone(c.session_chain("SPXW", date(2026, 11, 25)))
             self.assertEqual(len(op.reqs), 1)
 
+    def test_a_chain_longer_than_the_minute_limit_carries_on_next_time(self):
+        t = [0.0]
+        wed = date(2026, 11, 25)
+        probe = {"contracts": 5001, "greeks_as_of": "2026-11-25 21:00:00", "rows": [row(1)]}
+        p1 = {"contracts": 5001, "greeks_as_of": "2026-11-25 21:00:00", "rows": [row(k) for k in range(5000)]}
+        p2 = {"contracts": 5001, "greeks_as_of": "2026-11-25 21:00:00", "rows": [row(9999)]}
+        with tempfile.TemporaryDirectory() as tmp:
+            op = Script(probe, p1, probe, p2)
+            c = lse.LseClient(key=KEY, opener=op, clock=lambda: t[0], cache_dir=tmp, per_minute=2)
+            with self.assertRaises(RateLimitError):                       # probe + page 1, then the minute's limit
+                c.session_chain("SPXW", wed, max_dte=10)
+            self.assertIsNone(c.cached("SPXW", wed))                       # half a chain is never a landed session
+            self.assertIsNone(c.newest_landed("SPXW"))
+            t[0] += 61
+            got = c.session_chain("SPXW", wed, max_dte=10)
+            self.assertEqual(len(got["rows"]), 5001)
+            self.assertEqual(len(op.reqs), 4)                             # page 1 was not asked for again
+            self.assertIn("offset=5000", op.reqs[3].full_url)
+            self.assertEqual(list((Path(tmp) / "chains").glob("*.part")), [])
+
     def test_a_greeks_time_is_dated_in_new_york(self):
         self.assertEqual(lse.session_of("2026-11-25 20:58:19.448381162"), date(2026, 11, 25))
         self.assertEqual(lse.session_of("2026-11-26 01:30:00"), date(2026, 11, 25))   # 20:30 ET

@@ -233,12 +233,17 @@ class LseClient:
     # ---------------------------------------------------------------- endpoints
     def chain(self, root: str, *, type: Optional[str] = None, expiry: Optional[str] = None,
               strike_min: Optional[float] = None, strike_max: Optional[float] = None,
-              min_dte: Optional[int] = None, max_dte: Optional[int] = None) -> dict:
-        """Every page of one root's chain: {underlying, greeks_as_of, contracts, rows}."""
-        rows, offset, head = [], 0, {}
+              min_dte: Optional[int] = None, max_dte: Optional[int] = None, resume: Optional[dict] = None) -> dict:
+        """Every page of one root's chain: {underlying, greeks_as_of, contracts, rows}. A limit reached part-way raises
+        RateLimitError with `.partial` ({head, rows, offset}); passing that back as `resume` carries on from there."""
+        rows, offset, head = (list(resume["rows"]), resume["offset"], dict(resume["head"])) if resume else ([], 0, {})
         while True:
-            d = self.get("/v3/options/chain", underlying=root, type=type, expiry=expiry, strike_min=strike_min,
-                         strike_max=strike_max, min_dte=min_dte, max_dte=max_dte, limit=PAGE, offset=offset)
+            try:
+                d = self.get("/v3/options/chain", underlying=root, type=type, expiry=expiry, strike_min=strike_min,
+                             strike_max=strike_max, min_dte=min_dte, max_dte=max_dte, limit=PAGE, offset=offset)
+            except RateLimitError as e:
+                e.partial = {"head": head, "rows": rows, "offset": offset} if head else None
+                raise
             if not head:
                 head = {k: d.get(k) for k in ("underlying", "underlying_price", "underlying_at", "contracts", "greeks_as_of")}
             elif d.get("greeks_as_of") != head["greeks_as_of"]:
@@ -299,7 +304,29 @@ class LseClient:
         return None
 
     def _fetch_landed(self, root: str, session: date, filters: dict) -> Optional[dict]:
-        got = self.chain(root, **filters)
+        # a chain longer than the per-minute limit is fetched over several refreshes: the pages so far wait on disk
+        # (not *.json, so never read as a landed session) and the next attempt carries on from them
+        part = self._file(root, session)
+        part = part.with_suffix(".part") if part else None
+        resume = None
+        try:
+            got = json.loads(part.read_text(encoding="utf-8")) if part and part.exists() else None
+            if got and got.get("filters") == filters:
+                resume = got
+        except (OSError, ValueError):
+            pass
+        try:
+            got = self.chain(root, **filters, resume=resume)
+        except RateLimitError as e:
+            if part and getattr(e, "partial", None) and session_of(e.partial["head"].get("greeks_as_of")) == session:
+                _atomic_write(part, dict(e.partial, filters=filters))
+            raise
+        except ProviderError:
+            if part:
+                part.unlink(missing_ok=True)    # e.g. the Greeks changed day while paging: start again
+            raise
+        if part:
+            part.unlink(missing_ok=True)
         if session_of(got.get("greeks_as_of")) != session:
             return None                     # moved on between the probe and the pages: asked again later
         rec = dict(got, root=root, session=session.isoformat(), fetched_at=self.clock(), landed=True, filters=filters)
