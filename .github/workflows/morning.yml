@@ -1,0 +1,36 @@
+name: Morning save
+# The OCC estimate's raw inputs, saved before each open to
+# the raw branch (gexpro/rawsave.py), so a morning the PC
+# slept through can be rebuilt. Free data only, never LSE.
+on:
+  schedule:
+    # every 30 min 09:05-14:35 UTC = 05:00-09:30 ET in EDT
+    # and EST; rawsave.py saves only on trading days
+    # between 05:00 ET and the open (marketcal)
+    - cron: "5,35 9-14 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: write   # only to add files to the raw branch
+
+concurrency:
+  group: morning-save
+  cancel-in-progress: false
+
+jobs:
+  save:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -q -r requirements.txt
+      - name: Save the raw morning inputs
+        env:
+          GEX_NO_LSE: "1"
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          python -m gexpro --log-level WARNING rawsave
