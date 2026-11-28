@@ -37,6 +37,14 @@ class Templates(unittest.TestCase):
                          "that range, where hedging tends to add to moves. The put wall, 24,770.00, is 330 pts (0.3σ) below; "
                          "the call wall, 28,881.50, is 3,782 pts (3.0σ) above.")
 
+    def test_an_earlier_sessions_reading_is_past_tense_with_its_day(self):
+        got = say([dict(BASE, past="Wed, Nov 25"), dict(BASE, zgStatus="", past="Wed, Nov 25")])
+        self.assertEqual(got[0], "As of Wed, Nov 25, NQ had no zero-gamma crossing within ±5.0% of the price; modeled dealer "
+                                 "gamma was negative throughout that range, where hedging tends to add to moves. The put wall, "
+                                 "24,770.00, was 330 pts (0.3σ) below; the call wall, 28,881.50, was 3,782 pts (3.0σ) above.")
+        self.assertTrue(got[1].startswith("As of Wed, Nov 25, zero gamma for NQ was unavailable;"), got[1])
+        self.assertNotRegex(got[0], r"\b(is|has)\b")
+
     def test_a_crossing_and_its_side(self):
         below, above = say([{**BASE, "zg": 25510.25, "regime": "NEGATIVE"}, {**BASE, "zg": 24600.0, "regime": "POSITIVE"}])
         self.assertTrue(below.startswith("NQ is 410 pts (0.3σ) below zero gamma (25,510.25); modeled dealer gamma is negative, "
@@ -89,7 +97,7 @@ class Placement(unittest.TestCase):
     def test_under_the_price_and_escaped(self):
         hero = JS.split("function renderHero(", 1)[1].split("\n}\n", 1)[0]
         self.assertIn('<p class="lvh-say" id="lvSay">${esc(stateSentence({m: market, regime: s.regime, ref, zg: zgp,', hero)
-        self.assertIn("emd, cw: lvPrice(L.call_wall), pw: lvPrice(L.put_wall), backup: !!s.backup}))}</p>", hero)
+        self.assertIn("emd, cw: lvPrice(L.call_wall), pw: lvPrice(L.put_wall), backup: !!s.backup, past: rOld}))}</p>", hero)
 
 
 if __name__ == "__main__":

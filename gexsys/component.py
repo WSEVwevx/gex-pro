@@ -65,7 +65,19 @@ def _calendar(now: datetime) -> dict:
             "sessions": [{"date": d.isoformat(), "open": _utc(marketcal.rth_open_dt(d)), "close": _utc(marketcal.rth_close_dt(d)),
                           "early": d in marketcal.early_closes(d.year), "roll_week": marketcal.roll_week(d)}
                          for d in marketcal.sessions_ahead(now.astimezone(marketcal.NY).date(), 8)],
+            # the 10 cash sessions before today: the page names the session a reading belongs to (the last one that
+            # opened at or before it) and flags a reading from before the current or most recent session
+            "past_sessions": [{"date": d.isoformat(), "open": _utc(marketcal.rth_open_dt(d)), "close": _utc(marketcal.rth_close_dt(d))}
+                              for d in _sessions_before(now.astimezone(marketcal.NY).date(), 10)],
             "states": [[_utc(t), s] for t, s in marketcal.state_changes(now - timedelta(days=1), now + timedelta(days=9))]}
+
+
+def _sessions_before(d, n: int) -> list:
+    out = []
+    for _ in range(n):
+        d = marketcal.previous_trading_day(d)
+        out.append(d)
+    return out[::-1]
 
 
 def _utc(t: datetime) -> str:
@@ -178,11 +190,14 @@ class GexComponent:
                          "detail": f"the paste on the site is the {pub['slot_et']} ET one" if pub.get("slot_et") else None})
             # the website's index -> futures conversion: the measured NQ=F / ^NDX basis, or the carry model when
             # Yahoo's minute bars fail (that model sat ~20 NQ / 6 ES points below the market, stress test C1)
-            mode = (((getattr(w, "result", None) or {}).get("mapped") or {}).get("mapping") or {}).get("futures_ref_mode") or ""
+            mapping = ((getattr(w, "result", None) or {}).get("mapped") or {}).get("mapping") or {}
+            mode = mapping.get("futures_ref_mode") or ""
             if mode:
                 measured = mode.startswith("measured")
+                # worked = when the futures price behind it was read (a fresh process has no last_success: the row
+                # read "not checked yet" beside a measured time in its own detail, 27 Nov 2026)
                 rows.append({"name": f"{w.cfg.market} futures basis", "provider": "Yahoo Finance 1-minute bars",
-                             "pages": ["Levels", "Heatmap", "Bias"], "last_ok": ok, "error": None, "detail": mode,
+                             "pages": ["Levels", "Heatmap", "Bias"], "last_ok": mapping.get("futures_time") or ok, "error": None, "detail": mode,
                              "note": None if measured else "fell back to the carry model: website levels may sit "
                              "about 20 NQ / 6 ES points off (the TradingView chart maps live and is unaffected)"})
         for m in dict.fromkeys(w.cfg.market for w in self.workers.values()):
