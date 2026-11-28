@@ -279,7 +279,20 @@ const BKIND = {nyam: "NY AM", asia: "Asia", weekly: "Weekly"};
 const B2_COL = n => /call/i.test(n) ? "var(--pos)" : /put/i.test(n) ? "var(--neg)" : /zero/i.test(n) ? "var(--zg)" : "var(--ag)";
 const B2_TAG = {band: "Range", regime_range: "Regime", key_level: "Level", wall_holds: "Wall"};
 const isBrief2 = b => !!b && (b.kind === "nyam" || b.kind === "asia") && b.version >= 2;
-function briefMarket2(m, grades, kind){
+// the session before d (YYYY-MM-DD) from the build's calendar, or null when the calendar does not reach back that far
+function prevSession(d){
+  const cal = data && data.calendar, ds = [...((cal && cal.past_sessions) || []), ...((cal && cal.sessions) || [])].map(x => x.date).filter(x => x < d).sort();
+  return ds.length ? ds[ds.length - 1] : null;
+}
+// "Yesterday" only when the graded session is the one right before the brief's; briefs frozen before the brief named a
+// gap itself (2026-11-28) are judged from the calendar (hosted sweep: briefs of Nov 23-27 said "Yesterday" for Nov 20)
+function yGap(y, session){
+  if(!y) return false;
+  if(y.gap) return true;
+  const prev = session && prevSession(session);
+  return !!prev && y.session < prev;
+}
+function briefMarket2(m, grades, kind, session){
   const col = m.regime === "POSITIVE" ? "var(--pos)" : m.regime === "NEGATIVE" ? "var(--neg)" : "var(--zg)";
   const go = (p, t) => `<button class="blink" data-go="${p}" data-m="${esc(m.market)}">${t} →</button>`;
   const r = m.range;
@@ -302,7 +315,7 @@ function briefMarket2(m, grades, kind){
     ${bar}
     <div class="eyebrow b2-eb">${m.changes.since ? `Since ${esc(m.changes.since)}'s close` : "Since the previous close"}</div>
     <ul class="b2-ul">${m.changes.items.map(x => `<li>${esc(x)}</li>`).join("")}</ul>
-    <div class="eyebrow b2-eb">${kind === "asia" || (m.yesterday && m.yesterday.gap) ? "Last session, graded" : "Yesterday, graded"}</div>
+    <div class="eyebrow b2-eb">${kind === "asia" || yGap(m.yesterday, session) ? "Last session, graded" : "Yesterday, graded"}</div>
     <p class="b2-p">${m.yesterday ? esc(m.yesterday.text) : "No earlier session in the track record yet."}</p>
     ${g.length ? `<div class="eyebrow b2-eb">This brief, graded after the close</div><div class="b2-gr">${g.map(x => `<span class="trk-tag ${x.hit ? "good" : "bad"}">${x.hit ? "✓" : "✗"} ${B2_TAG[x.type] || esc(x.type)}</span>`).join("")}</div>` : ""}
     ${m.stale ? `<div class="expl c-warn">${esc(m.stale)}</div>` : ""}</section>`;
@@ -352,7 +365,7 @@ function renderBriefings(){
   $("briefNewsList").innerHTML = (b.headlines || []).map(x => `<div class="bpost"><div class="meta"><b class="c-ink2">${esc(new Date(x.day + "T12:00:00Z").toLocaleDateString("en-US", {weekday: "short", timeZone: "UTC"}))}</b>${x.source ? `<span>${esc(x.source)}</span>` : ""}${/^https:/.test(x.url || "") ? `<a href="${link(x.url)}" target="_blank" rel="noopener">open</a>` : ""}</div>${esc(x.title)}</div>`).join("");
   const col = r => r === "POSITIVE" ? "var(--pos)" : r === "NEGATIVE" ? "var(--neg)" : "var(--zg)";
   const v2 = isBrief2(b), oneDay = v2 && b.kind === "nyam", bid = (brief.history.find(h => h.slot === b.slot && h.kind === b.kind) || {}).id;
-  $("briefMarkets").innerHTML = v2 ? b.markets.map(m => briefMarket2(m, ((brief.score || {}).grades || {})[bid], b.kind)).join("")
+  $("briefMarkets").innerHTML = v2 ? b.markets.map(m => briefMarket2(m, ((brief.score || {}).grades || {})[bid], b.kind, b.session)).join("")
     : (b.markets || []).map(m => `<section class="card bm accent" style="--accent:${col(m.regime)}">
     <div class="head mb-0"><h2>${esc(m.market)}</h2><span class="chip" style="color:${col(m.regime)}">${esc((m.regime || "").toLowerCase())} gamma</span></div>
     <div class="hl">${esc(m.headline)}</div>
@@ -803,7 +816,7 @@ function renderCot(){
     ${s.groups.map(g => `<tr><td>${esc(g.name)}</td><td class="m">${n(g.net)}</td><td class="m">${n(g.change)}</td><td class="m"><span class="rk"><i style="width:${Math.max(0, Math.min(100, g.rank))}%"></i></span><b>${num(g.rank, 0)}%</b></td><td class="trk-mean">${esc(g.label)}</td></tr>`).join("")}</table>`;
 }
 // no cash session today (weekend, holiday): the card shows the latest bias and says so
-const biasDay = () => sessionPhase(new Date(), data && data.calendar).phase === "no cash session today" ? "Latest bias, no session today" : "Today's bias";
+const biasDay = () => ({"no cash session today": "Latest bias, no session today", "after the close": "Latest bias, after the close"})[sessionPhase(new Date(), data && data.calendar).phase] || "Today's bias";
 function renderBias(w){
   loadCot(); renderCot();
   const b = w.result.bias, old = oldDay(w.result.summary.asof), dayLab = old ? `Bias from ${old}, an earlier session` : biasDay();
@@ -815,7 +828,7 @@ function renderBias(w){
   const drift = b.target - ref;
   const lean = {Bullish: "Positioning leans up.", Bearish: "Positioning leans down.", Neutral: "No directional lean."}[b.bias];
   const moves = {positive: "Moves are likely to be capped (positive gamma).", negative: "Moves are likely to extend (negative gamma)."}[b.side] || "Price is at the flip: the day type depends on which side of zero gamma it holds.";
-  $("biasCard").innerHTML = `<div class="eyebrow">${dayLab} (positioning model)</div>
+  $("biasCard").innerHTML = `<div class="eyebrow">${dayLab} (positioning model)${esc(refAt(w.result.summary.asof))}</div>
     <div class="bv-top">
       <div class="bv-call"><div class="regime"><span class="tag" style="border-color:${col}">${b.bias === "Bullish" ? "▲" : b.bias === "Bearish" ? "▼" : "◆"}</span><span style="color:${col}">${b.bias}</span><span class="chip">${b.confidence} confidence</span></div>
         <div class="bv-day"><span>Day type</span><b>${esc(b.day_type)}</b></div></div>
@@ -1347,7 +1360,7 @@ const HELP = {
     body: `<p>Behind the candles is the net dealer gamma from every GEX PRO snapshot, each one shown from the moment it was taken until the next, with neighbouring price bands blended into soft zones (hover for the exact value at any price and time). <b>Today</b>, <b>2 days</b> (the default) and <b>All</b> (about a week) pick how much price action is shown. <b>Blue</b> = positive gamma (hedging leans against moves, so price tends to stall or pin there); <b>orange</b> = negative gamma (hedging adds to moves). Brighter = more gamma.</p><p>The lines are the call wall (blue) and put wall (orange) wherever they held for an hour or more; the ZG, CW and PW labels on the price axis are where zero gamma and the walls were in the latest saved snapshot. Times are New York time; a dashed line marks each 9:30 cash open.</p><p>The space right of the last candle shows <b>GEX</b> with the latest saved snapshot's time: that snapshot as bars (right = more gamma, blue or orange by sign), with today's key levels from the first expiry: C1 / C2, P1 / P2, Ab1 and the 0DTE flip, the same levels the TradingView indicator draws. <b>Today / 2 days / All</b> sets how much history is in view; the colour scale under the chart says how much gamma the brightest colour means. Watch how price reacts when it reaches a bright band, and how the bands move during the day. Hover anywhere for the numbers.</p><p><b>Hatched ground</b> means no GEX was saved for that time: the newest snapshot is more than 90 minutes older than the candle (for example while a source is down). The page leaves it uncoloured rather than stretch an old snapshot over it.</p><p>Candles: Yahoo Finance, delayed. Gamma: OCC open interest with VIX-family vols, mapped to futures with today's basis. History builds up as snapshots are saved (about 12 days in the app, 5 on the hosted site).</p>`,
     watch: ["Price stalling at a bright blue band = positive-gamma support or resistance", "Price slicing through orange = negative gamma, moves can extend"]},
   paste: {title: "The scheduled paste", tldr: "One text block that carries all levels to TradingView.",
-    body: `<p>Published every 30 minutes (:00 and :30 ET), plus 09:45 ET. One paste holds NQ and ES; each chart draws only its own market. The indicator marks levels stale after 90 minutes.</p>`},
+    body: `<p>Published every 30 minutes (:00 and :30 ET), plus 09:45 ET, while the levels come from a full option chain; on the OCC chain the paste is on hold until the accuracy study passes, and the page shows the last one with its time. One paste holds NQ and ES; each chart draws only its own market. The indicator marks levels stale after 90 minutes.</p>`},
 };
 const PAGE_HELP = {levels: "regime", ladder: "livetable", heatmap: "heatmap", screener: "screener", bias: "bias", briefings: "briefings", news: "calendar", indicator: "indicator", library: "library", glossary: "glossary", track: "track", backtest: "studies", health: "health"};
 let exKey = null;
@@ -2770,7 +2783,7 @@ function renderPlan(w){
     && new Date(e.time).toLocaleDateString("en-US", ET) === now.toLocaleDateString("en-US", ET) && Date.parse(e.time) > Date.now() - 3600e3);
   const earn = planEarnings(k);
   const R = {POSITIVE: ["positive", "var(--pos)"], NEGATIVE: ["negative", "var(--neg)"]}[lv.regime] || ["balanced", "var(--zg)"];
-  $("planCard").innerHTML = `<div class="head"><h2>${esc(title)}</h2><span class="sub">${old ? `${esc(market)} · <b class="c-warn">an earlier session</b>` : `${esc(day)} · ${esc(market)} · ${esc(phase)}`}</span></div>
+  $("planCard").innerHTML = `<div class="head"><h2>${esc(title)}</h2><span class="sub">${old ? `${esc(market)} · <b class="c-warn">an earlier session</b>` : `${esc(day)} · ${esc(market)} · ${esc(phase)}`}${esc(refAt(s.asof))}</span></div>
     <div class="plan-kv"><span>Regime</span><b style="color:${R[1]}">${R[0]} gamma</b><span>Price${refAt(s.ref_time)}</span><b class="m">${num(ref, 2)}</b>
       <span>${em.anchor_label ? "Day ±1σ from " + esc(em.anchor_label) : "Day range ±1σ"}</span><b class="m">${d && a ? p(a - d) + " – " + p(a + d) + (bandNote(em) ? " · " + bandNote(em) : "") : "-"}</b><span>Ab1 (magnet)</span><b class="m">${lv.Ab1 != null ? p(lv.Ab1) : s.backup ? "not in the backup" : "-"}</b></div>
     <div class="plan-sc">${rows.map(([when, what, here]) => `<div class="${here ? "here" : ""}"><b>${esc(when)}</b><span>${esc(what)}</span>${here ? `<em>price ${old || review ? "was" : "is"} here</em>` : ""}</div>`).join("")}</div>

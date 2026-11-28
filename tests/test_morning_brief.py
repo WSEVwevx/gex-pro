@@ -83,7 +83,7 @@ class TestText(unittest.TestCase):
         self.assertTrue(y["text"].startswith("No plan for the sessions after Fri Nov 13 (no GEX PRO calculation from before this "
                                              "session's open was saved); the last planned one, Fri Nov 13: closed inside"), y["text"])
         self.assertFalse(morning.yesterday_block("NQ", history(3), "2026-11-16")["gap"])            # Monday after Friday: no gap
-        self.assertIn('(m.yesterday && m.yesterday.gap) ? "Last session, graded"', JS)
+        self.assertIn('yGap(m.yesterday, session) ? "Last session, graded"', JS)           # yGap reads .gap first
 
     def test_same_price_levels_merge_and_the_nearest_three_are_kept(self):
         lv = morning.key_levels(market(nearest={}))

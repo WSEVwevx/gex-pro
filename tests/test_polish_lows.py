@@ -32,6 +32,10 @@ class BiasDay(unittest.TestCase):
     def test_a_session_day_says_today(self):
         self.assertEqual(self.label("2026-11-23T15:00:00Z", [self.MON]), "Today's bias")
 
+    def test_after_the_close_says_latest(self):
+        # hosted sweep 2026-11-27 23:28 ET: "Today's bias" above a card that said "Plan for the Monday, Nov 30 session"
+        self.assertEqual(self.label("2026-11-23T23:00:00Z", [self.MON]), "Latest bias, after the close")
+
     def test_no_card_title_hard_codes_today(self):
         self.assertNotIn('<div class="eyebrow">Today\'s bias', JS)
 

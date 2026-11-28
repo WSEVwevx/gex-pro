@@ -194,7 +194,7 @@ setTimeout(function(){ document.documentElement.classList.remove("booting"); }, 
           <div class="rp-read" id="rpRead" aria-live="polite"></div>
         </div>
         <div class="legend" id="biasLegend"><span data-live><i class="sw ink ln3" id="pathSw"></i>Base-case path</span><span data-live><i class="sw cone" id="coneSw"></i>±1σ expected-move cone</span><span data-rp hidden><i class="sw ink ln"></i>Futures price</span><span data-lv="Call wall"><i class="sw pos ln"></i>Call wall</span><span data-lv="Put wall"><i class="sw neg ln"></i>Put wall</span><span data-lv="Zero gamma"><i class="sw zg ln"></i>Zero gamma</span><span data-lv="Abs gamma"><i class="sw ag ln"></i>Abs gamma</span><span data-lv="Max pain 0DTE"><i class="sw mp ln"></i>0DTE max pain</span></div>
-        <div class="expl">A scenario built from options positioning (15-min delayed, end-of-day open interest), not a prediction. About 1 day in 3, price leaves the cone.</div>
+        <div class="expl">A scenario built from options positioning (open interest and implied volatility, as of the time shown above), not a prediction. About 1 day in 3, price leaves the cone.</div>
       </section>
       <section class="card mt-3" data-help="factors">
         <div class="head"><h2>Why: factor by factor</h2></div>
