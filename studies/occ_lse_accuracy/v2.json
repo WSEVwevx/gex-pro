@@ -1,0 +1,31 @@
+{
+ "study": "occ_lse_accuracy",
+ "version": 2,
+ "written": "2026-11-28, before any comparison was computed and before any LSE call for it",
+ "changes_from_v1": [
+  "truth: the FIRST snapshot after d's close + 15 min, not the last: overnight Cboe reprices its frozen 1-day quotes with less time left (ES 18 Nov: 0.268 at 22:46 UTC, 0.330 at 08:30 UTC)",
+  "truth field: extras.expected_move.daily_iv (the index's own options only, call and put averaged at the strike nearest the price, time counted from Cboe's quote time), not expected_move.atm_iv, which can be a converted QQQ or SPY option",
+  "LSE rows: /v3/options/flow prints (each carries the IV of its minute), collapsed to one row per contract; the chain endpoint serves only the newest session",
+  "A's secondary comparison (one session late) is not run: the owner's budget is 20 LSE calls"
+ ],
+ "pass_bar": "identical to v1 pass_bar_proposed, approved by the owner on 2026-11-28 (approval.json)",
+ "privacy": "as v1: LSE values and per-pair results stay in %LOCALAPPDATA%/gexsys/studies/occ_lse_accuracy/",
+ "seed": 20261128,
+ "A_iv_level": {
+  "pairs": "market in (NQ, ES) x session d with a Cboe-era snapshot taken after rth_close(d) + 15 min and before the next session's open, in %LOCALAPPDATA%/gexsys/snapshots/{NQ-CBOE,ES-CBOE}/; a pair without one is dropped and counted",
+  "truth": "the first such snapshot: IV_cboe = extras.expected_move.daily_iv, expiry E = daily_iv_expiry (it must be the session after d), price S = anchor, time t0 = variance_from",
+  "vix_same": "the OCC provider's curve of vol date d (_curve_on; x VXN/VIX for NDX) at T = (E's expiry time - t0) in years",
+  "smile_same": {
+   "lse_call": "GET /v3/options/flow underlying=NDXP (NQ) or SPXW (ES), expiry=E, strike_min=floor(0.96 S), strike_max=ceil(1.04 S), from=rth_close(d) - 60 min, to=rth_close(d) (UTC, seconds), order=desc, limit=5000; one call per pair; returned = 5000 is reported as truncated (the newest 5000 prints kept)",
+   "rows": "per contract (strike, call/put): the last print's ts as last_trade_at, its iv and underlying_price as greeks_underlying_price (a print without underlying_price takes the index's Yahoo 1-minute close of that print's minute, ^NDX or ^GSPC, chart interval=1m; with neither, the print is dropped and counted); volume_today = the sum of the window's print sizes",
+   "fit": "gexsys/smile.py rules v1 with sigma_ref = vix_same; session window = d's open to close, rows inside the last hour only (the fallback to the whole session would need another call: when the last hour fails the fit test, the pair is reported as 'no smile' and counted, never filled in)",
+   "price": "Surface({E: fit}, r, q, anchor 1).iv(E, K = S, S, t0)"
+  },
+  "metric": "error = arm IV - IV_cboe in vol points; per pair, per market and in total: n, median |error|, mean error, worst",
+  "primary": "D = |err smile_same| - |err vix_same| per pair; median D, its 95% bootstrap interval (10,000 resamples of pairs, numpy default_rng(seed)), and the count of pairs where the smile is closer",
+  "verdict": "v1 pass bar on the pairs that have both arms"
+ },
+ "B_C_D": "as v1",
+ "roll_weeks": "none in 9-19 Nov 2026 (the December roll is 10 Dec)",
+ "not_tested": "as v1, plus the one-session-late arms"
+}
