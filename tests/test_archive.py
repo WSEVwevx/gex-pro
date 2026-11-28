@@ -229,6 +229,12 @@ class TestHealth(unittest.TestCase):
         self.assertEqual((ok["markets"]["NQ"]["sessions"], ok["markets"]["ES"]["sessions"]), (1, 0))
         waiting = A.index_record({}, et(D, 18, 1), pending={"2026-11-18": ["NQ=F 1-minute bars: HTTPError 429"]})
         self.assertIn("2026-11-18 (NQ=F 1-minute bars: HTTPError 429)", A.health_row(waiting)["error"])
+        kept = ["ES open snapshot: no usable snapshot in the 30 hours before 09:30 ET" + A.KEPT + "ES-open-estimate.json",
+                "ES midday snapshot: no usable snapshot within 30 minutes of 12:00 ET"]
+        self.assertIn("2026-11-18 (ES midday snapshot: no usable snapshot within 30 minutes of 12:00 ET)",
+                      A.health_row(A.index_record({}, et(D, 18, 1), pending={"2026-11-18": kept}))["error"])
+        self.assertIn("waits for missing parts: ES midday snapshot",
+                      A.health_row(A.index_record({}, et(D, 17, 30), pending={"2026-11-18": kept}))["note"])
         early = A.index_record({}, et(D, 17, 30), pending={"2026-11-18": ["x"]})
         self.assertIn("waits for missing parts", A.health_row(early)["note"])
         failed = A.index_record({}, et(D, 17, 0), "RuntimeError: x", last_ok="2026-11-18T20:00:00+00:00")
