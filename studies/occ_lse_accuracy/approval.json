@@ -1,0 +1,8 @@
+{
+ "study": "occ_lse_accuracy",
+ "version": 1,
+ "approves_sha256": "607b25a66a54b3df619c9bd436ee6ab427d6f0e496a01879baf7f5b58d641737",
+ "what": "pass_bar_proposed, as written in v1.json (minimum_n, better, no_worse, no_better, unlocks)",
+ "owner": "Approve pass bar",
+ "approved": "2026-11-28, in chat, before any comparison was computed"
+}
