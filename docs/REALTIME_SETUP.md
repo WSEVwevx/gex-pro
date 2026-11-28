@@ -44,7 +44,7 @@ using the live `NASDAQ:NDX` / `SP:SPX` reference. Levels are marked `[STALE]` af
 
 ## Change the schedule
 
-Edit `"publish": {"times_et": [...], "all_day": true}` in `configs/free_nq_cboe.json` and
-`configs/free_es_cboe.json`, then restart START.bat. `all_day: false` keeps only the times before the
+Edit `"publish": {"times_et": [...], "all_day": true}` in `configs/free_nq.json` and
+`configs/free_es.json`, then restart START.bat. `all_day: false` keeps only the times before the
 cash close (16:00 ET, or 13:00 on early-close days). To stop the Windows notifications, set
 `"desktop_notify": false`; the website's Copy button still has each new paste.

@@ -49,7 +49,7 @@ Then open http://127.0.0.1:8765. The demo data is **SYNTHETIC** and labeled as s
 With real data (see [DATA_PROVIDERS](docs/DATA_PROVIDERS.md)):
 
 ```bash
-python -m gexsys snapshot --config configs/free_es_cboe.json
+python -m gexsys snapshot --config configs/free_es.json
 ```
 
 ```bash
@@ -75,8 +75,8 @@ TradingView's Pine Editor but has not been tested on a chart automatically) are 
 
 | File | Market | Options source | Notes |
 |---|---|---|---|
-| `configs/free_nq_cboe.json` | NQ/MNQ | NDX + QQQ via Cboe free feed | **used by START.bat** and the hosted site |
-| `configs/free_es_cboe.json` | ES/MES | SPX + SPY via Cboe free feed | **used by START.bat** and the hosted site |
+| `configs/free_nq.json` | NQ/MNQ | NDX + QQQ: OCC open interest + Yahoo VIX-family closes | **used by START.bat** and the hosted site |
+| `configs/free_es.json` | ES/MES | SPX + SPY: OCC open interest + Yahoo VIX-family closes | **used by START.bat** and the hosted site |
 | `configs/es_fop_csv.json` | ES/MES | ES futures options (CSV) | identity mapping; points at the hand-made sample file |
 | `configs/*_demo_synthetic.json` | NQ / ES | synthetic | demo only |
 
