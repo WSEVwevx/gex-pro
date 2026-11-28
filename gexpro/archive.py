@@ -6,6 +6,10 @@ Written once a day by the hosted build (python -m gexpro archive, .github/workfl
   {M}-open.json      the saved snapshot the plan uses: the last usable one in the 30 hours before 09:30 ET
   {M}-midday.json    the usable one nearest 12:00 ET (within 30 minutes; ties: the earlier one)
   {M}-close.json     the last usable one at or before the close (within 60 minutes; early closes from marketcal)
+  {M}-{k}-estimate.json  (k = open, midday, close; from rules 4) when no usable snapshot exists for k, the OCC estimate
+                     (a backup snapshot: OCC open interest + VIX-family vols) chosen by the same time rule, byte for byte.
+                     Never {M}-{k}.json: a study that reads {M}-open.json still gets only full-chain snapshots, and one
+                     that wants estimates must ask for them by name. The manifest's "missing" says which slots hold one.
   {M}-candidates.json  every snapshot seen for that day, so the choice can be re-derived by anyone
   calendar.json      the ForexFactory weekly calendar as last fetched before 09:30 ET (in the 30 hours before), unchanged:
                      what was listed before the open (from 2026-11-19; the feed has no history of its own)
@@ -37,8 +41,10 @@ from gexsys import marketcal
 
 log = logging.getLogger("gexpro.archive")
 NY = marketcal.NY
-RULES_VERSION = 3                              # 2 (from 2026-11-19): Yahoo's live-quote row is no longer kept as a bar
+RULES_VERSION = 4                              # 2 (from 2026-11-19): Yahoo's live-quote row is no longer kept as a bar
                                                # 3: calendar.json added (a missing copy is named, never waited for)
+                                               # 4 (from 2026-11-28): OCC estimates kept as {M}-{k}-estimate.json when no
+                                               # usable snapshot exists (Cboe gone since 2026-11-19: every snapshot is one)
 FIRST_DAY = date(2026, 11, 18)                 # the archive starts here; earlier days are not recoverable
 PRE_OPEN_WINDOW = timedelta(hours=30)          # = gexpro.context.PRE_OPEN_WINDOW (tested)
 MIDDAY = time(12, 0)
@@ -77,16 +83,18 @@ def candidates(folder: Path, d: date) -> list[dict]:
             if lo <= t <= hi:
                 em = ((s.get("extras") or {}).get("expected_move") or {}).get("daily_points")
                 out.append({"file": f"{f.parent.name}/{f.name}", "asof": t.isoformat(), "status": s.get("status"),
-                            "usable": bool(s.get("status") != "UNAVAILABLE" and not s.get("backup") and em)})
+                            "usable": bool(s.get("status") != "UNAVAILABLE" and not s.get("backup") and em),
+                            "estimate": bool(s.get("status") != "UNAVAILABLE" and s.get("backup") and em)})
         day += timedelta(days=1)
     return sorted(out, key=lambda c: c["asof"])
 
 
-def choose(cands: list[dict], d: date) -> dict:
-    """{"open" | "midday" | "close": candidate or None} by the rules in the module docstring."""
+def choose(cands: list[dict], d: date, kind: str = "usable") -> dict:
+    """{"open" | "midday" | "close": candidate or None} by the rules in the module docstring, among the candidates
+    flagged `kind` ("usable", or "estimate" for the OCC backups)."""
     o, c = marketcal.rth_open_dt(d), marketcal.rth_close_dt(d)
     noon = datetime.combine(d, MIDDAY, NY)
-    ok = [(datetime.fromisoformat(x["asof"]), x) for x in cands if x["usable"]]
+    ok = [(datetime.fromisoformat(x["asof"]), x) for x in cands if x.get(kind)]
     pre = [x for t, x in ok if o - PRE_OPEN_WINDOW <= t < o]
     mid = sorted(((abs(t - noon), t, x) for t, x in ok if o <= t <= c and abs(t - noon) <= MIDDAY_WINDOW), key=lambda r: r[:2])
     end = [x for t, x in ok if c - CLOSE_WINDOW <= t <= c]
@@ -185,18 +193,25 @@ def build_day(d: date, folders: dict[str, Path], now: datetime, get: Callable[[s
     the gaps in words). A missing calendar copy is named but never waited for: after 09:30 none can appear."""
     files: dict[str, bytes] = {}
     gaps: list[str] = []
+    wait = False                       # a gap that may still fill (an estimate never turns into a full snapshot later)
     chosen: dict = {}
     for m, folder in sorted(folders.items()):
         cands = candidates(folder, d)
-        pick = choose(cands, d)
+        pick, est = choose(cands, d), choose(cands, d, "estimate")
         files[f"{m}-candidates.json"] = _json(cands)
         chosen[m] = {}
         for k, c in pick.items():
             chosen[m][k] = c and {"file": c["file"], "asof": c["asof"]}
-            if c is None:
-                gaps.append(f"{m} {k} snapshot: {WHY[k]}")
-            else:
+            if c is not None:
                 files[f"{m}-{k}.json"] = (folder / c["file"]).read_bytes()
+            elif est[k] is not None:
+                e = est[k]
+                chosen[m][f"{k}_estimate"] = {"file": e["file"], "asof": e["asof"]}
+                files[f"{m}-{k}-estimate.json"] = (folder / e["file"]).read_bytes()
+                gaps.append(f"{m} {k} snapshot: {WHY[k]}; the OCC estimate is kept as {m}-{k}-estimate.json")
+            else:
+                gaps.append(f"{m} {k} snapshot: {WHY[k]}")
+                wait = True
         syms = MARKETS[m]
         for sym, (lo, hi) in ((syms["futures"], futures_window(d)), (syms["index"], (marketcal.rth_open_dt(d), marketcal.rth_close_dt(d)))):
             try:
@@ -207,9 +222,10 @@ def build_day(d: date, folders: dict[str, Path], now: datetime, get: Callable[[s
                 err = None if bars else "the source returned no bars"
             if err:
                 gaps.append(f"{sym} 1-minute bars: {err}")
+                wait = True
                 continue
             files[file_name(sym)] = _json(bar_record(m, sym, d, lo, hi, bars))
-    if gaps and now < datetime.combine(d + timedelta(days=GIVE_UP_DAYS), WRITE_AFTER, NY):
+    if wait and now < datetime.combine(d + timedelta(days=GIVE_UP_DAYS), WRITE_AFTER, NY):
         return None, gaps
     cal = calendar_copy(calendar, d) if calendar else None
     if cal:

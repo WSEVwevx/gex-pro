@@ -27,12 +27,14 @@ def cand(t, usable=True):
             "status": "OK" if usable else "UNAVAILABLE", "usable": usable}
 
 
-def save_snap(folder: Path, t: datetime, usable=True):
+def save_snap(folder: Path, t: datetime, usable=True, backup=False):
     u = t.astimezone(timezone.utc)
     f = folder / u.strftime("%Y%m%d") / u.strftime("%H%M%S_000000.json")
     f.parent.mkdir(parents=True, exist_ok=True)
     s = {"asof": t.isoformat(), "status": "OK" if usable else "UNAVAILABLE", "zero_gamma": 1.0,
          "extras": {"expected_move": {"daily_points": 100.0 if usable else None}}, "futures_map": {"factor": 1.003, "offset": 0}}
+    if backup:
+        s["backup"] = "OCC open interest + VIX-family vols: an estimate (one vol per expiry, no skew)"
     f.write_text(json.dumps(s), encoding="utf-8")
     return f
 
@@ -175,6 +177,40 @@ class TestBuildDay(unittest.TestCase):
         self.assertIsNotNone(files)
         self.assertEqual(gaps, ["calendar: no ForexFactory copy fetched in the 30 hours before 09:30 ET"])
         self.assertIsNone(json.loads(files["days/2026-11-18/manifest.json"])["calendar"])
+
+    def test_estimates_are_kept_under_their_own_name_and_never_as_the_snapshot(self):
+        # since Cboe left (2026-11-19) every hosted snapshot is an OCC estimate: the archive kept none of them, and the
+        # 7-day build state lost them for good (days 2026-11-23 and 24 have no snapshot at all)
+        cal = Path(self.tmp.name) / "calendar"
+        from feeds.forexfactory import keep_copy
+        keep_copy({"fetched_at": et(D, 8, 45).isoformat(), "events": []}, cal, now=et(D, 17, 20))
+        for t in (et(D, 9, 0), et(D, 9, 20), et(D, 9, 31), et(D, 12, 2), et(D, 15, 50)):
+            save_snap(self.folders["ES"], t, backup=True)
+            save_snap(self.folders["NQ"], t, backup=t != et(D, 9, 0))     # NQ: one full snapshot at 09:00
+        save_snap(self.folders["NQ"], et(D, 9, 25), usable=False, backup=True)        # an UNAVAILABLE estimate: never kept
+        files, gaps = A.build_day(D, self.folders, et(D, 17, 20), get=fake_get, calendar=cal)
+        self.assertIsNotNone(files, "an estimate cannot turn into a full snapshot later: the day is not held back")
+        day = "days/2026-11-18/"
+        man = json.loads(files[day + "manifest.json"])
+        self.assertEqual(man["rules_version"], 4)
+        self.assertNotIn(day + "ES-open.json", files)
+        self.assertEqual(files[day + "ES-open-estimate.json"], (self.folders["ES"] / man["chosen"]["ES"]["open_estimate"]["file"]).read_bytes())
+        self.assertEqual(man["chosen"]["ES"]["open_estimate"]["asof"], et(D, 9, 20).isoformat())       # last before 09:30
+        self.assertEqual(man["chosen"]["ES"]["midday_estimate"]["asof"], et(D, 12, 2).isoformat())
+        self.assertIsNone(man["chosen"]["ES"]["open"])
+        self.assertIn("ES open snapshot: no usable snapshot in the 30 hours before 09:30 ET; the OCC estimate is kept as "
+                      "ES-open-estimate.json", man["missing"])
+        # NQ's 09:00 full snapshot is the open; no estimate is kept beside a full one
+        self.assertEqual(man["chosen"]["NQ"]["open"]["asof"], et(D, 9, 0).isoformat())
+        self.assertNotIn("open_estimate", man["chosen"]["NQ"])
+        self.assertNotIn(day + "NQ-open-estimate.json", files)
+        self.assertIn(day + "NQ-close-estimate.json", files)
+        flags = {(c["asof"], c["usable"], c["estimate"]) for c in json.loads(files[day + "NQ-candidates.json"])}
+        self.assertIn((et(D, 9, 25).isoformat(), False, False), flags)
+        self.assertIn((et(D, 9, 20).isoformat(), False, True), flags)
+
+    def test_a_day_without_any_snapshot_still_waits(self):
+        self.assertIsNone(A.build_day(D, self.folders, et(D, 17, 20), get=fake_get)[0])
 
     def test_failed_bars_are_named(self):
         def boom(url):
