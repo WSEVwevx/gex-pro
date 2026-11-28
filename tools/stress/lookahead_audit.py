@@ -227,10 +227,12 @@ def audit_archive(br: str = "origin/" + archive.BRANCH) -> list[str]:
                 bad.append(f"A2 {d}/{n}: content does not match its manifest")
         day = date.fromisoformat(d)
         for m, pick in (man.get("chosen") or {}).items():
-            if pick.get("open") and datetime.fromisoformat(pick["open"]["asof"]) >= marketcal.rth_open_dt(day):
-                bad.append(f"A3 {d} {m}: open snapshot {pick['open']['asof']} is not before 09:30 ET")
-            if pick.get("close") and datetime.fromisoformat(pick["close"]["asof"]) > marketcal.rth_close_dt(day):
-                bad.append(f"A3 {d} {m}: close snapshot {pick['close']['asof']} is after the close")
+            for k in ("open", "open_estimate"):          # rules 4 keep OCC estimates under their own key: same guard
+                if pick.get(k) and datetime.fromisoformat(pick[k]["asof"]) >= marketcal.rth_open_dt(day):
+                    bad.append(f"A3 {d} {m}: {k.replace('_', ' ')} snapshot {pick[k]['asof']} is not before 09:30 ET")
+            for k in ("close", "close_estimate"):
+                if pick.get(k) and datetime.fromisoformat(pick[k]["asof"]) > marketcal.rth_close_dt(day):
+                    bad.append(f"A3 {d} {m}: {k.replace('_', ' ')} snapshot {pick[k]['asof']} is after the close")
         cal = man.get("calendar")
         if cal and datetime.fromisoformat(cal["fetched_at"]) >= marketcal.rth_open_dt(day):
             bad.append(f"A3 {d}: calendar copy fetched {cal['fetched_at']}, not before 09:30 ET")
