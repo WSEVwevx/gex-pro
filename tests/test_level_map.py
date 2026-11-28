@@ -84,7 +84,7 @@ class LevelMap(unittest.TestCase):
         self.assertIn('data-help="level_map"', (ROOT / "dashboard" / "index.html").read_text(encoding="utf-8"))
         self.assertIn("  level_map: {title:", JS)
         self.assertIn("body.stale-data #lvHead .lvh-px .eyebrow::after{content:var(--stale-text)", CSS)
-        self.assertIn('<div class="lvh-px"><div class="eyebrow">${esc(market)} ${w.result.mapped ? "equiv. of " + esc(w.source) : esc(w.source)}${refAt(s.ref_time)}</div>', JS)
+        self.assertIn('<div class="lvh-px"><div class="eyebrow">${esc(market)} ${w.result.mapped ? "equiv. of " + esc(w.source) : esc(w.source)}${refAt(s.ref_time)}${pOld ? ` <b class="c-warn">from ${esc(pOld)}</b>` : ""}</div>', JS)
 
 
 # the field: an index-price profile times the frozen basis; the net crosses zero halfway between 26,900 and 27,100

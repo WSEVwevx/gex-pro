@@ -542,8 +542,8 @@ function render(){
   const opts = s ? esc(s.options_source || w.source) + (s.etf ? "+" + esc(s.etf) : "") : esc(w.source);
   $("status").innerHTML = `<span class="chip"><i class="dot ${svc}"></i>Data <b>${esc(used)}</b> · ${opts}</span>
     <span class="chip">Options <b>${bk ? "last close OI" : rt ? "real time" : "15-min delayed"}</b></span>
-    ${s ? `<span class="chip">Updated <b>${ago(s.asof)}</b></span>` : ""}
-    <span class="chip"${bk ? ' title="No new TradingView paste while the levels are an estimate"' : ""}>Next paste <b>${bk ? "on hold" : h.next_publish_et ? esc(h.next_publish_et.slice(11)) + " ET" : "-"}</b></span>
+    ${s ? (oldDay(s.asof) ? `<span class="chip">Updated <b class="c-warn">${esc(oldDay(s.asof))}</b></span>` : `<span class="chip">Updated <b>${ago(s.asof)}</b></span>`) : ""}
+    <span class="chip"${bk ? ' title="No new TradingView paste while the levels are an estimate"' : ""}>Next paste <b>${bk ? "on hold" : h.next_publish_et && h.next_publish_et > etStampNow() ? esc(h.next_publish_et.slice(11)) + " ET" : "-"}</b></span>
     ${(() => { const e = nextHighUSD(); return e ? `<span class="chip" title="Next ${e.impact.toLowerCase()}-impact USD event (ForexFactory)"><i class="dot ${e.impact === "High" ? "bad" : "warn"}"></i>${esc(e.title)} <b>in ${dur(Date.parse(e.time) - Date.now())}</b></span>` : ""; })()}`;
   $("banner").innerHTML = !w.result ? `<div class="banner">${h.last_error ? "The options data source failed on its last try. Nothing to show yet; retrying by itself. Details are on the Data health page." : "First calculation in progress: levels appear within a minute."}</div>`
     : s && s.backup ? `<div class="banner backup"><b>OCC open interest + VIX-family vols.</b> One implied vol per expiry (no skew); the TradingView paste keeps its last published levels.<span class="bn-more"> It gives the walls, C1, P1 and zero gamma when price is near a crossing; it has no 0DTE flip and no first-expiry Ab1 or lower ranks. Details are on the Data health page.</span></div>`
@@ -601,7 +601,9 @@ function stateSentence(o){
     : `Zero gamma for ${o.m} is unavailable; ${g}${why}.`;
   const wall = (name, v) => v == null ? `the ${name} is unavailable` : `the ${name}, ${num(v)}, is ${gap(v) || "at the price"}`;
   const second = wall("put wall", o.pw) + "; " + wall("call wall", o.cw) + ".";
-  return first + " " + second[0].toUpperCase() + second.slice(1);
+  const out = first + " " + second[0].toUpperCase() + second.slice(1);
+  // a reading of an earlier session is told as what it was, with its day, never in the present tense
+  return o.past ? `As of ${o.past}, ` + (out[0] === "Z" ? "z" : "") + out.slice(out[0] === "Z" ? 1 : 0).replace(/\b(is|has)\b/g, v => v === "is" ? "was" : "had") : out;
 }
 function renderHero(w, s, L, X, ref){
   const R = {POSITIVE:["Positive gamma","+","var(--pos)","Modeled dealers are long gamma, so their hedging leans against moves. That tends to mean tighter ranges and more mean reversion."],
@@ -617,12 +619,13 @@ function renderHero(w, s, L, X, ref){
   const rc = {POSITIVE: "c-pos", NEGATIVE: "c-neg", INDETERMINATE: "c-zg"}[s.regime] || "c-ink3";
   const says = {POSITIVE: "hedging leans against moves", NEGATIVE: "moves can extend", INDETERMINATE: "no clear tilt either way"}[s.regime] || "no usable estimate";
   const mp = w.result.mapped && w.result.mapped.mapping;     // the headline is the index converted with the frozen basis
-  $("lvHead").innerHTML = `<div class="lvh-px"><div class="eyebrow">${esc(market)} ${w.result.mapped ? "equiv. of " + esc(w.source) : esc(w.source)}${refAt(s.ref_time)}</div><div class="lvh-big">${num(ref)}</div>${mp ? `<div class="lvh-sub">${esc(w.source)} ${num(mp.source_ref, 2)} × basis ${num(mp.factor, 5)}, not the live futures price</div>` : ""}</div>
+  const pOld = oldDay(s.ref_time), rOld = oldDay(s.asof);
+  $("lvHead").innerHTML = `<div class="lvh-px"><div class="eyebrow">${esc(market)} ${w.result.mapped ? "equiv. of " + esc(w.source) : esc(w.source)}${refAt(s.ref_time)}${pOld ? ` <b class="c-warn">from ${esc(pOld)}</b>` : ""}</div><div class="lvh-big">${num(ref)}</div>${mp ? `<div class="lvh-sub">${esc(w.source)} ${num(mp.source_ref, 2)} × basis ${num(mp.factor, 5)}, not the live futures price</div>` : ""}</div>
     <div class="lvh-rg"><div class="eyebrow"><span class="wide-only">Gamma </span>regime (model)</div><div class="lvh-regime ${rc}">${R[0]}</div>
       <div class="lvh-sub">${sig == null ? "" : `${num(Math.abs(sig), 1)}σ ${sig >= 0 ? "above" : "below"} zero gamma · `}${says}</div></div>
     <div class="lvh-net"><div class="eyebrow">Net gamma, all expiries</div><div class="lvh-mid ${s.net >= 0 ? "c-pos" : "c-neg"}">${money(s.net)}</div><div class="lvh-sub">per 1% move</div></div>
     <p class="lvh-say" id="lvSay">${esc(stateSentence({m: market, regime: s.regime, ref, zg: zgp, zgStatus: L.zero_gamma_status || s.zero_gamma_status,
-      emd, cw: lvPrice(L.call_wall), pw: lvPrice(L.put_wall), backup: !!s.backup}))}</p>`;
+      emd, cw: lvPrice(L.call_wall), pw: lvPrice(L.put_wall), backup: !!s.backup, past: rOld}))}</p>`;
   $("regimeCard").parentElement.classList.add("accent"); $("regimeCard").parentElement.style.setProperty("--accent", R[2]);
   $("regimeCard").innerHTML = `<div class="eyebrow">Gamma regime (model)</div>
     <div class="regime"><span class="tag" style="border-color:${R[2]}">${R[1]}</span><span style="color:${R[2]}">${R[0]}</span>${changed ? '<span class="chip">changed since last update</span>' : ""}</div>
@@ -803,8 +806,8 @@ function renderCot(){
 const biasDay = () => sessionPhase(new Date(), data && data.calendar).phase === "no cash session today" ? "Latest bias, no session today" : "Today's bias";
 function renderBias(w){
   loadCot(); renderCot();
-  const b = w.result.bias, dayLab = biasDay();
-  if(!b){ $("biasCard").innerHTML = `<div class="eyebrow">${dayLab}</div><div>${stateHtml("empty", "No bias yet", "It needs today's levels and an expected move. It appears with the next refresh that has both.")}</div>`; return; }
+  const b = w.result.bias, old = oldDay(w.result.summary.asof), dayLab = old ? `Bias from ${old}, an earlier session` : biasDay();
+  if(!b){ $("biasCard").innerHTML = `<div class="eyebrow">${esc(dayLab)}</div><div>${stateHtml("empty", "No plan: no pre-open reading", `(${w.result.summary.status === "UNAVAILABLE" ? "the last calculation was unavailable: see Data health" : "this reading has no expected move"}). It appears with the next refresh that has levels and an expected move.`)}</div>`; return; }
   const col = BIAS_COLOR[b.bias], ref = b.ref;
   const tm = iso => new Date(iso).toLocaleTimeString("en-US", {...ET, hour:"numeric", minute:"2-digit"});
   const card = $("biasCard").parentElement; card.classList.add("accent"); card.style.setProperty("--accent", col);
@@ -826,7 +829,9 @@ function renderBias(w){
     <div class="bv-facts"><div><span>Base case by the close</span><b>${num(b.target, 0)}</b><em>${Math.abs(drift) < 0.5 ? "no drift expected" : signed(drift, 0) + " pts from " + num(ref, 0)}</em></div>
       <div><span>Model range</span><b>${num(b.range[0], 0)} – ${num(b.range[1], 0)}</b><em>the 1σ move ±${num(b.expected_move, 0)} pts, scaled for the gamma side</em></div></div>`;
   $("biasSummary").textContent = "";                                    // the strip above says it; replay puts its own hint here
-  $("biasWhen").textContent = b.session.live ? `Session in progress · calculated ${ago(w.result.summary.asof)}` : `Plan for the ${new Date(b.session.open).toLocaleDateString("en-US", {...ET, weekday:"long", month:"short", day:"numeric"})} session`;
+  const asofTxt = new Date(w.result.summary.asof).toLocaleString("en-US", {...ET, month: "short", day: "numeric", hour: "numeric", minute: "2-digit"}) + " ET";
+  $("biasWhen").textContent = old ? `From the ${old} reading (${asofTxt}): not the current session's`
+    : b.session.live ? `Session in progress · calculated ${ago(w.result.summary.asof)}` : `Plan for the ${new Date(b.session.open).toLocaleDateString("en-US", {...ET, weekday:"long", month:"short", day:"numeric"})} session · data as of ${asofTxt}`;
   const day = b.factors.filter(f => f.name === "Gamma side"), dir = b.factors.filter(f => f.name !== "Gamma side");
   $("biasFactors").innerHTML = day.map(f => `<div class="fx-day"><span>${esc(b.day_type)}</span>${esc(whole(f.why))}. This sets the day type, not the direction.</div>`).join("")
     + dir.map(f => { const c = f.score > 0 ? "var(--pos)" : f.score < 0 ? "var(--neg)" : "var(--ink3)", wd = 50 * Math.min(1, Math.abs(f.score));
@@ -1159,6 +1164,28 @@ function sessionPhase(d, cal){
   const t = +d, o = Date.parse(s.open), c = Date.parse(s.close);
   return {phase: t < o ? "before the open" : t < c ? "cash session" : "after the close", session: s};
 }
+// the cash session a moment belongs to: the last one that opened at or before it (after its close, and before the next
+// open, a reading still belongs to it); from data.calendar (marketcal). null when the calendar does not say.
+function sessionOf(ms, cal){
+  let best = null;
+  for(const s of [...((cal && cal.past_sessions) || []), ...((cal && cal.sessions) || [])])
+    if(Date.parse(s.open) <= ms && (!best || s.date > best.date)) best = s;
+  return best;
+}
+const dayName = iso => new Date(iso + "T12:00:00Z").toLocaleDateString("en-US", {timeZone: "UTC", weekday: "short", month: "short", day: "numeric"});
+// a time from before the current or most recent session: that session's day ("Fri, Nov 27"), else null. Never shown
+// as today's: the page names the day and builds no present-tense sentence from it.
+function oldDay(iso, nowMs = Date.now()){
+  const cal = data && data.calendar, cur = sessionOf(nowMs, cal), t = Date.parse(iso || "");
+  if(!cur || !isFinite(t)) return null;
+  const s = sessionOf(t, cal);
+  if(s) return s.date < cur.date ? dayName(s.date) : null;
+  const first = (cal.past_sessions || [])[0];         // older than the calendar reaches: its own New York day
+  return first && t < Date.parse(first.open) ? new Date(t).toLocaleDateString("en-US", {...ET, weekday: "short", month: "short", day: "numeric"}) : null;
+}
+// "YYYY-MM-DD HH:MM" in New York time, the format of the engine's next_publish_et (dashboard/v2/core.js etStamp)
+const etStampNow = () => { const p = {}; for(const x of new Intl.DateTimeFormat("en-US", {...ET, year: "numeric", month: "2-digit", day: "2-digit",
+  hour: "2-digit", minute: "2-digit", hourCycle: "h23"}).formatToParts(Date.now())) p[x.type] = x.value; return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}`; };
 function sessionLabel(d){
   const cal = (data && data.calendar) || {}, cs = calState(+d, cal);
   if(!cs) return ["Session unknown", "warn"];
@@ -1857,10 +1884,13 @@ function renderLiveTable(){
   const all = ldSel.size === 0, on = i => all || ldSel.has(i);
   // expiration strip
   const emax = Math.max(1, ...E.map(e => Math.abs(e.net)));
+  // settled since this reading: AM monthlies at the open, the rest at the close (marketcal's times, via data.calendar)
+  const cal = data && data.calendar, ses = d => [...((cal && cal.past_sessions) || []), ...((cal && cal.sessions) || [])].find(x => x.date === d);
+  const expired = e => { const x = e.date !== "other" && ses(e.date); return !!x && Date.now() >= Date.parse(/AM/.test(e.tag || "") ? x.open : x.close); };
   $("ldStrip").innerHTML = E.map((e, i) => {
     const h = Math.max(3, Math.round(Math.abs(e.net) / emax * 34)), pos = e.net >= 0;
     return `<button class="ld-exp${on(i) ? " on" : ""}" data-i="${i}" type="button" title="${esc(e.date === "other" ? "Every later expiration in the basket" : e.date + ldSettle(e.tag))}: net GEX ${esc(money(e.net))}, net DEX ${esc(compact(e.dex))}">
-      <span class="ld-d">${ldDate(e.date)}</span><span class="ld-dte">${e.dte == null ? "rest" : num(e.dte, 1) + " DTE"}</span><span class="ld-tag">${esc(e.tag || "")}</span>
+      <span class="ld-d">${ldDate(e.date)}</span><span class="ld-dte">${e.dte == null ? "rest" : expired(e) ? "expired" : num(e.dte, 1) + " DTE"}</span><span class="ld-tag">${esc(e.tag || "")}</span>
       <i class="ld-dot" style="background:${pos ? "var(--pos)" : "var(--neg)"}"></i>
       <span class="ld-mini"><i style="height:${h}px;background:${pos ? "var(--pos)" : "var(--neg)"}"></i></span><span class="ld-v ${pos ? "pos" : "neg"}">${compact(e.net)}</span></button>`;
   }).join("");
@@ -2511,7 +2541,8 @@ function renderLevelHistory(){
   const w = curW(), mp = w && w.result && w.result.mapped && w.result.mapped.mapping;
   if(!trk || !trk.sessions){ $("lhTable").innerHTML = `<div class="expl"><span class="skeleton sk-line">Loading the saved sessions</span></div>`; return; }
   const f = (mp && mp.factor) || 1, o = (mp && mp.offset) || 0, fut = p => p == null ? null : Math.round((p * f + o) * 4) / 4;
-  const ss = trk.sessions.filter(s => s.market === market && s.plan).sort((a, b) => b.session.localeCompare(a.session));
+  const all = trk.sessions.filter(s => s.market === market).sort((a, b) => b.session.localeCompare(a.session));
+  const ss = all.filter(s => s.plan), gaps = all.filter(s => !s.plan && (!ss.length || s.session >= ss[ss.length - 1].session) && s.status !== "pending");
   $("lhSub").textContent = ss.length ? `${market} · ${ss.length} session${ss.length === 1 ? "" : "s"} since ${new Date(ss[ss.length - 1].session + "T12:00:00Z").toLocaleDateString("en-US", {month: "short", day: "numeric", timeZone: "UTC"})}` : "";
   $("lhNote").textContent = `Levels from the last calculation before each 9:30 ET open (the same plan the Track record grades), converted to ${market} with today's basis so they match a back-adjusted continuous chart (${market}1!). The TradingView indicator draws the last few sessions' closing levels on the chart ("Past sessions' levels" in its settings).`;
   if(!ss.length){ $("lhTable").innerHTML = `<div>${stateHtml("empty", `No ${market} sessions saved yet`, "The 9:30 ET paste of each session is saved here once that session has opened.")}</div>`; $("lhChart").innerHTML = ""; return; }
@@ -2524,7 +2555,7 @@ function renderLevelHistory(){
       <td class="m">${px(p.cw)} ${oc ? wl(oc.cw) : ""}</td><td class="m">${px(p.pw)} ${oc ? wl(oc.pw) : ""}</td><td class="m">${px(p.ag)}</td>
       <td class="m">${p.ref && p.em ? `${px(p.ref - p.em)} – ${px(p.ref + p.em)}` : "-"}</td>
       <td class="m">${oc ? `${px(oc.low)} – ${px(oc.high)}` : `<span class="dim">${esc(s.status === "pending" ? "waiting for the close" : s.status)}</span>`}</td>
-      <td class="m">${oc ? px(oc.close) : "-"}</td></tr>`; }).join("")}</table>`;
+      <td class="m">${oc ? px(oc.close) : "-"}</td></tr>`; }).join("")}</table>${gaps.length ? `<div class="expl mt-2">Missing: ${gaps.map(s => `${esc(day(s.session))} (${esc(s.why || s.status || "no plan saved")})`).join("; ")}.</div>` : ""}`;
   renderLevelHistoryChart(ss.slice(0, 20).reverse(), fut);
 }
 // oldest left: a column per session with its ±1σ band, the day's range and close, and dashes at its levels
@@ -2646,6 +2677,8 @@ function renderLevelMap(w, L, X, ref){
     tape.innerHTML = `<line x1="${xt}" x2="${xt}" y1="${y0}" y2="${y1}"/><line x1="${xt - 5}" x2="${xt + 5}" y1="${y0}" y2="${y0}"/><line x1="${xt - 5}" x2="${xt + 5}" y1="${y1}" y2="${y1}"/>`;
     tape.setAttribute("visibility", "visible");
     box.querySelector(".m-tapeout").textContent = "Tape: " + tapeText(near ? near.k : "", v, ref, d);
+    const was = oldDay(w.result.summary.asof);          // measured from an earlier session's price: said so, in the past tense
+    if(was) box.querySelector(".m-tapeout").textContent = "Tape: " + tapeText(near ? near.k : "", v, ref, d).replace(" is ", " was ") + ` (the ${was} price)`;
   };
   $("lvMapSub").textContent = `${w.result.mapped ? market + " equiv. of " + w.source : w.source + " prices"} · ±${MAP_SPAN}σ around the price`;
 }
@@ -2707,7 +2740,9 @@ function planHere(ref, C1, P1, F){
 const planEdges = (C1, P1, F) => [F == null || C1 > F ? C1 : F, F == null || P1 < F ? P1 : F];
 function renderPlan(w){
   const S = w && w.result && w.result.session;
-  if(!S || !S.levels){ $("planCard").innerHTML = `<div class="eyebrow">Today's plan</div><div class="expl">The plan appears with the next refresh.</div>`; $("chgFeed").innerHTML = ""; return; }
+  if(!S || !S.levels){ const why = !w || !w.result ? (w && w.health && w.health.last_error ? "the options source failed: see Data health" : "the first calculation has not finished")
+      : w.result.summary && w.result.summary.status === "UNAVAILABLE" ? "the last calculation was unavailable: see Data health" : "this reading has no first-expiry levels";
+    $("planCard").innerHTML = `<div class="eyebrow">Today's plan</div><div class="expl">No plan: no pre-open reading (${esc(why)}).</div>`; $("chgFeed").innerHTML = ""; return; }
   const lv = S.levels, s = w.result.summary, X = (w.result.mapped || s).extras || {}, em = X.expected_move || {};
   const ref = (w.result.mapped || {}).futures_equiv_of_ref ?? s.ref_price, k = market === "ES" ? "es" : "nq";
   const p = x => x == null ? "-" : num(x, 0), d = (em.daily_points_fut ?? em.daily_points), a = em.anchor_fut ?? em.anchor;
@@ -2726,18 +2761,22 @@ function renderPlan(w){
     P1 != null && F != null && P1 < F && [`Between P1 ${p(P1)} and ${fl} ${p(F)}`, `negative ${g0}gamma: moves can extend` + (P2 != null ? `; a break of P1 opens ${p(P2)}` : ""), here === "lower"],
     P1 != null && [`Below ${bot}`, "hedging adds to selling" + (P2 != null ? `; next put level ${p(P2)}` : ""), here === "below"],
   ].filter(Boolean);
-  const day = now.toLocaleDateString("en-US", {...ET, weekday: "short", month: "short", day: "numeric"});
-  const usd = ((news && news.events) || []).filter(e => e.country === "USD" && (e.impact === "High" || e.impact === "Medium")
+  const old = oldDay(s.asof), rs = sessionOf(Date.parse(s.asof), data && data.calendar);
+  // the plan's own session: an earlier one, today's after its close (a review), the last one on a day without a session
+  const review = !old && (phase === "after the close" || phase === "no cash session today");
+  const day = old || (phase === "no cash session today" && rs ? dayName(rs.date) : now.toLocaleDateString("en-US", {...ET, weekday: "short", month: "short", day: "numeric"}));
+  const title = old ? `Plan from ${old}` : phase === "no cash session today" ? `Plan for ${day}, in review` : review ? "Today's plan, in review" : "Today's plan";
+  const usd = old ? [] : ((news && news.events) || []).filter(e => e.country === "USD" && (e.impact === "High" || e.impact === "Medium")
     && new Date(e.time).toLocaleDateString("en-US", ET) === now.toLocaleDateString("en-US", ET) && Date.parse(e.time) > Date.now() - 3600e3);
   const earn = planEarnings(k);
   const R = {POSITIVE: ["positive", "var(--pos)"], NEGATIVE: ["negative", "var(--neg)"]}[lv.regime] || ["balanced", "var(--zg)"];
-  $("planCard").innerHTML = `<div class="head"><h2>Today's plan</h2><span class="sub">${esc(day)} · ${esc(market)} · ${esc(phase)}</span></div>
+  $("planCard").innerHTML = `<div class="head"><h2>${esc(title)}</h2><span class="sub">${old ? `${esc(market)} · <b class="c-warn">an earlier session</b>` : `${esc(day)} · ${esc(market)} · ${esc(phase)}`}</span></div>
     <div class="plan-kv"><span>Regime</span><b style="color:${R[1]}">${R[0]} gamma</b><span>Price${refAt(s.ref_time)}</span><b class="m">${num(ref, 2)}</b>
       <span>${em.anchor_label ? "Day ±1σ from " + esc(em.anchor_label) : "Day range ±1σ"}</span><b class="m">${d && a ? p(a - d) + " – " + p(a + d) + (bandNote(em) ? " · " + bandNote(em) : "") : "-"}</b><span>Ab1 (magnet)</span><b class="m">${lv.Ab1 != null ? p(lv.Ab1) : s.backup ? "not in the backup" : "-"}</b></div>
-    <div class="plan-sc">${rows.map(([when, what, here]) => `<div class="${here ? "here" : ""}"><b>${esc(when)}</b><span>${esc(what)}</span>${here ? '<em>price is here</em>' : ""}</div>`).join("")}</div>
+    <div class="plan-sc">${rows.map(([when, what, here]) => `<div class="${here ? "here" : ""}"><b>${esc(when)}</b><span>${esc(what)}</span>${here ? `<em>price ${old || review ? "was" : "is"} here</em>` : ""}</div>`).join("")}</div>
     ${usd.length ? `<div class="plan-ev"><span class="eyebrow">Data today (ET)</span>${usd.map(e => `<span class="${e.impact === "High" ? "hi" : ""}">${esc(new Date(e.time).toLocaleTimeString("en-US", {...ET, hour: "numeric", minute: "2-digit"}))} ${esc(e.title)}</span>`).join("")}</div>` : ""}
     ${earn.length ? `<div class="plan-ev"><span class="eyebrow">Earnings ahead</span>${earn.map(r => `<span>${esc(r.symbol)} ${esc(earnTxt(r.earnings))}: ±${num(r.earn_move.pct, 1)}% ≈ ±${num(Math.abs(r["earn_pts_" + k]), 0)} ${esc(market)} pts</span>`).join("")}</div>` : ""}
-    ${P1 != null && P1 > ref ? `<div class="expl">P1 ${p(P1)} is above the price: the first expiry's most negative-gamma strike is now above it.</div>` : ""}${C1 != null && C1 < ref ? `<div class="expl">C1 ${p(C1)} is below the price: the first expiry's most positive-gamma strike is now below it.</div>` : ""}
+    ${P1 != null && P1 > ref ? `<div class="expl">${old || review ? `P1 ${p(P1)} was above the price: the first expiry's most negative-gamma strike was above it.` : `P1 ${p(P1)} is above the price: the first expiry's most negative-gamma strike is now above it.`}</div>` : ""}${C1 != null && C1 < ref ? `<div class="expl">${old || review ? `C1 ${p(C1)} was below the price: the first expiry's most positive-gamma strike was below it.` : `C1 ${p(C1)} is below the price: the first expiry's most positive-gamma strike is now below it.`}</div>` : ""}
     <div class="expl">Levels and zones from the first expiry, the same as the indicator's C / P / Ab; the regime counts every expiry. A plan, not a prediction: news can override any level.</div>`;
   // the change feed
   const nm = {C1: "C1", C2: "C2", P1: "P1", P2: "P2", Ab1: "Ab1", flip: "0DTE flip", ZG: "Zero gamma", CW: "Call wall", PW: "Put wall", regime: "Regime"};
