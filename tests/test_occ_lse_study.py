@@ -20,6 +20,10 @@ class Definition(unittest.TestCase):
         self.assertIn("not possible: no historical OI", d["B_levels_on_cboe_days"]["result_before_running"])
         self.assertIn("paste stays held", d["pass_bar_proposed"]["unlocks"])
 
+    def test_the_owner_approved_this_exact_definition(self):
+        a = json.loads((DEF.parent / "approval.json").read_text(encoding="utf-8"))
+        self.assertEqual((a["approves_sha256"], a["owner"]), (SHA, "Approve pass bar"))
+
 
 if __name__ == "__main__":
     unittest.main()

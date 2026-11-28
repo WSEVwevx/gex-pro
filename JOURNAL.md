@@ -567,3 +567,5 @@ The entry above and its PR text got these wrong. Rechecked the same evening:
 - Written before any comparison. A (IV level vs Cboe's own close quotes, 10-19 Nov, n at most 12 pairs) needs LSE
   Greeks history for 9-19 Nov: not yet budgeted. B: not possible (no historical OI from OCC). C: runs once START.bat has
   cached LSE chains. D: not run (Cboe removed). Pass bar proposed, waiting for the owner; the paste stays held either way.
+- 2026-11-28: the owner approved the pass bar ("Approve pass bar"), recorded in studies/occ_lse_accuracy/approval.json
+  against the v1 hash; v1.json itself is unchanged. Still nothing computed.
